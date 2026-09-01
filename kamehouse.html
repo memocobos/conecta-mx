@@ -3191,6 +3191,13 @@
       catálogo que manda el servidor (_lib/categorias-gasto). Tener la lista
       también en el HTML sería la segunda copia que acaba divergiendo. -->
  <select id="gasto-categoria"></select>
+ <!-- [FLUJO-UX-3] Las dos reglas de este campo, leídas de sus dueños:
+      `_lib/categorias-gasto` (10 categorías, sensible a mayúsculas a propósito)
+      y `_lib/cuenta-evento`, cuya fórmula de GASTOS excluye `Boletos`. -->
+ <div class="fld-help"><b>Boletos no es un gasto más:</b> su inversión ya pesa
+  entera en la utilidad desde que compras el boleto, así que ese pago no se
+  vuelve a restar — abona la deuda del proveedor. Por eso te va a pedir
+  proveedor y evento.</div>
  </div>
  </div>
  <div class="form-row cols-2">
@@ -3209,6 +3216,12 @@
  <select id="gasto-evento" onchange="_fin1aOnEvento()">
  <option value="">General (no ligado a evento)</option>
  </select>
+ <!-- [FLUJO-UX-3] `_lib/cuentas-dinero`: la utilidad global es Σ utilidades por
+      evento − GASTOS SIN EVENTO. Y `admin-gasto-crear` rechaza abonar sin
+      evento: la deuda a proveedores es POR evento. -->
+ <div class="fld-help">Sin evento, este gasto resta de la utilidad de
+  <b>toda la empresa</b> — y no puede abonarle a ningún proveedor: la deuda
+  es por evento.</div>
  </div>
  <div class="form-group">
  <label>Método de Pago</label>
@@ -3232,7 +3245,10 @@
  <option>BBVA</option>
  <option>Banamex</option>
  </select>
- <div id="gasto-cuenta-pista" style="display:none;font-size:10.5px;color:var(--ts);margin-top:4px;line-height:1.45">
+ <!-- [FLUJO-UX-3] El estilo en línea pasa a `.fld-help` — esta pista ERA el
+      patrón, sólo que sin nombre. El `display:none` se queda en línea porque
+      `_gastoOnCuentaChange` lo alterna con `style.display`. -->
+ <div id="gasto-cuenta-pista" class="fld-help" style="display:none">
  Este gasto no cuelga de ningún evento: resta de la utilidad de <b>toda la empresa</b>, así que hay que decir de qué caja salió.
  </div>
  </div>
@@ -3250,6 +3266,12 @@
    <select id="gasto-proveedor" onchange="_fin1aOnProveedor()">
     <option value="">— No va a ningún proveedor —</option>
    </select>
+   <!-- [FLUJO-UX-3] `admin-gasto-crear`: con proveedor, el guardado abona
+        además de gastar; en categoría `Boletos` el proveedor es OBLIGATORIO
+        («sin él, este dinero no tendría dónde registrarse»). -->
+   <div class="fld-help">Si eliges proveedor, este mismo guardado <b>abona su
+    deuda</b> además de salir de la caja. En categoría <b>Boletos</b> es
+    obligatorio: un pago de boletos siempre abona.</div>
   </div>
   <div id="fin1a-caja" class="fin1a-caja" style="display:none"></div>
  </div>
@@ -3309,6 +3331,15 @@
  <select id="ingreso-evento">
  <option value="">Sin evento</option>
  </select>
+ <!-- [FLUJO-UX-3] MEDIDO, no supuesto: `_lib/cuenta-evento` —la fórmula
+      UTIL-C del Palacio— NO lee la tabla `ingresos` ni una vez. Quienes sí la
+      leen son `admin-saldos` (la caja) y `_lib/utilidad-evento` (la utilidad
+      de CAJA del Portal, de donde sale la comisión del 30%). Son dos
+      preguntas distintas sobre el mismo dinero, y el capturista no tiene por
+      qué saberlo de memoria. -->
+ <div class="fld-help">Un ingreso suelto entra a la <b>caja</b> (Saldos) y a la
+  utilidad de caja del Portal. <b>No</b> entra en la utilidad del evento del
+  Palacio, que es cobrado − inversión en boletos − gastos.</div>
  </div>
  </div>
  <div class="form-row cols-2">
@@ -3327,6 +3358,13 @@
  <option>BBVA</option>
  <option>Banamex</option>
  </select>
+ <!-- [FLUJO-UX-3] La asimetría es real y está en `_lib/cuentas-dinero`:
+      `errorCuentaDeGasto` EXIGE cuenta cuando no hay evento;
+      `errorCuentaDeIngreso` sólo valida el valor. Y `admin-saldos` sólo
+      acumula lo que trae cuenta. -->
+ <div class="fld-help">Aquí la cuenta <b>no</b> es obligatoria (en un gasto sin
+  evento sí lo es). Pero un ingreso sin cuenta <b>no aparece en Saldos</b>: no
+  tiene cubeta donde caer.</div>
  </div>
  </div>
  <div class="form-row">

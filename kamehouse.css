@@ -808,6 +808,30 @@ tr:hover td{background:var(--bg3)}
 .alert-error{background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.25);color:var(--red)}
 .alert-info{background:rgba(94,167,255,.1);border:1px solid rgba(94,167,255,.25);color:var(--blue)}
 
+/* ═══════════════════════════════════════════════════════════════════════
+   [FLUJO-UX-3] LA AYUDA DE CAMPO — una línea bajo el campo que decide dinero.
+   La radiografía de UX-0 midió: el Radar tiene 10 textos de apoyo y Gastos,
+   Ingresos y el Palacio tienen CERO — las tres donde se captura plata.
+
+   ⚠️ ESTA CLASE NO INVENTA NADA: es la EXTRACCIÓN del estilo en línea que ya
+   vivía dentro del modal de gastos (`#gasto-cuenta-pista`, con sus 10.5px, su
+   `--ts` y su interlínea de 1.45). El nombre se toma de `rol.html`, que lleva
+   la misma idea con el mismo nombre desde ROL-HIST: dos vocabularios para una
+   sola cosa es la primera mitad de dos implementaciones para una sola cosa.
+
+   Se eligió LÍNEA SIEMPRE VISIBLE y no el `?` del Radar (decisión de Memo,
+   1-sep): el `?` explica una MÉTRICA que ya está pintada y se lee cuando la
+   pides; esto explica un CAMPO que estás a punto de llenar, y una ayuda que
+   hay que pedir es una ayuda que nadie lee justo donde se decide plata.
+   ═══════════════════════════════════════════════════════════════════════ */
+.fld-help{
+  margin-top:4px;font-size:10.5px;color:var(--ts);
+  line-height:1.45;font-weight:500;
+}
+/* El `b` marca LA REGLA, no el énfasis decorativo: lo que quien captura no
+   tiene por qué saberse de memoria. Mismo papel que en rol.html. */
+.fld-help b{color:var(--gold);font-weight:700}
+
 /* Modal */
 .modal-overlay{
  position:fixed;inset:0;z-index:500;

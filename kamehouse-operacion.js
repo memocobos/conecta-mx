@@ -75,34 +75,14 @@ function _cobExportCSV() {
 async function _poblarSelectsGastos() {
   if (_gastosSelectsPoblado) return;
   const ev = await _fetchEVFromIndex();
-  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
-  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
-  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
-  const opciones = [];
-  eventos.forEach(e => {
-    if (Array.isArray(e.multifecha) && e.multifecha.length) {
-      e.multifecha.forEach((mf, i) => {
-        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
-        const id = e.id + '#' + i;
-        _gastosEVMap[id] = { nombre: e.a, fecha: lbl };
-        opciones.push({ value: id, label: e.a + ' · ' + lbl });
-      });
-    } else {
-      _gastosEVMap[e.id] = { nombre: e.a, fecha: '' };
-      opciones.push({ value: e.id, label: e.a });
-    }
-  });
-  ['filtro-evento-gastos', 'gasto-evento'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    if (!sel) return;
-    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / General)
-    opciones.forEach(o => {
-      const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
-      sel.appendChild(opt);
-    });
-  });
+  // [FLUJO-UX-4] LOS DOS SELECTORES, CON LA PIEZA DE LA CASA — y con papeles
+  // DISTINTOS a propósito: el de la tabla FILTRA (vacío = todos) y el del modal
+  // ATRIBUYE (vacío = gasto general, que resta de la utilidad de toda la
+  // empresa). Antes decían «Todos» y «General (no ligado a evento)» por dos
+  // caminos que armaban las mismas opciones byte a byte.
+  const opciones = evSelectorPintar(document.getElementById('filtro-evento-gastos'), ev, { papel: 'filtro' });
+  evSelectorPintar(document.getElementById('gasto-evento'), ev, { papel: 'atribucion' });
+  opciones.forEach((o) => { _gastosEVMap[o.value] = { nombre: o.nombre, fecha: o.fecha }; });
   _gastosSelectsPoblado = true;
 }
 // Nombre del evento para la tabla, resuelto desde EV. evento_id vacío = General.
@@ -326,34 +306,12 @@ async function _poblarSelectsIngresos() {
 
   // ── Eventos desde EV (igual que gastos) ──
   const ev = await _fetchEVFromIndex();
-  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
-  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
-  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
-  const opciones = [];
-  eventos.forEach(e => {
-    if (Array.isArray(e.multifecha) && e.multifecha.length) {
-      e.multifecha.forEach((mf, i) => {
-        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
-        const id = e.id + '#' + i;
-        _ingresosEVMap[id] = { nombre: e.a, fecha: lbl };
-        opciones.push({ value: id, label: e.a + ' · ' + lbl });
-      });
-    } else {
-      _ingresosEVMap[e.id] = { nombre: e.a, fecha: '' };
-      opciones.push({ value: e.id, label: e.a });
-    }
-  });
-  ['filtro-evento-ingresos', 'ingreso-evento'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    if (!sel) return;
-    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / Sin evento)
-    opciones.forEach(o => {
-      const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
-      sel.appendChild(opt);
-    });
-  });
+  // [FLUJO-UX-4] Gemelo del de gastos, y con los mismos dos papeles: la tabla
+  // FILTRA, el modal ATRIBUYE. El orden sigue siendo el de ORD-1 — ahora
+  // porque la pieza lo aplica, no porque este lazo lo repita.
+  const opciones = evSelectorPintar(document.getElementById('filtro-evento-ingresos'), ev, { papel: 'filtro' });
+  evSelectorPintar(document.getElementById('ingreso-evento'), ev, { papel: 'atribucion' });
+  opciones.forEach((o) => { _ingresosEVMap[o.value] = { nombre: o.nombre, fecha: o.fecha }; });
 
   // ── Clientes desde admin-clientes-min (solo para el select del modal) ──
   try {

@@ -832,6 +832,21 @@ tr:hover td{background:var(--bg3)}
    tiene por qué saberse de memoria. Mismo papel que en rol.html. */
 .fld-help b{color:var(--gold);font-weight:700}
 
+/* ═══════════════════════════════════════════════════════════════════════
+   [FLUJO-UX-4] EL SELECTOR DE EVENTO — la misma forma en las siete puertas.
+   Medido antes: 40px en seis y 35px en el del Palacio. Los 35 se QUEDAN y se
+   dicen: el mando del Palacio es una barra compacta y pegajosa (KMS-6), y
+   subirlo a 40 le rompe la línea única al desplazarse. La clase unifica lo que
+   SÍ se puede unificar sin tocar esa barra.
+   ═══════════════════════════════════════════════════════════════════════ */
+.ev-sel{ text-overflow:ellipsis; }
+/* La marca de OBLIGATORIO, sólo mientras está vacío: los dos mandos
+   (`selector-evento` y `kms-evt`) no funcionan sin evento y no lo decían. No es
+   un asterisco flotante porque NINGUNO de los dos tiene etiqueta visible donde
+   colgarlo — el mismo problema que resolvió `rep-evento` con su «Evento *».
+   Se apaga sola al elegir, que es cuando deja de ser cierto. */
+.ev-sel-req:invalid{ border-color:var(--gold); }
+
 /* Modal */
 .modal-overlay{
  position:fixed;inset:0;z-index:500;

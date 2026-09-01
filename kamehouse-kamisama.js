@@ -43,16 +43,18 @@ function _kmsPintaOpciones() {
   if (!sel) return;
   const elegido = sel.value;
   const q = _kmNorm(String((document.getElementById('kms-ebusca') || {}).value || '').trim());
-  // [ORD-1] Antes era fecha ASCENDENTE a secas, que pone los PASADOS primero.
-  // Ahora la regla compartida: próximos · sin fecha · pasados.
-  const lista = _evOrdenarPorFecha(_kmsEVCache
+  // El BUSCADOR es de esta pantalla y se queda aquí: la pieza compartida pinta
+  // la lista que le den, no decide a quién dejar fuera.
+  const lista = _kmsEVCache
     .filter((e) => e && e.id)
-    .filter((e) => !q || _kmNorm(String(e.a || e.id)).includes(q) || _kmNorm(String(e.v || '')).includes(q)));
-  sel.innerHTML = '<option value="">— Elige un evento —</option>' + lista
-    .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}${e.f ? ' · ' + _esfEsc(e.f) : ''}</option>`)
-    .join('');
-  // Se conserva lo elegido si el filtro no lo dejó fuera: filtrar no debe
-  // deshacer la selección de quien ya estaba trabajando un evento.
+    .filter((e) => !q || _kmNorm(String(e.a || e.id)).includes(q) || _kmNorm(String(e.v || '')).includes(q));
+  // [FLUJO-UX-4] Papel de MANDO —el Palacio no arranca sin evento— y
+  // 🔒 `expandirFechas:false` A PROPÓSITO: las otras cuatro pantallas abren una
+  // opción por fecha (`slug#idx`) y el Palacio NO, porque tiene su propio
+  // `kms-fecha` al lado. Ésa es la razón de que aquí haya 110 opciones y allá
+  // 131, y es «qué evento carga cada pantalla»: esta tuerca no lo toca.
+  // El orden (ORD-1) y la voz del vacío ya no viven aquí.
+  evSelectorPintar(sel, lista, { papel: 'mando', expandirFechas: false });
   if (elegido && lista.some((e) => e.id === elegido)) sel.value = elegido;
   const vacio = document.getElementById('kms-ebusca-vacio');
   if (vacio) vacio.style.display = (q && !lista.length) ? '' : 'none';

@@ -182,6 +182,10 @@ async function loadEquipo() {
     // perfil, generar contrato) GANAN con esto: antes el perfil de un pausado
     // no abría.
     _gzCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
+    // [FLUJO-UX-1b] Una lista VACÍA de usuarios no es «no hay equipo»: con 14
+    // usuarios activos medidos, un cero aquí sólo puede ser un fallo que alguien
+    // se tragó. Se dice, en vez de pintar el estado vacío de siempre.
+    if (!Array.isArray(_gzCache) || !_gzCache.length) throw new Error('la lista del equipo vino vacía');
     renderGZ();
   } catch(e) {
     // [FLUJO-UX-1] EL ERROR SE PINTABA Y SE BORRABA TRES LÍNEAS DESPUÉS.

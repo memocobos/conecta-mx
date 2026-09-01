@@ -63,7 +63,14 @@ async function _evtPoblarSelector() {
   // rechazaba sin dueño y el selector se quedaba con su «Selecciona un
   // evento…» para siempre: indistinguible de un catálogo vacío.
   let ev;
-  try { ev = await _fetchEVFromIndex(); }
+  try {
+    ev = await _fetchEVFromIndex();
+    // [FLUJO-UX-1b] `_fetchEVFromIndex` NO LANZA: devuelve [] y manda el fallo a
+    // la consola. Sin esta pregunta, el `catch` de abajo era INALCANZABLE y una
+    // caída se veía igual que un catálogo vacío.
+    const fallo = (typeof evCatalogoFallo === 'function') ? evCatalogoFallo() : null;
+    if (fallo) throw fallo;
+  }
   catch (e) {
     // `evt-desglose` es el contenedor visible más cercano al selector, y nace
     // oculto: se destapa aquí. El id se LEYÓ del marcado — la primera versión

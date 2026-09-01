@@ -508,6 +508,13 @@ async function loadEsferasEventos() {
   } catch(e) {
     // [FLUJO-UX-1] Mismo cambio que en Capsule: el mensaje crudo pasa a ser el
     // patrón con nombre y reintento.
+    // [FLUJO-UX-1b] SE DESTAPA EL PADRE ANTES DE PINTAR. `#esf-listado-body`
+    // está en `display:none` cuando la lista viene plegada, así que el aviso se
+    // pintaba DENTRO de un contenedor oculto: medido, la caja quedaba con
+    // alto 0. «Existe» no es «se ve», y un error que no se ve no es un error:
+    // es la pantalla en blanco de siempre.
+    const cuerpo = document.getElementById('esf-listado-body');
+    if (cuerpo) cuerpo.style.display = '';
     khErrorCarga(cont, 'la lista de Esferas', 'loadEsferasEventos', e);
   }
 }

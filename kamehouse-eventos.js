@@ -85,26 +85,12 @@ async function _evtPoblarSelector() {
     khErrorCarga(caja, 'la lista de eventos', '_evtPoblarSelector', e);
     return;
   }
-  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
-  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
-  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
-  while (sel.options.length > 1) sel.remove(1);
-  eventos.forEach(e => {
-    if (Array.isArray(e.multifecha) && e.multifecha.length) {
-      e.multifecha.forEach((mf, i) => {
-        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
-        const opt = document.createElement('option');
-        opt.value = e.id + '#' + i;
-        opt.textContent = e.a + ' · ' + lbl;
-        sel.appendChild(opt);
-      });
-    } else {
-      const opt = document.createElement('option');
-      opt.value = e.id;
-      opt.textContent = e.a;
-      sel.appendChild(opt);
-    }
-  });
+  // [FLUJO-UX-4] Con la pieza de la casa, y con papel de MANDO: esta pantalla
+  // NO FUNCIONA sin evento y no lo decía — su vacío era «Selecciona un evento…»
+  // sin marca de obligatorio. Ahora lo dice con la misma voz que el Palacio, y
+  // `required`/`aria-required` lo hacen decible también para un lector de
+  // pantalla.
+  evSelectorPintar(sel, ev, { papel: 'mando' });
   _evtSelectorPoblado = true;
   _evtAplicarPendiente();
 }

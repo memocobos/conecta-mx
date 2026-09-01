@@ -389,6 +389,9 @@
  <div class="form-group">
  <label>Evento</label>
  <select id="filtro-evento-pagos" onchange="_renderCobranza()">
+ <!-- [FLUJO-UX-4] La voz la escribe `evSelectorPintar` (papel FILTRO). Esto es
+      el respaldo por si el catálogo no baja: se deja con la MISMA voz para que
+      un fallo no estrene una cuarta. -->
  <option value="">Todos los eventos</option>
  </select>
  </div>
@@ -477,7 +480,9 @@
  <div class="form-group">
  <label>Evento</label>
  <select id="selector-evento" onchange="loadPorEvento()">
- <option value="">Selecciona un evento…</option>
+ <!-- [FLUJO-UX-4] Papel MANDO: esta pantalla no funciona sin evento. La voz la
+      escribe la pieza; esto es el respaldo, con la misma. -->
+ <option value="">— Elige un evento —</option>
  </select>
  </div>
  <div class="form-group">
@@ -618,7 +623,9 @@
  <div class="form-group">
  <label>Evento</label>
  <select id="filtro-evento-gastos" onchange="loadGastos()">
- <option value="">Todos</option>
+ <!-- [FLUJO-UX-4] Papel FILTRO. Decía «Todos»; la voz de la casa es «Todos los
+      eventos». Respaldo. -->
+ <option value="">Todos los eventos</option>
  </select>
  </div>
  <div class="form-group">
@@ -674,7 +681,8 @@
  <div class="form-group">
  <label>Evento</label>
  <select id="filtro-evento-ingresos" onchange="loadIngresos()">
- <option value="">Todos</option>
+ <!-- [FLUJO-UX-4] Papel FILTRO. Respaldo. -->
+ <option value="">Todos los eventos</option>
  </select>
  </div>
  <div class="form-group">
@@ -2084,6 +2092,9 @@
          opciones ordenadas por nombre y sin forma de buscar. -->
     <input id="kms-ebusca" class="cot-input kms-ebusca" type="search" placeholder="Buscar evento…"
            autocomplete="off" oninput="_kmsBuscarEvento()" aria-label="Buscar evento">
+    <!-- [FLUJO-UX-4] Papel MANDO. `cot-input` se QUEDA: el mando del Palacio es
+         una barra compacta y pegajosa (KMS-6) y sus 35px son a propósito. La
+         pieza le suma `.ev-sel` sin quitarle la suya. -->
     <select id="kms-evt" class="cot-input" onchange="_kmsOnEvento()" aria-label="Evento del Palacio">
      <option value="">— Elige un evento —</option>
     </select>
@@ -3214,7 +3225,10 @@
  <div class="form-group">
  <label>Evento (si aplica)</label>
  <select id="gasto-evento" onchange="_fin1aOnEvento()">
- <option value="">General (no ligado a evento)</option>
+ <!-- [FLUJO-UX-4] Papel ATRIBUCIÓN: el vacío es una ELECCIÓN con consecuencia
+      (resta de la utilidad de toda la empresa, y lo dice la ayuda de abajo).
+      Respaldo con la voz de la casa. -->
+ <option value="">Sin evento (general)</option>
  </select>
  <!-- [FLUJO-UX-3] `_lib/cuentas-dinero`: la utilidad global es Σ utilidades por
       evento − GASTOS SIN EVENTO. Y `admin-gasto-crear` rechaza abonar sin
@@ -3331,7 +3345,8 @@
  <div class="form-group">
  <label>Evento (si aplica)</label>
  <select id="ingreso-evento">
- <option value="">Sin evento</option>
+ <!-- [FLUJO-UX-4] Papel ATRIBUCIÓN. Respaldo. -->
+ <option value="">Sin evento (general)</option>
  </select>
  <!-- [FLUJO-UX-3] MEDIDO, no supuesto: `_lib/cuenta-evento` —la fórmula
       UTIL-C del Palacio— NO lee la tabla `ingresos` ni una vez. Quienes sí la

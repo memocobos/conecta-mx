@@ -2433,6 +2433,96 @@ function _evOrdenarPorFecha(lista, hoyISO) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [FLUJO-UX-4] EL SELECTOR DE EVENTO DE LA CASA — UNA SOLA PIEZA
+// ═══════════════════════════════════════════════════════════════════════════
+// MEDIDO EN LA PÁGINA REAL antes de escribir nada (por la puerta que usa la
+// gente, y con el instrumento validado contra `gasto-categoria`, del que sé
+// exactamente cómo se ve):
+//   filtro-evento-pagos     40px · 131 ops · «Todos los eventos»
+//   selector-evento         40px · 131 ops · «Selecciona un evento…»
+//   filtro-evento-gastos    40px · 131 ops · «Todos»
+//   filtro-evento-ingresos  40px · 131 ops · «Todos»
+//   kms-evt                 35px · 110 ops · «— Elige un evento —»
+//   gasto-evento   (modal)  40px · 131 ops · «General (no ligado a evento)»
+//   ingreso-evento (modal)  40px · 131 ops · «Sin evento»
+// Cuatro voces para lo mismo, y CUATRO COPIAS byte a byte del mismo lazo de
+// opciones (pagos, gastos, ingresos y Por Evento arman `value` y `label`
+// idénticos). Dos listas iguales no existen: existen dos que todavía no
+// divergen — y estas ya iban por cuatro.
+//
+// 🔒 TRES VOCES, UNA POR PAPEL, y no es una concesión: EL VACÍO NO SIGNIFICA LO
+// MISMO EN LOS TRES (decisión de Memo, 1-sep).
+//   · FILTRO     → el vacío es un VALOR: «no filtres por evento».
+//   · MANDO      → el vacío es AUSENCIA: la pantalla no funciona hasta elegir.
+//   · ATRIBUCIÓN → el vacío es una ELECCIÓN con consecuencia: un gasto sin
+//                  evento resta de la utilidad de TODA la empresa.
+// Fundirlas en una sola cadena habría hecho que Gastos dijera «falta que
+// elijas» mientras ya te está enseñando todo. Lo que se unifica es LA REGLA,
+// no la cadena.
+//
+// 🔒 Y LOS MANDOS DICEN QUE SON OBLIGATORIOS. Medido: `selector-evento` y
+// `kms-evt` no funcionan sin evento y NINGUNO lo decía. (`rep-evento` sí: su
+// etiqueta es «Evento *» — de ahí se copia la idea.)
+const EVSEL_PAPELES = {
+  filtro:     { vacio: 'Todos los eventos',   obligatorio: false },
+  mando:      { vacio: '— Elige un evento —', obligatorio: true  },
+  atribucion: { vacio: 'Sin evento (general)', obligatorio: false },
+};
+
+// Las opciones, en el orden de ORD-1 y con la MISMA forma de `value` que hoy.
+// `expandirFechas` NO es un adorno: cuatro pantallas abren una opción por fecha
+// de un multifecha (`slug#idx`) y el Palacio NO —tiene su propio `kms-fecha` al
+// lado—, y eso es «qué evento carga cada pantalla», que esta tuerca no toca.
+function _evSelectorOpciones(lista, opts) {
+  const o = opts || {};
+  const expandir = o.expandirFechas !== false;
+  const eventos = _evOrdenarPorFecha((lista || []).filter((e) => e && e.id));
+  const out = [];
+  eventos.forEach((e) => {
+    if (expandir && Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        out.push({ value: e.id + '#' + i, label: (e.a || e.id) + ' · ' + lbl, nombre: e.a || e.id, fecha: lbl });
+      });
+    } else {
+      const suf = (!expandir && e.f) ? (' · ' + e.f) : '';
+      out.push({ value: e.id, label: (e.a || e.id) + suf, nombre: e.a || e.id, fecha: '' });
+    }
+  });
+  return out;
+}
+
+// Pinta el selector entero: la voz del vacío que le toca a su papel, las
+// opciones en el orden de la casa, la marca de obligatorio y la forma. Devuelve
+// las opciones por si el llamador arma su propio mapa (varios lo hacen).
+//
+// Conserva lo que estuviera elegido si sigue en la lista: repoblar no debe
+// deshacerle la selección a quien ya estaba trabajando un evento.
+function evSelectorPintar(sel, lista, opts) {
+  const o = opts || {};
+  const papel = EVSEL_PAPELES[o.papel] ? o.papel : 'filtro';
+  const cfg = EVSEL_PAPELES[papel];
+  if (!sel) return [];
+  const elegido = sel.value;
+  const ops = _evSelectorOpciones(lista, o);
+  // La voz del vacío la escribe el papel, salvo que el llamador la dicte a
+  // propósito (`vacio`). Se deja la puerta porque una pantalla puede tener un
+  // matiz —y entonces se ve en el diff, que es lo que importa.
+  const vacio = (typeof o.vacio === 'string') ? o.vacio : cfg.vacio;
+  sel.innerHTML = '<option value="">' + _esfEsc(vacio) + '</option>'
+    + ops.map((x) => '<option value="' + _esfEsc(x.value) + '">' + _esfEsc(x.label) + '</option>').join('');
+  if (elegido && ops.some((x) => x.value === elegido)) sel.value = elegido;
+  // La marca de obligatorio: `required` + `aria-required` (que es lo que lee un
+  // lector de pantalla) y la clase que le pone el acento mientras esté vacío.
+  // No se inventa un asterisco flotante: dos de los tres mandos NO tienen
+  // etiqueta visible donde colgarlo.
+  if (cfg.obligatorio) { sel.required = true; sel.setAttribute('aria-required', 'true'); }
+  sel.classList.add('ev-sel');
+  sel.classList.toggle('ev-sel-req', !!cfg.obligatorio);
+  return ops;
+}
+
 // El banco de 200 frases del cine vive en frases-cine.js (window.FRASES_CINE),
 // cargado ANTES de kamehouse.js. Campos: f=frase · p=película · c=personaje · t=tono.
 // Check-in de ánimo (solo admins) elige el bucket de tono; sin check-in = banco completo.
@@ -2633,32 +2723,10 @@ async function _poblarFiltroEventoPagos() {
   if (_cobranzaEventoSelectPoblado) return;
   const sel = document.getElementById('filtro-evento-pagos');
   const ev = await _fetchEVFromIndex();
-  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
-  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
-  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
-  const opciones = [];
-  eventos.forEach(e => {
-    if (Array.isArray(e.multifecha) && e.multifecha.length) {
-      e.multifecha.forEach((mf, i) => {
-        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
-        const id = e.id + '#' + i;
-        _cobEVMap[id] = { nombre: e.a, fecha: lbl };
-        opciones.push({ value: id, label: e.a + ' · ' + lbl });
-      });
-    } else {
-      _cobEVMap[e.id] = { nombre: e.a, fecha: '' };
-      opciones.push({ value: e.id, label: e.a });
-    }
-  });
-  if (sel) {
-    while (sel.options.length > 1) sel.remove(1);
-    opciones.forEach(o => {
-      const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
-      sel.appendChild(opt);
-    });
-  }
+  // [FLUJO-UX-4] El lazo de opciones y el orden de ORD-1 los pone la pieza de
+  // la casa. Aquí queda lo que SÍ es de esta pantalla: su mapa de etiquetas.
+  const opciones = evSelectorPintar(sel, ev, { papel: 'filtro' });
+  opciones.forEach((o) => { _cobEVMap[o.value] = { nombre: o.nombre, fecha: o.fecha }; });
   _cobranzaEventoSelectPoblado = true;
 }
 

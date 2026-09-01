@@ -859,6 +859,15 @@ async function _kamComprasLoad() {
           <label class="kmt-lbl">FECHA<input class="cot-input" id="kmt-fecha" type="date" value="${_kamToday()}"></label>
           <label class="kmt-lbl" style="flex:1;min-width:180px">NOTA DE LA TANDA<input class="cot-input" id="kmt-nota" placeholder="opcional — ej. pedido inicial" maxlength="500"></label>
         </div>
+        <!-- [FLUJO-UX-3] La regla sale de _lib/cuenta-evento (UTIL-C):
+             GANANCIA = COBRADO − INVERSIÓN EN BOLETOS − GASTOS, y la inversión
+             son TODOS los boletos comprados «vendidos o no, pagados o no».
+             De ahí el corolario incómodo que hay que decir antes de que
+             alguien lo reporte como bug. -->
+        <div class="fld-help" style="margin:0 0 8px">Esto es la <b>inversión en
+         boletos</b>: pesa entera en la utilidad del evento desde el día que
+         compras, se vendan o no — los boletos no tienen devolución. Por eso un
+         evento recién cargado <b>nace en rojo</b> y se endereza cobrando.</div>
         <div class="kmt-tabla-wrap">
           <table class="kmt-tabla"><thead><tr>
             <th>Zona</th><th style="width:110px">Cantidad</th><th style="width:130px">Costo unit.</th><th style="width:120px">Subtotal</th>
@@ -963,6 +972,12 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
     _kmsTableroPintar({ abonado: abonadoTotal, abonadoProv: abonadoPorProveedor });
     cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:9px 11px">
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">Abonos a proveedores</div>
+      <!-- [FLUJO-UX-3] _lib/cuenta-evento: DEUDA A PROVEEDORES = compras −
+           abonos, y está marcada INFORMATIVA, «jamás dentro de la ganancia:
+           meterla contaría dos veces lo mismo el día que se pague». -->
+      <div class="fld-help" style="margin:0 0 8px">Un abono <b>baja la deuda</b>
+       del proveedor. No es un gasto nuevo: el costo del boleto ya entró como
+       inversión cuando capturaste la compra.</div>
       ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}
       ${form}
       <div id="kam-abonos-alert" style="margin-bottom:8px"></div>
@@ -1397,6 +1412,15 @@ function _kamAjusteHtml(sem, zi) {
       <input class="cot-input kam-ajuste-nota" id="kam-fuera-nota-${zi}" placeholder="Nota (ej. corte Excel 24-jul)" maxlength="500" value="${_esfEsc(nota)}">
       <button class="btn btn-ghost btn-sm" type="button" onclick="_kamAjusteGuardar(${zi})">Guardar</button>
     </div>
+    <!-- [FLUJO-UX-3] MEDIDO en admin-compras (ajuste_guardar): el PATCH
+         escribe { vendidos_fuera } tal cual — REEMPLAZA. Quien SUMA es el
+         botón 🎟 Cortesía (admin-coordi-asignaciones: suma = vendidos_fuera
+         + boletos). Son dos caminos con memoria distinta sobre la MISMA
+         columna, y la casilla llega ya rellenada con el total: sin decirlo,
+         quien capture «vendí 3 hoy» borra los 12 que había. -->
+    <div class="fld-help">Es el <b>total acumulado</b> de esta zona, no lo que
+     vendiste hoy: lo que guardes <b>reemplaza</b> el número anterior. (El
+     botón 🎟 Cortesía sí suma sobre él.)</div>
     <div class="kam-ajuste-nota-pie">Puente de transición: es lo único que le cuenta al semáforo las ventas que no pasaron por el sistema. Se retira cuando MIG-1b sume los viajeros migrados a la disponibilidad.${meta ? ' · ' + meta : ''}</div>
   </details>`;
 }

@@ -574,7 +574,12 @@ async function loadResumen() {
     // 3) Ya con la cache lista: la tabla de ganancia por evento.
     _renderResumenUtilidad(ev);
   } catch (e) {
-    if (atrEl)  atrEl.innerHTML  = '';
+    // [FLUJO-UX-1] Antes esto vaciaba el contenedor y NO DECÍA NADA. El Resumen
+    // es la pantalla de aterrizaje: al fallar, sus tarjetas se quedaban en cero
+    // y un cero aquí no es «no hay», es «no cargó» — la lección de AUD-1, donde
+    // «Cobrado $0» con $136,391 cobrados no era un dato que faltaba sino uno
+    // falso. Ahora lo dice, con el nombre de lo que falló y con reintento.
+    khErrorCarga(atrEl, 'el Resumen', 'loadResumen', e);
   }
 }
 async function _saldosCargar(force) {

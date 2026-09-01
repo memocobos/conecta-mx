@@ -184,7 +184,14 @@ async function loadEquipo() {
     _gzCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
     renderGZ();
   } catch(e) {
-    grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    // [FLUJO-UX-1] EL ERROR SE PINTABA Y SE BORRABA TRES LÍNEAS DESPUÉS.
+    // `showGZTab(...)` de abajo llama a `renderGZ()`, que reescribe `grid` con
+    // su estado vacío — así que el aviso vivía milisegundos y el usuario veía
+    // «no hay equipo» ante una caída del servidor. Medido dos veces: a los
+    // 250 ms y a los 2.5 s, `gz-grid` nunca contenía el error.
+    // Se marca el fallo y se pinta DESPUÉS del cambio de pestaña, que es quien
+    // manda sobre ese contenedor.
+    _gzFalloCarga = e;
   }
   // Mostrar la tab correcta según rol al entrar a Guerreros Z
   // Todos los roles ahora pueden ver la lista del equipo (solo lectura)
@@ -192,7 +199,10 @@ async function loadEquipo() {
   const tabInicial = gzPermitidas.includes('lista') ? 'lista' : 'miperfil';
   const btnInicial = document.querySelector(`.gz-tab-btn[onclick*="${tabInicial}"]`);
   showGZTab(tabInicial, btnInicial);
+  if (_gzFalloCarga) { khErrorCarga(grid, 'el equipo', 'loadEquipo', _gzFalloCarga); _gzFalloCarga = null; }
 }
+// El fallo de la última carga, para pintarlo cuando el contenedor ya es suyo.
+let _gzFalloCarga = null;
 async function _gzCargarContratos() {
   if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
   try {

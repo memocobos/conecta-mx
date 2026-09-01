@@ -105,6 +105,46 @@ const GZ_TABS_PERMITIDAS = {
 // ellos el render es byte-igual (siempre pudieron borrar); para milk se ocultan.
 function _puedeBorrarAdmin() { return ['maestro_roshi', 'bulma'].includes(currentUser && currentUser.rol); }
 
+// ── [FLUJO-UX-1] EL ERROR DE CARGA, EN UNA SOLA FUENTE ──────────────────────
+//
+// NO ES UN PATRÓN NUEVO. Es el `.err-box` que ya existía en Lista de espera y
+// en el Radar —con su CSS ya escrito en kamehouse.css— mudado a una función
+// para que las otras pantallas lo COPIEN en vez de reinventarlo. Diez pantallas
+// escribiendo el mismo bloque a mano son diez listas que todavía no divergen.
+//
+// Medido en FLUJO-UX-0: con el backend caído, DIEZ de las veinte pantallas se
+// quedaban mudas — entre ellas el RESUMEN, que es la de aterrizaje. Y una
+// pantalla muda ante un fallo no se queda en blanco: se queda con CEROS, y en
+// esta casa un cero es una afirmación (AUD-1: «Cobrado $0» con $136,391
+// cobrados no es un dato que falta, es un dato falso).
+//
+// Las tres cosas que dice, y por qué las tres:
+//   · QUÉ falló, con el nombre de la pantalla — «no se pudo cargar» a secas no
+//     dice si se cayó todo o sólo este pedazo.
+//   · QUÉ HACER: un botón que vuelve a llamar al mismo cargador. Sin él, la
+//     salida es recargar la página entera y perder lo que hubiera a medias.
+//   · El detalle técnico, recortado y ABAJO: sirve para el reporte, no para el
+//     que está capturando. Pegar `e.message` crudo arriba fue el mal que EQ-8
+//     ya corrigió en el Radar y en la Lista de espera.
+//
+// `reintentar` es el NOMBRE de la función global que recarga esa pantalla. Se
+// verifica que exista antes de ofrecer el botón: un botón que llama a algo que
+// no está es peor que no tener botón.
+function khErrorCarga(cont, queEs, reintentar, e) {
+  const el = (typeof cont === 'string') ? document.getElementById(cont) : cont;
+  console.error('[' + (queEs || 'carga') + ']', e);
+  if (!el) return false;
+  const hayBoton = typeof reintentar === 'string' && typeof window[reintentar] === 'function';
+  const det = String((e && e.message) || e || '').slice(0, 200);
+  el.innerHTML = '<div class="err-box">'
+    + '<strong class="err-titulo">No se pudo cargar ' + _esfEsc(queEs || 'esta pantalla') + '.</strong><br>'
+    + 'Puede ser la conexión. Vuelve a intentar en un momento.'
+    + (hayBoton ? '<div class="err-pie"><button class="btn btn-ghost btn-sm err-btn" onclick="' + reintentar + '()">↻ Reintentar</button></div>' : '')
+    + (det ? '<div class="err-detalle">detalle técnico: ' + _esfEsc(det) + '</div>' : '')
+    + '</div>';
+  return true;
+}
+
 // ── TOAST ──
 function showToast(msg, tipo) {
   tipo = tipo || 'error';
@@ -4387,7 +4427,10 @@ async function loadCapsule() {
     _ccEventosCache = _evOrdenarPorFecha(_ccEventosCache);
     renderCCEventos(_ccEventosCache, 'todos');
   } catch(e) {
-    if (g) g.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    // [FLUJO-UX-1] Pegaba `e.message` crudo, sin decir QUÉ falló ni cómo
+    // reintentar — el mismo mal que EQ-8 ya corrigió en el Radar. Ahora usa el
+    // patrón de la casa, con su botón.
+    khErrorCarga(g, 'Capsule Corp', 'loadCapsule', e);
   }
 }
 

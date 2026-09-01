@@ -59,7 +59,20 @@ async function _evtPoblarSelector() {
   if (_evtSelectorPoblado) { _evtAplicarPendiente(); return; }
   const sel = document.getElementById('selector-evento');
   if (!sel) return;
-  const ev = await _fetchEVFromIndex();
+  // [FLUJO-UX-1] NO TENÍA CATCH. Si el catálogo no bajaba, la promesa se
+  // rechazaba sin dueño y el selector se quedaba con su «Selecciona un
+  // evento…» para siempre: indistinguible de un catálogo vacío.
+  let ev;
+  try { ev = await _fetchEVFromIndex(); }
+  catch (e) {
+    // `evt-desglose` es el contenedor visible más cercano al selector, y nace
+    // oculto: se destapa aquí. El id se LEYÓ del marcado — la primera versión
+    // usó uno inventado («evt-tabla-wrap») que no existe en ningún lado.
+    const caja = document.getElementById('evt-desglose');
+    if (caja) caja.style.display = '';
+    khErrorCarga(caja, 'la lista de eventos', '_evtPoblarSelector', e);
+    return;
+  }
   // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
   // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
   const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));

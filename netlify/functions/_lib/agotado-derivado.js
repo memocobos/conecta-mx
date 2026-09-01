@@ -181,30 +181,37 @@ function simetrizarFicha(ficha) {
   return { zonas: out.zonas, cheapZonas: out.cheapZonas, multifecha: out.multifecha, cambiadas };
 }
 
-// ── 🔒 EL CANDADO MULTIFECHA (AG-STOCK-1b) — TAL CUAL, y ahora sólo donde su
-// razón alcanza: EL AVISO. Se escribió porque el STOCK de un multifecha puede
-// salir INFLADO, y eso sigue siendo cierto. MEDIDO en la base el 1-sep-2026:
-//   · `viajeros_evento` SÍ llavea por `slug#idx` — 27 filas en 13 eventos
-//     (omar#0/#1, karolg#0/#1/#2, morat#0/#1…).
-//   · `compras` tiene CERO filas con `#`, y cero también sin `#` para esos
-//     eventos. `stock_ajustes`, igual.
-// O sea que NINGÚN multifecha tiene pedido capturado todavía, y por eso la
-// convención de llaves no está definida: nunca se ha ejercitado. El día que se
-// capture el primero, el consumo de sus viajeros —que vive bajo `omar#0`— no se
-// restaría de un stock guardado bajo `omar`, y el aviso saldría al revés:
-// callaría zonas que sí necesitan compra.
+// ── 🔓 EL CANDADO MULTIFECHA (AG-STOCK-1b) SE LEVANTÓ — AG-STOCK-3, 1-sep ──
 //
-// LA SIMETRÍA NO PASA POR AQUÍ, y es a propósito: no consulta el stock ni una
-// vez. Mira los `ag` de dos listas, que están capturados a mano y no dependen
-// de ninguna convención de llaves. Detenerla aquí sería heredarle a la simetría
-// una cautela cuya razón no la alcanza — y dejaría vivas seis fechas con el
-// defecto exacto de calle24 (coronacapital ×4, weeknd, harry). Decisión de
-// Memo, 1-sep. El candado se quita cuando la convención se MIDA.
-function esDerivable(obj) {
-  const mf = obj && obj.multifecha;
-  if (Array.isArray(mf) && mf.length) return { ok: false, motivo: 'multifecha: llaves sin definir' };
-  return { ok: true, motivo: null };
-}
+// 1b lo puso y dejó escrita su condición de salida: «el candado se quita cuando
+// la convención se MIDA, no cuando se suponga». Ya se midió, y por un camino que
+// nadie planeó: BRUNO-UNIF-1 unificó Bruno Mars 4 y 7 de diciembre, y al
+// renombrar los satélites apareció el PRIMER multifecha con pedido capturado.
+//
+// LO QUE SE MIDIÓ EN LA BASE EL 1-SEP, y es lo que sostiene este levantamiento:
+//   · OCHO multifecha tienen compras, y las OCHO llavean por `slug#idx`:
+//     alvarodiaz(#0,#1) · brunomars(#0,#1) · caifanes(#0,#1) ·
+//     coronacapital(#0,#1,#5) · karolg(#0,#1,#2) · morat(#0,#1) ·
+//     omar(#0,#1) · straykids(#0,#1).
+//   · CERO filas de `compras` con el slug pelado en esos eventos.
+//   · `viajeros_evento` usa EXACTAMENTE las mismas llaves.
+// O sea: la convención existe, es una sola, y las dos tablas la comparten. El
+// peligro que 1b describía —consumo bajo `omar#0` restándose de un stock
+// guardado bajo `omar`— ya no puede ocurrir, porque nadie guarda bajo `omar`.
+//
+// ⚠️ Y AUNQUE PUDIERA, HOY NO CERRARÍA NADA. Desde AG-STOCK-2 el stock es
+// AVISO, no acción: lo peor que puede hacer un stock mal medido aquí es
+// nombrar de más o de menos en un informe. La dirección peligrosa —cerrar
+// zonas que sí se venden— se retiró con la derivación.
+//
+// 🔒 LO QUE NO CAMBIA: JAMÁS ENTRE FECHAS. Cada fecha se mide contra SU llave
+// (`slug#idx`) y contra las zonas de ESA fecha. Es la misma regla que la
+// simetría: agotado la noche 1 no es agotado la noche 2, y comprado para la
+// noche 1 tampoco.
+//
+// Una fecha sin compras dentro de un evento que sí tiene —coronacapital tiene
+// #0, #1 y #5 pero no #2, #3 ni #4— NO se avisa: se NOMBRA, igual que un
+// evento entero sin pedido. Cada fecha es su propia unidad.
 
 // disponiblesPorZona: Map|objeto zona → número.
 function _disp(mapa, zona) {
@@ -222,32 +229,64 @@ function _disp(mapa, zona) {
 //   gestionado: ¿el evento tiene compras capturadas? Lo decide el llamador con
 //               el HECHO —está o no en el lote de stock—, no con una lista.
 //   disponibles: zona → número. Ausente = no hay pedido de esa zona.
-function avisosStock({ ficha, gestionado, disponibles }) {
-  if (!gestionado) return { zonas: [], gestionado: false };
-  const der = esDerivable(ficha);
-  if (!der.ok) return { zonas: [], gestionado: true, excluido: der.motivo };
+function avisosStock({ ficha, slug, stock }) {
+  // Las zonas A LA VENTA de UNA lista-par. Después de la simetría las dos
+  // gemelas dicen lo mismo de cada zona que comparten, así que la unión no
+  // infla.
+  const vivasDe = (zonas, cheapZonas) => {
+    const v = new Set();
+    const meter = (l) => (Array.isArray(l) ? l : []).forEach((z) => {
+      const n = _n(z);
+      if (n && !_ag(z) && !_prox(z)) v.add(n);
+    });
+    meter(zonas); meter(cheapZonas);
+    return v;
+  };
+  // El veredicto de UNA unidad (un evento de una fecha, o UNA fecha de un
+  // multifecha) contra SU llave y SUS zonas. Nunca mira otra fecha.
+  const medir = (llave, zonas, cheapZonas) => {
+    const disponibles = stock && (typeof stock.get === 'function' ? stock.get(llave) : stock[llave]);
+    if (!disponibles) return { sinPedido: true, zonas: [] };
+    const out = [];
+    for (const n of vivasDe(zonas, cheapZonas)) {
+      const d = _disp(disponibles, n);
+      const num = (d == null) ? null : Number(d);
+      if (num == null) { out.push({ zona: n, disponibles: null, motivo: 'sin pedido capturado' }); continue; }
+      // `<= 0` y no `=== 0`: un negativo es sobreventa, y una zona sobrevendida
+      // necesita compra todavía más urgente que una en cero.
+      if (num <= 0) out.push({ zona: n, disponibles: num, motivo: num < 0 ? 'sobrevendida' : 'stock 0' });
+    }
+    out.sort((x, y) => x.zona.localeCompare(y.zona, 'es'));
+    return { sinPedido: false, zonas: out };
+  };
 
-  // A LA VENTA = viva en alguna de las listas. Después de la simetría las dos
-  // dicen lo mismo de cada zona que comparten, así que la unión no infla.
-  const vivas = new Set();
-  const meter = (l) => (Array.isArray(l) ? l : []).forEach((z) => {
-    const n = _n(z);
-    if (n && !_ag(z) && !_prox(z)) vivas.add(n);
-  });
-  meter(ficha && ficha.zonas);
-  meter(ficha && ficha.cheapZonas);
+  const mf = (ficha && Array.isArray(ficha.multifecha)) ? ficha.multifecha : null;
+  const porFecha = !!(mf && C._hayZonasPorFecha(mf));
 
-  const zonas = [];
-  for (const n of vivas) {
-    const d = _disp(disponibles, n);
-    const num = (d == null) ? null : Number(d);
-    if (num == null) { zonas.push({ zona: n, disponibles: null, motivo: 'sin pedido capturado' }); continue; }
-    // `<= 0` y no `=== 0`: un negativo es sobreventa, y una zona sobrevendida
-    // necesita compra todavía más urgente que una en cero.
-    if (num <= 0) zonas.push({ zona: n, disponibles: num, motivo: num < 0 ? 'sobrevendida' : 'stock 0' });
+  // ── UNA SOLA FECHA (o fechas que no gobiernan): la llave es el slug pelado.
+  if (!porFecha) {
+    const r = medir(slug, ficha && ficha.zonas, ficha && ficha.cheapZonas);
+    return r.sinPedido
+      ? { zonas: [], gestionado: false, fechas: [] }
+      : { zonas: r.zonas, gestionado: true, fechas: [] };
   }
-  zonas.sort((x, y) => x.zona.localeCompare(y.zona, 'es'));
-  return { zonas, gestionado: true };
+
+  // ── MULTIFECHA: cada fecha con SU llave y SUS zonas. 🔓 AG-STOCK-3.
+  const fechas = [];
+  const todas = [];
+  let algunaGestionada = false;
+  mf.forEach((f, i) => {
+    const llave = slug + '#' + i;
+    const lbl = (f && f.lbl) ? String(f.lbl) : ('Fecha ' + (i + 1));
+    const r = medir(llave, f && f.zonas, f && f.cheapZonas);
+    if (r.sinPedido) { fechas.push({ idx: i, lbl, llave, sin_pedido: true, zonas: [] }); return; }
+    algunaGestionada = true;
+    fechas.push({ idx: i, lbl, llave, sin_pedido: false, zonas: r.zonas });
+    // El montón plano lleva la fecha PEGADA a la zona: sin eso, «Platino» de
+    // dos noches distintas se leería como una sola línea repetida.
+    r.zonas.forEach((z) => todas.push(Object.assign({}, z, { fecha: lbl })));
+  });
+  return { zonas: todas, gestionado: algunaGestionada, fechas };
 }
 
 // ── EL LOTE ─────────────────────────────────────────────────────────────────
@@ -344,9 +383,13 @@ function avisosDelLote({ filas, stock }) {
   const reporte = { eventos: [], total: 0, sin_compras: [] };
   (filas || []).forEach((e) => {
     if (!e || !e.slug || !e.__ficha) return;
-    if (!stock || !stock.has(e.slug)) { reporte.sin_compras.push(e.slug); return; }
-    const r = avisosStock({ ficha: e.__ficha, gestionado: true, disponibles: stock.get(e.slug) });
-    if (r.excluido) { reporte.sin_compras.push(e.slug + ' (' + r.excluido + ')'); return; }
+    const r = avisosStock({ ficha: e.__ficha, slug: e.slug, stock });
+    // 🔓 [AG-STOCK-3] LAS FECHAS SE NOMBRAN UNA POR UNA. Decir «coronacapital»
+    // a secas escondería que #0, #1 y #5 SÍ tienen pedido capturado y #2, #3 y
+    // #4 no — que es justo lo que Memo necesita saber para comprar.
+    (r.fechas || []).filter((f) => f.sin_pedido)
+      .forEach((f) => reporte.sin_compras.push(e.slug + ' · ' + f.lbl));
+    if (!r.gestionado) { if (!(r.fechas || []).length) reporte.sin_compras.push(e.slug); return; }
     if (!r.zonas.length) return;
     reporte.eventos.push({ slug: e.slug, zonas: r.zonas });
     reporte.total += r.zonas.length;
@@ -360,6 +403,6 @@ function soltarFichas(filas) { (filas || []).forEach((e) => { if (e) delete e.__
 module.exports = {
   sincronizarPar, simetrizarFicha, avisosStock,
   simetrizarLote, avisosDelLote, soltarFichas,
-  disponiblesPorEvento, esDerivable, AGOTADA,
+  disponiblesPorEvento, AGOTADA,
   _ag, _prox,
 };

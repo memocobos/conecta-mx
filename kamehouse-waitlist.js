@@ -40,13 +40,14 @@ function copiarLinkProximos(btn) {
 async function loadWaitlist() {
   const summary = document.getElementById('wl-summary');
   const groups = document.getElementById('wl-groups');
-  // [FLUJO-UX-2] Señal de vida ANTES de esperar. Sin esto, en conexión lenta
-  // esta pantalla se veía igual que una rota — y desde WL-1 ya sabe decir su
-  // error, así que callar mientras carga era lo único que la volvía ambigua.
-  if (summary) summary.textContent = 'Cargando…';
-  khCargando(groups, 'la lista de espera');
+  // [FLUJO-UX-2b] LA SEÑAL VA DESPUÉS DEL VACIADO, no antes.
+  // En 2b la puse arriba y las dos líneas de abajo —que ya estaban— la borraban
+  // al instante: `groups.innerHTML = ''`. El arnés la reportaba como «sin
+  // señal» y tenía razón; lo que fallaba era el ORDEN, no el cableado. Tercera
+  // vez en la sesión que aparece «se pinta y se borra tres líneas después».
   if (summary) summary.textContent = 'Cargando…';
   if (groups) groups.innerHTML = '';
+  khCargando(groups, 'la lista de espera');
 
   let rows = [], snap = [];
   try {

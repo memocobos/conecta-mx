@@ -580,9 +580,18 @@ function _kamProvSelectsRefrescar(nuevoId) {
     else if (nuevoId) sel.value = String(nuevoId);
   });
 }
-function _kamComprasAlert(msg) {
+// [ESF-DICE-1] El canal acepta TIPO. Antes todo salía en rojo, así que decir
+// «se guardó» por aquí habría parecido un error: por eso el guardado del ajuste
+// prefería callarse. Un canal que sólo sabe gritar deja mudos a los éxitos.
+function _kamComprasAlert(msg, tipo) {
   const a = document.getElementById('kam-compras-alert');
-  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
+  if (!a) return;
+  if (!msg) { a.innerHTML = ''; return; }
+  a.innerHTML = `<div class="alert alert-${tipo || 'error'}">${_esfEsc(msg)}</div>`;
+  if (tipo && tipo !== 'error') {
+    clearTimeout(window._kamAlertT);
+    window._kamAlertT = setTimeout(() => { const e = document.getElementById('kam-compras-alert'); if (e) e.innerHTML = ''; }, 4000);
+  }
 }
 // Puebla el <select> de eventos desde el EV del index (solo zonas raíz en Capa 1).
 async function _kamPopulateEventos() {
@@ -1412,7 +1421,7 @@ function _kamAjusteHtml(sem, zi) {
   return `<details class="kam-ajuste-wrap">
     <summary class="kam-ajuste-sum">Vendidos fuera del sistema${fuera > 0 ? ` <b>${fuera}</b>` : ''}</summary>
     <div class="kam-ajuste">
-      <input class="cot-input kam-ajuste-num" id="kam-fuera-${zi}" type="number" min="0" value="${fuera}" aria-label="Vendidos fuera del sistema">
+      <input class="cot-input kam-ajuste-num" id="kam-fuera-${zi}" type="number" min="0" value="${fuera}" data-antes="${fuera}" data-antes-nota="${_esfEsc(nota)}" aria-label="Vendidos fuera del sistema">
       <input class="cot-input kam-ajuste-nota" id="kam-fuera-nota-${zi}" placeholder="Nota (ej. corte Excel 24-jul)" maxlength="500" value="${_esfEsc(nota)}">
       <button class="btn btn-ghost btn-sm" type="button" onclick="_kamAjusteGuardar(${zi})">Guardar</button>
     </div>
@@ -1438,6 +1447,14 @@ async function _kamAjusteGuardar(zi) {
   const v = parseInt(document.getElementById('kam-fuera-' + zi)?.value, 10);
   if (!Number.isInteger(v) || v < 0) { _kamComprasAlert('Vendidos fuera: entero >= 0.'); return; }
   const nota = (document.getElementById('kam-fuera-nota-' + zi)?.value || '').trim();
+  // [ESF-DICE-1] LO QUE HABÍA ANTES, para poder decir si de verdad cambió algo.
+  // La casilla nace rellenada con el total, así que «Guardar» sin tocarla es lo
+  // más fácil del mundo — y hasta hoy contestaba exactamente igual que un
+  // guardado que sí movía el inventario: con silencio.
+  const inp = document.getElementById('kam-fuera-' + zi);
+  const antesV = inp ? parseInt(inp.dataset.antes, 10) : NaN;
+  const antesN = inp ? (inp.dataset.antesNota || '') : '';
+  const sinCambio = Number.isInteger(antesV) && antesV === v && antesN === nota;
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-compras', {
       method: 'POST',
@@ -1445,6 +1462,11 @@ async function _kamAjusteGuardar(zi) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo guardar el ajuste');
+    // 🔒 EL ÉXITO HABLA, y distingue haber trabajado de no haber tenido nada que
+    // hacer. Las dos cosas están bien; lo que no puede pasar es que se vean igual.
+    _kamComprasAlert(sinCambio
+      ? `«${zona}» ya tenía ${v} vendidos fuera — no había nada que cambiar.`
+      : `«${zona}»: vendidos fuera guardados en ${v}.`, sinCambio ? 'info' : 'success');
     _kamComprasLoad(); // recarga con el semáforo recalculado
   } catch (e) { _kamComprasAlert(e.message); }
 }

@@ -655,11 +655,17 @@ function _homeDeRol() {
 // y se mantienen separadas: aquí NO se consulta ningún rol para permitir, solo
 // para ordenar la vitrina. Por eso milk no ve "Ventas" —no tiene 'ventas'— sin
 // que este catálogo tenga que saberlo.
+// [FLUJO-UX-6] UN ATAJO DICE A DÓNDE VA, no promete una acción. Medido el
+// 2-sep: los cuatro que llevaban verbo —'Crear evento', 'Registrar gasto',
+// 'Registrar pago', 'Registrar ingreso'— NO crean ni registran nada: hacen
+// showPage(). Prometían un acto que no ejecutan, y 'Crear evento' era además
+// el único 'Crear' de toda la casa. Ahora se nombran por su DESTINO, que es
+// lo que ya hacían los otros cinco de esta misma tira.
 const ATAJOS_HOME = {
   maestro_roshi: [
-    { tab: 'esferas',  etiqueta: 'Crear evento' },
+    { tab: 'esferas',  etiqueta: 'Esferas' },
     { tab: 'kamisama', etiqueta: 'Pedido de boletos' },   // FIRMADO: el stock por evento
-    { tab: 'gastos',   etiqueta: 'Registrar gasto' },
+    { tab: 'gastos',   etiqueta: 'Gastos' },
     { tab: 'radar',    etiqueta: 'Radar' },
     { tab: 'recibos',  etiqueta: 'Recibos',  herramienta: true },
     { tab: 'diseno',   etiqueta: 'Diseño',   herramienta: true },
@@ -670,8 +676,8 @@ const ATAJOS_HOME = {
     // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
     // pago", y dos botones al mismo sitio no son dos atajos.
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
-    { tab: 'pagos',    etiqueta: 'Registrar pago' },
-    { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
+    { tab: 'pagos',    etiqueta: 'Pagos' },
+    { tab: 'ingresos', etiqueta: 'Ingresos' },
     { tab: 'ventas',   etiqueta: 'Ventas' },
   ],
   milk: [
@@ -680,8 +686,8 @@ const ATAJOS_HOME = {
     // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
     // pago", y dos botones al mismo sitio no son dos atajos.
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
-    { tab: 'pagos',    etiqueta: 'Registrar pago' },
-    { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
+    { tab: 'pagos',    etiqueta: 'Pagos' },
+    { tab: 'ingresos', etiqueta: 'Ingresos' },
     { tab: 'ventas',   etiqueta: 'Ventas' },   // milk NO tiene 'ventas': el filtro lo quita
   ],
 };

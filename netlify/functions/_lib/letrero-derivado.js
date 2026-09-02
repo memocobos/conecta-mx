@@ -105,4 +105,82 @@ function derivarLetreros(esferas, codigos, ahora) {
   return { esferas: derivadas, avisos };
 }
 
-module.exports = { derivarLetrero, derivarLetreros, aplicaAlEvento, _obj };
+// ═══════════════════════════════════════════════════════════════════════════
+// [PROMO-DERIVA-1] EL CHIP DE LA CARD — el hermano exacto del letrero
+// ═══════════════════════════════════════════════════════════════════════════
+// EL DEFECTO, medido el 1-sep: OCHO fichas traían chips de códigos VENCIDOS a
+// la vista del cliente — FIN (venció el 31-ago) en juniorh y caifanes, las cinco
+// «PROMO DE PAREJA · HASTA EL 24 AGO» (tini, calle24, alejandrosanz, enjambre,
+// scorpions) y BADGYAL. Todas prometiendo un descuento que la caja rechaza.
+//
+// Jane las limpió a mano careando contra `promos_codigos`, y ahí está el punto:
+// LA LIMPIEZA MANUAL ES LA FUENTE NÚMERO DOS. La regla que BABA-UX-2 escribió
+// para el letrero vale igual para el chip — LETRERO VIVO = CÓDIGO VIVO— y si
+// sólo se cumple cuando alguien se acuerda, no es una regla.
+//
+// ── LA REGLA, IGUAL QUE LA DEL LETRERO ─────────────────────────────────────
+// `promo_code` y `promo_label` de la ficha dejan de ser el dato: son LA MARCA
+// de qué código le toca a este evento. Al publicar, su vigencia Y SU TEXTO
+// salen de la fila viva de `promos_codigos`. Si el código no existe, está
+// archivado, no aplica al evento, todavía no empieza o YA VENCIÓ, el chip NO SE
+// EMITE y se AVISA por su nombre, en el mismo montón que los letreros.
+//
+// ⚠️ TRES DIFERENCIAS CON EL LETRERO, y las tres están medidas:
+//   1. UN CHIP NO NECESITA `pct` NI `monto`. El letrero los exige porque es un
+//      cronómetro con una cifra; el chip es una etiqueta. Las cinco promos de
+//      pareja tienen los dos en NULL —su valor vive en `segundo_pax`— y son
+//      chips perfectamente legítimos. Exigirlos aquí habría apagado a las cinco
+//      por la razón equivocada.
+//   2. UN CHIP SIN VENCIMIENTO ES VÁLIDO. El letrero sin `expires_at` no es
+//      letrero (no hay cronómetro que correr); un código sin vencer es un código
+//      que no vence, y su chip vive mientras el código viva.
+//   3. EL TEXTO SE DERIVA de `desc_texto`, y NO hay respaldo a la etiqueta
+//      guardada. Ese respaldo sería la copia vieja entrando por la puerta de
+//      atrás — y es justo la copia que puso «HASTA EL 24 AGO» en cinco cards
+//      una semana después del 24 de agosto.
+//
+// 🔒 EL `promo` BOOLEANO A SECAS NO SE TOCA: es el tag del filtro «Promos» del
+// catálogo, no un chip con código. Son dos cosas con el mismo prefijo.
+function derivarChip(esfera, porCodigo, ahora) {
+  const code = (esfera && typeof esfera.promo_code === 'string') ? esfera.promo_code.trim() : '';
+  if (!code) return { promo_code: null, promo_label: null, aviso: null };  // sin marca no hay chip
+
+  const slug = esfera && esfera.slug;
+  const fila = porCodigo.get(code.toUpperCase());
+  const dilo = (motivo) => ({ promo_code: null, promo_label: null,
+    aviso: `${slug}: el chip de promo apunta a «${code}» y ${motivo}. No se emitió — vuelve a encenderlo desde Baba.` });
+
+  if (!fila) return dilo('ese código ya no existe en la casa de Baba');
+  if (fila.archivado) return dilo('ese código está archivado');
+  if (!aplicaAlEvento(fila, slug)) return dilo('ese código ya no aplica a este evento');
+  const t = (ahora == null) ? Date.now() : ahora;
+  const ini = fila.starts_at ? Date.parse(fila.starts_at) : NaN;
+  if (Number.isFinite(ini) && ini > t) return dilo('ese código todavía no empieza');
+  const fin = fila.expires_at ? Date.parse(fila.expires_at) : NaN;
+  if (Number.isFinite(fin) && fin <= t) return dilo('ese código YA VENCIÓ');
+
+  // El texto, de la fila viva. Sin respaldo a la etiqueta guardada: ver la
+  // diferencia (3) de arriba.
+  const txt = (typeof fila.desc_texto === 'string') ? fila.desc_texto.trim() : '';
+  return { promo_code: fila.codigo, promo_label: txt || null, aviso: null };
+}
+
+// Aplica la derivación del chip a TODAS las esferas. Gemela de `derivarLetreros`
+// y con el mismo contrato: devuelve copias y su montón de avisos.
+function derivarChips(esferas, codigos, ahora) {
+  const porCodigo = new Map((codigos || [])
+    .filter((c) => c && c.codigo)
+    .map((c) => [String(c.codigo).toUpperCase(), c]));
+  const avisos = [];
+  const derivadas = (esferas || []).map((e) => {
+    const r = derivarChip(e, porCodigo, ahora);
+    if (r.aviso) avisos.push(r.aviso);
+    // Se escriben SIEMPRE, incluso `null`: el compilador emite `promoCode` y
+    // `promoLabel` sólo si traen texto, así que un null es cómo se retira un
+    // chip muerto. `promo` no se menciona: no es de esta pieza.
+    return { ...e, promo_code: r.promo_code, promo_label: r.promo_label };
+  });
+  return { esferas: derivadas, avisos };
+}
+
+module.exports = { derivarLetrero, derivarLetreros, derivarChip, derivarChips, aplicaAlEvento, _obj };

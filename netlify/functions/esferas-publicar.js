@@ -25,7 +25,7 @@ const { compilarEV, fechaDisplayDeEsfera, extraerEV } = require('./_lib/esferas-
 const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vigentes');
 const { simetrizarLote, avisosDelLote, soltarFichas, disponiblesPorEvento } = require('./_lib/agotado-derivado');
 const { consumeBoleto } = require('./_lib/paquete-viaje');
-const { derivarLetreros } = require('./_lib/letrero-derivado');
+const { derivarLetreros, derivarChips } = require('./_lib/letrero-derivado');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
 // correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
 const { notificarEvento, upsertSnapshot, esALaVenta, PRESUPUESTO_PUBLICAR_MS } = require('./_lib/waitlist-core');
@@ -137,7 +137,11 @@ exports.handler = async (event) => {
       const codigos = await cr.json();
       if (!Array.isArray(codigos)) throw new Error('la lista de códigos no vino como lista');
       const d = derivarLetreros(esferasCrudas, codigos);
-      esferas = d.esferas; avisosLetrero = d.avisos;
+      // [PROMO-DERIVA-1] Y EL CHIP DE LA CARD, en la MISMA pasada y con los
+      // MISMOS códigos: es el hermano exacto del letrero, y sus avisos van al
+      // mismo montón. Ocho fichas traían chips de códigos vencidos el 1-sep.
+      const p = derivarChips(d.esferas, codigos);
+      esferas = p.esferas; avisosLetrero = d.avisos.concat(p.avisos);
     } catch (e) {
       // 🔒 SI NO SE PUEDEN LEER LOS CÓDIGOS, NO SE PUBLICA. Seguir con la copia
       // vieja sería exactamente el defecto que esta tuerca viene a matar, y

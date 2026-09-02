@@ -5393,17 +5393,33 @@ function buildZonaButtons(zonas){
   var h='';
   for(var i=0;i<zonas.length;i++){
     var z=zonas[i];
-    // ag efectivo: el inventario real (overlay) manda sobre el ag manual del EV, pero
-    // solo en zonas gestionadas (presentes en el map). Sin overlay → respeta z.ag.
+    // 🔒 [OVERLAY-DIR-1] EL OVERLAY SOLO APAGA. NUNCA ENCIENDE.
+    //
+    // La Tuerca 2c dejaba dos direcciones: `ov===true` apagaba (bien) y
+    // `ov===false` ENCENDÍA una zona que el EV traía con `ag:1` si el inventario
+    // tenía stock. Esa segunda dirección quedó PROHIBIDA en el servidor por
+    // AG-STOCK-2 —«se AGREGA ag, jamás se quita»— pero siguió viva aquí, en el
+    // navegador, DORMIDA porque casi ningún evento tenía compras capturadas.
+    //
+    // Se despertó el 1-sep, cuando Jane sembró los pedidos: REABRÍA 18 zonas
+    // agotadas a mano en 13 eventos (julion Primer Nivel, alvarodiaz Beyond en
+    // sus dos fechas, brunomars General B/Verde B/Zona GNP, caifanes Platino en
+    // las dos, edsheeran General B, hilary Sección D, monlaferte Perfiles,
+    // siddharta Perfiles A, soyluna Banco Azteca/McCormick, wwemexico Butaca,
+    // youngmiko Luneta…). El cliente veía a la venta lo que Memo había cerrado.
+    //
+    // AGOTAR DE MÁS A MANO ES DECISIÓN COMERCIAL VÁLIDA y el inventario no la
+    // revierte: quien cierra una zona sabe por qué (boletos apartados, un
+    // acuerdo, una fila que no está capturada). Vender lo que alguien cerró es
+    // lo que no puede pasar.
+    //
+    // El candado `p:0` de 2c-iii muere con la rama: existía SOLO para atajar
+    // esta dirección —encender una zona sin precio— y sin la dirección no tiene
+    // a quién atajar.
     var effAg=z.ag;
     if(dispOverlay&&cur&&dispOverlay.evId===cur.id){
       var ov=dispOverlay.map[(z.n||'').trim()];
-      if(ov===true)effAg=1;        // agotada según inventario real
-      // Candado p:0 (Tuerca 2c-iii): el Palacio quiere encender, pero si el EV no
-      // tiene precio real (!z.p cubre 0/null/undefined) NO encendemos — la dejamos
-      // agotada para no ofrecerla al cliente en $0. Las zonas free (GRATIS) sí se
-      // encienden. Apagar (ov===true) se respeta siempre, sin importar el precio.
-      else if(ov===false) effAg = (z.p || z.free) ? 0 : 1;
+      if(ov===true)effAg=1;        // agotada según inventario real: ésta SÍ manda
     }
     if(z.prox){
       h+='<button class="z-btn ag" disabled style="opacity:.6;font-style:italic"><div class="z-name">'+z.n+'</div><div class="z-ag">Próximamente</div></button>';

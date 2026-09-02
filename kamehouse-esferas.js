@@ -2141,28 +2141,58 @@ function _esfTabEstrenarCheapMago() {
     _esfAddCheapZona({ n: z.n, p: pc, ag: z.ag, prox: z.prox, vip: z.vip });
   });
 }
+// 🔒 [ESF-DICE-1] LA ACCIÓN QUE NO TIENE NADA QUE HACER, LO DICE.
+//
+// Caso real del 1-sep: Memo quiso agotar una zona de julion que YA estaba
+// agotada en la ficha. El botón hizo su trabajo —volver a poner `ag:1` donde ya
+// estaba— y se quedó MUDO. Memo se fue creyendo que el sistema había fallado,
+// cuando el sistema estaba de acuerdo con él.
+//
+// Es la familia de los errores mudos de FLUJO-UX-1, aplicada al ÉXITO VACÍO: un
+// «no hice nada porque no hacía falta» y un «no hice nada porque me rompí» se
+// ven EXACTAMENTE igual desde fuera, y el segundo es el que la gente supone.
+//
+// Así que se CUENTA lo que de verdad cambió. Las dos respuestas son buenas —
+// «cerré cinco» y «ya estaban las cinco»—; lo que no puede pasar es el silencio.
 function _esfTabAgotar(col, agotar) {
+  let tocadas = 0, total = 0;
   if (col.mago) {
     _esfMagoFilas('zonas').concat(_esfMagoFilas('cheapZonas')).forEach((r) => {
       const ag = r.querySelector('.esf-zona-ag, .esf-cz-ag');
       const px = r.querySelector('.esf-zona-prox, .esf-cz-prox');
       if (!ag) return;
+      total++;
+      if (ag.checked !== !!agotar) tocadas++;
       ag.checked = !!agotar;
       if (agotar && px) px.checked = false;
       ag.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    _esfTableroPintar();
+  } else {
+    ['zonas', 'cheapZonas'].forEach((c) => {
+      const l = (c === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
+      (Array.isArray(l) ? l : []).forEach((z) => {
+        total++;
+        const antes = !!z.ag;
+        if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; }
+        if (antes !== !!z.ag) tocadas++;
+      });
+    });
+    const ride = col.box.querySelector('.esf-mf-ride'), rag = col.box.querySelector('.esf-mf-rideag');
+    if (agotar) { if (ride && ride.value && rag) { if (!rag.checked) tocadas++; rag.checked = true; } }
+    else if (rag) { if (rag.checked) tocadas++; rag.checked = false; }
+  }
+  _esfTableroPintar();
+  const donde = col.mago ? 'el evento' : ('«' + (col.lbl || 'esta fecha') + '»');
+  if (!total) { _esfAviso('No hay zonas en ' + donde + ' que agotar.', 'info'); return; }
+  if (!tocadas) {
+    _esfAviso(agotar
+      ? 'Las ' + total + ' zona(s) de ' + donde + ' YA estaban agotadas — no había nada que cambiar.'
+      : 'Las ' + total + ' zona(s) de ' + donde + ' YA estaban a la venta — no había nada que cambiar.', 'info');
     return;
   }
-  ['zonas', 'cheapZonas'].forEach((c) => {
-    const l = (c === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
-    (Array.isArray(l) ? l : []).forEach((z) => {
-      if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; }
-    });
-  });
-  const ride = col.box.querySelector('.esf-mf-ride'), rag = col.box.querySelector('.esf-mf-rideag');
-  if (agotar) { if (ride && ride.value && rag) rag.checked = true; } else if (rag) rag.checked = false;
-  _esfTableroPintar();
+  _esfAviso(agotar
+    ? '✓ ' + tocadas + ' de ' + total + ' zona(s) de ' + donde + ' quedaron agotadas. Se ve en el sitio al publicar.'
+    : '✓ ' + tocadas + ' de ' + total + ' zona(s) de ' + donde + ' volvieron a la venta. Se ve en el sitio al publicar.');
 }
 // [ESF-UX-5] El primer «Zona N» que no choque con lo que ya hay. El tablero
 // DEDUPLICA por nombre —dos zonas que se llaman igual son una sola fila—, así

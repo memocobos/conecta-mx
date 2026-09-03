@@ -144,6 +144,36 @@ async function loadGastos() {
  tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
  }
 }
+// [INGRESO-CAT-1] Gemela de `_gastoPoblarCategorias`. Llena los DOS selects de
+// ingreso con el catálogo que manda el servidor. Si la respuesta no lo trae
+// —una versión vieja de la función, un fallo— se conserva el último conocido en
+// vez de vaciar los selects: dejar a alguien sin categorías es peor que
+// enseñarle las de hace un minuto.
+let _ingresoCategorias = null;
+function _ingresoPoblarCategorias(cats) {
+  if (Array.isArray(cats) && cats.length) _ingresoCategorias = cats.slice();
+  const lista = _ingresoCategorias || [];
+  if (!lista.length) return;   // sin catálogo no se toca el markup que ya está
+  const sel = document.getElementById('ingreso-categoria');
+  if (sel) {
+    const antes = sel.value;
+    // [DEFAULTS-1] La primera va vacía. Sin ella el navegador elegía «Vuelo»
+    // sola, y un ingreso capturado sin mirar nacía clasificado como vuelo. La
+    // categoría es una ATRIBUCIÓN: decide cómo se lee ese dinero.
+    sel.innerHTML = '<option value="">— elige categoría —</option>'
+      + lista.map((c) => `<option>${_esfEsc(c)}</option>`).join('');
+    sel.value = (antes && lista.includes(antes)) ? antes : '';
+  }
+  // El filtro de la tabla conserva su primera opción ("Todas").
+  const filtro = document.getElementById('filtro-cat-ingresos');
+  if (filtro) {
+    const antes = filtro.value;
+    while (filtro.options.length > 1) filtro.remove(1);
+    lista.forEach((c) => { const o = document.createElement('option'); o.value = c; o.textContent = c; filtro.appendChild(o); });
+    if (antes && lista.includes(antes)) filtro.value = antes;
+  }
+}
+
 function _gastoPoblarCategorias(cats) {
   if (Array.isArray(cats) && cats.length) _gastoCategorias = cats.slice();
   const lista = _gastoCategorias || [];
@@ -371,6 +401,10 @@ async function loadIngresos() {
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los ingresos');
+ // [INGRESO-CAT-1] El catálogo llega del servidor, de la MISMA fuente que
+ // valida el alta y la edición. Llena los DOS selects: el del modal y el del
+ // filtro de la tabla — que es justo donde gastos se había roto.
+ _ingresoPoblarCategorias(d.categorias);
  _poblarCuentas(d.cuentas);          // [BANCO-SELECT-1] el catálogo, del servidor
  const ingresos = Array.isArray(d.ingresos) ? d.ingresos : [];
  _ingresosListCache = ingresos;   // para que editarIngreso pre-llene desde memoria

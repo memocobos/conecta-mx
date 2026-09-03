@@ -610,6 +610,10 @@ async function _ppVerPreview(slug) {
         <div style="margin-top:6px">Afecta a <b>${d.clientes} cliente${d.clientes === 1 ? '' : 's'}</b> activo${d.clientes === 1 ? '' : 's'}.</div>
         <div>Se recorrerán <b>${d.cuotas} cuota${d.cuotas === 1 ? '' : 's'}</b> pendiente${d.cuotas === 1 ? '' : 's'} los mismos días. Los montos NO cambian.</div>
         <div style="margin-top:6px;color:var(--ts);font-size:12px">Nadie recibe correo todavía: al terminar te pregunto si aviso.</div>
+        ${d.f_texto_accion === 'actualizado'
+          ? `<div style="margin-top:6px">El letrero de la card pasará de <b>${_esfEsc(d.f_texto_anterior)}</b> a <b style="color:var(--yellow,#e8ff4c)">${_esfEsc(d.f_texto_nuevo)}</b>.</div>`
+          : ''}
+        ${d.f_texto_aviso ? `<div style="margin-top:6px;color:var(--orange,#ff8c00)">⚠ ${_esfEsc(d.f_texto_aviso)}</div>` : ''}
       </div>`;
     const conEl = document.getElementById('pp-confirmacion');
     if (conEl) conEl.innerHTML = `
@@ -695,6 +699,7 @@ function _ppExito(slug, d) {
   const n = d.clientes || 0;
   if (resEl) resEl.innerHTML = `
     <div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}.${_esfEsc(extra)} ${_esfEsc(d.recordatorio || '')}</div>
+    ${d.f_texto_aviso ? `<div class="alert alert-info" style="margin-top:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_esfEsc(d.f_texto_aviso)}</div>` : ''}
     ${atoradas ? `<div class="alert alert-error" style="margin-top:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${d.pagos_fallidos || ''} cuota(s) no se pudieron recorrer. Úsalo con <b>↻ Reintentar</b> en la fila del evento: sólo mueve las que faltaron.</div>` : ''}
     <div style="border:1px solid var(--bd,rgba(255,255,255,.15));border-radius:var(--r-sm,8px);padding:12px 14px;margin-top:10px;font-size:13px;line-height:1.6">
       <div style="margin-bottom:10px">Nadie ha recibido correo. <b>¿Aviso a ${n} cliente${n === 1 ? '' : 's'} ahora?</b><br>

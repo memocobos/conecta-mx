@@ -1015,7 +1015,13 @@
           <!-- [MIG-1a] El wizard de captura del Excel. Va AQUÍ y no dentro de
                #cc-kh-wrap porque ese bloque está display:none mientras no haya
                migrados — que es exactamente el estado en el que se estrena. -->
-          <button class="btn btn-ghost btn-sm" id="mig-abrir" onclick="migAbrir()" style="font-size:10px;border-color:var(--orange);color:var(--orange)">↥ Migrar del Excel</button>
+          <!-- [FLUJO-UX-8] Se llamaba «↥ Migrar del Excel»: un verbo de mudanza de UNA
+               VEZ para lo que en realidad es el alta de TODOS LOS DÍAS. Nadie
+               alcanzaba este botón para registrar al cliente de hoy, y por eso
+               el Excel seguía siendo la puerta. Mismo acto = MISMO nombre en
+               las dos puertas: dos nombres para una acción es justo lo que
+               UX-6 acaba de quitar de la casa. -->
+          <button class="btn btn-ghost btn-sm" id="mig-abrir" onclick="migAbrir()" style="font-size:10px;border-color:var(--orange);color:var(--orange)">+ Registrar cliente</button>
          </div>
         </div>
         <!-- [FLUJO-UX-7] EL BLOQUE DEL PORTAL DICE SU NOMBRE. Estos tres chips
@@ -1202,6 +1208,11 @@
 
      <!-- Modales Capsule Corps -->
      <div class="modal-overlay" id="modal-cc-evento"></div>
+     <!-- [FLUJO-UX-8] El paso que le falta a la puerta nueva: registrar a un
+          cliente EMPIEZA por el evento, y esa elección es del capturista. Por
+          el camino viejo el evento ya venía elegido (se entra desde su ficha);
+          desde Resumen no hay ninguno, así que se pregunta. -->
+     <div class="modal-overlay" id="modal-vj-alta"></div>
      <div class="modal-overlay" id="modal-viajero"></div>
      <div class="modal-overlay" id="modal-habitacion"></div>
      <div class="modal-overlay" id="modal-asignar-coordi"></div>

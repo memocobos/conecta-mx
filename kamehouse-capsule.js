@@ -29,6 +29,82 @@ function _migSlug() {
   if (!base) return null;
   return (_migFechaIdx == null) ? base : `${base}#${_migFechaIdx}`;
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// [FLUJO-UX-8] LA PUERTA NUEVA DEL ALTA — «+ Registrar cliente» desde Resumen
+// ═══════════════════════════════════════════════════════════════════════════
+// El wizard ya existía y ya capturaba las NUEVE columnas del Excel; lo que le
+// faltaba era ROTULO y LUGAR. Aquí va el lugar: la tira de acciones rápidas de
+// Resumen, medida como el punto cero (los tres roles aterrizan ahí y la tira se
+// ve sin scroll). Esto NO reimplementa nada — pregunta el evento y le entrega
+// el mando al MISMO `migAbrir()` de siempre.
+//
+// 🔒 REGISTRAR UN CLIENTE EMPIEZA POR EL EVENTO, y esa elección es del
+// capturista: selector de papel MANDO (nace vacío, «— Elige un evento —»,
+// `required`), la pieza de FLUJO-UX-4. Un default aquí ATRIBUIRÍA un cliente al
+// evento que el orden de la lista puso primero — el defecto de `kmt-prov`, que
+// mandó 3 compras a «Hotel».
+//
+// ⚠️ `expandirFechas:false` a propósito: el wizard resuelve la multifecha
+// ADENTRO (`_migFechaIdx`, «la fecha se elige UNA vez»), igual que el Palacio.
+// Y `_ccEventoActual` tiene que ser el slug BASE, porque `migAbrir` busca con
+// `e.id === _ccEventoActual`; un `slug#idx` no casaría con ningún evento.
+async function vjAltaAbrir() {
+  if (typeof _vjPuedeAlta === 'function' && !_vjPuedeAlta()) return;
+  const cont = document.getElementById('modal-vj-alta');
+  if (!cont) return;
+  cont.innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Registrar cliente</div>
+        <button class="modal-close" onclick="closeModal('modal-vj-alta')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Evento *</label>
+          <select class="cot-input" id="vj-alta-ev" style="width:100%"></select>
+          <div class="fld-help">El separo y el boleto son de un evento: primero se elige cuál.</div>
+        </div>
+        <div id="vj-alta-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-vj-alta')">Cancelar</button>
+        <button class="btn btn-primary" id="vj-alta-ir" onclick="vjAltaIr()">Continuar</button>
+      </div>
+    </div>`;
+  const sel = document.getElementById('vj-alta-ev');
+  let lista = [];
+  try { lista = await _fetchEVFromIndex(); } catch (_) { lista = []; }
+  // `_fetchEVFromIndex` NO LANZA: devuelve [] y hace console.warn. Un catálogo
+  // vacío aquí no es «no hay eventos», es «no cargó», y se dice.
+  if (!lista.length) {
+    const a = document.getElementById('vj-alta-alert');
+    if (a) a.innerHTML = '<div class="alert alert-error">No se pudo cargar el catálogo de eventos. Intenta de nuevo.</div>';
+  }
+  evSelectorPintar(sel, lista, { papel: 'mando', expandirFechas: false });
+  openModal('modal-vj-alta');
+  setTimeout(() => { if (sel) sel.focus(); }, 60);
+}
+
+// Lleva al MISMO sitio de siempre, en un paso: la ficha del evento, su pestaña
+// de Viajeros, y el wizard abierto. El camino viejo no se toca ni se duplica.
+async function vjAltaIr() {
+  const sel = document.getElementById('vj-alta-ev');
+  const id = sel && sel.value;
+  const alerta = document.getElementById('vj-alta-alert');
+  if (!id) {
+    // El vacío del MANDO no es un valor: la pantalla no funciona sin él.
+    if (alerta) alerta.innerHTML = '<div class="alert alert-error">Elige el evento para continuar.</div>';
+    if (sel) sel.focus();
+    return;
+  }
+  closeModal('modal-vj-alta');
+  showPage('capsule');
+  await abrirDetalleEvento(id);
+  const sub = document.getElementById('cc-sub-btn-viajeros');
+  if (typeof showCCSubTab === 'function') showCCSubTab('viajeros', sub);
+  await migAbrir();
+}
+
 async function migAbrir() {
   const panel = _migEl('mig-panel');
   if (!panel || !_ccEventoActual) return;

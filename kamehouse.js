@@ -2940,7 +2940,20 @@ function _renderCobranza() {
     // 🔒 [FLUJO-UX-5] TIPO **FILTRO**, y es la pantalla que enseñó por qué hace
     // falta el tipo: aquí SÍ puede haber cientos de tours debajo del filtro.
     // Mandar a «capturar un tour» sería mentir sobre el estado de la base.
-    khVacio(tbody, 'tour', { tipo: 'filtro', colspan: 10 });
+    //
+    // 🔒 [FLUJO-UX-7] …PERO SOLO CUANDO HAY ALGO DEBAJO. Esta pantalla decía
+    // «filtro» SIEMPRE, sin mirar la caché, y es la primera que abre Bulma cada
+    // día: con la base vacía la recibía un «ningún tour coincide con los
+    // filtros» sobre unos filtros que nacen TODOS en «Todos» y no excluyen
+    // nada. Medido en sesión real (Jane, 3-sep): costaba un clic de más y la
+    // duda de si el filtro estaba mal puesto. La pregunta correcta no es
+    // «¿quedó vacía la lista?» sino «¿hay algo que filtrar?».
+    const hayQueFiltrar = (_cobranzaCache || []).length > 0;
+    khVacio(tbody, 'tour', hayQueFiltrar
+      ? { tipo: 'filtro', colspan: 10 }
+      // `frase` propia porque los dos tipos piden número distinto: el de filtro
+      // dice «Ningún tour…» (singular) y el de datos «Sin … todavía» (plural).
+      : { tipo: 'datos', colspan: 10, frase: 'Sin tours en cobranza todavía' });
     return;
   }
 

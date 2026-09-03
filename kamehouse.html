@@ -1018,6 +1018,24 @@
           <button class="btn btn-ghost btn-sm" id="mig-abrir" onclick="migAbrir()" style="font-size:10px;border-color:var(--orange);color:var(--orange)">↥ Migrar del Excel</button>
          </div>
         </div>
+        <!-- [FLUJO-UX-7] EL BLOQUE DEL PORTAL DICE SU NOMBRE. Estos tres chips
+             filtran SOLO la lista del Portal y sus contadores cuentan SOLO esa
+             lista — pero no lo decían, y el bloque de abajo («Viajeros migrados
+             y de staff») sí tiene título. Medido en sesión real (Jane, 3-sep):
+             se leían «todos (0) · clientes (0) · staff (0)» con DOCE filas de
+             migrados a la vista, y eso se lee como un contador que miente.
+             No mentía: contaba otra población. Se le pone el mismo encabezado
+             que ya tiene su hermano, para que el (0) se lea con su alcance.
+             🔒 NO se suman los dos mundos: están separados A PROPÓSITO (dos
+             orígenes con reglas distintas y contabilidades distintas), y un
+             chip «todos (12)» que al pulsarlo enseña 0 sería peor mentira. -->
+        <!-- Se usan `vj2-t`/`vj2-d` (la tipografía del hermano) pero NO `vj2-h`:
+             esa clase trae `border-top`, que ahí es el SEPARADOR entre los dos
+             mundos. Arriba del primero sería una línea suelta bajo la barra. -->
+        <div style="margin-bottom:10px">
+         <div class="vj2-t">Viajeros del Portal</div>
+         <div class="vj2-d">Los que reservaron en el sitio. Su dinero se lleva aquí.</div>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
          <button class="gz-filter active" id="cc-fil-viaj-todos" onclick="filtrarViajerosCC('todos',this)">// todos <span id="cc-cnt-todos" style="color:var(--ts);margin-left:4px"></span></button>
          <button class="gz-filter" id="cc-fil-viaj-cliente" onclick="filtrarViajerosCC('cliente',this)">// clientes <span id="cc-cnt-cliente" style="color:var(--ts);margin-left:4px"></span></button>

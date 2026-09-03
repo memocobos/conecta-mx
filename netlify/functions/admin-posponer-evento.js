@@ -24,6 +24,10 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [POSPONER-TEXTO-1] La MISMA función que decide el letrero al publicar. No se
+// copia el formato: se le pregunta a quien manda, o el día que el formato cambie
+// tendríamos dos.
+const { fechaDisplayDeEsfera } = require('./_lib/esferas-compile');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -78,7 +82,7 @@ exports.handler = async (event) => {
   try {
     // 1. Leer el evento y su fecha actual.
     const evRes = await fetch(
-      `${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug,nombre,fecha_inicio&limit=1`,
+      `${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug,nombre,fecha_inicio,fecha_fin,fechas_extra,multifecha,f_texto&limit=1`,
       { headers: sbHeaders }
     );
     if (!evRes.ok) {
@@ -101,6 +105,55 @@ exports.handler = async (event) => {
       (Date.parse(fechaNueva + 'T00:00:00Z') - Date.parse(String(fechaAnterior).slice(0, 10) + 'T00:00:00Z')) / MS_DIA
     );
 
+    // ─────────────────────────────────────────────────────────────────────
+    // [POSPONER-TEXTO-1] EL LETRERO DE LA FECHA
+    //
+    // `f_texto` es un OVERRIDE que le gana a todo en `fechaDisplayDeEsfera`: si
+    // está puesto, el compilador lo devuelve tal cual. Por eso posponer cambiaba
+    // `fecha_inicio` y la card seguía anunciando la fecha muerta — y republicar
+    // NO podía arreglarlo, porque el publish re-emitía fielmente el texto viejo.
+    // Pasó dos veces de verdad (anuelaa el 2-sep, scorpions el 3-sep) y las dos
+    // las curó Jane a mano.
+    //
+    // MEDIDO EN LA BASE antes de escribir esto (3-sep, 104 fichas con fecha):
+    //   · 78 con `f_texto` NULL     → el compilador deriva. Posponer YA les servía.
+    //   · 16 con el texto = la fecha → los que muerde el bug. Aquí se arreglan.
+    //   · 10 con texto A MANO        → 7 multifecha + 3 con fechas extra. NO se tocan.
+    //
+    // 🔒 LA PREGUNTA NO ES «¿parece una fecha?» sino «¿es EXACTAMENTE lo que este
+    // evento mostraría sin el override?». Se le pregunta a la función del
+    // compilador con el override apagado: si coinciden, el texto no aportaba nada
+    // y se puede rehacer. Si difieren, alguien escribió algo que ninguna regla
+    // genera y ESO NO SE PISA.
+    const _fTextoViejo = (typeof ev.f_texto === 'string') ? ev.f_texto.trim() : '';
+    // Un evento de VARIAS fechas no se resuelve moviendo `fecha_inicio`: sus
+    // `fechas_extra` se quedarían en su sitio y el letrero mezclaría dos épocas.
+    // El endpoint NO las mueve —medido: no las menciona— así que aquí tampoco se
+    // finge que sí. Se avisa y se deja intacto.
+    const _tieneVariasFechas = !!(
+      (ev.fechas_extra && String(ev.fechas_extra).trim() && !['[]', 'null'].includes(String(ev.fechas_extra).trim())) ||
+      ev.fecha_fin ||
+      (ev.multifecha && String(ev.multifecha).trim())
+    );
+    const _sinOverride = (fecha) => fechaDisplayDeEsfera({ ...ev, f_texto: null, fecha_inicio: fecha });
+    const _derivadoViejo = _sinOverride(fechaAnterior);
+    const _derivadoNuevo = _sinOverride(fechaNueva);
+
+    let fTextoNuevo = null;           // lo que se va a escribir, si algo
+    let fTextoAccion, fTextoAviso = null;
+    if (!_fTextoViejo) {
+      fTextoAccion = 'no_hacia_falta';
+    } else if (_tieneVariasFechas) {
+      fTextoAccion = 'respetado_multifecha';
+      fTextoAviso = `Este evento tiene varias fechas y su letrero dice "${_fTextoViejo}". Posponer solo movió la fecha de inicio: revisa el letrero y las fechas extra a mano en Esferas.`;
+    } else if (_fTextoViejo === _derivadoViejo) {
+      fTextoNuevo = _derivadoNuevo;
+      fTextoAccion = 'actualizado';
+    } else {
+      fTextoAccion = 'respetado_custom';
+      fTextoAviso = `El letrero de este evento dice "${_fTextoViejo}", que no es su fecha: se dejó como estaba. Si hay que cambiarlo, se edita en Esferas.`;
+    }
+
     // 2b. SEG-1 · Modo preview: enseñar qué va a pasar y NO escribir nada.
     //     Aditivo — nadie mandaba `preview` antes, así que ningún contrato se
     //     rompe. Corta ANTES del INSERT de la bitácora, que es la primera
@@ -120,6 +173,11 @@ exports.handler = async (event) => {
           delta_dias: deltaDias,
           clientes: u.destinatarios.length,
           cuotas: u.pagosPendientes.length,
+          // [POSPONER-TEXTO-1] Se dice ANTES de apretar, no después.
+          f_texto_accion: fTextoAccion,
+          f_texto_anterior: _fTextoViejo || null,
+          f_texto_nuevo: fTextoNuevo,
+          f_texto_aviso: fTextoAviso,
         }),
       };
     }
@@ -149,7 +207,10 @@ exports.handler = async (event) => {
     const patchRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}`, {
       method: 'PATCH',
       headers: { ...sbHeaders, Prefer: 'return=minimal' },
-      body: JSON.stringify({ fecha_inicio: fechaNueva }),
+      // [POSPONER-TEXTO-1] El letrero viaja en el MISMO PATCH que la fecha: dos
+      // escrituras podrían dejar la fecha nueva con el texto viejo si la segunda
+      // falla, que es exactamente el estado del que venimos.
+      body: JSON.stringify(fTextoNuevo ? { fecha_inicio: fechaNueva, f_texto: fTextoNuevo } : { fecha_inicio: fechaNueva }),
     });
     if (!patchRes.ok) {
       const detail = await patchRes.text();
@@ -225,7 +286,17 @@ exports.handler = async (event) => {
         evento_nombre: ev.nombre,
         fecha_anterior: fechaAnterior,
         fecha_nueva: fechaNueva,
-        recordatorio: 'Republica el evento desde Esferas para que el sitio muestre la nueva fecha',
+        // [POSPONER-TEXTO-1] El recordatorio ya existía y la pantalla YA lo pintaba
+        // (medido en kamehouse-esferas.js): el «no funcionó» de las dos veces NO
+        // fue por no saber del publish —Memo sí republicó— sino porque el publish
+        // re-emitía el letrero viejo. Se conserva, y se le añade el paso concreto.
+        recordatorio: fTextoAccion === 'actualizado'
+          ? `Fecha y letrero actualizados ("${_derivadoViejo}" → "${fTextoNuevo}"). Falta UN paso: dale Publicar en Esferas para que salga al sitio.`
+          : 'Fecha cambiada. Falta UN paso: dale Publicar en Esferas para que salga al sitio.',
+        f_texto_accion: fTextoAccion,
+        f_texto_anterior: _fTextoViejo || null,
+        f_texto_nuevo: fTextoNuevo,
+        f_texto_aviso: fTextoAviso,
         clientes: universo ? universo.destinatarios.length : null,
         ...pagosInfo,
       }),

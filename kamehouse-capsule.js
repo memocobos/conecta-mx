@@ -101,7 +101,11 @@ async function vjAltaIr() {
   showPage('capsule');
   await abrirDetalleEvento(id);
   const sub = document.getElementById('cc-sub-btn-viajeros');
-  if (typeof showCCSubTab === 'function') showCCSubTab('viajeros', sub);
+  // [FLUJO-UX-9b] `true` = la eligió la casa. Este salto a Viajeros es parte del
+  // camino del alta, NO la costumbre de quien navega: registrarlo cambiaría el
+  // aterrizaje de TODOS los eventos siguientes —a Roshi, además, de equipo a
+  // viajeros— por haber usado una vez «+ Registrar cliente».
+  if (typeof showCCSubTab === 'function') showCCSubTab('viajeros', sub, true);
   await migAbrir();
 }
 

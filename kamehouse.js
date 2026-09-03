@@ -661,8 +661,32 @@ function _homeDeRol() {
 // showPage(). Prometían un acto que no ejecutan, y 'Crear evento' era además
 // el único 'Crear' de toda la casa. Ahora se nombran por su DESTINO, que es
 // lo que ya hacían los otros cinco de esta misma tira.
+// [FLUJO-UX-8] GEMELO CON NOMBRE de `ROLES_EDITA_VIAJERO` (la lista que manda,
+// en `admin-coordi-asignaciones` para la acción `viajero_migrar`). Se declara
+// aparte y NO se reusa `VJ_ROLES_ELIMINAR` —que vive ~4,700 líneas abajo—: hoy
+// coinciden, pero borrar y dar de alta son dos permisos distintos, y el día que
+// uno se mueva el otro no debe moverse solo. El arnés carea los dos runtimes.
+//
+// ⚠️ VA AQUÍ, ANTES DE `ATAJOS_HOME`, Y NO JUNTO A SU HERMANO. `ATAJOS_HOME` es
+// un `const` que EVALÚA esta lista al cargar el archivo; declararla después la
+// deja en zona muerta temporal y el `ReferenceError` **mata kamehouse.js
+// entero** — la página completa, no solo el atajo. Lo cazó el arnés antes de
+// que nadie la abriera. Hermana de «declarar la constante en un runtime y
+// usarla en otro»: aquí el runtime es el mismo y lo que falla es el ORDEN.
+const VJ_ROLES_ALTA = ['maestro_roshi', 'bulma', 'milk'];
+function _vjPuedeAlta() {
+  return !!(currentUser && VJ_ROLES_ALTA.includes(currentUser.rol));
+}
+
 const ATAJOS_HOME = {
   maestro_roshi: [
+    // [FLUJO-UX-8] La PRIMERA acción de verdad de esta tira. Su título dice
+    // «ACCIONES RÁPIDAS» y hasta hoy las siete entradas eran destinos (UX-6 lo
+    // hizo explícito). Va aquí porque se MIDIÓ el lugar: los tres roles
+    // aterrizan en Resumen y esta tira se ve SIN hacer scroll (top 429px de
+    // 950) — posición cero. `roles` en vez de `tab` porque lo que la gobierna
+    // no es un permiso de pantalla sino `VJ_ROLES_ALTA`.
+    { accion: 'vjAltaAbrir', etiqueta: '+ Registrar cliente', roles: VJ_ROLES_ALTA },
     { tab: 'esferas',  etiqueta: 'Esferas' },
     { tab: 'kamisama', etiqueta: 'Pedido de boletos' },   // FIRMADO: el stock por evento
     { tab: 'gastos',   etiqueta: 'Gastos' },
@@ -675,6 +699,7 @@ const ATAJOS_HOME = {
     // rescata un destino real, no repite uno que ya tiene puerta. Por eso NO
     // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
     // pago", y dos botones al mismo sitio no son dos atajos.
+    { accion: 'vjAltaAbrir', etiqueta: '+ Registrar cliente', roles: VJ_ROLES_ALTA },
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Pagos' },
     { tab: 'ingresos', etiqueta: 'Ingresos' },
@@ -685,6 +710,7 @@ const ATAJOS_HOME = {
     // rescata un destino real, no repite uno que ya tiene puerta. Por eso NO
     // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
     // pago", y dos botones al mismo sitio no son dos atajos.
+    { accion: 'vjAltaAbrir', etiqueta: '+ Registrar cliente', roles: VJ_ROLES_ALTA },
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Pagos' },
     { tab: 'ingresos', etiqueta: 'Ingresos' },

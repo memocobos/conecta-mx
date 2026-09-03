@@ -18,15 +18,25 @@
 function _renderAtajosHome() {
   const cont = document.getElementById('resumen-atajos');
   if (!cont || !currentUser) return;
-  const visibles = (ATAJOS_HOME[currentUser.rol] || []).filter(a => _puedeVerTab(a.tab));
+  // [FLUJO-UX-8] DOS CLASES DE ENTRADA, y cada una se filtra con SU pregunta:
+  //   · DESTINO   → `tab`, y manda `_puedeVerTab` (permiso de pantalla).
+  //   · ACCIÓN    → `accion` + `roles`, y manda la lista de roles de esa acción.
+  // Preguntarle `_puedeVerTab(undefined)` a una acción la escondería siempre, en
+  // silencio — la forma exacta de las pérdidas que cazó la serie EVT-NAV.
+  const visibles = (ATAJOS_HOME[currentUser.rol] || []).filter(a => a.accion
+    ? (Array.isArray(a.roles) && a.roles.includes(currentUser.rol) && typeof window[a.accion] === 'function')
+    : _puedeVerTab(a.tab));
   if (!visibles.length) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
   cont.innerHTML = '<div class="k-mono" style="margin-bottom:10px">// ACCIONES RÁPIDAS</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
     + visibles.map(a => {
         // Sin segundo parámetro: todos estos destinos SÍ tienen botón de menú, así
         // que showPage saca el rótulo móvil de ahí. Pasarlo sería argumento muerto.
-        const abrir = a.herramienta ? `showHerramienta('${a.tab}')` : `showPage('${a.tab}')`;
-        return `<button class="btn btn-ghost btn-sm" onclick="${abrir}">${a.etiqueta}</button>`;
+        const abrir = a.accion ? `${a.accion}()`
+                    : a.herramienta ? `showHerramienta('${a.tab}')` : `showPage('${a.tab}')`;
+        // La acción se distingue a la vista: es la única que HACE algo.
+        const clase = a.accion ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+        return `<button class="${clase}" onclick="${abrir}">${a.etiqueta}</button>`;
       }).join('')
     + '</div>';
   cont.style.display = '';

@@ -23,6 +23,8 @@ const { validarMonto } = require('./_lib/monto-limites');
 // [UTIL-C-3] La lista, de su dueño. La regla del evento NO aplica a un
 // ingreso: lo que se exige aquí es lo mismo de siempre.
 const { normCuenta, errorCuentaDeIngreso } = require('./_lib/cuentas-dinero');
+// [INGRESO-CAT-1] El catálogo manda AQUÍ, no en el navegador.
+const { esValida: esValidaCategoria, errorCategoria } = require('./_lib/categorias-ingreso');
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 exports.handler = async (event) => {
@@ -71,6 +73,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'evento_id inválido' }) };
   }
   const categoria  = (typeof body.categoria === 'string' && body.categoria.trim()) ? body.categoria.trim().slice(0, 60) : null;
+  // [INGRESO-CAT-1] Se valida en los DOS escritores: editar no puede ser la
+  // puerta trasera del alta. El recorte a 60 se queda —es la defensa contra un
+  // texto enorme—, pero recortar NO es validar: dejaba pasar cualquier cadena.
+  if (!esValidaCategoria(categoria)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: errorCategoria(categoria) }) };
+  }
   const metodoPago = (typeof body.metodo_pago === 'string' && body.metodo_pago.trim()) ? body.metodo_pago.trim().slice(0, 60) : null;
 
   // Cuenta a la que entró el ingreso (para el futuro visor de saldos). Opcional,

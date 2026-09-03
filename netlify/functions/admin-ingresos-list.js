@@ -26,6 +26,10 @@
 // [BANCO-SELECT-1] El catálogo de cuentas viaja con la lista, igual que las
 // categorías en `admin-gastos-list`: el navegador no tiene lista propia.
 const { CUENTAS } = require('./_lib/cuentas-dinero');
+// [INGRESO-CAT-1] El navegador llena sus DOS selects con esto: el del alta y el
+// del filtro de la tabla. Dos listas escritas a mano acaban divergiendo — en
+// gastos ya había pasado, y el filtro no podía filtrar lo que el alta capturaba.
+const { CATEGORIAS } = require('./_lib/categorias-ingreso');
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -104,7 +108,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, count: ingresos.length, ingresos, total, total_mes: totalMes, cuentas: CUENTAS }),
+      body: JSON.stringify({ ok: true, count: ingresos.length, ingresos, total, total_mes: totalMes, categorias: CATEGORIAS, cuentas: CUENTAS }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando ingresos', detail: e.message }) };

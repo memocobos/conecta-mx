@@ -669,7 +669,12 @@ async function abrirEditarUsuarioMT(id) {
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
   const tabsBloq  = permisos.tabs_bloqueados || [];
-  const todasTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','kamisama'];
+  // [VENTAS-RETIRO-1] Sale 'ventas': el panel ya no existe (VEN-BORRA-1), y esta
+  // lista es la que pinta las casillas de «tabs extra» por usuario. Ofrecer una
+  // pantalla retirada no es cosmético — `_puedeVerTab` SUMA `tabs_extra`, así que
+  // conceder 'ventas' encendía un atajo cuyo `showPage` revienta contra un `null`
+  // y deja la app en blanco. Las otras nueve se quedan, una por una.
+  const todasTabs = ['resumen','pagos','eventos','gastos','inventario','reportes','capsule','equipo','kamisama'];
 
   document.getElementById('modal-mt-usuario').innerHTML = `
     <div class="modal" style="max-width:520px">

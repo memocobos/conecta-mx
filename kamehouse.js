@@ -653,8 +653,16 @@ function _homeDeRol() {
 // Los atajos del home. El ROL decide qué es RELEVANTE (qué hace esa persona a
 // diario); _puedeVerTab decide qué está PERMITIDO. Son dos preguntas distintas
 // y se mantienen separadas: aquí NO se consulta ningún rol para permitir, solo
-// para ordenar la vitrina. Por eso milk no ve "Ventas" —no tiene 'ventas'— sin
-// que este catálogo tenga que saberlo.
+// para ordenar la vitrina.
+//
+// [VENTAS-RETIRO-1] Aquí vivían dos atajos a 'ventas'. El panel se lo llevó
+// VEN-BORRA-1 junto con los vendedores —no queda `page-ventas`, ni `khVentas`,
+// ni `admin-ventas-resumen`—, así que eran una PUERTA A LA NADA: `showPage`
+// hace `getElementById('page-ventas').classList` y con `null` revienta, dejando
+// la app en blanco. No se veían porque ningún rol trae 'ventas' en
+// PERMISOS_TABS… pero Montaña Pai OFRECÍA concederla como permiso extra, y
+// `_puedeVerTab` suma `tabs_extra`. Medido: 14 usuarios, 0 con permisos_extra —
+// la trampa estaba armada y sin disparar.
 // [FLUJO-UX-6] UN ATAJO DICE A DÓNDE VA, no promete una acción. Medido el
 // 2-sep: los cuatro que llevaban verbo —'Crear evento', 'Registrar gasto',
 // 'Registrar pago', 'Registrar ingreso'— NO crean ni registran nada: hacen
@@ -703,7 +711,6 @@ const ATAJOS_HOME = {
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Pagos' },
     { tab: 'ingresos', etiqueta: 'Ingresos' },
-    { tab: 'ventas',   etiqueta: 'Ventas' },
   ],
   milk: [
     // [E5-6] 'solicitudes_portal' acaba de perder su entrada del menú: un atajo
@@ -714,7 +721,6 @@ const ATAJOS_HOME = {
     { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Pagos' },
     { tab: 'ingresos', etiqueta: 'Ingresos' },
-    { tab: 'ventas',   etiqueta: 'Ventas' },   // milk NO tiene 'ventas': el filtro lo quita
   ],
 };
 

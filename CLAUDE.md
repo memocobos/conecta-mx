@@ -344,7 +344,15 @@ está caduco antes de escribirse.
   no se mergean, no se retoman y no se re-proponen. Se dejan anotadas justamente
   para que nadie las "rescate" creyendo que se olvidaron.
 - **Doc `kamehouse.md`**: bloqueado por permisos de macOS/TCC.
-- Retirar el panel `ventas-resumen` cuando ya no se use.
+- ✅ **`ventas-resumen`: RETIRADO** (VENTAS-RETIRO-1, 3-sep-2026). El panel, su
+  módulo `khVentas` y el endpoint `admin-ventas-resumen` ya se los había
+  llevado **VEN-BORRA-1**; lo que quedaba eran **restos con dientes**: dos
+  atajos a `showPage('ventas')` —que revienta contra un `null` y deja la app en
+  blanco— y, sobre todo, la casilla de **Montaña Pai que OFRECÍA conceder
+  'ventas'** como permiso extra (`_puedeVerTab` suma `tabs_extra`). Medido: 14
+  usuarios, **0 con `permisos_extra`** — la trampa estaba armada y sin disparar.
+  ⚠️ La columna **«Ventas» del Resumen NO es esto**: es un dato de la tabla
+  (facturado · ventas · gastos · ganancia) y se queda.
 
 ### ⚪ Anotados sin urgencia (decisiones ya tomadas)
 - 🔒 **SELLADO (SCROLL-2, 23-ago-2026): las 5 animaciones infinitas que pintan

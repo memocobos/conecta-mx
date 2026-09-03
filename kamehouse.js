@@ -4678,7 +4678,36 @@ function showCCTab(tab, btn) {
   document.getElementById('cc-tab-detalle').style.display = tab === 'detalle' ? '' : 'none';
 }
 
-function showCCSubTab(sub, btn) {
+// ═══════════════════════════════════════════════════════════════════════════
+// [FLUJO-UX-9b] LA FICHA ATERRIZA DONDE LA PERSONA TRABAJA
+// ═══════════════════════════════════════════════════════════════════════════
+// `abrirDetalleEvento` mandaba SIEMPRE a «equipo», sin mirar el rol. Para Bulma
+// y Milk —cuyos caminos son viajeros y rooming— eso era UN CLIC en la primera
+// visita a CADA evento. Hecho firmado por Memo (3-sep): bulma/milk van primero
+// a Viajeros, y luego a Rooming.
+//
+// 🔒 ROSHI SE QUEDA EN «equipo», y no por descuido: **su costumbre no se midió,
+// y un default que nadie midió es un dato inventado** — el defecto de
+// `kmt-prov`, que mandó 3 compras a «Hotel» porque el orden de la lista eligió
+// por alguien. Este mapa solo tiene a quien tiene el hecho firmado.
+//
+// ⚠️ Se LEE EN CADA LLAMADA, no al cargar el archivo. Es lo contrario de
+// `ATAJOS_HOME`, que evalúa su lista al cargar y por eso su constante tuvo que
+// subir 4,700 líneas en UX-8. Aquí el orden no muerde, pero se dice para que
+// nadie deduzca la regla equivocada del ejemplo de al lado.
+const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros' };
+function _ccSubDefault() {
+  return (currentUser && CC_SUB_POR_ROL[currentUser.rol]) || 'equipo';
+}
+// La sub-pestaña que LA PERSONA eligió en esta sesión. `null` = todavía no
+// eligió ninguna, y entonces manda el default de su rol.
+let _ccSubElegida = null;
+
+// `deLaCasa` = la eligió el CÓDIGO, no la persona. Sin ese aviso, la llamada
+// que abre la ficha se registraría como una elección y el default se estaría
+// «recordando» a sí mismo, borrando la costumbre real de quien navega.
+function showCCSubTab(sub, btn, deLaCasa) {
+  if (!deLaCasa) _ccSubElegida = sub;
   document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   ['equipo','viajeros','rooming','transporte','pagos'].forEach(s => {
@@ -5041,7 +5070,12 @@ async function abrirDetalleEvento(id) {
   }
 
   // Cargar datos. Rooming agrupa _ccViajeros, así que corre DESPUÉS de loadViajeros.
-  showCCSubTab('equipo', document.getElementById('cc-sub-btn-equipo'));
+  // 🔒 LA MEMORIA MANDA SOBRE EL DEFAULT. Si la persona ya se movió a otra
+  // sub-pestaña en esta sesión, ahí se queda: el default es para quien todavía
+  // no ha dicho nada, no para corregir a quien ya dijo. (Medido en UX-9: la
+  // memoria de Capsule ya era completa; esta tuerca no se la pisa.)
+  const _sub = _ccSubElegida || _ccSubDefault();
+  showCCSubTab(_sub, document.getElementById('cc-sub-btn-' + _sub), true);
   await Promise.all([loadCCEquipo(), loadViajeros()]);
   await loadRooming();
 }

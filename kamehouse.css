@@ -648,7 +648,25 @@ tr:hover td{background:var(--bg3)}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-green{background:rgba(87,227,137,.15);border:1px solid rgba(87,227,137,.30);color:var(--green)}
 .btn-red{background:rgba(255,90,77,.13);border:1px solid rgba(255,90,77,.28);color:var(--red)}
-.btn-sm{padding:5px 10px;font-size:10px}
+/* [BTN-SM-1] LA FAMILIA PEQUEÑA DECLARA SU ALTO. UX-6 la acoto a proposito para
+   no arreglarla a medias; esta es su medicion propia (137 btn-sm visibles en las
+   20 pantallas, rol Roshi).
+   El alto salia de `10 de padding + borde + contenido`, y NADIE eligio ninguno
+   de los dos sumandos variables:
+     · el BORDE: 0 en primary, 2 en ghost — la misma «tasa de variante» que ya
+       se curo en los grandes;
+     · el CONTENIDO: 12 con texto plano, 13 con un glifo como «→», 14 con «↻» o
+       un svg. El renglon no estaba declarado, asi que lo fijaba el glifo.
+   Reparto medido: 23 (110) · 24 (15) · 25 (10) · 26 (2).
+   Se declara `height` y, con `box-sizing:border-box`, el borde y el glifo dejan
+   de mover la caja: los 110 se quedan EXACTOS y los 27 emergentes vuelven a 23.
+   ⚠️ 23 NO es una altura «natural» que yo dedujera: es la que ya tienen 110 de
+   137, la unica que no mueve lo que Memo y Jane miran a diario. Si algun dia se
+   quiere otra, se cambia este numero y el arnes vuelve a decir quien se movio.
+   ⚠️ NO SE TOCA EL PADDING: el bloque de movil (`@media max-width:768px`) lo
+   redefine junto con `min-height:34px`, y cambiarlo aqui le moveria el ancho
+   tactil. Ese `min-height` mayor sigue ganando sobre este `height`. */
+.btn-sm{padding:5px 10px;font-size:10px;line-height:13px;height:23px}
 
 /* Selector de color de tema (DC1) */
 .tema-dots{display:flex;gap:12px;flex-wrap:wrap}

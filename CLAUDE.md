@@ -326,6 +326,13 @@ está caduco antes de escribirse.
   a `REPORTE-COBROS-OXXO-MSI.md`, que **NO existe en el repo** (es de los `.md`
   sueltos sin commitear): un puntero a un archivo que nadie puede abrir vale
   menos que decir dónde está la decisión.
+- ✅ **Hojas de impresión a nivel raíz: PODADAS** (IMPRESION-PODA-1, 4-sep-2026).
+  **Eran CINCO, no cuatro**: las 4 de una línea y el bloque multilínea de la
+  cotización (empieza con `@page`, por eso el grep viejo no lo veía). Quitaban
+  la rejilla gris de TODAS las tablas y —lo que nadie había medido— **le pisaban
+  a la app su `font-family:'Montserrat'`**: medido, BASE «Arial» → HEAD
+  «Montserrat». Prescindibles porque `_printVentana` abre `window.open('','_blank')`
+  **sin cargar kamehouse.css** y escribe su propio `<style>`.
 - **El COLOR en línea del Palacio** (medido y congelado por KH-4, sin resolver):
   827 estilos con `color:` en `kamehouse.js` y 158 en el HTML, y **49 `<th>`
   con su propio `color` que NINGUNA hoja de estilo alcanza**. Es la misma

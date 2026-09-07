@@ -97,6 +97,21 @@ function autovalidar() {
 
 const args = process.argv.slice(2);
 const v = autovalidar();
+
+// ⚠️ `--autotest` estaba PROMETIDO en el encabezado y NO EXISTÍA: caía al camino
+// normal y parecía funcionar. Un letrero que promete lo que el código no hace es
+// justo el defecto que esta sesión lleva días cazando — y aquí estaba en el
+// vigilante mismo. Ahora la bandera hace lo que dice, y lo IMPRIME: siembra,
+// caza, quita, calla. Es el modo que se corre para creerle al instrumento.
+if (args.includes('--autotest')) {
+  console.log('── AUTOTEST DEL VIGÍA ──');
+  console.log(`   siembra un color de más  → cuenta ${v.base} → ${v.sembrado}  ${v.caza ? 'LO CAZA ✅' : 'NO LO CAZA ❌'}`);
+  console.log(`   quita la semilla         → cuenta vuelve a ${v.base}       ${v.calla ? 'CALLA ✅' : 'SIGUE GRITANDO ❌'}`);
+  console.log(v.caza && v.calla
+    ? '\n🟢 el instrumento sirve: se le puede creer el veredicto.'
+    : '\n🔴 el instrumento NO sirve: su veredicto no vale nada.');
+  process.exit(v.caza && v.calla ? 0 : 2);
+}
 if (!v.caza || !v.calla) {
   console.error('🔴 EL INSTRUMENTO NO SIRVE — no se emite veredicto.');
   console.error(`   ¿caza un color sembrado? ${v.caza ? 'sí' : 'NO'} (${v.base} → ${v.sembrado})`);

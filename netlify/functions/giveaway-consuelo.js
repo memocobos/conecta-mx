@@ -1,6 +1,8 @@
-// giveaway-consuelo.js — [MEL-1] El correo de consolación del sorteo de Melanie.
-// Un correo corto a los registrados que NO ganaron, con el código MELANIE (30%
-// de descuento, muere hoy a las 8:00 PM de Reynosa).
+// giveaway-consuelo.js — El correo de consolación del sorteo.
+// [MEL-1] nació para melanie · [GIVEAWAY-NATA-1, 6-sep-2026] hoy sirve a
+// NATANAEL CANO. Un correo corto a los registrados que NO ganaron, con el
+// código de consolación — que YA NO SE ESCRIBE AQUÍ: se lee de `promos_codigos`
+// (ver el bloque de la derivación más abajo).
 //
 // PRIVADA (x-admin-token), como giveaway-sortear: esto le escribe a 88 personas
 // reales. Un endpoint abierto sería un botón de spam con el membrete de la casa.
@@ -26,11 +28,53 @@ const FROM = process.env.RESEND_FROM_CONTRATOS
   || 'Conecta Reynosa <admin@conectareynosa.mx>';
 const SITE = process.env.URL || 'https://conectareynosa.mx';
 
-const CODIGO = 'MELANIE';
-// El mismo instante que PROMOS['MELANIE'] en index.html. Reynosa es zona
-// fronteriza (America/Matamoros, UTC-5 en agosto), NO Monterrey (UTC-6): el
-// offset va explícito para que el correo y el cotizador mueran a la misma hora.
-const MUERE = '2026-08-05T20:00:00-05:00';
+// ═══════════════════════════════════════════════════════════════════════════
+// [GIVEAWAY-NATA-1] EL CÓDIGO SE DERIVA DE BABA. No se escribe aquí.
+//
+// Antes vivían CUATRO literales en este archivo —el código `'MELANIE'`, su
+// vencimiento, un «30% de descuento» dentro del párrafo y OTRO en el botón de
+// llamada a la acción— y un enlace a `/melanie` que ya no existía. El del botón
+// lo encontró el arnés, no yo: se me había pasado al leer. Ese tercero es el que enseña por qué la
+// derivación no es cosmética: **NATA no es un porcentaje, son $500**. Copiar
+// este correo cambiando solo el código habría mandado a ~90 personas reales una
+// promesa de «30% de descuento» que ningún código honra.
+//
+// Doctrina de PROMO-DERIVA-1: letrero vivo = código vivo. La vigencia Y EL
+// TEXTO salen de la fila de `promos_codigos`; si el código no existe, está
+// archivado o no está vigente, NO SE MANDA NADA y se dice por qué.
+//
+// ⚠️ DOS BASES. El giveaway vive en el PORTAL y `promos_codigos` en KAMEHOUSE:
+// son proyectos distintos y hacen falta las dos llaves. Pedirle la promo al
+// Portal habría contestado «no existe» sobre un código que sí existe.
+const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+const CODIGO = 'NATA';   // QUÉ código se busca; el CONTENIDO se lee de la fila.
+
+// Devuelve { codigo, texto, expira } o { error } — nunca a medias.
+async function promoViva(codigo, ahoraMs) {
+  if (!KH_URL || !KH_KEY) return { error: 'Faltan las llaves de KameHouse (SUPABASE_URL_KAMEHOUSE / _SERVICE_KEY_KAMEHOUSE)' };
+  let filas;
+  try {
+    const r = await fetch(
+      `${KH_URL}/rest/v1/promos_codigos?codigo=eq.${encodeURIComponent(codigo)}` +
+      '&select=codigo,desc_texto,monto,pct,starts_at,expires_at,archivado&limit=1',
+      { headers: { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY } }
+    );
+    if (!r.ok) return { error: `Baba contestó ${r.status} al pedir el código ${codigo}` };
+    filas = await r.json();
+  } catch (e) { return { error: `No se pudo leer el código ${codigo}: ${e.message}` }; }
+  const p = Array.isArray(filas) ? filas[0] : null;
+  if (!p) return { error: `El código ${codigo} no existe en promos_codigos` };
+  if (p.archivado) return { error: `El código ${codigo} está archivado` };
+  const ahora = ahoraMs != null ? ahoraMs : Date.now();
+  const ini = p.starts_at ? Date.parse(p.starts_at) : null;
+  const fin = p.expires_at ? Date.parse(p.expires_at) : null;
+  if (ini && ahora < ini) return { error: `El código ${codigo} todavía no empieza (${p.starts_at})` };
+  if (fin && ahora >= fin) return { error: `El código ${codigo} ya venció (${p.expires_at})` };
+  const texto = String(p.desc_texto || '').trim();
+  if (!texto) return { error: `El código ${codigo} no tiene desc_texto: sin él el correo mentiría` };
+  return { codigo: p.codigo, texto, expira: p.expires_at };
+}
 
 const ASUNTO = 'No ganaste el sorteo… pero te tenemos algo 💜';
 
@@ -39,7 +83,7 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function correoHtml(nombre, link) {
+function correoHtml(nombre, link, codigo, texto) {
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(ASUNTO)}</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
@@ -55,20 +99,20 @@ function correoHtml(nombre, link) {
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">No salió tu nombre</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:32px;line-height:1.05;color:#e8ff4c;text-transform:uppercase;margin:0 0 16px 0">${escapeHtml(primero)}, no te vamos a dejar con las ganas</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para Melanie Martinez… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${CODIGO}</strong> y llévate el <strong style="color:#e8ff4c">30% de descuento</strong> en el paquete que más te guste.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para Natanael Cano… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${escapeHtml(codigo)}</strong> y llévate <strong style="color:#e8ff4c">${escapeHtml(texto)}</strong>.</p>
         <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 20px 0">Aplica en <strong>PLUS</strong>, <strong>STAY</strong> y <strong>CHEAP</strong> (no aplica en RIDE).</p>
       </td></tr>
       <tr><td style="padding:0 26px 20px 26px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000;border:1px dashed #e8ff4c">
           <tr><td style="padding:18px 20px;text-align:center">
             <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px">Tu código</div>
-            <div style="font-family:Arial Black,Arial,sans-serif;font-size:30px;letter-spacing:.14em;color:#e8ff4c">${CODIGO}</div>
+            <div style="font-family:Arial Black,Arial,sans-serif;font-size:30px;letter-spacing:.14em;color:#e8ff4c">${escapeHtml(codigo)}</div>
             <div style="font-size:13px;color:#ff283b;font-weight:700;margin-top:10px">Válido solo HOY hasta las 8:00 PM</div>
           </td></tr>
         </table>
       </td></tr>
       <tr><td style="padding:0 26px 10px 26px">
-        <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:16px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;box-sizing:border-box">Usar mi 30% de descuento</a>
+        <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:16px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;box-sizing:border-box">Usar mi código ${escapeHtml(codigo)}</a>
       </td></tr>
       <tr><td style="padding:6px 26px 28px 26px">
         <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0;text-align:center">El concierto es <strong style="color:#fff">mañana</strong> — todavía alcanzas. 🖤</p>
@@ -92,6 +136,15 @@ async function enviar(to, subject, html) {
   if (!r.ok) { console.error('[giveaway-consuelo] Resend', r.status, await r.text().catch(() => '')); return false; }
   return true;
 }
+
+// [GIVEAWAY-NATA-1] Expuesto para el arnés — patrón de la casa (los «helpers
+// puros expuestos» de `_lib/esferas-compile`). El careo tiene que poder mirar el
+// HTML QUE DE VERDAD SE IMPRIME, con su contexto: recomponer la plantilla fuera
+// de este archivo se cayó dos veces (se llevaba el `;` de cierre, y luego no
+// encontraba `ASUNTO`). Se prueba la función real, no una copia de su texto.
+exports._correoHtml = correoHtml;
+exports._promoViva = promoViva;
+exports._ASUNTO = ASUNTO;
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -176,12 +229,22 @@ exports.handler = async (event) => {
     });
   }
 
-  const link = SITE + '/melanie';
+  // El enlace iba a `/melanie`, una ruta que ya no existe: el correo mandaba a
+  // ~90 personas a una página muerta. Ahora apunta al evento de verdad.
+  const link = SITE + '/#natanael';
+
+  // 🔒 SE PREGUNTA A BABA ANTES DE ESCRIBIRLE A NADIE. Si el código no está
+  // vigente, no se manda NADA: un correo con un código muerto es peor que no
+  // mandarlo, porque quema la promesa y llena el WhatsApp de reclamos.
+  const promo = await promoViva(CODIGO);
+  if (promo.error) {
+    return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + promo.error });
+  }
   let enviados = 0, fallidos = 0, sinMarcar = 0, filasMarcadas = 0;
 
   // Uno por uno y en serie: un buzón malo no puede tumbar al resto.
   for (const [correo, info] of destinatarios) {
-    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link));
+    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link, promo.codigo, promo.texto));
     if (!ok) { fallidos++; continue; }
     enviados++;
 

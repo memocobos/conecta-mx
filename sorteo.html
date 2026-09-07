@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Sorteo en vivo · Conecta Reynosa</title>
+<title>Sorteo en vivo · Natanael Cano · Conecta Reynosa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -485,7 +485,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
   <!-- La cuenta regresiva al giro. Se esconde sola cuando el sorteo arranca. -->
   <div class="cuenta" id="cuenta">
-    <div class="cuenta-l">El sorteo es a las 12:00 PM hora de Reynosa</div>
+    <div class="cuenta-l">El sorteo es el 13 de septiembre a las 8:00 PM hora de Reynosa</div>
     <div class="cuenta-n" id="cuenta-n">—</div>
   </div>
 
@@ -521,7 +521,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   </div>
 
   <div class="espera" id="espera">
-    Todavía no se gira.<br>El sorteo es a las <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey).<br>
+    Todavía no se gira.<br>El sorteo es el <b>domingo 13 de septiembre a las 8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey).<br>
     Deja esta página abierta: se actualiza sola.
   </div>
 
@@ -558,10 +558,10 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
        Lo enciende pintarPanel(); nace apagado para que quien llegue con el
        JS caído no lea un consuelo por un sorteo que aún no pasa. -->
   <div class="rescate" id="rescate" style="display:none">
-    <h3>¿No ganaste? Todavía hay lugares para Melanie Martinez</h3>
+    <h3>¿No ganaste? Todavía hay lugares para Natanael Cano</h3>
     <p>Todavía quedan lugares para el 6 de agosto en Arena Monterrey. Escríbenos y te armamos tu paquete.</p>
     <a class="btn-rescate" target="_blank" rel="noopener"
-       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Melanie%20Martinez%20-%20Hades%3A%20The%20Sacrifice%20Tour%20(6%20ago%202026)">
+       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Natanael%20Cano%20el%202%20de%20octubre">
       <svg class="ic"><use href="#ic-wa"/></svg> Apartar mi lugar
     </a>
   </div>
@@ -585,7 +585,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
        sin puerta a quien llegue antes de que conteste la primera consulta. -->
   <nav class="navegar" style="justify-content:center;margin-top:34px" aria-label="Ir a otras páginas">
     <a class="nav-btn fuerte" id="ir-registro" href="/giveaway"><svg class="ic"><use href="#ic-lapiz"/></svg> Registrarme</a>
-    <a class="nav-btn" href="/?evento=melanie"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
+    <a class="nav-btn" href="/?evento=natanael"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
     <a class="nav-btn" href="/"><svg class="ic"><use href="#ic-casa"/></svg> Volver al inicio</a>
   </nav>
 
@@ -684,7 +684,9 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // decide nada —el servidor sigue siendo quien acepta o rechaza registros—:
   // solo apaga el botón de "Registrarme" para no mandar gente a una puerta
   // cerrada. El -05:00 es Reynosa con horario de verano (America/Matamoros).
-  var CIERRE_TS = Date.parse('2026-08-05T11:00:00-05:00');
+  // [GIVEAWAY-NATA-1] Gemelo de `_lib/giveaway.js` (el navegador no importa la
+  // function). Septiembre en Reynosa es -05:00, con el offset explícito.
+  var CIERRE_TS = Date.parse('2026-09-13T19:00:00-05:00');
 
   var TOKEN = null;       // SOLO en memoria. Nunca localStorage.
   var estado = null;
@@ -848,7 +850,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
 
   // ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════
-  var SORTEO_TS = Date.parse('2026-08-05T12:00:00-05:00');
+  var SORTEO_TS = Date.parse('2026-09-13T20:00:00-05:00');   // gemelo del lib
   function pintarCuenta(){
     var caja = $('cuenta');
     // Con un giro ya en pantalla la cuenta sobra.

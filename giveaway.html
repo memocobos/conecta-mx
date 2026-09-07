@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Gánate un paquete PLUS a Melanie Martinez · Conecta Reynosa</title>
-<meta name="description" content="Gánate un paquete PLUS que contiene transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta. Para Melanie Martinez en Arena Monterrey. Sorteo en vivo el 5 de agosto, 12:00 PM hora de Reynosa.">
+<title>Gánate tu lugar para Natanael Cano · Conecta Reynosa</title>
+<meta name="description" content="Gánate tu lugar para Natanael Cano el 2 de octubre en el Estadio Walmart Park. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta). Si eres de fuera: boleto en Zona Tumbada + Kit Conecta. Registro hasta el 13 de septiembre 7:00 PM · sorteo en vivo ese día a las 8:00 PM, hora de Reynosa.">
 <meta name="robots" content="index,follow">
-<meta property="og:title" content="Gánate un paquete PLUS a Melanie Martinez">
-<meta property="og:description" content="Gánate un paquete PLUS que contiene transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta. Sorteo en vivo el 5 de agosto, 12:00 PM hora de Reynosa.">
-<meta property="og:image" content="https://conectareynosa.mx/imgs/giveaways/melanie-hades.jpg">
+<meta property="og:title" content="Gánate tu lugar para Natanael Cano">
+<meta property="og:description" content="Gánate tu lugar para Natanael Cano el 2 de octubre en el Estadio Walmart Park. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta). Si eres de fuera: boleto en Zona Tumbada + Kit Conecta. Registro hasta el 13 de septiembre 7:00 PM · sorteo en vivo ese día a las 8:00 PM, hora de Reynosa.">
+<meta property="og:image" content="https://conectareynosa.mx/imgs/giveaways/natanael-tumbada.jpg">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
@@ -127,6 +127,9 @@ h1 em{font-style:normal;color:var(--c-amarillo)}
 
 /* Formulario */
 .campo{margin-bottom:14px}
+/* [GIVEAWAY-NATA-1] Se DECLARA: un `<small>` con una clase inexistente sale
+   sin estilo y nadie lo nota hasta que está publicado. */
+.campo-ayuda{display:block;margin-top:5px;font-size:12px;line-height:1.45;color:rgba(255,255,255,.55)}
 label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px}
 input[type=text],input[type=tel],input[type=email]{
   width:100%;padding:14px;background:rgba(255,255,255,.05);border:1px solid var(--c-line);
@@ -382,18 +385,18 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
 <div class="pagina">
   <div class="foto-col">
-    <img class="hero-foto" src="imgs/giveaways/melanie-hades.jpg" alt="Melanie Martinez en Arena Monterrey" width="1080" height="1349">
+    <img class="hero-foto" src="imgs/giveaways/natanael-tumbada.jpg" alt="Natanael Cano en el Estadio Walmart Park" width="1200" height="1200">
     <div class="hero-velo" aria-hidden="true"></div>
   </div>
 
   <div class="hero-txt">
     <div class="kicker"><svg class="ic"><use href="#ic-regalo"/></svg> Giveaway</div>
-    <h1>Gánate un<br>paquete <em>PLUS</em></h1>
+    <h1>Gánate tu lugar<br>para <em>Natanael Cano</em></h1>
     <ul class="incluye">
       <li><svg class="ic"><use href="#ic-bus"/></svg>Transporte ida y vuelta</li>
       <li><svg class="ic"><use href="#ic-auto"/></svg>Traslados</li>
       <li><svg class="ic"><use href="#ic-cama"/></svg>Hospedaje</li>
-      <li><svg class="ic"><use href="#ic-boleto"/></svg>Boleto en zona VIP</li>
+      <li><svg class="ic"><use href="#ic-boleto"/></svg>Boleto en <b>Zona Tumbada</b></li>
       <li><svg class="ic"><use href="#ic-regalo"/></svg>Kit Conecta</li>
     </ul>
   </div>
@@ -407,7 +410,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <div class="cd-c"><div class="cd-n" id="cd-m">--</div><div class="cd-l">min</div></div>
     <div class="cd-c"><div class="cd-n" id="cd-s">--</div><div class="cd-l">seg</div></div>
   </div>
-  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Sorteo en vivo · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey)</p>
+  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Sorteo en vivo · <b>13 sep, 8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey)</p>
   </div>
 
   <form id="form" novalidate>
@@ -423,6 +426,14 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       <label for="f-correo">Correo</label>
       <input type="email" id="f-correo" autocomplete="email" placeholder="tu@correo.com" required>
     </div>
+    <div class="campo">
+      <!-- [GIVEAWAY-NATA-1] La ciudad NO es un campo de adorno: el premio es
+           DUAL y lo decide la residencia. Se dice aquí, para que quien lo
+           llena entienda por qué se lo preguntamos. -->
+      <label for="f-ciudad">¿De qué ciudad eres?</label>
+      <input type="text" id="f-ciudad" autocomplete="address-level2" placeholder="Reynosa" required>
+      <small class="campo-ayuda">De tu ciudad depende tu premio — mira las bases.</small>
+    </div>
     <label class="bases-ck">
       <input type="checkbox" id="f-acepto">
       <span>Acepto las bases del sorteo y que me contacten por WhatsApp si gano.</span>
@@ -435,8 +446,8 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <h2>¡Ya estás dentro!</h2>
     <div class="ok-num" id="ok-num">—</div>
     <div class="ok-num-l" id="ok-num-l">tu número de participante</div>
-    <p class="ok-premio">Gánate un paquete PLUS que contiene transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta.</p>
-    <p>Sorteo en vivo el 5 de agosto · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey). Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
+    <p class="ok-premio">El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si eres de <b>fuera</b>, boleto en Zona Tumbada + Kit Conecta.</p>
+    <p>Sorteo en vivo el <b>domingo 13 de septiembre</b> · <b>8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey). Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
     <a class="btn btn-wa" id="ok-share" href="#" target="_blank" rel="noopener">
       <svg class="ic" style="width:20px;height:20px"><use href="#ic-wa"/></svg> Invitar a alguien
     </a>
@@ -449,7 +460,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
   <div class="cerrado" id="cerrado">
     <h2>El registro cerró</h2>
-    <p>Gánate un paquete PLUS que contiene transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta.<br><br>Sorteo en vivo el 5 de agosto · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey). Síguenos para verlo.</p>
+    <p>El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si eres de <b>fuera</b>, boleto en Zona Tumbada + Kit Conecta.<br><br>Sorteo en vivo el <b>domingo 13 de septiembre</b> · <b>8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey). Síguenos para verlo.</p>
   </div>
 
   </div><!-- /cuerpo -->
@@ -462,10 +473,10 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   <div class="bases">
     <h3>Bases</h3>
     <ol>
-      <li>El premio es un paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta.</li>
+      <li>El premio es DUAL y lo decide tu ciudad: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si NO eres de Reynosa, boleto en Zona Tumbada + Kit Conecta (el viaje y el hospedaje corren por tu cuenta).</li>
       <li>Mayores de 18 años.</li>
       <li>Un registro por persona; WhatsApp repetido se anula.</li>
-      <li>El sorteo es en vivo el 5 de agosto a las 12:00 PM hora de Reynosa (11:00 AM en Monterrey).</li>
+      <li>El registro cierra el domingo 13 de septiembre a las 7:00 PM hora de Reynosa, y el sorteo es en vivo ese mismo día a las 8:00 PM (6:00 y 7:00 PM en Monterrey).</li>
       <li>El ganador tiene 10 minutos para contestar su WhatsApp durante la transmisión. Si no contesta, se vuelve a girar.</li>
       <li>El ganador firma contrato antes de recibir el premio.</li>
     </ol>
@@ -476,17 +487,17 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
        apartar de una vez en lugar de jugársela. Número, formato de liga y
        ?text= codificado son los del index. -->
   <div class="rescate">
-    <h3>¿No ganaste? Todavía hay lugares para Melanie Martinez</h3>
+    <h3>¿No ganaste? Todavía hay lugares para Natanael Cano</h3>
     <p>Todavía quedan lugares para el 6 de agosto en Arena Monterrey. Escríbenos y te armamos tu paquete.</p>
     <a class="btn-rescate" target="_blank" rel="noopener"
-       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Melanie%20Martinez%20-%20Hades%3A%20The%20Sacrifice%20Tour%20(6%20ago%202026)">
+       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Natanael%20Cano%20el%202%20de%20octubre">
       <svg class="ic"><use href="#ic-wa"/></svg> Apartar mi lugar
     </a>
   </div>
 
   <nav class="navegar" aria-label="Ir a otras páginas">
     <a class="nav-btn fuerte" href="/sorteo"><svg class="ic"><use href="#ic-vivo"/></svg> Ver el sorteo en vivo</a>
-    <a class="nav-btn" href="/?evento=melanie"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
+    <a class="nav-btn" href="/?evento=natanael"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
     <a class="nav-btn" href="/"><svg class="ic"><use href="#ic-casa"/></svg> Volver al inicio</a>
   </nav>
 
@@ -569,8 +580,11 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   // ⚠️ Offset -05:00: Reynosa (America/Matamoros) SÍ trae horario de verano;
   // Monterrey no. En agosto son una hora distintas.
   // Y son DOS momentos: el registro cierra a las 11, se gira a las 12.
-  var CIERRE = new Date('2026-08-05T11:00:00-05:00').getTime();
-  var SORTEO = new Date('2026-08-05T12:00:00-05:00').getTime();
+  // [GIVEAWAY-NATA-1] Gemelos de `_lib/giveaway.js` — el navegador no puede
+  // importar la function, así que son copia con nombre y el arnés los carea
+  // contra el lib. En SEPTIEMBRE Reynosa está en -05:00.
+  var CIERRE = new Date('2026-09-13T19:00:00-05:00').getTime();
+  var SORTEO = new Date('2026-09-13T20:00:00-05:00').getTime();
 
   var $ = function(id){ return document.getElementById(id); };
   var form = $('form'), aviso = $('aviso'), btn = $('btn');
@@ -627,6 +641,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     var nombre = $('f-nombre').value.trim();
     var whatsapp = $('f-wa').value.replace(/\D/g, '');
     var correo = $('f-correo').value.trim();
+    var ciudad = $('f-ciudad').value.trim().replace(/\s+/g, ' ');
 
     // Espejo de las validaciones del servidor, en el mismo orden: así el aviso
     // llega antes y con las mismas palabras. La autoridad sigue siendo la
@@ -635,12 +650,13 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     if (nombre.length < 3) return mal('Escribe tu nombre completo');
     if (whatsapp.length !== 10) return mal('El WhatsApp va a 10 dígitos, sin lada de país');
     if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(correo)) return mal('Revisa tu correo, algo no cuadra');
+    if (ciudad.length < 3) return mal('Escribe tu ciudad — de ella depende tu premio');
 
     btn.disabled = true; btn.textContent = 'Registrando…';
     fetch('/.netlify/functions/giveaway-registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, acepto: true })
+      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, ciudad: ciudad, acepto: true })
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
     }).then(function(res){
@@ -660,13 +676,13 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
         $('ok-num-l').style.display = 'none';
       }
       $('ok-share').href = 'https://wa.me/?text=' + encodeURIComponent(
-        'Me registré para ganarme un paquete PLUS a Melanie Martinez con Conecta Reynosa ' +
-        '(transporte, traslados, hospedaje, boleto VIP y Kit). El sorteo es en vivo el 5 de agosto a las 12 PM. Participa: ' +
+        'Me registré para ganarme mi lugar para Natanael Cano con Conecta Reynosa ' +
+        '(o boleto + Kit si eres de fuera). El sorteo es en vivo el 13 de septiembre a las 8 PM. Participa: ' +
         'https://conectareynosa.mx/giveaway'
       );
       // Pixel: Lead al CONFIRMARSE el registro, no al enviar el formulario.
       // trackLead ya dispara fbq + CAPI con el mismo event_id (meta-events.js).
-      try { if (typeof window.trackLead === 'function') window.trackLead('giveaway-melanie'); } catch (e) {}
+      try { if (typeof window.trackLead === 'function') window.trackLead('giveaway-natanael'); } catch (e) {}
       $('ok').scrollIntoView({ block: 'center', behavior: 'smooth' });
     }).catch(function(){
       btn.disabled = false; btn.textContent = 'Participar';

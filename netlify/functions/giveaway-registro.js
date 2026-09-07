@@ -56,6 +56,19 @@ exports.handler = async (event) => {
     return G.json(400, headers, { ok: false, error: 'Revisa tu correo, algo no cuadra' });
   }
 
+  // [GIVEAWAY-NATA-1] LA CIUDAD ES OBLIGATORIA, y no es un campo de adorno: el
+  // premio es DUAL y lo decide la residencia (Reynosa → PLUS; fuera → CHEAP).
+  // Medido antes de escribirlo: el formulario de melanie NO la pedía —solo
+  // nombre, whatsapp y correo—, así que sin esto el premio no se puede
+  // adjudicar y habría que perseguir a la persona por WhatsApp para saberlo.
+  // Se guarda TAL CUAL la escribe (con su acento y su «Tamps.»): la que decide
+  // es `G.premioPorCiudad`, que normaliza al leer. Guardar el texto normalizado
+  // perdería el dato que la persona dio, y el premio se adjudica mirándolo.
+  const ciudad = String(body.ciudad || '').trim().replace(/\s+/g, ' ');
+  if (ciudad.length < 3 || ciudad.length > 80) {
+    return G.json(400, headers, { ok: false, error: 'Escribe tu ciudad — de ella depende tu premio' });
+  }
+
   // Cierre por fecha. Va DESPUÉS de las validaciones de forma para que quien
   // llegue tarde con datos malos sepa que llegó tarde, no que su correo falla.
   if (G.registroCerrado()) {
@@ -94,7 +107,7 @@ exports.handler = async (event) => {
       method: 'POST',
       headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
       body: JSON.stringify({
-        slug: G.SLUG, nombre, whatsapp, correo, ip, user_agent: ua,
+        slug: G.SLUG, nombre, whatsapp, correo, ciudad, ip, user_agent: ua,
       }),
     });
   } catch (e) {

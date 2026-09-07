@@ -27,7 +27,10 @@ exports.handler = async (event) => {
   try {
     const r = await fetch(
       `${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${encodeURIComponent(G.SLUG)}` +
-      `&select=id,nombre&order=creado_at.asc`,
+      // [SORTEO-ADMIN-1] Los eliminados NO salen en el carrusel: si esta lista se
+      // proyecta en cámara, enseñar a alguien que ya no concursa es peor que un
+      // dato de más — es una promesa falsa delante de todos.
+      `&eliminado_at=is.null&select=id,nombre&order=creado_at.asc`,
       { headers: G.sbHeaders() }
     );
     if (!r.ok) {

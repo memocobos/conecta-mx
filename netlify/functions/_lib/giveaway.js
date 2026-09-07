@@ -11,7 +11,9 @@ const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || process.env.PORTAL_SUP
 
 // El único giveaway de esta versión. Se valida contra la entrada para que la
 // function no sea un buzón abierto a cualquier slug inventado.
-const SLUG = 'melanie-hades-2026';
+// [GIVEAWAY-NATA-1, 6-sep-2026] El módulo despierta para NATANAEL CANO
+// (2-oct-2026, Estadio Walmart Park, Mty). El de melanie queda como pasado.
+const SLUG = 'natanael-tumbada-2026';
 
 // ⚠️ REYNOSA NO ES MONTERREY. Reynosa vive en America/Matamoros, que SÍ trae
 // horario de verano (es zona fronteriza, se alinea con Texas); Monterrey vive
@@ -23,10 +25,17 @@ const SLUG = 'melanie-hades-2026';
 // aunque el servidor de Netlify viva en otro continente.
 //
 // Y son DOS momentos distintos, no uno:
-//   CIERRE — deja de aceptarse el registro. 11:00 AM de Reynosa.
-//   SORTEO — se gira en vivo, una hora después. 12:00 PM de Reynosa.
-const CIERRE = '2026-08-05T11:00:00-05:00';   // 10:00 AM en Monterrey
-const SORTEO = '2026-08-05T12:00:00-05:00';   // 11:00 AM en Monterrey
+//   CIERRE — deja de aceptarse el registro.
+//   SORTEO — se gira EN VIVO, una hora después.
+//
+// [GIVEAWAY-NATA-1] Firmado por Memo el 6-sep-2026: domingo 13-sep, cierre a
+// las 7:00 PM y sorteo a las 8:00 PM de Reynosa. En SEPTIEMBRE Reynosa sigue en
+// -05:00 (el horario de verano corre hasta el 1-nov), así que ése es el offset.
+// ⚠️ Las horas concretas NO se repiten en este comentario: las dicen las dos
+// constantes de abajo, y un letrero que las repita es el que se queda viejo —
+// éste ya decía «11:00 AM / 12:00 PM» de la época de melanie.
+const CIERRE = '2026-09-13T19:00:00-05:00';   // domingo 13-sep, 7:00 PM Reynosa
+const SORTEO = '2026-09-13T20:00:00-05:00';   // domingo 13-sep, 8:00 PM, en vivo
 
 const ALLOWED_ORIGINS = ['https://conectareynosa.mx', 'https://www.conectareynosa.mx'];
 const ALLOWED_ORIGINS_DEV = ['http://localhost:8888', 'http://localhost:3999', 'http://127.0.0.1:8888'];
@@ -116,8 +125,41 @@ function ipDe(event) {
   return String(xff).split(',')[0].trim() || 'desconocida';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [GIVEAWAY-NATA-1] EL PREMIO ES DUAL, Y LO DECIDE LA CIUDAD
+//
+// Firmado por Memo (6-sep-2026):
+//   · ganador DE REYNOSA  → paquete PLUS con boleto en Zona Tumbada
+//     (transporte + hospedaje + boleto + kit)
+//   · ganador de FUERA    → paquete CHEAP: boleto Zona Tumbada + Kit Conecta
+//
+// 🔒 Vive AQUÍ y no en la pantalla: es la regla que adjudica un premio, y la
+// van a leer el registro, el sorteo y las dos páginas. Una copia en el HTML
+// sería la segunda definición de quién gana qué.
+//
+// ⚠️ La ciudad la teclea una persona, así que se normaliza antes de decidir:
+// sin acentos, sin mayúsculas y sin espacios de sobra. «Reynosa, Tamps.» y
+// «REYNOSA» son el mismo lugar; «Río Bravo» —a 30 minutos— NO lo es, y ése es
+// justo el caso que la regla tiene que distinguir bien.
+function normalizarCiudad(c) {
+  return String(c == null ? '' : c)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+function esDeReynosa(ciudad) {
+  return /(^|[^a-z])reynosa([^a-z]|$)/.test(normalizarCiudad(ciudad));
+}
+function premioPorCiudad(ciudad) {
+  return esDeReynosa(ciudad) ? 'PLUS' : 'CHEAP';
+}
+const PREMIOS = {
+  PLUS:  'Paquete PLUS · boleto Zona Tumbada + transporte + hospedaje + Kit Conecta',
+  CHEAP: 'Boleto Zona Tumbada + Kit Conecta',
+};
+
 module.exports = {
   SB_URL, SB_KEY, SLUG, CIERRE, SORTEO,
+  normalizarCiudad, esDeReynosa, premioPorCiudad, PREMIOS,
   corsCheck, cabeceras, json, faltaEnv, sbHeaders,
   registroCerrado, tokenAdminValido, ipDe,
 };

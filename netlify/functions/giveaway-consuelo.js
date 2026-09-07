@@ -195,7 +195,7 @@ exports.handler = async (event) => {
   try {
     const r = await fetch(
       `${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${encodeURIComponent(G.SLUG)}`
-      // [SORTEO-ADMIN-1] EL DEFAULT PROPUESTO, y sale de UNA sola condición porque
+      // [SORTEO-ADMIN-1] LA REGLA DEL CONSUELO, y sale de UNA sola condición porque
       // este correo YA deduplica por `correo` y marca todas las filas de esa
       // persona. Excluyendo la FILA eliminada, las dos preguntas de Memo se
       // contestan solas, sin caso especial:
@@ -204,7 +204,7 @@ exports.handler = async (event) => {
       //   · eliminado por NO CUMPLIR o A PETICIÓN PROPIA → no le queda ninguna
       //     fila viva → no recibe nada.
       // 🔒 La regla en una frase: **el consuelo va a los correos que todavía
-      // tienen al menos UNA fila no eliminada.** ⏳ Espera la firma de Jane.
+      // tienen al menos UNA fila no eliminada.** 🔒 Firmado por Jane 6-sep-2026.
       + `&eliminado_at=is.null&consuelo_at=is.null&select=id,nombre,correo`,
       { headers: G.sbHeaders() }
     );

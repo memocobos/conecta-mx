@@ -137,10 +137,32 @@ $function$;
 
 commit;
 
--- ── VERIFICACIÓN (correr después; debe dar 0 y 'America/Matamoros') ─────────
--- select count(*) as funciones_con_monterrey
+-- ── VERIFICACIÓN (correr después) ───────────────────────────────────────────
+--
+-- 🔒 SE PODAN LOS COMENTARIOS ANTES DE CONTAR, y no es un detalle de estilo:
+-- la PRIMERA versión de esta consulta buscaba 'America/Monterrey' en el texto
+-- crudo de `pg_get_functiondef`, y el comentario que esta misma tuerca escribió
+-- en `radar_dia` para explicar POR QUÉ murió el huso viejo LO NOMBRA. Resultado:
+-- daba 1 PARA SIEMPRE, y Jane estuvo a punto de reportar una función viva que no
+-- existe. Medido el 7-sep: cruda = 1 (radar_dia, por el comentario) · podada = 0.
+--
+-- Es la 9ª vez que muerde la misma forma en esta casa: **el texto que documenta
+-- la ausencia es indistinguible de la presencia**. El remedio es mecánico —
+-- podar `--…` antes de medir— y va aquí para que nadie "arregle" un bug que no
+-- está.
+--
+-- Debe dar 0.
+-- select count(*) as funciones_con_monterrey_EN_CODIGO
+--   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--  where n.nspname='public' and p.prokind='f'
+--    and regexp_replace(pg_get_functiondef(p.oid), '--[^\n]*', '', 'g') like '%America/Monterrey%';
+--
+-- Y el par que prueba que la consulta SÍ sabe encontrar: sobre el texto CRUDO
+-- debe dar 1 (radar_dia, por su comentario). Si diera 0, el detector no sirve.
+-- select count(*) as cruda_debe_dar_1
 --   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 --  where n.nspname='public' and p.prokind='f'
 --    and pg_get_functiondef(p.oid) like '%America/Monterrey%';
 --
--- select radar_dia()->'clicks'->>'tz' as tz_de_los_clicks;
+-- Debe contestar 'America/Matamoros' las dos veces.
+-- select radar_dia()->>'tz' as tz_del_dia, radar_dia()->'clicks'->>'tz' as tz_de_los_clicks;

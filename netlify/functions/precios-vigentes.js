@@ -25,7 +25,7 @@
 // del calendario vive en `_lib/precios-vigentes`, en funciones puras.
 // =============================================================================
 
-const { resolverVigentes, TZ } = require('./_lib/precios-vigentes');
+const { resolverConPadre, TZ } = require('./_lib/precios-vigentes');
 const { fetchEventosRaw } = require('./_lib/catalogo-index');
 
 const AMBITOS = new Set(['zonas', 'cheapZonas']);
@@ -81,26 +81,50 @@ exports.handler = async (event) => {
   try {
     // 1. El historial de ESA zona. Se filtra en el servidor por las tres llaves:
     //    traer el historial entero y filtrar aquí sería la segunda fuente.
-    const sp = new URLSearchParams();
-    sp.set('select', 'precio,vigente_desde,fuente');
-    sp.append('evento_id', 'eq.' + evento_id);
-    sp.append('ambito', 'eq.' + ambito);
-    sp.append('zona', 'eq.' + zona);
-    sp.set('order', 'vigente_desde.asc');
-    sp.set('limit', '500');
-    const r = await fetch(SB_URL + '/rest/v1/precios_historial?' + sp.toString(), {
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY },
-    });
-    if (!r.ok) {
+    const traer = async (id) => {
+      const sp = new URLSearchParams();
+      sp.set('select', 'precio,vigente_desde,fuente');
+      sp.append('evento_id', 'eq.' + id);
+      sp.append('ambito', 'eq.' + ambito);
+      sp.append('zona', 'eq.' + zona);
+      sp.set('order', 'vigente_desde.asc');
+      sp.set('limit', '500');
+      const r = await fetch(SB_URL + '/rest/v1/precios_historial?' + sp.toString(), {
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY },
+      });
+      if (!r.ok) return { error: await r.text() };
+      const filas = await r.json();
+      if (!Array.isArray(filas)) return { error: 'El historial no vino como lista' };
+      return { filas };
+    };
+
+    const propias = await traer(evento_id);
+    if (propias.error) {
       return { statusCode: 502, headers, body: JSON.stringify({ ok: false,
-        error: 'No pude leer el historial', detail: await r.text() }) };
+        error: 'No pude leer el historial', detail: propias.error }) };
     }
-    const filas = await r.json();
-    if (!Array.isArray(filas)) {
-      return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'El historial no vino como lista' }) };
+    const filas = propias.filas;
+
+    // 1b. LA RAMPA AL PADRE (ROL-HIST-PADRE-1). Una llave con índice (`omar#0`)
+    //     puede haber NACIDO a media historia: antes de ese día la fecha no
+    //     tenía lista propia y el sitio cotizaba heredando la del evento. Su
+    //     ausencia en la tabla NO dice «nunca cambió», dice «yo no existía» — y
+    //     desde aquí las dos se ven igual. Por eso se trae también el historial
+    //     del PADRE, y `resolverConPadre` decide cuál habla: la propia si puede
+    //     hablar de esa fecha, el padre si no. La rampa va ANTES del catálogo,
+    //     que es el precio de HOY y sigue siendo el último recurso.
+    const base = evento_id.split('#')[0];
+    const esIndexada = evento_id.includes('#');
+    let filasPadre = [];
+    let padre_error = null;
+    if (esIndexada) {
+      const p = await traer(base);
+      // Un padre que no se pudo leer NO tumba la respuesta: se contesta con lo
+      // propio y el fallo VIAJA, en vez de morir callado y parecer «no hay».
+      if (p.error) padre_error = p.error; else filasPadre = p.filas;
     }
 
-    const res = resolverVigentes(filas, fecha, TZ);
+    const res = resolverConPadre(filas, filasPadre, fecha, TZ);
     if (res.error) return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: res.error }) };
 
     // 2. SIN HISTORIAL → la regla de la casa: ausencia = NUNCA CAMBIÓ, así que
@@ -139,6 +163,12 @@ exports.handler = async (event) => {
 
     return { statusCode: 200, headers, body: JSON.stringify({
       ok: true, evento_id, ambito, zona, fecha, tz: TZ,
+      // De QUÉ llave salió la respuesta. `heredado:true` = la contestó el
+      // evento, no la fecha, y la pantalla tiene que rotularlo: un precio del
+      // padre presentado como precio de la fecha es un dato bueno con la
+      // etiqueta equivocada.
+      heredado: !!res.heredado,
+      llave_usada: res.heredado ? base : evento_id,
       sin_historial: !!res.sin_historial,
       anterior_al_historial: !!res.anterior_al_historial,
       al_abrir: res.sin_historial
@@ -149,6 +179,8 @@ exports.handler = async (event) => {
       cambios: res.cambios || [],
       dia: res.dia || null,
       filas_historial: filas.length,
+      filas_historial_padre: esIndexada ? filasPadre.length : null,
+      padre_error,
       // Un respaldo que no pudo contestar se DICE. Un `al_abrir:null` callado se
       // lee como «no cambió nunca y no vale nada», que son dos mentiras.
       catalogo_error,

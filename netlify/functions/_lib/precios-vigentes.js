@@ -137,6 +137,57 @@ function resolverVigentes(filas, fechaYMD, tz) {
   };
 }
 
+// ── LA RAMPA AL PADRE (ROL-HIST-PADRE-1) ─────────────────────────────────────
+// EL BACKFILL DE JANE GRABÓ CAMBIOS, NO NACIMIENTOS. Esa es la semántica que
+// faltaba y de la que cuelga todo lo de abajo. La regla de la casa dice
+// «ausencia = nunca cambió», y para una llave que existió siempre eso es cierto.
+// Para una llave CON ÍNDICE (`omar#0`) nacida a media historia, no: su ausencia
+// antes del nacimiento no dice «nunca cambió», dice «yo todavía no existía» —
+// y las dos se ven exactamente igual desde la tabla.
+//
+// Medido: el 28-ago-2026 las fechas de `omar` YA existían pero NO tenían
+// `cheapZonas` propias; el sitio cotizaba el CHEAP del 6-Nov heredándolo del
+// evento, y sus listas propias nacieron el 29-ago a las 12:54. Preguntar por
+// `omar#0` ese día daba `sin_historial` → el respaldo del catálogo → EL PRECIO
+// DE HOY rotulado «esta zona nunca ha cambiado de precio», el día que cambió
+// dos veces (3400 al abrir, 3800 a las 12:50, 4350 a las 16:07).
+//
+// Quien desambigua es el padre: si la llave propia no puede hablar de esa
+// fecha, la que regía ese día es la del evento — que es DE DONDE HEREDABA EL
+// SITIO. La rampa del catálogo ya hacía esa herencia para decir el precio de
+// hoy; esto es la misma herencia, aplicada al historial.
+//
+// DOS CANDADOS EN LA REGLA:
+//   · La rampa entra SOLO cuando la propia no puede hablar de esa fecha
+//     (`sin_historial` o `anterior_al_historial`). Una llave que SÍ sabe hablar
+//     contesta lo mismo que antes, byte por byte: el padre no la pisa.
+//   · La rampa entra ANTES del catálogo. El catálogo es el precio de HOY y
+//     sigue siendo el último recurso, no el segundo.
+//
+// `heredado:true` viaja en la respuesta para que la pantalla lo ROTULE. Un
+// precio del evento presentado como precio de la fecha sería otra vez un dato
+// bueno con la etiqueta equivocada.
+function resolverConPadre(filasPropias, filasPadre, fechaYMD, tz) {
+  const propio = resolverVigentes(filasPropias, fechaYMD, tz);
+  if (propio.error) return propio;
+
+  // La propia sabe hablar de ese día: se contesta y no se mira al padre.
+  if (!propio.sin_historial && !propio.anterior_al_historial) {
+    return Object.assign({ heredado: false }, propio);
+  }
+
+  const padre = resolverVigentes(filasPadre, fechaYMD, tz);
+  // Un padre que tampoco sabe nada no mejora nada: se devuelve lo propio tal
+  // cual, para que el llamador caiga al catálogo como caía antes.
+  if (padre.error || padre.sin_historial) {
+    return Object.assign({ heredado: false }, propio);
+  }
+  // El padre habla. Incluso cuando SU respuesta es `anterior_al_historial`, es
+  // lo más viejo que se sabe de esa zona y la bandera viaja con ella: sigue
+  // siendo más verdad que el precio de hoy.
+  return Object.assign({}, padre, { heredado: true });
+}
+
 // ── EL GANCHO DEL PUBLISH ────────────────────────────────────────────────────
 // Compara lo que se acaba de compilar contra lo último que sabe el historial y
 // devuelve LAS FILAS A INSERTAR. No escribe: escribir es del endpoint, y así
@@ -222,5 +273,5 @@ function filasDelPublish({ nuevas, ultimas, previas, ahoraISO, vigenteDesdeBase 
 
 module.exports = {
   TZ, inicioDelDia, finDelDia, horaReynosa,
-  resolverVigentes, zonasDelObjeto, filasDelPublish, _llave, _offsetMs, FUENTES_VALIDAS,
+  resolverVigentes, resolverConPadre, zonasDelObjeto, filasDelPublish, _llave, _offsetMs, FUENTES_VALIDAS,
 };

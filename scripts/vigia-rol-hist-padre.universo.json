@@ -1,0 +1,2070 @@
+{
+"A": [
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Coke Studio",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Boing",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Super Palco",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Platino B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Primer Nivel Tercera Base",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Preferente Especial",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona McCormick",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "zayn",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Balcon",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Banco Azteca",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Sabritas",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Plata",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Butaca",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Megacable",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "zayn",
+"ambito": "cheapZonas",
+"zona": "Oro",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "morat",
+"ambito": "cheapZonas",
+"zona": "Oro",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "rufus#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Retráctil 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "keniaos#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "fanfest-firme#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Miniso",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Luneta",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "morat",
+"ambito": "cheapZonas",
+"zona": "Luneta",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "enjambre#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Tercer Nivel Tercera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Cancha A",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "vaiven#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Oro",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Doritos",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Balcón 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Plus Ultra",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "siddharta#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "ultramexico#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Retráctil 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "zayn",
+"ambito": "cheapZonas",
+"zona": "General A",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Beyond Gral",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Primer Nivel Central",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Perfil",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "soad#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "harry#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Barrera",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "pacoamoroso#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Tercer Nivel Tercera Base",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "eslabon#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Diamante",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Platea 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Barrera",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Barrera 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Tercer Nivel Central",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Balcón",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Barrera",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Primer Nivel Central",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Perfil",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "pacoamoroso#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Barrera 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Oro",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Platino B",
+"fecha": "2026-09-01"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Balcón 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "ironmaiden#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Platino B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Platea VIP 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "fanfest-firme#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "karolg",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Preferente Especial",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Segundo Nivel Central",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Platino B",
+"fecha": "2026-09-01"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Segundo Nivel tercera Base",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Tercer Nivel Primera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Perfil B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Butaca 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Elektra",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Osel",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "karolg#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Barrera 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Sabritas",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "morat",
+"ambito": "zonas",
+"zona": "Luneta",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Retráctil 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Segundo Nivel Primera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Retráctil 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "arre#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "soad#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Balcón 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Mega",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Pepsi",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Segundo Nivel Primera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "pulsoquetaro#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Diamante",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Tercer Nivel Primera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Coke Studio",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Oro",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Cancha A",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Balcón 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Preferente",
+"fecha": "2026-08-21"
+},
+{
+"evento_id": "jbalvin#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "weeknd",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-09-01"
+},
+{
+"evento_id": "megadeth#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "rosalia#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "SP Platino",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Balcon",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Coke Studio",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "rufus#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Platea 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Boing",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Retráctil 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "jbalvin#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Retráctil 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Platea VIP 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Perfil C",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Mc Cormick",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Super Palco",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "miloj#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Barrera",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "neighbourhood#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Mega",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Platea VIP 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Butaca 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Butaca",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "pulsoquetaro#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Balcón 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "pacoamoroso",
+"ambito": "cheapZonas",
+"zona": "Beyond",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "zayn",
+"ambito": "cheapZonas",
+"zona": "Plata",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Tercer Nivel Central",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "karolg",
+"ambito": "cheapZonas",
+"zona": "Club Seat Poniente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "keniaos#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Butaca 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Osel",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Oro",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "mendivil#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "pacoamoroso",
+"ambito": "zonas",
+"zona": "Beyond",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Butaca 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Jardín Derecho",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "weeknd",
+"ambito": "cheapZonas",
+"zona": "Zona GNP",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "ironmaiden#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "karolg",
+"ambito": "zonas",
+"zona": "Club Seat Poniente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Pepsi",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "vaiven#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "tini#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "fanfest-chayanne#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Doritos",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "badgyal",
+"ambito": "cheapZonas",
+"zona": "Perfil B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Balcón 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "dimitri#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Beyond Gral",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Luneta",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "anuelaa#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Segundo Nivel Central",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "arre#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Banco Azteca",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "aitana#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "fanfest-imagine#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "marcos#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "fanfest-chayanne#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Barrera 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Platea 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Doritos",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "dimitri#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Preferente",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Platino B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "alejandrosanz#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "fanfest-imagine#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Balcon",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "warped#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "tini#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "SP Oro",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "fanfest-enrique#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "romeo#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "warped#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Cancha General",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Plata",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Preferente",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "weeknd",
+"ambito": "zonas",
+"zona": "Zona GNP",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Banco Azteca",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Platea VIP 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "eslabon#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Butaca 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "romeo#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Luneta",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "mendivil#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "anuelaa#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Banco Azteca",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "fanfest-enrique#0",
+"ambito": "cheapZonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "enjambre#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "tiesto",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-11"
+},
+{
+"evento_id": "miloj#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "ultramexico#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "vaiven",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-07-04"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Butaca 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "yandel",
+"ambito": "zonas",
+"zona": "Plata",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Plus Ultra",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Jardín Derecho",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Preferente",
+"fecha": "2026-08-21"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "omar",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Megacable",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Diamante",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "morat",
+"ambito": "zonas",
+"zona": "Oro",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "megadeth#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "interpol",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-24"
+},
+{
+"evento_id": "neighbourhood#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Butaca",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "alejandrosanz#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Perfil C",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "natanael",
+"ambito": "cheapZonas",
+"zona": "Jardín Izquierdo",
+"fecha": "2026-07-29"
+},
+{
+"evento_id": "marcos#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "SP Platino",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "fanfest-imagine",
+"ambito": "cheapZonas",
+"zona": "VIP",
+"fecha": "2026-06-16"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "SP Oro",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "rosalia#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "karolg",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "siddharta#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "yandel",
+"ambito": "cheapZonas",
+"zona": "Mc Cormick",
+"fecha": "2026-08-19"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Platea 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "karolg#1",
+"ambito": "zonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Jardín Izquierdo",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona Miniso",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "aitana#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Oriente",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw",
+"ambito": "cheapZonas",
+"zona": "Zona Elektra",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar",
+"ambito": "zonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw",
+"ambito": "zonas",
+"zona": "Zona McCormick",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "harry#0",
+"ambito": "zonas",
+"zona": "Naranja C",
+"fecha": "2026-07-20"
+},
+{
+"evento_id": "natanael",
+"ambito": "zonas",
+"zona": "Segundo Nivel tercera Base",
+"fecha": "2026-07-28"
+},
+{
+"evento_id": "titodoble",
+"ambito": "cheapZonas",
+"zona": "Butaca",
+"fecha": "2026-08-20"
+},
+{
+"evento_id": "youngmiko",
+"ambito": "zonas",
+"zona": "Super Palco",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "badgyal",
+"ambito": "zonas",
+"zona": "Platino B",
+"fecha": "2026-08-27"
+}
+],
+"B": [
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Retráctil 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona McCormick",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Retráctil 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Platea VIP 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Super Palco",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Perfil C",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Platino B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Mega",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Boing",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Platea VIP 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Platino B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Butaca 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona McCormick",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Balcón 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "pacoamoroso#0",
+"ambito": "cheapZonas",
+"zona": "Beyond",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "cheapZonas",
+"zona": "Plata",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Banco Azteca",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "karolg#1",
+"ambito": "cheapZonas",
+"zona": "Club Seat Poniente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Butaca 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Sabritas",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "cheapZonas",
+"zona": "Oro",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "pacoamoroso#0",
+"ambito": "zonas",
+"zona": "Beyond",
+"fecha": "2026-06-22"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Butaca 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Retráctil 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "karolg#1",
+"ambito": "zonas",
+"zona": "Club Seat Poniente",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#0",
+"ambito": "cheapZonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "cheapZonas",
+"zona": "Beyond Pit",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Miniso",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Pepsi",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Perfil B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Balcón 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Beyond Gral",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Oro",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Balcón 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Barrera 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Platea 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Retráctil 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "zayn#0",
+"ambito": "cheapZonas",
+"zona": "General A",
+"fecha": "2026-06-09"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Beyond Gral",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Perfil",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "omar#0",
+"ambito": "cheapZonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "cheapZonas",
+"zona": "Perfil C",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Barrera",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "SP Oro",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar#0",
+"ambito": "cheapZonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "cheapZonas",
+"zona": "Perfil",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Platea 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Barrera 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Cancha General",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Balcón",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Preferente",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Banco Azteca",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Platea VIP 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Butaca 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "cheapZonas",
+"zona": "Perfil",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Barrera 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Balcón 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Platea VIP 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "vaiven#1",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-07-04"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Butaca 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Perfil B",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "omar#0",
+"ambito": "cheapZonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "cheapZonas",
+"zona": "Perfil B",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Butaca 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Elektra",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Barrera 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Sabritas",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar#0",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "cheapZonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Retráctil 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Retráctil 3",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Balcón 1",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Mega",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Pepsi",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "youngmiko#1",
+"ambito": "zonas",
+"zona": "Butaca",
+"fecha": "2026-08-26"
+},
+{
+"evento_id": "badgyal#1",
+"ambito": "zonas",
+"zona": "Perfil C",
+"fecha": "2026-08-27"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "SP Platino",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "fanfest-imagine#0",
+"ambito": "cheapZonas",
+"zona": "VIP",
+"fecha": "2026-06-16"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Balcón 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "SP Oro",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "SP Platino",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Platea 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "omar#0",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "omar#1",
+"ambito": "zonas",
+"zona": "Platino",
+"fecha": "2026-08-29"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Platea 2",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Boing",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "zonas",
+"zona": "Zona Miniso",
+"fecha": "2026-06-17"
+},
+{
+"evento_id": "wweraw#1",
+"ambito": "cheapZonas",
+"zona": "Zona Elektra",
+"fecha": "2026-06-17"
+}
+]
+}

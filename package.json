@@ -7,6 +7,7 @@
     "sharp": "^0.34.5"
   },
   "scripts": {
-    "vigia:color": "node scripts/vigia-color-en-linea.js"
+    "vigia:color": "node scripts/vigia-color-en-linea.js",
+    "vigia:rol-hist-padre": "node scripts/vigia-rol-hist-padre.js"
   }
 }

@@ -333,11 +333,21 @@ está caduco antes de escribirse.
   a la app su `font-family:'Montserrat'`**: medido, BASE «Arial» → HEAD
   «Montserrat». Prescindibles porque `_printVentana` abre `window.open('','_blank')`
   **sin cargar kamehouse.css** y escribe su propio `<style>`.
-- **El COLOR en línea del Palacio** (medido y congelado por KH-4, sin resolver):
-  827 estilos con `color:` en `kamehouse.js` y 158 en el HTML, y **49 `<th>`
-  con su propio `color` que NINGUNA hoja de estilo alcanza**. Es la misma
-  trampa de los `border-radius` en otra propiedad. Merece su propia tuerca con
-  su propia medición; el arnés de KH-4 assertea que no crezca.
+- **El COLOR en línea del Palacio** (medido y congelado por KH-4, SIN RESOLVER —
+  la deuda sigue, pagarla es otra tuerca). Y **49 `<th>` con su propio `color`
+  que NINGUNA hoja de estilo alcanza**: la misma trampa de los `border-radius`.
+  ✅ **El vigilante VOLVIÓ** (COLOR-VIGIA-1, 4-sep-2026): `npm run vigia:color`.
+  🔴 **La autopsia de por qué el de KH-4 nunca cazó nada importa más que el
+  arreglo: NO EXISTÍA.** `CAREO-*` está en `.gitignore`, ningún arnés se versionó
+  jamás (`git log --diff-filter=A -- 'CAREO*'` sale vacío), no hay CI ni scripts
+  de npm. Vivía como archivo ignorado en UNA máquina.
+  🔒 **LEY: un vigilante que vive en un archivo ignorado no es un vigilante, es
+  una nota.** Si tiene que sobrevivir a la sesión que lo escribió, va
+  VERSIONADO — por eso éste vive en `scripts/`.
+  ⚠️ Los números viejos (827/158, y el 965/196 que circulaba) **no se pueden
+  reproducir** con ninguna definición escribible: la base se remidió hoy y son
+  **888 en los .js** (la serie MONO repartió `kamehouse.js` en 18 módulos) y
+  **187 en el HTML**, contando `color:` dentro de `style=` en línea.
 - **La barrita de progreso de `funciona.html`** anima `width` (contra la regla
   de la casa: solo `transform`/`opacity`). Es de abril; tuerca micro cuando Memo
   la quiera.

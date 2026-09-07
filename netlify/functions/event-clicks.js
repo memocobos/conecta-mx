@@ -11,7 +11,7 @@
 // Lo que no vivía era el ranking.
 //
 // La base la puso Jane (KH): `event_clicks_diario` (event_id, dia, clicks,
-// event_name; PK evento+día, `dia` en hora de Monterrey) y la RPC
+// event_name; PK evento+día, `dia` en hora de Reynosa — ver RADAR-TZ) y la RPC
 // `increment_event_click_v2`, que alimenta el acumulado de siempre Y la cubeta
 // del día en una sola llamada — sin duplicar la receta del acumulado.
 //
@@ -62,13 +62,20 @@ function jsonRes(statusCode, body) {
   };
 }
 
-// Hoy en hora de México, 'YYYY-MM-DD'. Vía Intl, SIN aritmética de offset —
-// mismo patrón que admin-conexiones/marcar-pago. Tiene que ser la misma zona
-// que usa la RPC para escribir `dia` (America/Monterrey), o la ventana se
-// correría un día contra la cubeta que lee.
+// Hoy en hora de REYNOSA, 'YYYY-MM-DD'. Vía Intl, SIN aritmética de offset.
+//
+// 🔒 [RADAR-TZ] TIENE QUE SER LA MISMA ZONA QUE USA LA RPC para escribir `dia`,
+// y por eso este cambio NO viaja solo: va detrás del SQL que mueve
+// `increment_event_click_v2` (escribe la cubeta) y el bloque de clicks de
+// `radar_dia` (la lee). Las tres piezas parten el día en el mismo instante o no
+// lo parten.
+//
+// Monterrey dejó el horario de verano en 2022 y va UNA HORA DETRÁS de Reynosa,
+// así que entre las 00:00 y la 01:00 de Reynosa daba la fecha de AYER. Medido:
+// el 3.09% de la actividad de los últimos 21 días cae en esa franja.
 function hoyMX() {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Monterrey', year: 'numeric', month: '2-digit', day: '2-digit'
+    timeZone: 'America/Matamoros', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
 }
 

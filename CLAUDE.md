@@ -482,6 +482,36 @@ está caduco antes de escribirse.
   Reynosa **sí** cambia con EE.UU. (8-mar → 1-nov); la que dejó de cambiar es
   Monterrey (decreto de 2022). Son **133 días al año** de diferencia con Cancún,
   invisibles en verano. Unificado en #624.
+- 🔒 **EL HISTORIAL DE PRECIOS GRABÓ CAMBIOS, NO NACIMIENTOS — y en una llave
+  con índice eso se confunde con «nunca existió».** `precios_historial` solo
+  anota cuando un precio CAMBIA, así que la regla de la casa «ausencia = nunca
+  cambió» es cierta… para una llave que existió siempre. Para una llave con
+  índice (`omar#0`, una fecha de multifecha) **nacida a media historia**, su
+  ausencia antes del nacimiento no dice «nunca cambió»: dice **«yo todavía no
+  existía»** — y desde la tabla las dos se ven exactamente igual.
+  **Lo que costó:** el 28-ago-2026 las fechas de `omar` ya existían pero SIN
+  `cheapZonas` propias, y el sitio cotizaba el CHEAP del 6-Nov **heredándolo del
+  evento**. /rol preguntaba por `omar#0`, no encontraba nada, caía al respaldo
+  del catálogo y contestaba **EL PRECIO DE HOY** rotulado *«esta zona nunca ha
+  cambiado de precio»* — el día que esa zona cambió dos veces (3400 al abrir ·
+  3800 a las 12:50 · 4350 a las 16:07). Y su cara peor: una zona **CERRADA** ese
+  día se cotizaba en $3,700 con una fila nacida al día siguiente.
+  **Quien desambigua es el padre** (ROL-HIST-PADRE-1, #732): si la llave propia
+  no puede hablar de esa fecha (`sin_historial` o `anterior_al_historial`), se
+  pregunta al evento — que es **de donde el sitio heredaba** — y ANTES del
+  catálogo, que sigue siendo el último recurso. `heredado:true` viaja en la
+  respuesta y /rol lo ROTULA: un precio del evento presentado como precio de la
+  fecha es un dato bueno con la etiqueta equivocada.
+  ⚠️ La rampa de herencia **ya existía a medias**: el endpoint heredaba
+  `cheapZonas` del evento para el respaldo del catálogo y nunca para buscar el
+  historial. **Una regla aplicada a un solo lado de la costura es la forma en que
+  esta clase de hueco se esconde.**
+  ⚠️ El programa del backfill **no está en el repo** (sembró las 591 filas y no
+  se versionó), así que por qué una zona dejó fila al nacer y su vecina no **no
+  se puede leer, solo suponer**. La rampa no depende de esa respuesta.
+  **Vigilante:** `npm run vigia:rol-hist-padre` (pide `HEAD_URL`) — 447
+  aserciones contra los DOS sitios servidos, con control positivo en los dos
+  sentidos.
 - **Todo careo de pantalla-a-servidor invoca el handler REAL** y simula un salto
   más adentro. **Un mock de ruta salta al portero**: tres tuercas llegaron
   ROTAS a producción con el careo en verde (RAD-FIX-CAMINO, #625). Y una acción

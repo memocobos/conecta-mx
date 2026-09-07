@@ -346,7 +346,7 @@ exports.handler = async (event) => {
                                                         alertasCordura.push(`Precio por persona muy bajo (menor a ${fmtMxn(PISO_PP_MXN)})`);
 
   const fechaSolicitud = new Date(solicitud.created_at).toLocaleString('es-MX', {
-    timeZone: 'America/Monterrey',
+    timeZone: 'America/Matamoros',
     dateStyle: 'medium',
     timeStyle: 'short',
   });

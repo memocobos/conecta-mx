@@ -54,7 +54,7 @@ function fmtFecha(ds) {
   const s = String(ds).slice(0, 10);
   const d = new Date(s + 'T12:00:00');
   if (isNaN(d.getTime())) return s;
-  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Monterrey' });
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Matamoros' });
 }
 
 function slugBase(eventoId) {
@@ -228,7 +228,7 @@ exports.handler = async function () {
 
   const nowMs = Date.now();
   const nowISO = new Date(nowMs).toISOString();
-  const hoyMX = new Date(nowMs).toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyMX = new Date(nowMs).toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 
   // 1) Catálogo → eventos a ≤2 días. Sin catálogo NO se inventa nada: se sale
   //    en silencio (jamás avisar de un evento que no sabemos cuándo es).

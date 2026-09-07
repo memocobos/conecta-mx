@@ -319,10 +319,10 @@ exports.handler = async (event) => {
 
 // ----- helpers -----
 
-// Fecha de hoy en zona horaria de México (America/Monterrey), 'YYYY-MM-DD'.
+// Fecha de hoy en zona horaria de Reynosa (America/Matamoros), 'YYYY-MM-DD'.
 function hoyMx() {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Monterrey',
+    timeZone: 'America/Matamoros',
     year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
 }

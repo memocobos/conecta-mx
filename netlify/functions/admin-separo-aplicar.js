@@ -111,7 +111,7 @@ exports.handler = async (event) => {
   // 4. LA VÍA AUDITADA. El monto es el BASE (lo que entró al viaje), no el total.
   const montoPesos = Number(cuota.monto);
   const hoyMx = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Monterrey', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: 'America/Matamoros', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
   // [SEP-ETIQUETA-1a] LA ETIQUETA SALE DE LA SOLICITUD, no de una suposición.
   // Esta línea preguntaba a `stripe_checkout_sesiones` —que está VACÍA— y el

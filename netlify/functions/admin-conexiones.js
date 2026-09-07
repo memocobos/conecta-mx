@@ -7,11 +7,11 @@
 //
 // Acciones (POST { accion, ... }):
 //   · 'hoy'        → cada usuario ACTIVO con su PRIMERA y ÚLTIMA conexión de HOY
-//                    (hora America/Monterrey). Sin conexión hoy → primera/ultima null.
+//                    (hora de Reynosa (America/Matamoros)). Sin conexión hoy → primera/ultima null.
 //   · 'historial'  { usuario_id } → últimas 14 fechas (MX) con su primera conexión,
 //                    para ver patrones (incl. sábados).
 //
-// Zona horaria SIEMPRE America/Monterrey (vía Intl, sin aritmética de offset).
+// Zona horaria SIEMPRE America/Matamoros (vía Intl, sin aritmética de offset).
 // Privacidad: horas de conexión SOLO para Memo — gate ['maestro_roshi'] aquí y
 // en la UI. Fails-soft: tabla vacía/inexistente → listas vacías, nunca 500 por eso.
 // Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE + JWT_SECRET.
@@ -20,7 +20,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const ROLES = ['maestro_roshi'];
-const TZ = 'America/Monterrey';
+const TZ = 'America/Matamoros';
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 // Partes de un timestamp en hora de Monterrey (Intl → sin depender del offset).

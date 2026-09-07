@@ -455,7 +455,7 @@ function renderMTDeudas(lista, filtro) {
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:200px">
               <div style="font-size:13px">${_esfEsc(d.concepto)}</div>
-              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(d._evento?.nombre||'')} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})||'—'}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(d._evento?.nombre||'')} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Matamoros'})||'—'}</div>
             </div>
             <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
             <div style="display:flex;gap:6px">
@@ -1170,7 +1170,7 @@ async function loadMTAlertas() {
           <div>
             <div style="font-size:13px;font-weight:600">${ti.icon} ${_esfEsc(a.mensaje||ti.label)}</div>
             <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:3px">
-              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Monterrey'})}
+              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Matamoros'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Matamoros'})}
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">

@@ -321,7 +321,7 @@ exports.handler = async function(event) {
   // El CONGELAMIENTO no es de este cron: se calcula EN VIVO en admin-salidas.
   let sf = 0;
   try {
-    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
     const vencidas = await sb(
       `salidas_bodega?faltantes_monto=gt.0&faltantes_pagado_at=is.null` +
       `&strike_faltante_aplicado=eq.false&faltantes_vence=lt.${hoyMX}` +

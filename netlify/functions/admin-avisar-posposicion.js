@@ -186,7 +186,7 @@ function fmtFecha(ds) {
   const s = String(ds).slice(0, 10);
   const d = new Date(s + 'T12:00:00');
   if (isNaN(d.getTime())) return s;
-  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Monterrey' });
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Matamoros' });
 }
 
 function avisoHtml(nombre, eventoNombre, fechaAnterior, fechaNueva, motivo) {

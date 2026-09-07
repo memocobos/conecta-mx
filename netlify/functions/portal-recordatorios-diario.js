@@ -170,7 +170,7 @@ exports.handler = async function () {
   //    temprana (suma si 2+, p.ej. el titular con lugares sin conectar).
   let mandados = 0, sinCorreo = 0, conVencidos = 0, sinPendientes = 0, fallidos = 0;
   let saltados_por_duplicado = 0, sin_bitacora = 0;
-  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   for (const key of Object.keys(pendientesSC)) {
     if ((vencidosSC[key] || 0) >= 1) { conVencidos++; continue; } // a esa persona la regaña morosidad
     const solId = key.slice(0, key.indexOf(SEP));

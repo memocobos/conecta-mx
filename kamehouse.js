@@ -2462,8 +2462,8 @@ let _utilG3Cache = null;  // { eventos, sin_evento, totales } | null
 // Cero backend, cero fetch → aparece al instante.
 // ═══════════════════════════════════════════════════════════════
 
-function _mxHoraNum() { return parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey', hour: 'numeric', hour12: false }), 10) || 0; }
-function _mxFechaStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+function _mxHoraNum() { return parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Matamoros', hour: 'numeric', hour12: false }), 10) || 0; }
+function _mxFechaStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // [ORD-1] EL ORDEN DE LOS EVENTOS — UNA SOLA REGLA, UN SOLO LUGAR
@@ -2856,10 +2856,10 @@ async function loadPagos() {
 }
 
 function _cobHoyISO() {
-  // Hoy en hora MX (America/Monterrey), formato YYYY-MM-DD.
+  // Hoy en hora MX (America/Matamoros), formato YYYY-MM-DD.
   // NO usar toISOString(): es UTC y cerca de medianoche MX marca atrasados
   // un día antes (MX = UTC-6). Patrón consistente con _kamToday() y demás.
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 }
 
 // Atrasado: tiene un próximo pago pendiente con fecha_esperada anterior a hoy.
@@ -6142,7 +6142,7 @@ function _spFmtFechaRel(iso) {
 
 function _spFmtFechaAbs(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Matamoros', dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function _spEscape(s) {
@@ -6876,7 +6876,7 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
   if (!separos.length) return false;   // ya pagados o plan sin cuota 1 → nada que preguntar
 
   _spSeparoPend = { solicitudId, separos };
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   const bancoDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
   const filas = separos.map((p, i) => {
     const etiqueta = _spEtiquetaLugar(solicitudId, p.lugar_id);
@@ -7237,7 +7237,7 @@ function _spToggleTraspaso(lugarId, solicitudId){
 // [Gancho 1] Días hasta la PRIMERA fecha del evento (ds), hoy en hora MX (patrón
 // en-CA/Monterrey del cron F4). null si no se puede parsear.
 function _spDiasHastaEvento(dsISO){
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   const a = Date.parse(String(dsISO).slice(0,10) + 'T00:00:00Z');
   const b = Date.parse(hoy + 'T00:00:00Z');
   if (isNaN(a) || isNaN(b)) return null;
@@ -7525,7 +7525,7 @@ async function cargarBitacoraSP(solicitudId) {
       const numPago = (m.pagos && m.pagos.numero_pago != null) ? m.pagos.numero_pago : '?';
       const monto = (esPago && m.monto_pagado != null) ? ` · ${_spFmtMxn(m.monto_pagado)}` : '';
       const fecha = m.creado_en
-        ? new Date(m.creado_en).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' })
+        ? new Date(m.creado_en).toLocaleString('es-MX', { timeZone: 'America/Matamoros', dateStyle: 'medium', timeStyle: 'short' })
         : '';
       return `
       <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px">
@@ -9668,7 +9668,7 @@ function _ctrStrikesChip(c) {
 // como vencido en vez de contarse como bueno por descuido.
 function _ctrDiasVigencia(c) {
   if (!c || !c.vigencia_fin) return null;
-  const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }) + 'T00:00:00');
+  const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }) + 'T00:00:00');
   const fin = new Date(String(c.vigencia_fin).slice(0, 10) + 'T00:00:00');
   const dias = Math.round((fin - hoy) / 86400000);
   return Number.isFinite(dias) ? dias : null;
@@ -9885,7 +9885,7 @@ function _ctrPintarLista() {
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
         : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
       const fechaEnviado = c.enviado_at
-        ? _tsToDate(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
+        ? _tsToDate(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Matamoros'})
         : '—';
       const tokenSafe = _escCtr(c.token);
       const nombreSafe = _attrJs(c.creador_nombre);   // [CAP5-1] va dentro de onclick

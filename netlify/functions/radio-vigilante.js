@@ -41,7 +41,7 @@ const FROM_ADMIN = 'Radio Conecta <admin@conectareynosa.mx>';
 const TIMEOUT_MS = 8000;
 const REINTENTO_MS = 15000;                 // el reintento arranca a los 15s del 1er intento
 const AVISO_CADA_MS = 6 * 60 * 60 * 1000;   // máx 1 correo de alerta cada 6 horas
-const TZ = 'America/Monterrey';
+const TZ = 'America/Matamoros';
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;

@@ -6020,7 +6020,7 @@ function aplicarPromo(){
 // se comparan FECHAS PURAS (no instantes) y "hoy" se toma en hora de Mexico,
 // no en la del navegador. Asi el separo que ve el cliente es el mismo que
 // sella el servidor, sin importar desde donde se cotice ni a que hora.
-function _hoyMx(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Monterrey'});}
+function _hoyMx(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Matamoros'});}
 function _diasEventoMx(evISO,hoyISO){
   var m1=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO||''));
   var m2=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO||_hoyMx()));

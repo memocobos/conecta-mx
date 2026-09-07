@@ -159,7 +159,7 @@ exports.handler = async (event) => {
       }
       // Hoy en Monterrey, no en UTC: después de las 6pm de acá, toISOString ya
       // es mañana allá y una fecha de hoy pasaría por futura.
-      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
       if (fecha_nacimiento >= hoyMx) {
         return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Revisa tu fecha de nacimiento' }) };
       }

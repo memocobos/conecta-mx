@@ -368,7 +368,7 @@ exports.handler = async (event) => {
           // un strike con reloj mal sellado).
           const conCobro = sals.filter(s => Number(s.faltantes_monto) > 0 && !s.faltantes_vence);
           if (conCobro.length) {
-            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
             faltantes_vence = _masDiasISO(hoyMX, 15);
             for (const s of conCobro) {
               await fetch(`${env.KH_SB_URL}/rest/v1/salidas_bodega?id=eq.${encodeURIComponent(String(s.id))}&faltantes_vence=is.null`, {

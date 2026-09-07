@@ -253,11 +253,11 @@ module.exports = { aplicarNucleo, TOLERANCIA_MXN,
 
 // ----- helpers (movidos junto con el núcleo que los usa) -----
 
-// Fecha de hoy en zona horaria de México (America/Monterrey), formato YYYY-MM-DD.
+// Fecha de hoy en zona horaria de Reynosa (America/Matamoros), formato YYYY-MM-DD.
 // en-CA produce el formato ISO de fecha directamente.
 function hoyMx() {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Monterrey',
+    timeZone: 'America/Matamoros',
     year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
 }

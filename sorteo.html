@@ -569,9 +569,31 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <div class="admin" id="admin">
     <div class="admin-l">Controles</div>
     <button class="btn" id="girar">Girar</button>
+    <button class="btn btn-ghost btn-sm" id="ver-padron">Ver participantes</button>
+    <!-- [SORTEO-ADMIN-1] El padrón vive DENTRO del modo admin, que abre el
+         candadito. Sale por `giveaway-sortear` (acción `padron`), no por
+         `giveaway-lista`: esa otra devuelve nombres y nada más porque su
+         carrusel SALE EN CÁMARA, y un teléfono ahí es un teléfono en pantalla. -->
+    <div id="padron-caja" style="display:none;margin-top:14px">
+      <div class="admin-l" id="padron-resumen">Participantes</div>
+      <div class="table-wrap"><table class="padron-tabla" id="padron-tabla"></table></div>
+    </div>
   </div>
 
   </div><!-- /centro -->
+
+  <style>
+  /* [SORTEO-ADMIN-1] Se DECLARA: una clase que no existe es letra muerta y el
+     texto sale sin estilo — ya mordió esta semana con `.alert-warn`. */
+  .padron-tabla{width:100%;border-collapse:collapse;font-size:13px}
+  .padron-tabla th,.padron-tabla td{padding:7px 9px;text-align:left;border-bottom:1px solid rgba(255,255,255,.10);vertical-align:top}
+  .padron-tabla th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);font-weight:700}
+  .padron-tabla tr.fuera td{opacity:.45;text-decoration:line-through}
+  .padron-tabla tr.fuera td.motivo{opacity:.8;text-decoration:none;color:var(--orange,#ff8c00)}
+  .padron-premio{font-size:10px;font-weight:900;letter-spacing:.08em;padding:2px 7px;border-radius:4px}
+  .padron-premio.plus{background:rgba(232,255,76,.16);color:#e8ff4c}
+  .padron-premio.cheap{background:rgba(255,255,255,.08);color:rgba(255,255,255,.75)}
+  </style>
 
   <div class="err" id="err"></div>
 
@@ -709,6 +731,87 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
     });
   }
+  // ═══ [SORTEO-ADMIN-1] EL PADRÓN Y LA ELIMINACIÓN ═══════════════════════
+  var MOTIVOS = [
+    ['duplicado', 'Duplicado'],
+    ['no_cumple', 'No cumple requisitos'],
+    ['solicitud_participante', 'Lo pidió el participante'],
+    ['otro', 'Otro (escríbelo)']
+  ];
+  function pintarPadron(d){
+    var caja = document.getElementById('padron-caja');
+    var tab  = document.getElementById('padron-tabla');
+    var res  = document.getElementById('padron-resumen');
+    if (!caja || !tab) return;
+    caja.style.display = '';
+    res.textContent = d.total + ' registrados · ' + d.activos + ' en la tómbola · ' + d.eliminados + ' fuera';
+    var filas = (d.participantes || []).map(function(p, i){
+      var fuera = !!p.eliminado_at;
+      var prem = p.premio === 'PLUS' ? 'plus' : 'cheap';
+      return '<tr class="' + (fuera ? 'fuera' : '') + '">' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + esc(p.nombre) + '</td>' +
+        '<td>' + esc(p.ciudad || '—') + ' <span class="padron-premio ' + prem + '">' + esc(p.premio) + '</span></td>' +
+        '<td>' + esc(p.whatsapp || '—') + '</td>' +
+        '<td>' + esc(p.correo || '—') + '</td>' +
+        '<td>' + esc(String(p.creado_at || '').slice(0, 10)) + '</td>' +
+        (fuera
+          ? '<td class="motivo">fuera · ' + esc(p.eliminado_motivo || '') + '</td>'
+          : '<td><button class="btn btn-ghost btn-sm" data-quitar="' + esc(p.id) + '">Quitar</button></td>') +
+      '</tr>';
+    }).join('');
+    tab.innerHTML = '<thead><tr><th>#</th><th>Nombre</th><th>Ciudad · premio</th><th>WhatsApp</th>' +
+      '<th>Correo</th><th>Registro</th><th></th></tr></thead><tbody>' + filas + '</tbody>';
+  }
+  function cargarPadron(){
+    return api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'padron' }) })
+      .then(function(r){
+        if (r.status !== 200 || !r.j.ok) { $('err').textContent = (r.j && r.j.error) || 'No se pudo leer el padrón'; return; }
+        pintarPadron(r.j);
+      });
+  }
+  // 🔒 EL MOTIVO NACE VACÍO. Un default aquí ESCRIBIRÍA en el acta un motivo que
+  // nadie eligió — el defecto de `kmt-prov`, y aquí queda por escrito para
+  // siempre en `eliminado_motivo`.
+  function pedirMotivo(){
+    var op = MOTIVOS.map(function(m, i){ return (i + 1) + ') ' + m[1]; }).join('\n');
+    var elegido = window.prompt('¿Por qué se elimina a esta persona?\n\n' + op + '\n\nEscribe el número:');
+    if (elegido === null) return null;                       // canceló
+    var idx = parseInt(String(elegido).trim(), 10) - 1;
+    if (!(idx >= 0 && idx < MOTIVOS.length)) return { error: 'Elige uno de los motivos de la lista' };
+    var motivo = MOTIVOS[idx][0];
+    if (motivo !== 'otro') return { motivo: motivo, detalle: '' };
+    var txt = window.prompt('Escribe el motivo:');
+    if (txt === null) return null;
+    if (String(txt).trim().length < 3) return { error: 'Con «otro» hace falta escribir el motivo' };
+    return { motivo: 'otro', detalle: String(txt).trim() };
+  }
+  document.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest && ev.target.closest('[data-quitar]');
+    if (!b) return;
+    var m = pedirMotivo();
+    if (m === null) return;                                  // canceló: no pasa nada
+    if (m.error) { $('err').textContent = m.error; return; }
+    b.disabled = true;
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({
+      accion: 'eliminar', registro_id: b.getAttribute('data-quitar'),
+      motivo: m.motivo, motivo_detalle: m.detalle }) })
+      .then(function(r){
+        b.disabled = false;
+        // El servidor manda la voz: 409 con ganador dice «ya se giró».
+        if (r.status !== 200 || !r.j.ok) { $('err').textContent = (r.j && r.j.error) || 'No se pudo eliminar'; return; }
+        cargarPadron();
+      });
+  });
+  (function(){
+    var b = document.getElementById('ver-padron');
+    if (b) b.addEventListener('click', function(){
+      var c = document.getElementById('padron-caja');
+      if (c && c.style.display !== 'none') { c.style.display = 'none'; return; }
+      cargarPadron();
+    });
+  })();
+
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
 

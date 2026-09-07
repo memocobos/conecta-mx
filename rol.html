@@ -2307,7 +2307,7 @@ document.getElementById('codigo-input').addEventListener('input', function(){
 // `opciones` son el precio al ABRIR el día más cada cambio de ese día. Cuando
 // hay más de uno NO SE ELIGE: `elegido` se queda en null y `checkReady` no deja
 // avanzar. Elegir por quien captura sería inventar cuál de los dos le tocó.
-state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, heredado: false, msg: '' };
 
 function _ymdInput(){ var e = document.getElementById('sep-date'); return e && e.value ? e.value : ''; }
 
@@ -2331,11 +2331,11 @@ function pedirPrecioVigente(){
   if(!state.zona || !fecha || state.zona.n === 'Paquete RIDE'){
     // El RIDE no tiene zona de boleto: su precio es el del transporte y no vive
     // en el historial. Se sale sin pedir nada, no se pide y se ignora.
-    state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+    state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, heredado: false, msg: '' };
     pintarPrecioHist(); refreshPrecioFromBuyType(); return;
   }
   var mio = ++_histSeq;
-  state.precioHist = { estado: 'pidiendo', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+  state.precioHist = { estado: 'pidiendo', opciones: [], elegido: null, sinHistorial: false, anterior: false, heredado: false, msg: '' };
   pintarPrecioHist(); refreshPrecioFromBuyType();
   fetch('/.netlify/functions/precios-vigentes', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2345,7 +2345,7 @@ function pedirPrecioVigente(){
     if(mio !== _histSeq) return;
     if(!j || j.ok !== true){
       state.precioHist = { estado: 'error', opciones: [], elegido: null, sinHistorial: false, anterior: false,
-                           msg: (j && j.error) || 'No pude consultar el precio de esa fecha' };
+                           heredado: false, msg: (j && j.error) || 'No pude consultar el precio de esa fecha' };
     } else {
       var ops = [];
       if(j.al_abrir) ops.push({ precio: j.al_abrir.precio, cerrada: !!j.al_abrir.cerrada,
@@ -2358,6 +2358,11 @@ function pedirPrecioVigente(){
         // UN SOLO precio se aplica solo; VARIOS esperan a que alguien elija.
         elegido: (ops.length === 1 && ops[0].aplicable) ? 0 : null,
         sinHistorial: !!j.sin_historial, anterior: !!j.anterior_al_historial,
+        // [ROL-HIST-PADRE-1] estos precios los contestó el EVENTO, no la fecha:
+        // ese día la fecha todavía no tenía lista propia y el sitio heredaba.
+        // Va rotulado en pantalla — un precio del padre presentado como precio
+        // de la fecha es un dato bueno con la etiqueta equivocada.
+        heredado: !!j.heredado,
         msg: j.catalogo_error || '',
       };
     }
@@ -2365,7 +2370,7 @@ function pedirPrecioVigente(){
   }).catch(function(e){
     if(mio !== _histSeq) return;
     state.precioHist = { estado: 'error', opciones: [], elegido: null, sinHistorial: false, anterior: false,
-                         msg: 'No pude consultar el precio de esa fecha' };
+                         heredado: false, msg: 'No pude consultar el precio de esa fecha' };
     pintarPrecioHist(); refreshPrecioFromBuyType();
   });
 }
@@ -2401,6 +2406,13 @@ function pintarPrecioHist(){
     box.innerHTML = '<div class="fld-help" style="color:var(--red)">'+esc(h.msg)+'. Corrige la fecha o vuelve a intentar; no se cotiza a ciegas.</div>';
     return;
   }
+  // [ROL-HIST-PADRE-1] EL RÓTULO DE LA HERENCIA. Cuando la fecha no tenía lista
+  // propia ese día, quien contesta es el evento — que es de donde el sitio
+  // heredaba el precio. Se dice ANTES del precio, no en letra chica: quien
+  // captura tiene que poder decidir si eso le sirve para ESE comprobante.
+  var nota = h.heredado
+    ? '<div class="fld-help" style="color:var(--yel)">Precios <b>del evento</b>, no de esta fecha: ese día la fecha todavía no tenía precios propios.</div>'
+    : '';
   // SIN HISTORIAL: el catálogo nunca cambió para esa zona.
   if(h.sinHistorial){
     if(!h.opciones.length){
@@ -2413,15 +2425,15 @@ function pintarPrecioHist(){
   if(h.opciones.length === 1){
     var o = h.opciones[0];
     if(!o.aplicable){
-      box.innerHTML = '<div class="fld-help" style="color:var(--red)">Esa zona estaba <b>cerrada</b> el '+esc(_fechaCorta(fecha))+' (precio 0). Revisa la fecha o la zona.</div>';
+      box.innerHTML = nota + '<div class="fld-help" style="color:var(--red)">Esa zona estaba <b>cerrada</b> el '+esc(_fechaCorta(fecha))+' (precio 0). Revisa la fecha o la zona.</div>';
       return;
     }
-    box.innerHTML = '<div class="fld-help">Precio del <b>'+esc(_fechaCorta(fecha))+'</b>'+
+    box.innerHTML = nota + '<div class="fld-help">Precio del <b>'+esc(_fechaCorta(fecha))+'</b>'+
       (h.anterior ? ' <span style="color:var(--red)">— es lo más viejo que sabemos, no hay registro anterior</span>' : '')+'</div>';
     return;
   }
   // VARIOS ESE DÍA: chips con hora, y NADIE elige por quien captura.
-  var html = '<div class="fld-help">Ese día hubo <b>'+h.opciones.length+' precios</b>. Elige el que dice el comprobante:</div>'+
+  var html = nota + '<div class="fld-help">Ese día hubo <b>'+h.opciones.length+' precios</b>. Elige el que dice el comprobante:</div>'+
              '<div class="bt-pills" id="hist-pills" style="margin-top:6px">';
   h.opciones.forEach(function(o, i){
     var etq = (o.hora ? 'desde las '+esc(o.hora) : 'al abrir el día');
@@ -3528,7 +3540,7 @@ function openTour(idx){
   // Volver a preguntar podría cambiarle el número a un trato cerrado. Si quien
   // captura TOCA LA FECHA, ahí sí se re-consulta y manda el historial — que es
   // exactamente cuando está diciendo «esto estaba mal».
-  state.precioHist = { estado: 'listo', sinHistorial: false, anterior: false, msg: '',
+  state.precioHist = { estado: 'listo', sinHistorial: false, anterior: false, heredado: false, msg: '',
     opciones: [{ precio: state.precio, cerrada: false, aplicable: state.precio > 0, hora: null }],
     elegido: state.precio > 0 ? 0 : null };
   // [COT-FIX-3 · N2] sin fecha guardada, el separo es HOY EN MÉXICO.

@@ -874,7 +874,7 @@ async function exportarViajeros(formato) {
 function _printVentana(titulo, htmlCuerpo) {
   const w = window.open('', '_blank');
   if (!w) { alert('Permite las ventanas emergentes para generar la lista.'); return; }
-  const generado = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'long', timeStyle: 'short' });
+  const generado = new Date().toLocaleString('es-MX', { timeZone: 'America/Matamoros', dateStyle: 'long', timeStyle: 'short' });
   const doc = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
 <style>
   @page { size: letter; margin: 14mm; }

@@ -122,7 +122,7 @@ async function mandarEmailAdmin(alerta) {
   <div style="padding:22px">
     <p style="font-size:14px;line-height:1.55;color:#fff">${escapeHtml(alerta.mensaje)}</p>
     <p style="margin-top:18px;font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.08em;text-transform:uppercase">
-      Tipo: ${escapeHtml(alerta.tipo)} · ${new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' })}
+      Tipo: ${escapeHtml(alerta.tipo)} · ${new Date().toLocaleString('es-MX', { timeZone: 'America/Matamoros' })}
     </p>
     <p style="margin-top:14px;font-size:12px;color:rgba(255,255,255,.7)">
       Revisa el Radar en <a href="https://conectareynosa.mx/kamehouse" style="color:#e8ff4c;text-decoration:none;font-weight:700">Kamehouse → Radar del Dragón</a>.
@@ -456,7 +456,7 @@ async function detectarReembolsosPorVencer(resumen) {
 }
 async function detectarContratosPorVencer(resumen) {
   const dayMs = 24 * 3600 * 1000;
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   const hoyT = new Date(hoy + 'T00:00:00Z').getTime();
 
   const contratos = await sb(

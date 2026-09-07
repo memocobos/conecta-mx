@@ -292,7 +292,7 @@ exports.handler = async function () {
   }
 
   // 1) HOY en hora MX. 'en-CA' → 'YYYY-MM-DD'.
-  const hoyISO = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyISO = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 
   // 2) Catálogo desplegado (best-effort). Sin catálogo no hay fechas → nada que hacer.
   const catalogo = await fetchCatalogo();

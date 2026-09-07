@@ -36,7 +36,7 @@ const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
 
 // Hoy en hora MX ('YYYY-MM-DD'), patrón en-CA/Monterrey del cron F4.
 function hoyMx() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 }
 
 // Réplica de isCDMX(ev) del index.

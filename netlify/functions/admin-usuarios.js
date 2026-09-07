@@ -89,7 +89,7 @@ const ROLES_VE_DIRECTORIO = [...ROLES_ADMIN, 'milk', 'mister_popo'];
 // juntando respuestas de días distintos — justo lo que se quiere evitar.
 function _hoyMesDiaMx() {
   // 'YYYY-MM-DD' en Monterrey → 'MM-DD'.
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }).slice(5);
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }).slice(5);
 }
 function esCumpleHoyMx(fechaNac, hoyMesDia) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fechaNac || ''));

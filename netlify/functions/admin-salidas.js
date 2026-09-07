@@ -447,7 +447,7 @@ exports.handler = async (event) => {
 // null. Best-effort: cualquier error → null (NO congela).
 async function congeladoPorFaltantes(env, kh, uid) {
   try {
-    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
     const r = await fetch(
       `${env.KH_URL}/rest/v1/salidas_bodega?solicitante_id=eq.${encodeURIComponent(uid)}` +
       `&faltantes_monto=gt.0&faltantes_pagado_at=is.null&faltantes_vence=lt.${hoyMX}` +

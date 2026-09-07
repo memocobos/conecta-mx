@@ -24,7 +24,7 @@ function _radioFecha(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'short', timeStyle: 'short' });
+  return d.toLocaleString('es-MX', { timeZone: 'America/Matamoros', dateStyle: 'short', timeStyle: 'short' });
 }
 // Carga ambas listas al entrar (patrón de las demás loadX). Fails-soft.
 async function loadRadio() {

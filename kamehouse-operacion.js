@@ -670,7 +670,7 @@ async function loadTorreSalidas() {
     // botón "Marcar pagado" SOLO para Memo (descongela al instante).
     const ff = document.getElementById('torre-faltantes');
     if (ff) {
-      const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+      const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
       const esRoshi = currentUser?.rol === 'maestro_roshi';
       ff.innerHTML = !conFaltantes.length
         ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin faltantes cobrados</div>'

@@ -11,9 +11,9 @@
 // Está en `_lib/` (subcarpeta) — Netlify NO la auto-registra como function.
 // =============================================================================
 
-const MX_TZ = 'America/Monterrey';
+const MX_TZ = 'America/Matamoros';
 
-// Fecha de hoy en huso CDMX/Monterrey (NO UTC). Patrón todayMx() de
+// Fecha de hoy en huso de Reynosa (NO UTC). Patrón todayMx() de
 // rol-recordatorios.js. en-CA da formato YYYY-MM-DD directo.
 function todayMx() {
   const f = new Intl.DateTimeFormat('en-CA', {

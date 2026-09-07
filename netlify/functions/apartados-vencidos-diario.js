@@ -234,7 +234,7 @@ exports.handler = async function () {
   try {
     const filasHtml = Object.keys(porEvento).sort().map((ev) =>
       `<tr><td style="padding:4px 10px 4px 0">${escapeHtml(ev)}</td><td style="padding:4px 0;text-align:right"><strong>${porEvento[ev]}</strong></td></tr>`).join('');
-    const cuerpoAdmin = `<p style="margin:0 0 12px 0">Corrida del ${escapeHtml(new Date(nowMs).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' }))}.</p>
+    const cuerpoAdmin = `<p style="margin:0 0 12px 0">Corrida del ${escapeHtml(new Date(nowMs).toLocaleString('es-MX', { timeZone: 'America/Matamoros', dateStyle: 'medium', timeStyle: 'short' }))}.</p>
     <p style="margin:0 0 12px 0">Apartados vencidos en las últimas 24h: <strong>${vencidos.length}</strong> · avisados: <strong>${avisados}</strong> · sin correo: <strong>${sinCorreo}</strong> · fallidos: <strong>${fallidos}</strong>.</p>
     <table style="border-collapse:collapse;font-size:14px">${filasHtml}</table>
     <p style="margin:16px 0 0 0;font-size:13px;color:rgba(255,255,255,.6)">Solo aviso — ningún estado se cambió. Revisa el stock del evento en el Palacio si quieres liberar/reasignar.</p>`;

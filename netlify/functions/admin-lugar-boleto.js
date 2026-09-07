@@ -123,7 +123,7 @@ exports.handler = async (event) => {
 // Fecha corta Monterrey (DD/MM/YYYY) para la nota de auditoría.
 function hoyMx() {
   try {
-    return new Date().toLocaleDateString('es-MX', { timeZone: 'America/Monterrey', day: '2-digit', month: '2-digit', year: 'numeric' });
+    return new Date().toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch (e) {
     return new Date().toISOString().slice(0, 10);
   }

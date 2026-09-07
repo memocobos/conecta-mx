@@ -263,7 +263,7 @@ function _gzFmtVig(iso) {
 }
 // Días de aquí a una fecha ISO, en calendario de Monterrey. Negativo = pasada.
 function _gzDiasA(iso) {
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   return Math.round((new Date(String(iso).slice(0, 10) + 'T00:00:00Z') - new Date(hoy + 'T00:00:00Z')) / 86400000);
 }
 // [EQ-1] Chip de contratos de la tarjeta. ANTES solo hablaba de coordinador/cc

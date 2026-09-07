@@ -135,7 +135,7 @@ exports.handler = async function () {
   }
 
   // 1) HOY en hora MX (el cron corre en UTC). 'en-CA' → 'YYYY-MM-DD'.
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 
   // 2) Pagos PENDIENTES que vencen HOY (por fecha_esperada exacta → cualquier calendario).
   const pagosHoy = await sb(

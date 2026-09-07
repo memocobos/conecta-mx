@@ -345,7 +345,7 @@ exports.handler = async function (event) {
     // coordinador con vigencia_meses null → 12 (idéntico al _masUnAnio de siempre);
     // team null → 3. Lo YA FIRMADO nunca pasa por aquí (409 arriba) — su vigencia
     // sellada no se recalcula.
-    const hoyMX = new Date().toLocaleDateString("en-CA", { timeZone: "America/Monterrey" });
+    const hoyMX = new Date().toLocaleDateString("en-CA", { timeZone: "America/Matamoros" });
     const meses = Math.round(Number(contrato.vigencia_meses)) || (esTeam ? 3 : 12);
     patch.vigencia_inicio = hoyMX;
     patch.vigencia_fin = _masMeses(hoyMX, meses);

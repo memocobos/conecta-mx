@@ -200,7 +200,7 @@ exports.handler = async function () {
   // 4) Para cada PERSONA con vencidas >= 1, mandarle SU correo del nivel con SU deuda.
   let n1 = 0, n2 = 0, n3 = 0, sinCorreo = 0, fallidos = 0;
   let saltados_por_duplicado = 0, sin_bitacora = 0;                       // [CAP4-1]
-  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   for (const key of Object.keys(vencidosSC)) {
     const vencidos = vencidosSC[key] || 0;
     if (vencidos < 1) continue;

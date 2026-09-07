@@ -534,7 +534,7 @@ function posponerEsfera(slug) {
   if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
   window._ppPreview = null;
   const fechaActual = ev.fecha_inicio || '';
-  const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
   document.getElementById('modal-posponer').innerHTML = `
     <div class="modal" style="max-width:440px">
       <div class="modal-header">

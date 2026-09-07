@@ -203,7 +203,7 @@ function _wlFmtDate(iso) {
     return new Intl.DateTimeFormat('es-MX', {
       day:'2-digit', month:'short', year:'2-digit',
       hour:'2-digit', minute:'2-digit', hour12:true,
-      timeZone:'America/Monterrey'
+      timeZone:'America/Matamoros'
     }).format(_tsToDate(iso));
   } catch { return iso; }
 }

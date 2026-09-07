@@ -13,7 +13,7 @@ const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
 const FROM = process.env.RESEND_FROM_ROL || "Conecta Reynosa <admin@conectareynosa.mx>";
 const SITE        = process.env.URL || "https://conectareynosa.mx";
 
-const MX_TZ = "America/Monterrey";
+const MX_TZ = "America/Matamoros";
 
 function fmtMoney(n) {
   return "$" + Math.round(Number(n) || 0).toLocaleString("es-MX");

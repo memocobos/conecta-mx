@@ -348,9 +348,22 @@ está caduco antes de escribirse.
   reproducir** con ninguna definición escribible: la base se remidió hoy y son
   **888 en los .js** (la serie MONO repartió `kamehouse.js` en 18 módulos) y
   **187 en el HTML**, contando `color:` dentro de `style=` en línea.
-- **La barrita de progreso de `funciona.html`** anima `width` (contra la regla
-  de la casa: solo `transform`/`opacity`). Es de abril; tuerca micro cuando Memo
-  la quiera.
+- ✅ **La barrita de progreso de `funciona.html`: LA DEUDA YA ESTABA PAGADA**
+  (medido en FUNCIONA-BARRA-1, 7-sep-2026). **No anima `width`**: usa
+  `transform:scaleX()` con `transform-origin:left center` y
+  `transition:transform .1s`, y el JS escribe `bar.style.transform`. Se convirtió
+  en **`03d1179`** («T7: funciona.html — los 5 hallazgos del hook») y este
+  pendiente se quedó viejo.
+  🔒 **Verificado EN LA PÁGINA REAL, no en el archivo** (la lección del `th` del
+  Palacio): `#progress` existe, su `transform-origin` computa `0px 1.5px` —
+  izquierda—, la transición es de `transform`, y al hacer scroll el transform
+  pasa de `matrix(0,…)` a `matrix(0.32,…)` mientras el `width` **no se mueve**.
+  ⚠️ **Lo que sí encontró el barrido de ese archivo:** `pulseDot` anima
+  `box-shadow` en `infinite` sobre `.ftr-mini-dot`. Es **la misma forma** que las
+  cinco del index que **SCROLL-2 midió y SELLÓ** el 23-ago (mediana 8.4 ms,
+  mejora del 1% al apagarlas: dentro del ruido) — pero **esta de `funciona.html`
+  NO está en aquel sello**. Se anota, no se toca: sellarla es una decisión, y se
+  toma midiendo, no por parecido.
 - **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
   (`RESERVA_PORTAL` / `?portal=1`). Falta decidir **su** encendido — que es
   otro, no el del correo: ése ya ocurrió.

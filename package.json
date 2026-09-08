@@ -11,6 +11,7 @@
     "vigia:rol-hist-padre": "node scripts/vigia-rol-hist-padre.js",
     "mide:animacion": "node scripts/mide-animacion-infinita.js",
     "vigia:color-literal": "node scripts/vigia-color-literal.js",
-    "mide:color-tema": "node scripts/mide-color-tema.js"
+    "mide:color-tema": "node scripts/mide-color-tema.js",
+    "mide:puente-portal": "node scripts/mide-puente-portal.js"
   }
 }

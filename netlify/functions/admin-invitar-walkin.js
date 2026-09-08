@@ -19,6 +19,9 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+// [MIG-1d-i] La forma del correo sale de UNA fuente: el lote de MIG-1d valida
+// igual que este botón de uno en uno, o son dos reglas esperando a divergir.
+const { correoFormatoValido, tldClaramenteMalo } = require('./_lib/correo-forma');
 
 const PORTAL_URL = 'https://conectareynosa.mx/portal';
 
@@ -131,21 +134,8 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
-
-// Formato básico: algo@algo.tld con TLD de 2+ letras, sin espacios.
-function correoFormatoValido(correo) {
-  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
-}
-
-// TLD claramente mal escrito (típico de ".com" mal tecleado). Atrapa el caso que
-// pasó: "gmail.con" tiene formato válido pero el correo no existe.
-const _TLD_MALOS = ['con', 'cm', 'comm', 'ocm'];
-function tldClaramenteMalo(correo) {
-  const c = String(correo == null ? '' : correo).trim().toLowerCase();
-  const dot = c.lastIndexOf('.');
-  if (dot < 0) return false;
-  return _TLD_MALOS.includes(c.slice(dot + 1));
-}
+// `correoFormatoValido` y `tldClaramenteMalo` se mudaron a `_lib/correo-forma`
+// (MIG-1d-i): el puente por lotes tiene que validar con la MISMA regla.
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)

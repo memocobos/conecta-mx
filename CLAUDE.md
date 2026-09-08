@@ -320,6 +320,50 @@ está caduco antes de escribirse.
   **las 15 tablas satélite llavean por SLUG** (el uuid solo vive en `eventos`), y
   **`compilarEV` es un UPSERT que nunca borra** — un evento ausente de
   `esferas_eventos` NO se puede despublicar publicando.
+- 🌉 **MIG-1d-i · EL PUENTE AL PORTAL, en prod (7-sep-2026). Ni un correo.**
+  🔴 **Lo que lo destrabó fue una medición, no una idea:** el Portal estaba
+  **vacío** —`clientes` 1, `solicitudes_tour` 0, `pagos` 0, `lugares` 0— mientras
+  KameHouse tiene **2,447 viajeros migrados** (1,318 con correo). Y
+  `portal-reclamar-cuenta` solo enlaza a quien se registra si encuentra una fila
+  de `clientes` con SU correo. Mandar la invitación de 1d antes del puente habría
+  llevado a ~1,900 personas a un portal que no las reconoce.
+  **Lo que hace:** `admin-portal-puente` (POST `{evento_id, accion}`) agrupa a los
+  viajeros **por correo**, da de alta el walk-in en `clientes` del Portal y
+  escribe `portal_cliente_id` en **todas** las filas de esa persona. Con **vista
+  previa obligatoria** que enseña NOMBRES y motivos antes de escribir.
+  🔒 **CERO ESCRITURAS DE DINERO, y es regla:** `admin-saldos` suma los `pagos`
+  en estado `'pagado'` como entradas de caja, y el dinero migrado YA está contado
+  por `saldoMigrado` en `_lib/cuenta-evento`. Copiarlo al Portal lo contaría dos
+  veces. El plan lo SIRVE `portal-mi-plan-migrado`, **leyendo** KameHouse y
+  usando **la misma `saldoMigrado`** — no una fórmula nueva.
+  🔒 **`viajeros_evento.usuario_id` NO es el enlace al Portal: es el del STAFF**
+  (el único valor puesto apunta a `usuarios`, Victor coordinador). El diseño de
+  MIG-1 decía que ahí iría la invitación; reusarla habría metido dos significados
+  en una columna. El enlace nuevo es `portal_cliente_id` (SQL de Jane, con la
+  bitácora `invitaciones_portal` y **RLS deny-all**: no tiene lector de navegador).
+  **Las dos trampas, resueltas LEYENDO la base y no suponiendo:**
+  `numero_cliente` lo asigna el trigger `clientes_before_insert` con
+  `nextval('numero_cliente_seq')` cuando llega null —así que el puente lo
+  **omite**—, y ese mismo trigger baja el correo a minúsculas, que es la llave
+  del dedup (`clientes.correo` es **UNIQUE**). Y `clientes.talla_playera` tiene un
+  **CHECK de XS…XXL** mientras la de `viajeros_evento` es texto libre: se
+  normaliza o va **null**, porque una talla rara haría que la base rechace **esa
+  fila sola** y el puente perdería a esa persona en silencio.
+  **El careo** (`npm run mide:puente-portal`, 21 aserciones): entra por el
+  **handler REAL**, simula un salto más adentro (el `fetch` a PostgREST) con una
+  base falsa que respeta filtros, guarda estado, usa los nombres reales y modela
+  el trigger. 🔒 **Mide EL HECHO de que no toca dinero** —cuenta las filas de
+  `solicitudes_tour` y `pagos` antes y después y exige Δ 0—, **no un grep**. Con
+  **control positivo**: un handler saboteado que sí escribe un pago pone el careo
+  en rojo (Δ 1). Si el contador no puede ponerse rojo, su cero no dice nada.
+  ⏳ **Falta MIG-1d-ii** (el botón que invita) y, antes del PRIMER envío real,
+  **el render del correo pasa por visto de Jane y Memo** — como el consuelo.
+  ⏳ **El primer evento real lo elige Memo, y chico.** El puente inserta en una
+  base que hoy tiene 1 fila; `dalemix` metería ~156 clientes de golpe.
+  ⚠️ **Y una duplicación que conviene saber:** la sub-pestaña **Viajeros de
+  Capsule Corp** (`admin-viajeros-evento`) NO lee `viajeros_evento`: lee las
+  `solicitudes_tour` del Portal, que son 0. KameHouse tiene **dos listas de
+  viajeros** que no se ven entre sí.
 - **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
 - **Cobros OXXO / MSI**: pendiente, y **ahora depende de Mercado Pago** — se
   replantea con el módulo de cobro nuevo, no sobre Stripe. ⚠️ El libro remitía

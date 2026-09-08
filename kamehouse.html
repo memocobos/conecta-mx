@@ -1099,7 +1099,7 @@
           </div>
           <div style="margin-top:10px"><label class="mig-lbl">NOTAS</label><input class="cot-input" id="mig-notas" placeholder="opcional" autocomplete="off" style="width:100%"></div>
           <div id="mig-cuenta" style="margin-top:8px;font-size:11px;color:var(--ts);min-height:16px"></div>
-          <div id="mig-error" style="margin-top:8px;font-size:11px;color:#ff5f56;display:none"></div>
+          <div id="mig-error" style="margin-top:8px;font-size:11px;color:var(--red);display:none"></div>
           <!-- [MIG-1b] El aviso del DOBLE DESCUENTO. Aparece solo cuando la zona
                tiene "vendidos fuera" > 0: esa gente pudo ser la misma que se
                acaba de migrar, y entonces se está descontando dos veces. -->
@@ -2679,7 +2679,7 @@
        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
          <button class="btn btn-ghost" onclick="previewContrato()"><svg class="ic"><use href="#ic-ojo"/></svg> Vista previa</button>
          <button class="btn btn-primary" id="ctr-btn-enviar" onclick="enviarContrato()"><svg class="ic"><use href="#ic-correo"/></svg> Enviar por correo</button>
-         <button class="btn btn-ghost" id="ctr-btn-cancelar-edit" onclick="cancelarEdicionContrato()" style="display:none;color:#ff6666;border-color:rgba(255,68,68,.3)">Cancelar edición</button>
+         <button class="btn btn-ghost" id="ctr-btn-cancelar-edit" onclick="cancelarEdicionContrato()" style="display:none;color:var(--red);border-color:rgba(255,68,68,.3)">Cancelar edición</button>
        </div>
      </div>
    </div>
@@ -2694,6 +2694,7 @@
      <div class="page-sub">// quién avisa cuando un evento sale a la venta</div>
     </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <!-- [COLOR-1] `color:#000` NO baja: es TINTA SOBRE UN ACENTO CLARO. El fondo es var(--gold), y los 7 temas lo pintan claro (#e8ff4c, #FFB6E1, #D4688A, #FFB3CC…), así que el negro es legible en todos. No existe token «tinta sobre acento»; ponerle var(--bg) lo ROMPERÍA en tema-america, que tiene --bg:#FAFAFA. -->
        <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900"><svg class="ic"><use href="#ic-portapapeles"/></svg> Copiar link de próximos tours</button>
        <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
      </div>
@@ -3774,6 +3775,7 @@
       <button class="modal-close" onclick="closeModal('modal-contrato-preview')"></button>
     </div>
     <div class="modal-body" style="max-height:75vh;overflow-y:auto;padding:0">
+      <!-- [COLOR-1] Este bloque NO baja: es la VISTA PREVIA DEL CONTRATO — papel blanco con tinta oscura, que tiene que verse igual con cualquier tema. Es un documento, no pantalla. -->
       <div id="ctr-preview-body" style="background:#fff;color:#1a1a1a;padding:32px 28px;font-family:'Montserrat',sans-serif;line-height:1.5"></div>
     </div>
     <div class="modal-footer">
@@ -3805,13 +3807,13 @@
     </div>
     <div class="modal-body">
       <div style="font-size:11px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Evento</div>
-      <div id="wl-notif-evento" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;color:#fff;margin-bottom:6px">—</div>
+      <div id="wl-notif-evento" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;color:var(--text);margin-bottom:6px">—</div>
       <div id="wl-notif-target" style="font-size:12px;color:var(--ts);margin-bottom:22px">—</div>
 
       <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.2);border-radius:var(--r-sm,8px);cursor:pointer">
         <input type="checkbox" id="wl-notif-usar-codigo" style="width:18px;height:18px;margin-top:2px;accent-color:#e8ff4c;cursor:pointer">
         <div>
-          <div style="font-size:13px;font-weight:700;color:#e8ff4c;line-height:1.3">Incluir código de descuento exclusivo en el correo</div>
+          <div style="font-size:13px;font-weight:700;color:var(--gold);line-height:1.3">Incluir código de descuento exclusivo en el correo</div>
           <div style="font-size:11px;color:var(--ts);margin-top:4px;line-height:1.4">Aparece como bloque amarillo destacado dentro del email, con el código en grande.</div>
         </div>
       </label>
@@ -3820,25 +3822,26 @@
         <div style="margin-bottom:12px">
           <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Código (ej. KENIA24)</label>
           <input type="text" id="wl-notif-codigo" maxlength="24" placeholder="LETRAS Y NÚMEROS"
-            style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none">
+            style="width:100%;padding:11px 13px;background:var(--bg);border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none">
         </div>
         <div style="display:flex;gap:10px">
           <div style="flex:1">
             <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">% de descuento</label>
             <input type="number" id="wl-notif-descuento" min="1" max="99" step="1" placeholder="10"
-              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+              style="width:100%;padding:11px 13px;background:var(--bg);border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
           </div>
           <div style="flex:1">
             <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Válido por (horas)</label>
             <input type="number" id="wl-notif-horas" min="1" max="168" step="1" value="24"
-              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+              style="width:100%;padding:11px 13px;background:var(--bg);border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
           </div>
         </div>
-        <div id="wl-notif-error" style="display:none;margin-top:10px;font-size:12px;color:#ff6666;font-weight:600">—</div>
+        <div id="wl-notif-error" style="display:none;margin-top:10px;font-size:12px;color:var(--red);font-weight:600">—</div>
       </div>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn btn-ghost" id="wl-notif-cancel">Cancelar</button>
+      <!-- [COLOR-1] `color:#000` NO baja: es TINTA SOBRE UN ACENTO CLARO. El fondo es var(--gold), y los 7 temas lo pintan claro (#e8ff4c, #FFB6E1, #D4688A, #FFB3CC…), así que el negro es legible en todos. No existe token «tinta sobre acento»; ponerle var(--bg) lo ROMPERÍA en tema-america, que tiene --bg:#FAFAFA. -->
       <button type="button" class="btn btn-primary" id="wl-notif-submit" style="background:#e8ff4c;color:#000;font-weight:900">Enviar correos</button>
     </div>
   </div>

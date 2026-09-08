@@ -344,6 +344,52 @@ está caduco antes de escribirse.
   🔒 **LEY: un vigilante que vive en un archivo ignorado no es un vigilante, es
   una nota.** Si tiene que sobrevivir a la sesión que lo escribió, va
   VERSIONADO — por eso éste vive en `scripts/`.
+  ✅ **COLOR-0 (el mapa) y COLOR-1 (la primera fase) EN PROD, 7-sep-2026.**
+  🔒 **EL VEREDICTO DE COLOR-0, que achica la serie a su tamaño real:** de las
+  **1,075**, solo **194** escriben un color a mano. **811 ya son `var(--x)`** —y
+  ésos NO son deuda: son el sistema de temas funcionando, porque `--ts` y sus
+  hermanas **las sobreescriben los 7 temas personales**—, 68 son color semántico
+  calculado y 2 son `inherit`. De los 194, **43 viven en documentos firmables,
+  listas impresas y correos**, que NO cargan `kamehouse.css`: ahí el color en
+  línea es **obligatorio**. **Convertibles de verdad: 151, el 14 %.** Y **CERO**
+  vienen de la base: `usuarios.tema_acento` nunca llega a un `style=` en línea,
+  cambia una CLASE de tema. Los dos vetos —temas y tipografía— **no se cruzan con
+  el inventario**. Mapa en `DISENO-COLOR-0-mapa.md`.
+  🔴 **EL MEDIDOR DE LA SERIE NO ES `vigia:color`, y descubrirlo costó una fase.**
+  Ese vigía cuenta declaraciones `color:` dentro de un `style=`, y
+  **`color:var(--red)` sigue siendo una**: convertir hex→token **no mueve ese
+  número ni un punto** (medido: 187 → 187 tras 8 conversiones). El medidor es
+  **`npm run vigia:color-literal`** — solo los escritos A MANO. COLOR-1 lo bajó
+  de **194 → 186**, y `kamehouse.html` de **14 → 6**.
+  **COLOR-1 · el cascarón:** de sus 14, **8 convertidas**, **3 marcadas con su
+  razón EN EL CÓDIGO** (2 son tinta negra sobre un acento claro —no existe token
+  «tinta sobre acento» y `var(--bg)` las rompería en `tema-america`— y 1 es la
+  vista previa del contrato, papel blanco) y **3 escaladas**: `#04210f`,
+  `#ffb020` y `#ffb47a` **no tienen token**, y COLOR-1 no inventa paleta.
+  🔒 **DOS HALLAZGOS QUE VALEN PARA LAS FASES QUE SIGUEN:**
+  - **La unidad de conversión es el PAR `color`+`background`, no la declaración.**
+    Un `color:var(--text)` con un `background:#000` a mano se vuelve ILEGIBLE en
+    `tema-america` (`--bg:#FAFAFA`, `--text:#2D2D3A`). El vigía solo mira `color:`
+    — ve media pareja. Los tres inputs de la lista de espera se convirtieron **de
+    a dos**.
+  - **En `tema-america` hay reglas `!important` sobre `.btn` e `input` que YA le
+    ganaban al hex en línea.** La deuda ahí no está ausente: está **TAPADA**, y se
+    destapa el día que alguien quite un `!important`. En 4 de los 8 elementos el
+    tema ya llegaba por esa vía.
+  **El careo:** `npm run mide:color-tema` — color COMPUTADO elemento por
+  elemento, BASE contra HEAD, en los dos temas; exige que el color **SEA** el
+  token (resolviendo la variable en la página, no pareciéndose) y controla en los
+  dos sentidos. 17 aserciones verdes. ⚠️ Se puso rojo **cuatro veces y las cuatro
+  eran expectativas mías**: «todas las de BASE son sordas al tema» (falso: los
+  `!important`), «todas las de HEAD lo siguen» (falso: ningún tema toca `--red`,
+  y que los errores no se muevan es una PROPIEDAD), un ancla por prefijo de texto
+  que agarró el `div` ANCESTRO, y dar por hecho que solo el token puede mover un
+  color.
+  ⏳ **Anotadas aparte, NO se cuelan en las fases:** (a) `esferas_eventos.color`
+  está lleno en 111 de 111 filas y `eventos.color` en 16 de 16, y **no encontré
+  ningún render que los pinte**; (b) los `const map = {…}` con hex por estado
+  viven **fuera** de la ventana del vigía, así que el 1,075 es una ventana, no la
+  casa.
   ⚠️ Los números viejos (827/158, y el 965/196 que circulaba) **no se pueden
   reproducir** con ninguna definición escribible: la base se remidió hoy y son
   **888 en los .js** (la serie MONO repartió `kamehouse.js` en 18 módulos) y

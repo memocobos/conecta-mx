@@ -8,6 +8,7 @@
   },
   "scripts": {
     "vigia:color": "node scripts/vigia-color-en-linea.js",
-    "vigia:rol-hist-padre": "node scripts/vigia-rol-hist-padre.js"
+    "vigia:rol-hist-padre": "node scripts/vigia-rol-hist-padre.js",
+    "mide:animacion": "node scripts/mide-animacion-infinita.js"
   }
 }

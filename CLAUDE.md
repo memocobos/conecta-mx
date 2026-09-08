@@ -358,12 +358,32 @@ está caduco antes de escribirse.
   Palacio): `#progress` existe, su `transform-origin` computa `0px 1.5px` —
   izquierda—, la transición es de `transform`, y al hacer scroll el transform
   pasa de `matrix(0,…)` a `matrix(0.32,…)` mientras el `width` **no se mueve**.
-  ⚠️ **Lo que sí encontró el barrido de ese archivo:** `pulseDot` anima
-  `box-shadow` en `infinite` sobre `.ftr-mini-dot`. Es **la misma forma** que las
-  cinco del index que **SCROLL-2 midió y SELLÓ** el 23-ago (mediana 8.4 ms,
-  mejora del 1% al apagarlas: dentro del ruido) — pero **esta de `funciona.html`
-  NO está en aquel sello**. Se anota, no se toca: sellarla es una decisión, y se
-  toma midiendo, no por parecido.
+  ✅ **El `pulseDot` de `funciona.html`: SELLADO CON NÚMERO** (PULSEDOT-MIDE-1,
+  7-sep-2026). Anima `box-shadow` en `infinite` sobre `.ftr-mini-dot` — la misma
+  forma que las cinco del index— y **ya no se sella por parecido: se midió**.
+  - **Método, el de SCROLL-2:** viewport 390×844, CPU frenada **4×**, scroll de
+    2.600 px, 5 repeticiones por brazo (~1.560 fotogramas cada uno).
+  - **Con la animación VIVA y APAGADA, los dos brazos dan lo mismo:** mediana
+    **8.3 ms**, p95 **9.3-9.4 ms**, **0 fotogramas >32 ms**. **Δ = 0.0 ms (0 %)**.
+  - 🔒 **El instrumento se validó con un CONTROL POSITIVO** (una animación cara
+    de verdad inyectada en la página): mediana **39 ms**, p95 **72.7 ms**, **233
+    fotogramas >32 ms**. El arnés SÍ ve un costo cuando lo hay — así que el cero
+    de arriba es una medición, no un punto ciego.
+  - ⚠️ **Y algo que el parecido escondía: durante el scroll el punto NUNCA SE
+    VE.** Vive en `y=7.773` de una página de `7.810 px`: a la vista en **0 de 21**
+    posiciones del scroll de 2.600 px. Por eso se midió un segundo escenario
+    —**el pie quieto y a la vista**, el único estado donde de verdad se pinta— y
+    ahí también da Δ 0. Medir solo el scroll habría dado «no cuesta» por la razón
+    equivocada.
+  - **Es UN elemento de 6 px**, no 31 pastillas: convertirlo pediría un
+    pseudo-elemento para replicar el halo, a cambio de nada medible. Misma
+    sentencia que las cinco: **se queda como está.**
+  - **Límite honesto del método:** la mediana está cuantizada al vsync (~8.3 ms),
+    así que un costo por debajo de ese grano no se vería. Es el mismo límite que
+    tuvo SCROLL-2 (8.4 / 9.4 / 0), y por eso existe el control positivo.
+  - 🔒 **Para re-litigarlo hay que volver a MEDIR** — y ahora el instrumento
+    existe y está versionado: `npm run mide:animacion`, parametrizable con
+    `PAGINA` y `SELECTOR` para poder remedir también las cinco del index.
 - **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
   (`RESERVA_PORTAL` / `?portal=1`). Falta decidir **su** encendido — que es
   otro, no el del correo: ése ya ocurrió.
@@ -516,6 +536,22 @@ está caduco antes de escribirse.
   más adentro. **Un mock de ruta salta al portero**: tres tuercas llegaron
   ROTAS a producción con el careo en verde (RAD-FIX-CAMINO, #625). Y una acción
   nueva **va en `ACCIONES` o no existe** para el despacho.
+- 🔒 **COPIAR EL ESCENARIO DE UNA MEDICIÓN VIEJA PUEDE DAR EL RESULTADO BUENO POR
+  LA RAZÓN MALA. Se mide DONDE EL EFECTO OCURRE, no donde se midió la vez
+  pasada.** PULSEDOT-MIDE-1 repitió el escenario de SCROLL-2 —scroll de 2.600 px,
+  CPU 4×, 390×844— sobre `funciona.html` y dio Δ 0: la animación no cuesta. La
+  sentencia era correcta y **la razón era falsa**: el punto vive en `y=7.773` de
+  una página de `7.810`, así que durante ese scroll **está a la vista en 0 de 21
+  posiciones**. Una animación fuera de pantalla no cuesta porque **no se pinta**;
+  el escenario heredado estaba midiendo la nada y contestando que sí.
+  Lo que salvó la medición fue añadir un segundo escenario —**el elemento quieto
+  y A LA VISTA**, el único estado donde de verdad se pinta— y que ahí también
+  diera 0. **Antes de reusar un escenario, preguntar qué condición hacía que
+  midiera algo, y comprobar que esa condición se cumple aquí.** Es la hermana de
+  «fuera de pantalla no es limpia» y de «probar el camino, no la función».
+  Y el compañero obligatorio: **el CONTROL POSITIVO**. Un Δ 0 sin una animación
+  cara inyectada que el arnés SÍ vea (aquí: +370 %) no distingue «no cuesta» de
+  «no mido». `npm run mide:animacion` (con `PAGINA` y `SELECTOR`).
 - **Un arnés que se CAE no reporta**: deja las secciones de abajo sin ejercitar
   y esconde qué candado habría cazado el fallo. La aserción atrapa la excepción
   y la cuenta como rojo **con nombre**.

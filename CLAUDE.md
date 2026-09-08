@@ -536,6 +536,22 @@ está caduco antes de escribirse.
   más adentro. **Un mock de ruta salta al portero**: tres tuercas llegaron
   ROTAS a producción con el careo en verde (RAD-FIX-CAMINO, #625). Y una acción
   nueva **va en `ACCIONES` o no existe** para el despacho.
+- 🔒 **COPIAR EL ESCENARIO DE UNA MEDICIÓN VIEJA PUEDE DAR EL RESULTADO BUENO POR
+  LA RAZÓN MALA. Se mide DONDE EL EFECTO OCURRE, no donde se midió la vez
+  pasada.** PULSEDOT-MIDE-1 repitió el escenario de SCROLL-2 —scroll de 2.600 px,
+  CPU 4×, 390×844— sobre `funciona.html` y dio Δ 0: la animación no cuesta. La
+  sentencia era correcta y **la razón era falsa**: el punto vive en `y=7.773` de
+  una página de `7.810`, así que durante ese scroll **está a la vista en 0 de 21
+  posiciones**. Una animación fuera de pantalla no cuesta porque **no se pinta**;
+  el escenario heredado estaba midiendo la nada y contestando que sí.
+  Lo que salvó la medición fue añadir un segundo escenario —**el elemento quieto
+  y A LA VISTA**, el único estado donde de verdad se pinta— y que ahí también
+  diera 0. **Antes de reusar un escenario, preguntar qué condición hacía que
+  midiera algo, y comprobar que esa condición se cumple aquí.** Es la hermana de
+  «fuera de pantalla no es limpia» y de «probar el camino, no la función».
+  Y el compañero obligatorio: **el CONTROL POSITIVO**. Un Δ 0 sin una animación
+  cara inyectada que el arnés SÍ vea (aquí: +370 %) no distingue «no cuesta» de
+  «no mido». `npm run mide:animacion` (con `PAGINA` y `SELECTOR`).
 - **Un arnés que se CAE no reporta**: deja las secciones de abajo sin ejercitar
   y esconde qué candado habría cazado el fallo. La aserción atrapa la excepción
   y la cuenta como rojo **con nombre**.

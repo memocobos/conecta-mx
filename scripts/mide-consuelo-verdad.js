@@ -173,6 +173,20 @@ function careaHtml(html, rotulo) {
   af(!/domingo 20/.test(htmlBase) && !/2 de octubre/.test(htmlBase), '[2] BASE ya traía las fechas buenas: el careo de presencia no prueba nada');
 
   // ── [3] HANDLER REAL (HEAD): los caminos que NO mandan ─────────────────────
+  // [3a] VA PRIMERO: `fetchCatalogo` guarda caché 10 min en el módulo, y si otra
+  // corrida la llena antes, este caso lee el catálogo bueno y pasa en verde por
+  // la guarda equivocada (medido con el sabotaje de la guarda del sitio). El
+  // index SÍ honra el código —la guarda del sitio pasa— y a natanael le falta
+  // `ds`: la única que puede rehusarse aquí es la del catálogo.
+  const sinDs = indexPublicado.replace(/(\{id:'natanael',[^\n]*?)ds:'2026-10-02',/, '$1');
+  af(sinDs !== indexPublicado, '[3a] la sonda no le quitó ds a natanael (no mutó)');
+  const natSinDs = catLib._parseEV(sinDs).find((e) => e && e.id === 'natanael');
+  af(natSinDs && !natSinDs.ds && natSinDs.a === nat.a, '[3a] la sonda rompió el EV en vez de solo quitar ds (el 409 saldría por otra razón)');
+  const t3a = red({ indexHtml: sinDs, fila: FILA_NATA });
+  const r3a = await correr(C.handler, t3a, {}, AHORA);
+  af(r3a.res && r3a.res.statusCode === 409 && /fecha de natanael del catálogo/.test(r3a.res.body), '[3a] catálogo sin fecha no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
+  af(t3a.resend.length === 0 && t3a.patch === 0, '[3a] catálogo sin fecha y aun así se mandó/marcó');
+
   const t3d = red({ indexHtml: indexHead, fila: FILA_NATA });        // EL SITIO DE HOY: NATA vencida en PROMOS
   const r3d = await correr(C.handler, t3d, {}, AHORA);
   af(r3d.res && r3d.res.statusCode === 409 && /el sitio dice que NATA ya venció/.test(r3d.res.body),
@@ -185,11 +199,6 @@ function careaHtml(html, rotulo) {
   af(r3e.res && r3e.res.statusCode === 409 && /no vencen igual/.test(r3e.res.body),
     '[3e] sitio y fila con distinto vencimiento y el handler no se rehusó: ' + JSON.stringify(r3e.res || String(r3e.error)));
   af(t3e.resend.length === 0 && t3e.patch === 0, '[3e] sitio y fila distintos y se mandó/marcó');
-
-  const t3a = red({ indexHtml: null, fila: FILA_NATA });            // catálogo ilegible (va primero: sin caché)
-  const r3a = await correr(C.handler, t3a, {}, AHORA);
-  af(r3a.res && r3a.res.statusCode === 409 && /index/.test(r3a.res.body), '[3a] catálogo ilegible no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
-  af(t3a.resend.length === 0 && t3a.patch === 0, '[3a] catálogo ilegible y aun así se mandó/marcó');
 
   const t3b = red({ indexHtml: indexPublicado, fila: FILA_NATA });       // promo vencida
   const r3b = await correr(C.handler, t3b, {}, VENCIDO);

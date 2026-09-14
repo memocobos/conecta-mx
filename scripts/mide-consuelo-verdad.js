@@ -183,7 +183,9 @@ function careaHtml(html, rotulo) {
   const natSinDs = catLib._parseEV(sinDs).find((e) => e && e.id === 'natanael');
   af(natSinDs && !natSinDs.ds && natSinDs.a === nat.a, '[3a] la sonda rompió el EV en vez de solo quitar ds (el 409 saldría por otra razón)');
   const t3a = red({ indexHtml: sinDs, fila: FILA_NATA });
-  const r3a = await correr(C.handler, t3a, {}, AHORA);
+  // Corre 20 min ANTES: la caché que deja (catálogo SIN fecha) ya está vencida
+  // cuando llegan los demás casos a AHORA — si no, los envenena.
+  const r3a = await correr(C.handler, t3a, {}, AHORA - 20 * 60 * 1000);
   af(r3a.res && r3a.res.statusCode === 409 && /fecha de natanael del catálogo/.test(r3a.res.body), '[3a] catálogo sin fecha no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
   af(t3a.resend.length === 0 && t3a.patch === 0, '[3a] catálogo sin fecha y aun así se mandó/marcó');
 

@@ -131,11 +131,15 @@ function careaHtml(html, rotulo) {
 (async () => {
   const dirBase = extraer(BASE), dirHead = extraer(HEAD);
   const indexHead = fs.readFileSync(path.join(dirHead, 'index.html'), 'utf8');
+  // El index VENCIDO sale de BASE, no de HEAD: el 14-sep se publicaron los códigos
+  // y el index de main ya honra NATA. Leerlo de HEAD hizo caducar la premisa de
+  // [3d] en la primera corrida sobre el merge — el verde también caduca.
+  const indexBase = fs.readFileSync(path.join(dirBase, 'index.html'), 'utf8');
   const C = require(path.join(dirHead, 'netlify/functions/giveaway-consuelo.js'));
   const CB = require(path.join(dirBase, 'netlify/functions/giveaway-consuelo.js'));
   const catLib = require(path.join(dirHead, 'netlify/functions/_lib/catalogo-index.js'));
   const promLib = require(path.join(dirHead, 'netlify/functions/_lib/promos-compile.js'));
-  const comp = promLib.compilarPROMOS({ codigos: [FILA_NATA], indexHtml: indexHead });
+  const comp = promLib.compilarPROMOS({ codigos: [FILA_NATA], indexHtml: indexBase });
   const indexPublicado = comp.contenidoNuevo;   // lo que dejaría «publicar códigos» desde Baba
   const link = SITIO + '/#natanael';
 
@@ -145,6 +149,9 @@ function careaHtml(html, rotulo) {
   af(!!nat, '[0] natanael no está en el catálogo del commit');
   af(nat && nat.ds === '2026-10-02', `[0] el catálogo no dice 2026-10-02 (dice ${nat && nat.ds})`);
   const promosHead = promLib.evaluarPROMOS(indexHead);
+  const promosBase = promLib.evaluarPROMOS(indexBase);
+  af(promosBase && promosBase.NATA && promosBase.NATA.expiresTs < AHORA,
+    '[0] PREMISA de [3d]: el index de BASE ya no trae NATA vencida — el caso no mide nada');
   const promosPub = promLib.evaluarPROMOS(indexPublicado);
   const tsSitio = promosHead && promosHead.NATA && promosHead.NATA.expiresTs;
   af(promosPub && promosPub.NATA && promosPub.NATA.expiresTs === Date.parse(FILA_NATA.expires_at)
@@ -189,13 +196,13 @@ function careaHtml(html, rotulo) {
   af(r3a.res && r3a.res.statusCode === 409 && /fecha de natanael del catálogo/.test(r3a.res.body), '[3a] catálogo sin fecha no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
   af(t3a.resend.length === 0 && t3a.patch === 0, '[3a] catálogo sin fecha y aun así se mandó/marcó');
 
-  const t3d = red({ indexHtml: indexHead, fila: FILA_NATA });        // EL SITIO DE HOY: NATA vencida en PROMOS
+  const t3d = red({ indexHtml: indexBase, fila: FILA_NATA });        // el sitio de BASE: NATA vencida en PROMOS
   const r3d = await correr(C.handler, t3d, {}, AHORA);
   af(r3d.res && r3d.res.statusCode === 409 && /el sitio dice que NATA ya venció/.test(r3d.res.body),
     '[3d] con el index de hoy el handler no se rehusó por el sitio: ' + JSON.stringify(r3d.res || String(r3d.error)));
   af(t3d.resend.length === 0 && t3d.patch === 0, '[3d] con el index de hoy se mandó/marcó');
 
-  const idxOtroTs = promLib.compilarPROMOS({ codigos: [{ ...FILA_NATA, expires_at: '2026-09-25T04:59:59+00:00' }], indexHtml: indexHead }).contenidoNuevo;
+  const idxOtroTs = promLib.compilarPROMOS({ codigos: [{ ...FILA_NATA, expires_at: '2026-09-25T04:59:59+00:00' }], indexHtml: indexBase }).contenidoNuevo;
   const t3e = red({ indexHtml: idxOtroTs, fila: FILA_NATA });        // sitio vigente pero con OTRO vencimiento
   const r3e = await correr(C.handler, t3e, {}, AHORA);
   af(r3e.res && r3e.res.statusCode === 409 && /no vencen igual/.test(r3e.res.body),
@@ -240,8 +247,8 @@ function careaHtml(html, rotulo) {
   console.log(`BASE ${BASE.slice(0, 7)} · HEAD ${HEAD.slice(0, 7)}`);
   console.log('Línea de vigencia HEAD :', (html1.match(/Válido hasta[^<]*/) || [''])[0]);
   console.log('Línea de cierre HEAD   :', (html1.match(/El concierto es[^🖤]*/) || [''])[0].replace(/<[^>]+>/g, ''));
-  console.log('NATA en el index del commit vence:', tsSitio ? new Date(tsSitio).toISOString() : '—', '· en la fila:', FILA_NATA.expires_at);
-  console.log('Handler HEAD con el index de hoy →', r3d.res && r3d.res.statusCode, r3d.res && JSON.parse(r3d.res.body).error);
+  console.log('NATA en el index de BASE vence:', new Date(promosBase.NATA.expiresTs).toISOString(), '· en el de HEAD:', tsSitio ? new Date(tsSitio).toISOString() : '—', '· en la fila:', FILA_NATA.expires_at);
+  console.log('Handler HEAD con el index de BASE →', r3d.res && r3d.res.statusCode, r3d.res && JSON.parse(r3d.res.body).error);
   console.log(`Envíos al DOBLE: ${totalResend} (todos en [4], el control positivo) · red real: ${real.length}`);
   console.log(`\n${ok} verdes · ${mal} rojos`);
   for (const f of fallos) console.log('  ❌ ' + f);

@@ -12,6 +12,7 @@
     "mide:animacion": "node scripts/mide-animacion-infinita.js",
     "vigia:color-literal": "node scripts/vigia-color-literal.js",
     "mide:color-tema": "node scripts/mide-color-tema.js",
-    "mide:puente-portal": "node scripts/mide-puente-portal.js"
+    "mide:puente-portal": "node scripts/mide-puente-portal.js",
+    "mide:consuelo-verdad": "node scripts/mide-consuelo-verdad.js"
   }
 }

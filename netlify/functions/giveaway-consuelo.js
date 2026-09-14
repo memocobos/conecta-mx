@@ -21,6 +21,7 @@
 
 const G = require('./_lib/giveaway');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
 
 const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
 const FROM = process.env.RESEND_FROM_CONTRATOS
@@ -76,6 +77,64 @@ async function promoViva(codigo, ahoraMs) {
   return { codigo: p.codigo, texto, expira: p.expires_at };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [CONSUELO-VERDAD-1, 14-sep-2026] LAS DOS FECHAS DEL CORREO SE DERIVAN.
+//
+// La plantilla heredó de melanie dos textos tecleados, ciertos el 5-ago y
+// falsos para NATA: la vigencia decía que el código moría ese mismo día a las
+// ocho de la noche (NATA vale hasta el domingo 20-sep 11:59 PM) y el cierre
+// decía que el concierto era al día siguiente (natanael es el 2-oct). Mismo
+// error que el «30% de descuento» de GIVEAWAY-NATA-1, en otras dos líneas: un
+// texto escrito al lado del dato que describe.
+//
+//   · La VIGENCIA sale de `expires_at` de la fila viva de `promos_codigos`,
+//     pintada en el reloj de Reynosa (America/Matamoros, NO Monterrey).
+//   · La FECHA DEL EVENTO sale del catálogo (`ds` del EV que el sitio sirve),
+//     vía `_lib/catalogo-index` — la misma lectura que ya usan contratos y
+//     transporte. El slug es QUÉ evento se busca; la fecha, lo que el catálogo
+//     diga.
+// 🔒 Si alguna de las dos no se puede derivar, NO SE MANDA NADA: un correo sin
+// fecha o con una inventada es exactamente lo que esta tuerca quita.
+const EVENTO_SLUG = 'natanael';
+const TZ_REYNOSA = 'America/Matamoros';
+
+function _partes(fecha, tz) {
+  const o = {};
+  for (const p of new Intl.DateTimeFormat('es-MX', {
+    timeZone: tz, weekday: 'long', day: 'numeric', month: 'long',
+    hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(fecha)) o[p.type] = p.value;
+  return o;
+}
+
+// "Válido hasta el domingo 20 de septiembre" — y si la fila no vence al filo de
+// la medianoche, con su hora: decir solo el día prometería horas que no hay.
+function lineaValidez(expiraIso) {
+  const ms = Date.parse(expiraIso);
+  if (!expiraIso || !Number.isFinite(ms)) throw new Error(`vencimiento ilegible: ${expiraIso}`);
+  const p = _partes(new Date(ms), TZ_REYNOSA);
+  let s = `Válido hasta el ${p.weekday} ${p.day} de ${p.month}`;
+  const h = Number(p.hour), m = p.minute;
+  if (!(h === 23 && m === '59')) {
+    s += ` a las ${((h + 11) % 12) + 1}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+  }
+  return s;
+}
+
+// "viernes 2 de octubre". `ds` es una FECHA de calendario, no un instante: se
+// pinta en UTC a mediodía para que ningún huso la corra de día. Y se rechaza la
+// fecha imposible (2026-13-45 no se acomoda sola a otro día).
+function fechaEvento(ds) {
+  const mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ds || ''));
+  if (!mt) throw new Error(`fecha del evento ilegible: ${ds}`);
+  const d = new Date(Date.UTC(+mt[1], +mt[2] - 1, +mt[3], 12));
+  if (d.getUTCFullYear() !== +mt[1] || d.getUTCMonth() !== +mt[2] - 1 || d.getUTCDate() !== +mt[3]) {
+    throw new Error(`fecha del evento imposible: ${ds}`);
+  }
+  const p = _partes(d, 'UTC');
+  return `${p.weekday} ${p.day} de ${p.month}`;
+}
+
 const ASUNTO = 'No ganaste el sorteo… pero te tenemos algo 💜';
 
 function escapeHtml(s) {
@@ -83,7 +142,13 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function correoHtml(nombre, link, codigo, texto) {
+// `promo` = { codigo, texto, expira } tal como lo devuelve promoViva; `evento` =
+// { ds } del catálogo. Las dos líneas se derivan AQUÍ, dentro del render que se
+// imprime: si truena, truena antes de escribirle a nadie.
+function correoHtml(nombre, link, promo, evento) {
+  const { codigo, texto } = promo || {};
+  const validez = lineaValidez(promo && promo.expira);
+  const cuando = fechaEvento(evento && evento.ds);
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(ASUNTO)}</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
@@ -107,7 +172,7 @@ function correoHtml(nombre, link, codigo, texto) {
           <tr><td style="padding:18px 20px;text-align:center">
             <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px">Tu código</div>
             <div style="font-family:Arial Black,Arial,sans-serif;font-size:30px;letter-spacing:.14em;color:#e8ff4c">${escapeHtml(codigo)}</div>
-            <div style="font-size:13px;color:#ff283b;font-weight:700;margin-top:10px">Válido solo HOY hasta las 8:00 PM</div>
+            <div style="font-size:13px;color:#ff283b;font-weight:700;margin-top:10px">${escapeHtml(validez)}</div>
           </td></tr>
         </table>
       </td></tr>
@@ -115,7 +180,7 @@ function correoHtml(nombre, link, codigo, texto) {
         <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:16px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;box-sizing:border-box">Usar mi código ${escapeHtml(codigo)}</a>
       </td></tr>
       <tr><td style="padding:6px 26px 28px 26px">
-        <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0;text-align:center">El concierto es <strong style="color:#fff">mañana</strong> — todavía alcanzas. 🖤</p>
+        <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0;text-align:center">El concierto es el <strong style="color:#fff">${escapeHtml(cuando)}</strong> — todavía alcanzas. 🖤</p>
       </td></tr>
       <tr><td style="background:#000;padding:18px 26px;border-top:1px solid rgba(255,255,255,.1);text-align:center">
         <div style="font-size:10px;color:rgba(255,255,255,.32);letter-spacing:.18em;text-transform:uppercase">Conecta Reynosa · conectareynosa.mx</div>
@@ -145,6 +210,8 @@ async function enviar(to, subject, html) {
 exports._correoHtml = correoHtml;
 exports._promoViva = promoViva;
 exports._ASUNTO = ASUNTO;
+exports._lineaValidez = lineaValidez;
+exports._fechaEvento = fechaEvento;
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -162,11 +229,12 @@ exports.handler = async (event) => {
   // `seco:true` = ensayo. Mide a quién le tocaría y NO manda ni marca nada.
   const seco = body.seco === true;
 
-  // El código ya vencido no se anuncia: sería mandar 88 correos a una promoción
-  // muerta. Se puede forzar con `aunqueVencido` para una prueba.
-  if (Date.now() > Date.parse(MUERE) && body.aunqueVencido !== true) {
-    return G.json(409, headers, { ok: false, error: 'el código ya venció; no se manda nada' });
-  }
+  // [CONSUELO-VERDAD-1] Aquí vivía la guarda de vencimiento de melanie, que
+  // comparaba contra una constante que GIVEAWAY-NATA-1 borró sin borrar su
+  // lector: el handler tronaba con ReferenceError antes de hacer nada. La
+  // vigencia ya la decide `promoViva` contra la fila, así que la guarda sobra.
+  // (El atajo `aunqueVencido` se fue con ella: forzar un código muerto es
+  // justo lo que la fila prohíbe.)
 
   // ── El ganador, para excluirlo. ────────────────────────────────────────────
   // Con ASERCIÓN: si no se puede identificar, se ABORTA. Un fallo silencioso
@@ -228,6 +296,35 @@ exports.handler = async (event) => {
   }
 
   const destinatarios = [...porCorreo.entries()];
+
+  // El enlace iba a `/melanie`, una ruta que ya no existe: el correo mandaba a
+  // ~90 personas a una página muerta. Ahora apunta al evento de verdad.
+  const link = SITE + '/#' + EVENTO_SLUG;
+
+  // 🔒 SE PREGUNTA A BABA Y AL CATÁLOGO ANTES DE ESCRIBIRLE A NADIE. Si el código
+  // no está vigente o la fecha del evento no se puede leer, no se manda NADA: un
+  // correo con un código muerto o una fecha inventada es peor que no mandarlo,
+  // porque quema la promesa y llena el WhatsApp de reclamos. Va ANTES del ensayo
+  // para que `seco` no diga «listo» sobre una corrida que se rehusaría.
+  const promo = await promoViva(CODIGO);
+  if (promo.error) {
+    return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + promo.error });
+  }
+  const catalogo = await fetchCatalogo();
+  const evento = catalogo && catalogo[EVENTO_SLUG];
+  if (!evento || !evento.ds) {
+    return G.json(409, headers, { ok: false,
+      error: `No se mandó ningún correo: no se pudo leer la fecha de ${EVENTO_SLUG} del catálogo` });
+  }
+  let validez, cuando;
+  try {
+    validez = lineaValidez(promo.expira);
+    cuando = fechaEvento(evento.ds);
+    correoHtml('', link, promo, evento);   // el render entero, una vez, antes del primero
+  } catch (e) {
+    return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + e.message });
+  }
+
   if (seco) {
     return G.json(200, headers, {
       ok: true, ensayo: true,
@@ -236,25 +333,16 @@ exports.handler = async (event) => {
       sin_correo: sinCorreo,
       destinatarios: destinatarios.length,
       filas_a_marcar: destinatarios.reduce((a, [, v]) => a + v.ids.length, 0),
+      // Las dos líneas derivadas, para verlas en el ensayo antes del botón.
+      validez, evento: 'El concierto es el ' + cuando,
     });
   }
 
-  // El enlace iba a `/melanie`, una ruta que ya no existe: el correo mandaba a
-  // ~90 personas a una página muerta. Ahora apunta al evento de verdad.
-  const link = SITE + '/#natanael';
-
-  // 🔒 SE PREGUNTA A BABA ANTES DE ESCRIBIRLE A NADIE. Si el código no está
-  // vigente, no se manda NADA: un correo con un código muerto es peor que no
-  // mandarlo, porque quema la promesa y llena el WhatsApp de reclamos.
-  const promo = await promoViva(CODIGO);
-  if (promo.error) {
-    return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + promo.error });
-  }
   let enviados = 0, fallidos = 0, sinMarcar = 0, filasMarcadas = 0;
 
   // Uno por uno y en serie: un buzón malo no puede tumbar al resto.
   for (const [correo, info] of destinatarios) {
-    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link, promo.codigo, promo.texto));
+    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link, promo, evento));
     if (!ok) { fallidos++; continue; }
     enviados++;
 

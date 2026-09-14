@@ -15,6 +15,11 @@
 //     KameHouse el 14-sep-2026, ver FILA_NATA) servida un salto más adentro.
 //   · La fecha del evento sale del `index.html` DEL COMMIT, parseado por
 //     `_lib/catalogo-index` real.
+//   · 🔒 EL SITIO TIENE QUE HONRAR EL CÓDIGO. El index del commit trae NATA
+//     vencida el 1-sep (nadie publicó los códigos tras editar la fila): el
+//     handler tiene que REHUSARSE con ese index. La corrida buena usa el index
+//     que dejaría «publicar códigos» — generado por `compilarPROMOS` REAL con la
+//     fila real, no editado a mano.
 //   · 🔒 NI UN CORREO: `fetch` global es un doble. Resend se CUENTA y nunca sale;
 //     cualquier otro host no previsto se cuenta como «red real» y tiene que dar 0.
 //     El contador tiene CONTROL POSITIVO: la corrida buena tiene que contar
@@ -42,9 +47,14 @@ const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };
 // (select codigo, desc_texto, monto, pct, starts_at, expires_at, archivado).
 // Es una foto: por eso abajo se carea contra el `expiresTs` del catálogo del
 // commit, que es la OTRA fuente de la misma fecha.
+// (select * — actualizado_en 2026-09-07 00:23 por jane-giveaway-nata.)
 const FILA_NATA = {
-  codigo: 'NATA', desc_texto: '$500 de descuento con código NATA', monto: '500.00', pct: null,
-  starts_at: '2026-09-14T14:00:00+00:00', expires_at: '2026-09-21T04:59:59+00:00', archivado: false,
+  codigo: 'NATA', monto: '500.00', pct: null, pct_cheap: null,
+  desc_texto: '$500 de descuento con código NATA', custom_msg: null, hide_amount: false,
+  only_events: ['natanael'], all_events: false, only_zones: null, exclude_zones: null,
+  exclude_pkg: ['ride', 'stay', 'cheap'],
+  starts_at: '2026-09-14T14:00:00+00:00', expires_at: '2026-09-21T04:59:59+00:00',
+  max_usos: 9999, single_use: false, segundo_pax: null, exact_personas: null, archivado: false,
 };
 
 function extraer(sha) {
@@ -125,6 +135,9 @@ function careaHtml(html, rotulo) {
   const C = require(path.join(dirHead, 'netlify/functions/giveaway-consuelo.js'));
   const CB = require(path.join(dirBase, 'netlify/functions/giveaway-consuelo.js'));
   const catLib = require(path.join(dirHead, 'netlify/functions/_lib/catalogo-index.js'));
+  const promLib = require(path.join(dirHead, 'netlify/functions/_lib/promos-compile.js'));
+  const comp = promLib.compilarPROMOS({ codigos: [FILA_NATA], indexHtml: indexHead });
+  const indexPublicado = comp.contenidoNuevo;   // lo que dejaría «publicar códigos» desde Baba
   const link = SITIO + '/#natanael';
 
   // ── [0] Las dos fuentes de la vigencia dicen el mismo instante ─────────────
@@ -132,9 +145,12 @@ function careaHtml(html, rotulo) {
   const nat = EV.find((e) => e && e.id === 'natanael');
   af(!!nat, '[0] natanael no está en el catálogo del commit');
   af(nat && nat.ds === '2026-10-02', `[0] el catálogo no dice 2026-10-02 (dice ${nat && nat.ds})`);
-  af(nat && nat.flashPromo && nat.flashPromo.code === 'NATA'
-    && nat.flashPromo.expiresTs === Date.parse(FILA_NATA.expires_at),
-    '[0] la fila de NATA y el flashPromo del catálogo no vencen en el mismo instante');
+  const promosHead = promLib.evaluarPROMOS(indexHead);
+  const promosPub = promLib.evaluarPROMOS(indexPublicado);
+  const tsSitio = promosHead && promosHead.NATA && promosHead.NATA.expiresTs;
+  af(promosPub && promosPub.NATA && promosPub.NATA.expiresTs === Date.parse(FILA_NATA.expires_at)
+    && comp.aActualizar.length === 1 && comp.aInsertar.length === 0,
+    '[0] el index publicado por el compilador real no quedó con el vencimiento de la fila');
 
   // ── [1] _correoHtml real, con la fila real pasada por _promoViva real ──────
   const t1 = red({ indexHtml: indexHead, fila: FILA_NATA });
@@ -158,17 +174,30 @@ function careaHtml(html, rotulo) {
   af(!/domingo 20/.test(htmlBase) && !/2 de octubre/.test(htmlBase), '[2] BASE ya traía las fechas buenas: el careo de presencia no prueba nada');
 
   // ── [3] HANDLER REAL (HEAD): los caminos que NO mandan ─────────────────────
+  const t3d = red({ indexHtml: indexHead, fila: FILA_NATA });        // EL SITIO DE HOY: NATA vencida en PROMOS
+  const r3d = await correr(C.handler, t3d, {}, AHORA);
+  af(r3d.res && r3d.res.statusCode === 409 && /el sitio dice que NATA ya venció/.test(r3d.res.body),
+    '[3d] con el index de hoy el handler no se rehusó por el sitio: ' + JSON.stringify(r3d.res || String(r3d.error)));
+  af(t3d.resend.length === 0 && t3d.patch === 0, '[3d] con el index de hoy se mandó/marcó');
+
+  const idxOtroTs = promLib.compilarPROMOS({ codigos: [{ ...FILA_NATA, expires_at: '2026-09-25T04:59:59+00:00' }], indexHtml: indexHead }).contenidoNuevo;
+  const t3e = red({ indexHtml: idxOtroTs, fila: FILA_NATA });        // sitio vigente pero con OTRO vencimiento
+  const r3e = await correr(C.handler, t3e, {}, AHORA);
+  af(r3e.res && r3e.res.statusCode === 409 && /no vencen igual/.test(r3e.res.body),
+    '[3e] sitio y fila con distinto vencimiento y el handler no se rehusó: ' + JSON.stringify(r3e.res || String(r3e.error)));
+  af(t3e.resend.length === 0 && t3e.patch === 0, '[3e] sitio y fila distintos y se mandó/marcó');
+
   const t3a = red({ indexHtml: null, fila: FILA_NATA });            // catálogo ilegible (va primero: sin caché)
   const r3a = await correr(C.handler, t3a, {}, AHORA);
-  af(r3a.res && r3a.res.statusCode === 409 && /fecha de natanael/.test(r3a.res.body), '[3a] catálogo ilegible no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
+  af(r3a.res && r3a.res.statusCode === 409 && /index/.test(r3a.res.body), '[3a] catálogo ilegible no dio 409 con su razón: ' + JSON.stringify(r3a.res || String(r3a.error)));
   af(t3a.resend.length === 0 && t3a.patch === 0, '[3a] catálogo ilegible y aun así se mandó/marcó');
 
-  const t3b = red({ indexHtml: indexHead, fila: FILA_NATA });       // promo vencida
+  const t3b = red({ indexHtml: indexPublicado, fila: FILA_NATA });       // promo vencida
   const r3b = await correr(C.handler, t3b, {}, VENCIDO);
   af(r3b.res && r3b.res.statusCode === 409 && /ya venció/.test(r3b.res.body), '[3b] promo vencida no dio 409: ' + JSON.stringify(r3b.res || String(r3b.error)));
   af(t3b.resend.length === 0 && t3b.patch === 0, '[3b] promo vencida y aun así se mandó/marcó');
 
-  const t3c = red({ indexHtml: indexHead, fila: FILA_NATA });       // ensayo
+  const t3c = red({ indexHtml: indexPublicado, fila: FILA_NATA });       // ensayo
   const r3c = await correr(C.handler, t3c, { seco: true }, AHORA);
   const b3c = r3c.res ? JSON.parse(r3c.res.body) : {};
   af(r3c.res && r3c.res.statusCode === 200 && b3c.ensayo === true && b3c.destinatarios === 2, '[3c] el ensayo no contó 2 destinatarios: ' + JSON.stringify(b3c));
@@ -176,7 +205,7 @@ function careaHtml(html, rotulo) {
   af(t3c.resend.length === 0 && t3c.patch === 0, '[3c] el ensayo mandó o marcó');
 
   // ── [4] HANDLER REAL (HEAD): la corrida buena, al doble — CONTROL POSITIVO ─
-  const t4 = red({ indexHtml: indexHead, fila: FILA_NATA });
+  const t4 = red({ indexHtml: indexPublicado, fila: FILA_NATA });
   const r4 = await correr(C.handler, t4, {}, AHORA);
   const b4 = r4.res ? JSON.parse(r4.res.body) : {};
   af(r4.res && r4.res.statusCode === 200 && b4.enviados === 2, '[4] la corrida buena no dio 200 con 2 enviados: ' + JSON.stringify(b4 || String(r4.error)));
@@ -193,13 +222,16 @@ function careaHtml(html, rotulo) {
   af(t5.resend.length === 0, '[5] BASE llegó a mandar');
 
   // ── 🔒 La red real, en todo el careo ───────────────────────────────────────
-  const real = [t1, t3a, t3b, t3c, t4, t5].reduce((a, t) => a.concat(t.real), []);
+  const todas = [t1, t3d, t3e, t3a, t3b, t3c, t4, t5];
+  const real = todas.reduce((a, t) => a.concat(t.real), []);
   af(real.length === 0, '[red] se intentó salir a la red real: ' + real.join(', '));
-  const totalResend = [t1, t3a, t3b, t3c, t4, t5].reduce((a, t) => a + t.resend.length, 0);
+  const totalResend = todas.reduce((a, t) => a + t.resend.length, 0);
 
   console.log(`BASE ${BASE.slice(0, 7)} · HEAD ${HEAD.slice(0, 7)}`);
   console.log('Línea de vigencia HEAD :', (html1.match(/Válido hasta[^<]*/) || [''])[0]);
   console.log('Línea de cierre HEAD   :', (html1.match(/El concierto es[^🖤]*/) || [''])[0].replace(/<[^>]+>/g, ''));
+  console.log('NATA en el index del commit vence:', tsSitio ? new Date(tsSitio).toISOString() : '—', '· en la fila:', FILA_NATA.expires_at);
+  console.log('Handler HEAD con el index de hoy →', r3d.res && r3d.res.statusCode, r3d.res && JSON.parse(r3d.res.body).error);
   console.log(`Envíos al DOBLE: ${totalResend} (todos en [4], el control positivo) · red real: ${real.length}`);
   console.log(`\n${ok} verdes · ${mal} rojos`);
   for (const f of fallos) console.log('  ❌ ' + f);

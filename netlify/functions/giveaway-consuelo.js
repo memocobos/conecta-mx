@@ -22,6 +22,7 @@
 const G = require('./_lib/giveaway');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
+const { evaluarPROMOS } = require('./_lib/promos-compile');
 
 const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
 const FROM = process.env.RESEND_FROM_CONTRATOS
@@ -135,6 +136,38 @@ function fechaEvento(ds) {
   return `${p.weekday} ${p.day} de ${p.month}`;
 }
 
+// 🔒 LA TERCERA MENTIRA, la que no está en la plantilla: la FILA puede decir
+// «vigente hasta el 20» y el SITIO seguir diciendo «Código expirado». El index
+// no lee `promos_codigos`: lleva su copia en `var PROMOS`, y esa copia solo se
+// refresca cuando alguien publica los códigos desde Baba. Medido el 14-sep-2026:
+// la fila de NATA vence el 20-sep y el index en producción la tenía vencida
+// desde el 1-sep. El correo habría llevado a ~88 personas a un código que el
+// checkout rechaza. Así que se le pregunta al index SERVIDO —el que ve el
+// cliente— y se exige que honre el código AHORA y que venza en el MISMO instante
+// que la fila (si no, la línea de vigencia diría una fecha y el sitio otra).
+async function codigoEnElSitio(codigo, expiraFila, ahoraMs) {
+  let html;
+  try {
+    const r = await fetch(SITE.replace(/\/$/, '') + '/index.html', { headers: { 'Cache-Control': 'no-cache' } });
+    if (!r.ok) return { error: `el sitio contestó ${r.status} al pedir index.html` };
+    html = await r.text();
+  } catch (e) { return { error: `no se pudo leer el index del sitio: ${e.message}` }; }
+  const PROMOS = evaluarPROMOS(html);
+  if (!PROMOS) return { error: 'no se pudo leer var PROMOS del index del sitio' };
+  const p = PROMOS[codigo];
+  const publica = ' — publica los códigos desde Baba y vuelve a intentar';
+  if (!p) return { error: `el sitio no conoce el código ${codigo}` + publica };
+  const ahora = ahoraMs != null ? ahoraMs : Date.now();
+  if (p.startTs && ahora < p.startTs) return { error: `el sitio dice que ${codigo} todavía no empieza` + publica };
+  if (p.expiresTs && ahora > p.expiresTs) {
+    return { error: `el sitio dice que ${codigo} ya venció (${lineaValidez(new Date(p.expiresTs).toISOString()).replace('Válido hasta el ', '')})` + publica };
+  }
+  if (p.expiresTs !== Date.parse(expiraFila)) {
+    return { error: `el sitio y la fila no vencen igual (sitio ${p.expiresTs ? new Date(p.expiresTs).toISOString() : 'sin vencimiento'} · fila ${expiraFila})` + publica };
+  }
+  return { ok: true };
+}
+
 const ASUNTO = 'No ganaste el sorteo… pero te tenemos algo 💜';
 
 function escapeHtml(s) {
@@ -212,6 +245,7 @@ exports._promoViva = promoViva;
 exports._ASUNTO = ASUNTO;
 exports._lineaValidez = lineaValidez;
 exports._fechaEvento = fechaEvento;
+exports._codigoEnElSitio = codigoEnElSitio;
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -309,6 +343,10 @@ exports.handler = async (event) => {
   const promo = await promoViva(CODIGO);
   if (promo.error) {
     return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + promo.error });
+  }
+  const sitio = await codigoEnElSitio(CODIGO, promo.expira);
+  if (sitio.error) {
+    return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + sitio.error });
   }
   const catalogo = await fetchCatalogo();
   const evento = catalogo && catalogo[EVENTO_SLUG];

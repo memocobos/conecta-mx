@@ -43,11 +43,10 @@ const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };
 
-// La fila REAL, tal como la devolvió `promos_codigos` de KameHouse el 14-sep-2026
-// (select codigo, desc_texto, monto, pct, starts_at, expires_at, archivado).
-// Es una foto: por eso abajo se carea contra el `expiresTs` del catálogo del
-// commit, que es la OTRA fuente de la misma fecha.
-// (select * — actualizado_en 2026-09-07 00:23 por jane-giveaway-nata.)
+// La fila REAL, tal como la devolvió `select * from promos_codigos` de KameHouse
+// el 14-sep-2026 (actualizado_en 2026-09-07 00:23 por jane-giveaway-nata). Es una
+// FOTO: si la fila cambia, este careo no lo ve — lo que sí ve, en producción, es
+// la guarda del handler, que la lee viva y la carea contra el index servido.
 const FILA_NATA = {
   codigo: 'NATA', monto: '500.00', pct: null, pct_cheap: null,
   desc_texto: '$500 de descuento con código NATA', custom_msg: null, hide_amount: false,
@@ -140,7 +139,7 @@ function careaHtml(html, rotulo) {
   const indexPublicado = comp.contenidoNuevo;   // lo que dejaría «publicar códigos» desde Baba
   const link = SITIO + '/#natanael';
 
-  // ── [0] Las dos fuentes de la vigencia dicen el mismo instante ─────────────
+  // ── [0] El catálogo del commit y el index que dejaría «publicar códigos» ────
   const EV = catLib._parseEV(indexHead);
   const nat = EV.find((e) => e && e.id === 'natanael');
   af(!!nat, '[0] natanael no está en el catálogo del commit');

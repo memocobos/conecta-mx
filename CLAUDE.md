@@ -312,14 +312,63 @@ está caduco antes de escribirse.
   publicación completa, byte a byte** — `compilarEV` es un UPSERT que nunca borra.
   Si se quiere gobernarla desde Esferas, se siembra con *Traer del catálogo*.
   ⚠️ **El módulo del sorteo sigue entero en el árbol** y MEL-FRENTE-1 nunca lo
-  tocó: `giveaway.html`, `sorteo.html` y 7 funciones, de las cuales
-  `giveaway-consuelo.js` todavía trae `CODIGO='MELANIE'` y un enlace a `/melanie`.
-  **Nadie la llama y no existe esa ruta**, así que está muerto — pero está.
-  Limpiarlo es decisión aparte, sin firma.
+  tocó: `giveaway.html`, `sorteo.html` y 7 funciones. ⚰️ **Lo que decía aquí —que
+  `giveaway-consuelo.js` trae `CODIGO='MELANIE'` y enlaza a `/melanie`— CADUCÓ:**
+  GIVEAWAY-NATA-1 (6-sep) lo repuntó a NATA y CONSUELO-VERDAD-1 (14-sep) le quitó
+  las últimas dos mentiras. **Ese correo ya NO está muerto: espera el botón de
+  Memo** (ver el bloque de CONSUELO-VERDAD-1 abajo).
   Dos cosas que dejó aprendidas el borrado y valen para el próximo:
   **las 15 tablas satélite llavean por SLUG** (el uuid solo vive en `eventos`), y
   **`compilarEV` es un UPSERT que nunca borra** — un evento ausente de
   `esferas_eventos` NO se puede despublicar publicando.
+- 💜 **CONSUELO-VERDAD-1 · EL CORREO DE CONSOLACIÓN YA NO MIENTE, en prod
+  (#736, 14-sep-2026). Ni un correo disparado todavía: espera el botón de Memo.**
+  La plantilla de `giveaway-consuelo.js` traía DOS textos tecleados heredados de
+  melanie —ciertos el 5-ago, falsos para NATA—: la vigencia decía que el código
+  moría ese mismo día a las 8 PM (vale hasta el **domingo 20-sep 11:59 PM**) y el
+  cierre decía que el concierto era «mañana» (natanael es el **2-oct**). Es el
+  mismo error del «30% de descuento» de GIVEAWAY-NATA-1, en otras dos líneas.
+  **Doctrina PROMO-DERIVA aplicada a las fechas:** la vigencia sale de
+  `expires_at` de la fila viva de `promos_codigos` pintada en `America/Matamoros`
+  y la fecha del evento del `ds` del catálogo (`_lib/catalogo-index`). Sin dato
+  legible **no se manda nada** — y `seco:true` pasa por las mismas guardas y
+  ENSEÑA las dos líneas derivadas, para verlas antes del botón.
+  🔴 **La guarda muerta que tronaba el handler:** quedaba un lector de la
+  constante `MUERE` que GIVEAWAY-NATA-1 borró. **El botón contestaba
+  ReferenceError antes de hacer nada** — nadie lo había apretado desde entonces.
+  Es la hermana de la guarda inalcanzable: aquí el hueco no era una rama que no
+  se alcanza, es un LECTOR sin su dato.
+  🔒 **LA TERCERA MENTIRA, y es LEY nueva: la FILA VIVA no es lo que el cliente
+  ve.** El index no lee `promos_codigos`: lleva su COPIA en `var PROMOS`, y esa
+  copia solo se refresca cuando alguien **publica los códigos desde Baba**.
+  Medido el 14-sep: la fila de NATA vencía el 20-sep y **el index en producción
+  la traía vencida desde el 1-sep** (la fila la editó `jane-giveaway-nata` el
+  7-sep y nadie publicó). El correo habría mandado a ~88 personas a un **«Código
+  expirado»**. Hoy el handler lee el `PROMOS` **del index SERVIDO** y exige que
+  honre el código AHORA **y que venza en el MISMO instante que la fila**; si no,
+  409 diciendo «publica los códigos desde Baba». Hermana de
+  `flash_promo` era una COPIA: **todo letrero que viva en el index es una copia
+  con fecha de caducidad propia.**
+  **El careo** (`npm run mide:consuelo-verdad`, 50 aserciones): los DOS lados son
+  commits, entra por el **handler REAL** con `fetch` doble, la promo entra por
+  `_promoViva` real con la **fila real** y el index vencido sale de **BASE**
+  (anclarlo a HEAD hizo caducar el caso en cuanto se publicaron los códigos: **el
+  verde también caduca**). Las aserciones de ausencia se hacen sobre **el HTML
+  IMPRESO**, no sobre el fuente. 🔒 **Ni un correo**: Resend se cuenta en el
+  doble y la red real tiene que dar 0, con **control positivo** (la corrida buena
+  cuenta exactamente 2 envíos: si el contador no ve envíos, sus ceros no dicen
+  nada) y **cuatro sabotajes** con sha1 comprobado, los cuatro en rojo.
+  ⚠️ **Dos errores del careo que valen más que la tuerca:** (a) el caso «catálogo
+  sin fecha» salía VERDE por la razón equivocada —se rehusaba la guarda del sitio
+  y la caché de 10 min de `fetchCatalogo` tapaba el resto—; lo destapó un
+  sabotaje, y hoy corre PRIMERO y con el reloj 20 min atrás para no envenenar la
+  caché de los demás; (b) la sonda que le quitaba `ds` a natanael rompía el EV
+  entero, así que el 409 salía por «catálogo ilegible». **Las dos son la misma
+  forma: el resultado correcto por la razón falsa.**
+  ⏳ **Para apretar el botón:** códigos publicados (✅ ya quedaron en la
+  publicación de Esferas del 14-sep: el index trae `startTs` del 14 y el mismo
+  vencimiento que la fila) · ensayo `seco:true` y leer `validez`/`evento` ·
+  **visto de Memo al render** · botón.
 - 🌉 **MIG-1d-i · EL PUENTE AL PORTAL, en prod (7-sep-2026). Ni un correo.**
   🔴 **Lo que lo destrabó fue una medición, no una idea:** el Portal estaba
   **vacío** —`clientes` 1, `solicitudes_tour` 0, `pagos` 0, `lugares` 0— mientras
@@ -585,6 +634,13 @@ está caduco antes de escribirse.
   Desde MEDIA-GUARD el publish **se rehúsa** (409) nombrando los eventos, en vez
   de borrarlos en silencio. Para quitar un medio a propósito, la ficha tiene que
   decirlo (`mapa_null` y sus hermanos), no basta con vaciarlo.
+- 🔒 **LA FILA VIVA NO ES LO QUE EL CLIENTE VE.** `promos_codigos` gobierna, pero
+  el sitio lee su COPIA (`var PROMOS` del index), y esa copia solo se refresca
+  **publicando los códigos desde Baba**. Una promo vigente en la tabla puede
+  contestar «Código expirado» en el checkout — pasó con NATA: fila hasta el
+  20-sep, index vencido el 1-sep, siete días sin publicar. Cualquier cosa que
+  ANUNCIE un código (un correo, un letrero, un blast) tiene que carearse contra
+  el index SERVIDO antes de salir, no contra la fila. (CONSUELO-VERDAD-1.)
 - **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`. **Verificar el
   push contra el ref TRAÍDO DE VUELTA (`fetch` + `rev-parse origin/main`), no
   contra su propia salida — y solo entonces borrar la rama.**

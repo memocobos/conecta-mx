@@ -152,9 +152,18 @@ async function mirar(dirBase, mutaciones, top) {
   await page.waitForTimeout(400);
   // Con top servido, la tira nace con el respaldo y el top la ASCIENDE después
   // (`__landHeroTop`). Se espera al ascenso, o se mediría la tira de antes.
-  if (top) await page.waitForFunction(
-    () => document.getElementById('hh-strip').getAttribute('data-fuente') === 'top',
-    null, { timeout: 15000 });
+  // ⚠️ SE ESPERA, PERO NO SE MUERE. Si el ascenso no llega, esto tiene que
+  // salir como un ROJO de [8a] y dejar correr el resto: un arnés que se cae
+  // deja todas las secciones de abajo sin ejercitar, y el resumen no lo dice.
+  // (Probado: un sabotaje que le daba la tarjeta grande al #1 del top tumbaba
+  // el careo entero con un timeout en vez de reportar.)
+  if (top) {
+    try {
+      await page.waitForFunction(
+        () => document.getElementById('hh-strip').getAttribute('data-fuente') === 'top',
+        null, { timeout: 8000 });
+    } catch (e) { /* lo dice [8a], no una excepción */ }
+  }
 
   const foto = await page.evaluate(() => {
     const dsEf = (ev) => { const l = (ev.dsList && ev.dsList.length) ? ev.dsList : (ev.ds ? [ev.ds] : []); return l[0] || ''; };

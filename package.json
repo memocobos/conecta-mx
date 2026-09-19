@@ -13,6 +13,7 @@
     "vigia:color-literal": "node scripts/vigia-color-literal.js",
     "mide:color-tema": "node scripts/mide-color-tema.js",
     "mide:puente-portal": "node scripts/mide-puente-portal.js",
-    "mide:consuelo-verdad": "node scripts/mide-consuelo-verdad.js"
+    "mide:consuelo-verdad": "node scripts/mide-consuelo-verdad.js",
+    "mide:tira-agotados": "node scripts/mide-tira-agotados.js"
   }
 }

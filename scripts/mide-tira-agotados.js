@@ -167,6 +167,20 @@ async function mirar(dirBase, mutaciones) {
         selloTxt: sello ? sello.textContent.trim() : '',
         selloFondo: sello ? getComputedStyle(sello).backgroundColor : '',
         selloTapaNombre: encima(caja(sello), caja(nom)),
+        // 🔒 «Sin tapar el nombre» NO se puede falsear: `.hs-media` recorta con
+        // overflow:hidden y el nombre vive FUERA, en `.hs-media`+`.hs-body`
+        // hermanos. Probado con un sabotaje: mover el sello a top:44px no lo
+        // sacó de la foto y la aserción siguió verde — una guarda inalcanzable.
+        // Lo que SÍ puede romperse es lo que el sello tapa de la PORTADA: copiar
+        // el `::after` de `.ev-card` (inset:0, 26px) borraría el cartel entero
+        // en 50px de alto. Eso se mide por el CENTRO del cartel, sin inventar
+        // ningún umbral: si el sello lo cubre, la miniatura dejó de ser una foto.
+        selloTapaCartel: (() => {
+          const cs = caja(sello), cm = caja(it.querySelector('.hs-media'));
+          if (!cs || !cm) return false;
+          const cx = cm.x + cm.w / 2, cy = cm.y + cm.h / 2;
+          return cx >= cs.x && cx <= cs.x + cs.w && cy >= cs.y && cy <= cs.y + cs.h;
+        })(),
         dataId: it.getAttribute('data-id') || '',
         destino: clicar(it),
       };
@@ -243,6 +257,7 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
       af(it.selloTxt === 'AGOTADO', `[2a] el sello de «${e.nombre}» dice «${it.selloTxt}», no «AGOTADO»`);
       af(rojo(it.selloFondo), `[2b] el sello de «${e.nombre}» es ${it.selloFondo}, no el rojo de la casa #ff283b`);
       af(!it.selloTapaNombre, `[2c] el sello de «${e.nombre}» se encima con el nombre`);
+      af(!it.selloTapaCartel, `[2c] el sello de «${e.nombre}» tapa el centro del cartel: la miniatura dejó de enseñar la foto`);
     } else {
       af(!it.sello, `[2d] «${e.nombre}» está A LA VENTA y su miniatura trae sello de agotado`);
     }

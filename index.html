@@ -2563,7 +2563,7 @@ body.pf-barra-viva .wa-float{bottom:104px}
 
 /* ── 4 · LA TIRA ── */
 .hh-strip{display:flex;gap:6px;margin-top:11px}
-.hs-item{flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
+.hs-item{position:relative;flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
   background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);
   border-radius:var(--r-sm,8px);overflow:hidden;text-decoration:none;
   transition:border-color .2s,transform .2s}
@@ -2594,10 +2594,20 @@ body.pf-barra-viva .wa-float{bottom:104px}
    El nombre NO puede quedar tapado por construcción: vive en `.hs-body`, que
    es hermano de `.hs-media` y va DEBAJO. El careo igual lo mide con las cajas
    —lo medido manda sobre lo razonado. */
-.hs-ag{position:absolute;left:0;bottom:0;z-index:3;pointer-events:none;
+/* ⚠️ EL SELLO CUELGA DE `.hs-item`, NO DE `.hs-media`, Y ESO NO ES ESTÉTICA.
+   `showInitials()` —el fallback de la foto del artista, que corre ASÍNCRONO
+   cuando la API no contesta— hace `imgEl.parentElement.innerHTML = ...` y borra
+   la portada ENTERA. Con el sello adentro, el sello se iba con ella: medido, la
+   tira quedaba con «AGOTADO» en Stray Kids y sin él en Young Miko y The
+   Neighbourhood, según a quién le fallara la foto y cuándo. Un evento agotado
+   se anunciaba como disponible por una carrera de red.
+   Colgado del item es hermano de la portada y ningún repintado lo alcanza. Va
+   en la esquina de arriba porque el alto de `.hs-media` cambia en cada corte
+   (50/44/42/38/62/64px) y pegarlo abajo obligaría a perseguir seis números. */
+.hs-ag{position:absolute;left:0;top:0;z-index:3;pointer-events:none;
   background:var(--c-rojo);color:#fff;font-family:'Montserrat',sans-serif;
   font-size:7.5px;font-weight:900;letter-spacing:.1em;line-height:1;
-  padding:3px 5px;border-top-right-radius:var(--r-chip,999px)}
+  padding:3px 5px;border-bottom-right-radius:var(--r-chip,999px)}
 .hs-agotado .hs-img{filter:brightness(.5) grayscale(1)}
 .hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:rgba(232,255,76,.1);border-color:rgba(232,255,76,.35)}
@@ -4257,13 +4267,13 @@ var _landTick = null;
                   '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
       it.appendChild(m); it.appendChild(b);
       pintarPortada(m,e,'hs-img','hs-ini');
-      // [LAND-2] EL SELLO VA DESPUÉS DE LA PORTADA, no antes: `pintarPortada`
-      // arranca pisando el contenedor con innerHTML y se lo llevaría por
-      // delante sin decir nada.
+      // [LAND-2] EL SELLO NO SE CUELGA DE LA PORTADA. Ver la nota del CSS:
+      // `showInitials` reescribe `.hs-media` entera cuando la foto del artista
+      // falla, y se llevaba el sello por delante en una carrera de red.
       if(ag){
         var sello=document.createElement('span');
         sello.className='hs-ag'; sello.textContent='AGOTADO';
-        m.appendChild(sello);
+        it.appendChild(sello);
       }
       it.onclick=ag?function(){informes(e);}:function(){abrir(e.id);};
       strip.appendChild(it);

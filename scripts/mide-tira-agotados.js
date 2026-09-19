@@ -125,7 +125,22 @@ async function mirar(dirBase, mutaciones) {
   const errores = [];
   page.on('pageerror', (e) => errores.push(e.message));
   await page.goto(`http://127.0.0.1:${puerto}/index.html`, { waitUntil: 'load' });
-  await page.waitForFunction(() => typeof EV !== 'undefined' && document.querySelectorAll('.ev-card').length > 0);
+  // ⚠️ SE ESPERA AL HERO, NO AL CATÁLOGO. Esperar a que existan `.ev-card` NO
+  // prueba que la tira esté pintada: el catálogo y el hero los construyen
+  // bloques distintos. Con esa espera floja el careo parpadeó dos veces —leyó
+  // una tira que todavía no era la definitiva— y un parpadeo se lee igual que
+  // un defecto. Ahora se espera a que la tira TENGA miniaturas y a que el
+  // navegador haya terminado de cargar; si no llegan, el careo se cae a gritos
+  // en vez de medir a medias.
+  await page.waitForFunction(
+    () => document.readyState === 'complete' &&
+          typeof EV !== 'undefined' &&
+          document.querySelectorAll('.ev-card').length > 0 &&
+          document.querySelectorAll('#hh-strip .hs-item').length > 0,
+    null, { timeout: 15000 });
+  // Y un respiro para que cualquier repintado tardío del hero haya ocurrido
+  // ANTES de la foto: lo que se mide es la tira asentada, no una a mitad.
+  await page.waitForTimeout(400);
 
   const foto = await page.evaluate(() => {
     const dsEf = (ev) => { const l = (ev.dsList && ev.dsList.length) ? ev.dsList : (ev.ds ? [ev.ds] : []); return l[0] || ''; };
@@ -156,6 +171,7 @@ async function mirar(dirBase, mutaciones) {
     const encima = (a, b) => !!(a && b) && !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
 
     const strip = document.getElementById('hh-strip');
+    const volcado = strip ? strip.innerHTML.slice(0, 1200) : '(sin tira)';
     const items = [...document.querySelectorAll('#hh-strip .hs-item:not(.hs-mas)')].map((it) => {
       const sello = it.querySelector('.hs-ag');
       const nom = it.querySelector('.hs-name');
@@ -210,6 +226,8 @@ async function mirar(dirBase, mutaciones) {
       stripVisible: !!strip && getComputedStyle(strip).display !== 'none',
       masN,
       candado,
+      volcado,
+      listo: document.readyState,
     };
   });
 
@@ -232,6 +250,11 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   // ── HEAD, con el catálogo tal cual está publicado ──────────────────────────
   const H = await mirar(dirH, null);
   af(H.errores.length === 0, `[0] HEAD tiró errores de página: ${H.errores.join(' | ')}`);
+  // Toda carga que el careo mire tiene que estar limpia: un error de página en
+  // un CONTROL lo volvería un renglón verde sobre una página rota.
+  const limpio = (foto, etiqueta) => af(foto.errores.length === 0,
+    `[0${etiqueta}] la página tiró errores: ${foto.errores.join(' | ')}`);
+  limpio(H, '');
   af(!H.colisionNombre, `[0] dos eventos próximos comparten nombre corto («${H.colisionNombre}»): la llave no sirve`);
 
   const esp = esperados(H);
@@ -253,7 +276,7 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   esp.forEach((e, i) => {
     const it = itemDe(H, e, i); if (!it) return;
     if (e.ag) {
-      af(it.sello, `[2a] «${e.nombre}» está agotado y su miniatura NO trae sello visible`);
+      af(it.sello, `[2a] «${e.nombre}» está agotado y su miniatura NO trae sello visible · tira servida: ${H.volcado.replace(/\s+/g, ' ').slice(0, 300)}`);
       af(it.selloTxt === 'AGOTADO', `[2a] el sello de «${e.nombre}» dice «${it.selloTxt}», no «AGOTADO»`);
       af(rojo(it.selloFondo), `[2b] el sello de «${e.nombre}» es ${it.selloFondo}, no el rojo de la casa #ff283b`);
       af(!it.selloTapaNombre, `[2c] el sello de «${e.nombre}» se encima con el nombre`);
@@ -333,6 +356,7 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
       }
     });
     selloVsCard(M, '-mixto');
+    limpio(M, '-mixto');
   }
 
   // [6c] 🔒 EL AUTO-SEMÁFORO, la pata que una regla inventada se salta.
@@ -346,8 +370,10 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     const itS = S.items.find((x) => x.dataId === semId);
     af(cardAg(S, semId) === true, `[6c] el montaje falló: «${semId}» con todas las zonas agotadas no salió tachado en el catálogo`);
     af(!!itS, `[6c] «${semId}» agotado por semáforo desapareció de la tira`);
+    if (itS && !itS.sello) console.log('   [6c] volcado de la tira servida:\n   ' + S.volcado.replace(/\s+/g, ' ').slice(0, 900));
     if (itS) af(itS.sello, `[6c] «${semId}» está agotado SOLO por el auto-semáforo y la tira no lo selló`);
     selloVsCard(S, '-semáforo');
+    limpio(S, '-semáforo');
   }
 
   // [3b] La grande nunca es un agotado, ni forzándola: se agota al que hoy la ocupa.
@@ -359,10 +385,12 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     af(G.items.length === 3, `[3b] la tira quedó con ${G.items.length} miniaturas tras mover la grande`);
     const rotosG = G.candado.filter((c) => !c.hayCard || c.hero !== c.catalogo);
     af(rotosG.length === 0, `[6a-control] el candado se rompió con el catálogo mutado: ${rotosG.length} eventos`);
+    limpio(G, '-grande');
   }
 
   // ── [7] CONTROL POSITIVO: BASE TIENE QUE FALLAR ───────────────────────────
   const B = await mirar(dirB, null);
+  limpio(B, '-BASE');
   const agB = new Set(B.univ.filter((e) => e.ag).map((e) => e.id));
   const espB = esperados(B);
   console.log(`   BASE · tarjeta grande: ${B.grande.id} · tira: ${B.items.map(i=>i.nombre).join(' · ')}  (+N ${B.masN})`);

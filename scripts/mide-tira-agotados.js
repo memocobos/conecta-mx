@@ -53,10 +53,19 @@ function extraer(sha) {
 
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json',
   '.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.webp':'image/webp','.ico':'image/x-icon','.woff2':'font/woff2' };
-function servir(raiz) {
+function servir(raiz, top) {
   return new Promise((res, rej) => {
     const s = http.createServer((req, r) => {
       const u = decodeURIComponent(req.url.split('?')[0]);
+      // [LAND-2] LOS MÁS BUSCADOS, CUANDO SE PIDEN. Sin esto el endpoint da 404
+      // y la tira cae SIEMPRE en su respaldo por fecha — que es justo el camino
+      // que producción NO toma: allá el top sí contesta y manda. Medir solo el
+      // respaldo dejaba sin ejercitar la rama que el cliente ve todos los días.
+      // El contrato es el real: { top: [{event_id}] }, el mismo que lee refreshTop10.
+      if (u === '/.netlify/functions/event-clicks') {
+        r.writeHead(top ? 200 : 404, { 'Content-Type': 'application/json' });
+        return r.end(top ? JSON.stringify({ top: top.map((id) => ({ event_id: id })) }) : '{}');
+      }
       const f = path.join(raiz, u === '/' ? 'index.html' : u);
       if (!f.startsWith(raiz)) { r.writeHead(403); return r.end(); }
       fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end('no'); }
@@ -107,7 +116,7 @@ function mutarSemaforo(html, id) {
   return html.slice(0, ini) + nueva + html.slice(fin);
 }
 
-async function mirar(dirBase, mutaciones) {
+async function mirar(dirBase, mutaciones, top) {
   // Copia del commit con el catálogo que pida el caso. El navegador arranca de
   // cero contra ella: es una publicación distinta, no un estado inyectado.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'land2-run-'));
@@ -117,7 +126,7 @@ async function mirar(dirBase, mutaciones) {
     for (const [id, st] of mutaciones) html = (st === '@semaforo') ? mutarSemaforo(html, id) : mutarSt(html, id, st);
     fs.writeFileSync(path.join(dir, 'index.html'), html);
   }
-  const s = await servir(dir);
+  const s = await servir(dir, top);
   const puerto = s.address().port;
   const nav = await chromium.launch();
   const ctx = await nav.newContext({ viewport: { width: 1280, height: 900 } });
@@ -141,6 +150,11 @@ async function mirar(dirBase, mutaciones) {
   // Y un respiro para que cualquier repintado tardío del hero haya ocurrido
   // ANTES de la foto: lo que se mide es la tira asentada, no una a mitad.
   await page.waitForTimeout(400);
+  // Con top servido, la tira nace con el respaldo y el top la ASCIENDE después
+  // (`__landHeroTop`). Se espera al ascenso, o se mediría la tira de antes.
+  if (top) await page.waitForFunction(
+    () => document.getElementById('hh-strip').getAttribute('data-fuente') === 'top',
+    null, { timeout: 15000 });
 
   const foto = await page.evaluate(() => {
     const dsEf = (ev) => { const l = (ev.dsList && ev.dsList.length) ? ev.dsList : (ev.ds ? [ev.ds] : []); return l[0] || ''; };
@@ -224,6 +238,7 @@ async function mirar(dirBase, mutaciones) {
       grande,
       grandeVisible,
       stripVisible: !!strip && getComputedStyle(strip).display !== 'none',
+      fuente: strip ? strip.getAttribute('data-fuente') : '',
       masN,
       candado,
       volcado,
@@ -386,6 +401,38 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     const rotosG = G.candado.filter((c) => !c.hayCard || c.hero !== c.catalogo);
     af(rotosG.length === 0, `[6a-control] el candado se rompió con el catálogo mutado: ${rotosG.length} eventos`);
     limpio(G, '-grande');
+  }
+
+  // ── [8] EL CAMINO DE PRODUCCIÓN: LA TIRA QUE MANDA EL TOP ─────────────────
+  // Todo lo de arriba midió el RESPALDO por fecha, porque sin endpoint el top
+  // llega vacío. Producción es al revés: el top contesta y la tira sale de él
+  // —LAND-1d ya lo había anotado, y por no medirlo con el top puesto sus
+  // números del pliegue salieron 21px optimistas. Aquí se sirve el contrato
+  // real y se mide la tira que el cliente ve de verdad.
+  // El top se ARMA con lo que hoy no saldría por fecha: un agotado lejano y dos
+  // a la venta. Así el mismo caso prueba el sello, el chip #N y el control al
+  // revés por el camino bueno.
+  const agLejano = H.univ.find((e) => e.ag && !esp.some((x) => x.id === e.id) && e.id !== H.grande.id);
+  const ventaLejana = H.univ.filter((e) => !e.ag && e.id !== H.grande.id).slice(-2).map((e) => e.id);
+  af(!!agLejano, `[8] no hay un agotado fuera de los 3 próximos para armar el top: el caso no se pudo montar`);
+  if (agLejano) {
+    const elTop = [agLejano.id, ventaLejana[0], ventaLejana[1]].filter(Boolean);
+    const T = await mirar(dirH, null, elTop);
+    limpio(T, '-top');
+    console.log(`   top servido [${elTop.join(', ')}] · tira: ${T.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}`);
+    af(T.fuente === 'top', `[8a] con el top servido la tira dice fuente «${T.fuente}», no «top»`);
+    elTop.forEach((id, i) => {
+      const it = T.items.find((x) => x.dataId === id);
+      af(!!it, `[8a] «${id}» va #${i + 1} en el top y no salió en la tira`);
+      if (!it) return;
+      af(it.rank === '#' + (i + 1), `[8b] «${id}» va #${i + 1} en el top y su chip dice «${it.rank || '(ninguno)'}»`);
+    });
+    const itAg = T.items.find((x) => x.dataId === agLejano.id);
+    if (itAg) af(itAg.sello, `[8c] «${agLejano.id}» entró por el top estando agotado y no lleva sello`);
+    af(T.items.some((x) => !x.sello), `[8d] el top trajo dos eventos a la venta y la tira los selló igual`);
+    selloVsCard(T, '-top');
+    // La tarjeta grande no depende del top: sigue siendo el próximo a la venta.
+    af(T.grande.id === H.grande.id, `[8e] el top cambió la tarjeta grande: ${H.grande.id} → ${T.grande.id}`);
   }
 
   // ── [7] CONTROL POSITIVO: BASE TIENE QUE FALLAR ───────────────────────────

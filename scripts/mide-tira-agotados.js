@@ -87,6 +87,26 @@ function mutarSt(html, id, nuevoSt) {
   return html.slice(0, ini) + nueva + html.slice(fin);
 }
 
+// [LAND-2] AGOTAR POR SEMÁFORO, no por etiqueta. Deja `st:''` y marca `ag:1` en
+// todas las zonas: el evento queda agotado SOLO por el auto-semáforo, que es la
+// tercera pata de la regla sellada (st · ev.agotado · zonas). Sirve para que el
+// candado hero↔catálogo tenga algo que morder: un hero que preguntara nada más
+// por `st==='agotado'` pintaría este evento SIN sello mientras el catálogo lo
+// tacha. 🔒 Comprueba que mutó de verdad.
+function mutarSemaforo(html, id) {
+  const ini = html.indexOf(`\n  {id:'${id}',`);
+  if (ini < 0) throw new Error(`mutarSemaforo: no encontré la ficha de ${id}`);
+  const sig = html.indexOf(`\n  {id:'`, ini + 3);
+  const fin = sig < 0 ? html.length : sig;
+  const ficha = html.slice(ini, fin);
+  // Los objetos de zona son planos y no contienen `}` adentro: cerrar cada uno
+  // con `,ag:1}` los agota a todos sin tocar nada anidado.
+  let nueva = ficha.replace(/(\{n:'[^']*'[^{}]*?)\}/g, (m, cuerpo) => /,ag:1/.test(cuerpo) ? m : cuerpo + ',ag:1}');
+  nueva = nueva.replace(/,st:'[^']*'/, ",st:''");
+  if (nueva === ficha) throw new Error(`mutarSemaforo: ${id} no cambió`);
+  return html.slice(0, ini) + nueva + html.slice(fin);
+}
+
 async function mirar(dirBase, mutaciones) {
   // Copia del commit con el catálogo que pida el caso. El navegador arranca de
   // cero contra ella: es una publicación distinta, no un estado inyectado.
@@ -94,7 +114,7 @@ async function mirar(dirBase, mutaciones) {
   for (const f of ARCHIVOS.split(' ')) fs.copyFileSync(path.join(dirBase, f), path.join(dir, f));
   if (mutaciones && mutaciones.length) {
     let html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
-    for (const [id, st] of mutaciones) html = mutarSt(html, id, st);
+    for (const [id, st] of mutaciones) html = (st === '@semaforo') ? mutarSemaforo(html, id) : mutarSt(html, id, st);
     fs.writeFileSync(path.join(dir, 'index.html'), html);
   }
   const s = await servir(dir);
@@ -215,8 +235,9 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
      `[1b] el catálogo de hoy no tiene NI UN agotado entre los 3 próximos: este careo no puede probar la tuerca`);
 
   // [2] EL SELLO
+  const itemDe = (foto, e, i) => foto.items.find((x) => x.dataId === e.id) || foto.items[i];
   esp.forEach((e, i) => {
-    const it = H.items[i]; if (!it) return;
+    const it = itemDe(H, e, i); if (!it) return;
     if (e.ag) {
       af(it.sello, `[2a] «${e.nombre}» está agotado y su miniatura NO trae sello visible`);
       af(it.selloTxt === 'AGOTADO', `[2a] el sello de «${e.nombre}» dice «${it.selloTxt}», no «AGOTADO»`);
@@ -234,7 +255,7 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
 
   // [4] EL CLIC
   esp.forEach((e, i) => {
-    const it = H.items[i]; if (!it) return;
+    const it = itemDe(H, e, i); if (!it) return;
     if (e.ag) {
       af(it.destino.ruta === 'wa', `[4a] tocar «${e.nombre}» (agotado) aterrizó en ${it.destino.ruta}, no en WhatsApp`);
       af(/wa\.me\//.test(it.destino.url || ''), `[4a] «${e.nombre}» no abrió wa.me: ${it.destino.url}`);
@@ -256,19 +277,62 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
      `[6a] el veredicto del hero y la tarjeta del catálogo divergen en ${rotos.length}: ${rotos.slice(0,5).map(r=>r.id+(r.hayCard?` hero=${r.hero} catálogo=${r.catalogo}`:' sin tarjeta')).join(', ')}`);
   af(H.candado.length > 0, `[6a] el candado se corrió sobre CERO eventos`);
 
+  // [6b] 🔒 LA MITAD QUE DE VERDAD IMPORTA: el sello PINTADO contra la clase de
+  // la tarjeta. [6a] carea `_evVeredicto` contra el catálogo, pero las dos
+  // salen de la misma función: si el hero se inventara SU regla, [6a] seguiría
+  // verde. Esto compara lo que el cliente VE en la tira con lo que el cliente
+  // VE en el catálogo, que es el candado que la tuerca pide.
+  const cardAg = (foto, id) => { const c = foto.candado.find((x) => x.id === id); return c && c.catalogo; };
+  const selloVsCard = (foto, etiqueta) => foto.items.forEach((it) => {
+    if (!it.dataId) return;
+    af(it.sello === !!cardAg(foto, it.dataId),
+       `[6b${etiqueta}] «${it.dataId}»: la tira ${it.sello ? 'SÍ' : 'NO'} lo sella y su tarjeta del catálogo ${cardAg(foto, it.dataId) ? 'SÍ' : 'NO'} está agotada`);
+  });
+  selloVsCard(H, '');
+
   // ── CONTROLES: se cambia el DATO y la página arranca de nuevo ──────────────
-  // [2d/4b] Mezcla de verdad: se despierta al 2º de la tira, que hoy está agotado.
-  const mezclaId = esp[1] && esp[1].ag ? esp[1].id : (esp.find((e) => e.ag) || {}).id;
-  if (mezclaId) {
-    const M = await mirar(dirH, [[mezclaId, '']]);
-    const it = M.items.find((i) => i.dataId === mezclaId) ||
-               M.items[esperados(M).findIndex((e) => e.id === mezclaId)];
-    af(!!it, `[2d-control] «${mezclaId}» desagotado ya no aparece en la tira`);
-    if (it) {
-      af(!it.sello, `[2d-control] «${mezclaId}» a la venta SIGUE trayendo sello`);
-      af(it.destino.ruta === 'ficha', `[4b-control] «${mezclaId}» a la venta no abrió la ficha (${it.destino.ruta})`);
-    }
-    af(M.items.some((i) => i.sello), `[2d-control] al desagotar uno se apagaron TODOS los sellos`);
+  // [2d/4b] UNA TIRA MIXTA, BUSCADA EN LOS DATOS, NO ADIVINADA.
+  // El control al revés («un evento a la venta NO lleva sello») no se puede
+  // correr con el catálogo de hoy: las tres miniaturas están agotadas, así que
+  // esa rama vivía EN VACÍO — un renglón verde sobre algo que nunca se ejercitó.
+  // Y no basta con desagotar a uno cualquiera: desagotar al PRIMERO de la tira
+  // lo convierte en la tarjeta grande (pasa a ser el próximo a la venta) y
+  // desaparece de la tira — así se cayó el primer intento. Se prueban los
+  // agotados en orden hasta dar con una publicación que deje la tira MEZCLADA,
+  // y si ninguna la deja, se dice en rojo en vez de callarlo.
+  let mixta = null;
+  for (const cand of esp.filter((e) => e.ag)) {
+    const M = await mirar(dirH, [[cand.id, '']]);
+    if (M.items.some((i) => !i.sello) && M.items.some((i) => i.sello)) { mixta = { cand, M }; break; }
+  }
+  af(!!mixta, `[2d-control] con el catálogo de hoy no se pudo armar una tira MIXTA: el control al revés no se corrió`);
+  if (mixta) {
+    const { cand, M } = mixta;
+    console.log(`   control mixto · desagotando «${cand.id}»: ${M.items.map((i) => i.nombre + (i.sello ? ' [AGOTADO]' : ' [venta]')).join(' · ')}`);
+    esperados(M).forEach((e, i) => {
+      const it = itemDe(M, e, i); if (!it) return;
+      if (e.ag) af(it.sello, `[2d-control] «${e.id}» sigue agotado y perdió el sello en la tira mixta`);
+      else {
+        af(!it.sello, `[2d-control] «${e.id}» está A LA VENTA y lleva sello`);
+        af(it.destino.ruta === 'ficha', `[4b-control] «${e.id}» a la venta aterrizó en ${it.destino.ruta}, no en la ficha`);
+      }
+    });
+    selloVsCard(M, '-mixto');
+  }
+
+  // [6c] 🔒 EL AUTO-SEMÁFORO, la pata que una regla inventada se salta.
+  // Se agota al primero de la tira SIN etiqueta: `st:''` y todas las zonas en
+  // `ag:1`. El catálogo lo tacha (lo hace `_evVeredicto`), así que la tira
+  // TIENE que sellarlo. Un hero que preguntara nada más por `st==='agotado'`
+  // —la copia fácil— pasaría [6a] y moriría aquí.
+  const semId = (esp.find((e) => e.ag) || esp[0] || {}).id;
+  if (semId) {
+    const S = await mirar(dirH, [[semId, '@semaforo']]);
+    const itS = S.items.find((x) => x.dataId === semId);
+    af(cardAg(S, semId) === true, `[6c] el montaje falló: «${semId}» con todas las zonas agotadas no salió tachado en el catálogo`);
+    af(!!itS, `[6c] «${semId}» agotado por semáforo desapareció de la tira`);
+    if (itS) af(itS.sello, `[6c] «${semId}» está agotado SOLO por el auto-semáforo y la tira no lo selló`);
+    selloVsCard(S, '-semáforo');
   }
 
   // [3b] La grande nunca es un agotado, ni forzándola: se agota al que hoy la ocupa.

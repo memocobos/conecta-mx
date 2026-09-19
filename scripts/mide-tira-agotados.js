@@ -241,7 +241,8 @@ async function mirar(dirBase, mutaciones, top) {
 
     return {
       colisionNombre: colision,
-      univ: univ.map((e) => ({ id: e.id, ds: dsEf(e), ag: esAg(e), nombre: limpio(e.a) })),
+      univ: univ.map((e) => { const v = _evVeredicto(e);
+        return { id: e.id, ds: dsEf(e), ag: v.isAg, proxi: v.isProxi || v.isPronto, nombre: limpio(e.a) }; }),
       aLaVenta: aLaVenta.map((e) => e.id),
       items,
       grande,
@@ -410,6 +411,23 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     const rotosG = G.candado.filter((c) => !c.hayCard || c.hero !== c.catalogo);
     af(rotosG.length === 0, `[6a-control] el candado se rompió con el catálogo mutado: ${rotosG.length} eventos`);
     limpio(G, '-grande');
+  }
+
+  // ── AVISO, NO ASERCIÓN: lo que la tuerca no nombró ────────────────────────
+  // El universo nuevo excluye pasados, listOnly y la tarjeta grande — y nada
+  // más. Eso mete en la tira estados que ANTES no podían entrar, porque el
+  // filtro «a la venta» los dejaba fuera: los `proximamente`, que no se pueden
+  // comprar y NO llevan sello (el sello es solo para AGOTADO). En el catálogo
+  // esos van con su etiqueta «Próximamente» y su badge AVÍSAME; en la tira
+  // saldrían pelados. Hoy no alcanzan la tira por fecha, pero el TOP sí puede
+  // subirlos: los más buscados incluyen lo que la gente clickea, y un evento en
+  // lista de espera se clickea.
+  // No se falla por esto —es exactamente el universo que la tuerca pidió— pero
+  // queda contado a la vista para que sea una decisión y no un descubrimiento.
+  const proxis = H.univ.filter((e) => e.proxi);
+  if (proxis.length) {
+    console.log(`   ⚠️  ${proxis.length} «próximamente» en el universo de la tira, sin sello que los distinga: ${proxis.map((e) => e.id + ' ' + e.ds).join(', ')}`);
+    console.log(`       (hoy ninguno llega por fecha; por el top sí podrían)`);
   }
 
   // ── [8] EL CAMINO DE PRODUCCIÓN: LA TIRA QUE MANDA EL TOP ─────────────────

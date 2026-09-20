@@ -428,6 +428,110 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     af(cuenta(uno.tablas, 'abonos_viajero') === 0, 'pedí solo `totales` y escribió abonos');
   }
 
+  // ── [8b] 🔒 EL BOTÓN DE RENGLÓN TAMBIÉN PREGUNTA ANTES DE ESCRIBIR ───────
+  // El primer clic del renglón PIDE EL PLAN; el segundo escribe. Y se mide por
+  // el CAMINO DEL CLIENTE, no por el del servidor: el handler siempre supo
+  // esperar `confirmar`, y aun así la pantalla le mandaba `confirmar:true` de
+  // un golpe. Aquí se ejecuta la función REAL de `kamehouse-eventos.js` con su
+  // `khAdminFetch` apuntando al HANDLER REAL, y se cuentan las escrituras.
+  //
+  // Por qué importa justo aquí: el botón de renglón existe SOLO para la clase
+  // más peligrosa —el «$0» sobre un total bueno y el exacto de la libreta—,
+  // que se sacó del clic global precisamente porque pide mirada humana. Un
+  // dedazo ahí escribe dinero.
+  console.log('\n[8b] el botón de renglón: dos clics, no uno');
+  try {
+    const fuenteP = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-eventos.js'), 'utf8');
+    // ⚠️ El recorte tiene que traerse el `async`. La primera versión cortaba en
+    // `function <nombre>(` y dejaba el `async` fuera: las funciones salían
+    // síncronas y el arnés se CAÍA con «await is only valid in async
+    // functions» — es decir, dejaba de reportar en vez de ponerse rojo.
+    const corte = (n) => {
+      const m = new RegExp('(?:async\\s+)?function\\s+' + n + '\\s*\\(').exec(fuenteP);
+      if (!m) throw new Error('no encontré la función ' + n + ' en kamehouse-eventos.js');
+      const i = m.index;
+      let prof = 0;
+      for (let k = fuenteP.indexOf('{', i); k < fuenteP.length; k++) {
+        if (fuenteP[k] === '{') prof++;
+        else if (fuenteP[k] === '}' && --prof === 0) return fuenteP.slice(i, k + 1);
+      }
+      throw new Error('llaves desbalanceadas en ' + n);
+    };
+    const red8 = redFalsa(SEMILLA(), null);
+    global.fetch = red8.fetchFalso;
+    for (const f of ['admin-excel-aplicar.js', 'admin-excel-careo.js', 'admin-coordi-asignaciones.js',
+                     '_lib/excel-careo.js', '_lib/cosecha-excel.js', '_lib/excel-careo-correr.js', '_lib/excel-aplicar.js']) {
+      try { delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))]; } catch (_) {}
+    }
+    const handler8 = require(path.join(RAIZ, 'netlify/functions/admin-excel-aplicar.js')).handler;
+    const enviados = [];
+    // El navegador de mentira: `khAdminFetch` habla con el HANDLER REAL.
+    const ctx = {
+      document: { getElementById: (id) => (id === 'selector-evento' ? { value: EVENTO } : { innerHTML: '' }) },
+      showToast: () => {},
+      excelCarear: async () => {},
+      khAdminFetch: async (_url, opts) => {
+        const cuerpo = JSON.parse(opts.body);
+        enviados.push(cuerpo);
+        const r = await handler8({ httpMethod: 'POST',
+          headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer x' }, body: opts.body });
+        return { ok: r.statusCode === 200, status: r.statusCode, json: async () => JSON.parse(r.body) };
+      },
+    };
+    const armar = new Function('document', 'showToast', 'excelCarear', 'khAdminFetch',
+      corte('_evtEsc') + '\n' + corte('_evtMxn') + '\n' + corte('_excelAplicar') + '\n'
+      + corte('_excelAplicarPreviaHtml') + '\n' + corte('excelAplicarUno') + '\n'
+      + corte('excelAplicarConfirmar') + '\n' + corte('_excelAplicarHechoHtml') + '\n'
+      + 'return { excelAplicarUno, excelAplicarConfirmar, _excelAplicarPreviaHtml };');
+    const api = armar(ctx.document, ctx.showToast, ctx.excelCarear, ctx.khAdminFetch);
+
+    const antes = cuenta(red8.tablas, 'abonos_viajero') + red8.escrituras.length;
+    await api.excelAplicarUno('totales', 'Rosa Vela');
+    const tras1 = red8.escrituras.length;
+    console.log('    1er clic → mandó ' + JSON.stringify(enviados[0]) + ' · escrituras: ' + tras1);
+    af(tras1 === 0, 'EL PRIMER CLIC DEL RENGLÓN ESCRIBIÓ (' + tras1 + '): tiene que preguntar antes, como el global');
+    af(enviados[0] && enviados[0].confirmar !== true,
+       'el primer clic del renglón manda `confirmar:true`: la pantalla se salta su propia regla de los dos clics');
+    af(enviados[0] && enviados[0].solo === 'totales' && Array.isArray(enviados[0].claves),
+       'el primer clic no manda el alcance del renglón: ' + JSON.stringify(enviados[0]));
+    const rosaAntes = (red8.tablas.viajeros_evento || []).find((v) => v.id === 'v-e');
+    af(rosaAntes.total_contrato === 4200, 'el primer clic ya movió el total de Rosa: ' + rosaAntes.total_contrato);
+
+    // El SEGUNDO clic. Se lee el alcance del botón que pintó la vista previa —
+    // no de una variable escondida — y se confirma.
+    // El alcance se saca DEL HTML QUE LA VISTA PREVIA ACABA DE PINTAR, no se
+    // escribe a mano aquí: lo que se confirma tiene que ser lo que se enseñó.
+    const htmlU = api._excelAplicarPreviaHtml(await (async () => {
+      const r = await ctx.khAdminFetch('/x', { body: JSON.stringify({ evento_id: EVENTO, solo: 'totales', claves: ['Rosa Vela'] }) });
+      enviados.pop();                       // esa consulta es del arnés, no un clic
+      return r.json();
+    })(), { solo: 'totales', claves: ['Rosa Vela'] });
+    const mAlc = /data-alcance="([^"]*)"/.exec(htmlU);
+    af(!!mAlc, 'el botón de confirmar de la vista previa no lleva el alcance: el 2º clic mandaría el plan GLOBAL');
+    const alcancePintado = JSON.parse((mAlc ? mAlc[1] : '{}').replace(/&quot;/g, '"'));
+    af(/Sí, aplicar solo a/.test(htmlU), 'la vista previa de UN renglón no dice que aplica solo a esa persona');
+    await api.excelAplicarConfirmar({ dataset: { alcance: JSON.stringify(alcancePintado) } });
+    const tras2 = red8.escrituras.length;
+    console.log('    2º clic  → mandó ' + JSON.stringify(enviados[1]) + ' · escrituras: ' + tras2);
+    af(enviados[1] && enviados[1].confirmar === true, 'el segundo clic no confirma: ' + JSON.stringify(enviados[1]));
+    af(tras2 === 1, 'el segundo clic escribió ' + tras2 + ' vez(ces), se esperaba 1');
+    const rosaDesp = (red8.tablas.viajeros_evento || []).find((v) => v.id === 'v-e');
+    af(rosaDesp.total_contrato === 6000, 'tras los dos clics el total de Rosa quedó en ' + rosaDesp.total_contrato + ', se esperaba 6000');
+
+    // 🔒 LA TRAMPA DEL ALCANCE: la vista previa de UN renglón no puede acabar
+    // aplicando TODO. Si el botón de confirmar perdiera el alcance, el segundo
+    // clic mandaría el plan global — enseñando un renglón y escribiendo diez.
+    af(enviados[1] && enviados[1].solo === 'totales' && (enviados[1].claves || []).length === 1,
+       'el segundo clic perdió el alcance del renglón y mandaría el plan GLOBAL: '
+       + JSON.stringify(enviados[1]) + ' — enseñar un renglón y escribir diez es peor que no preguntar');
+    const ana8 = (red8.tablas.viajeros_evento || []).find((v) => v.id === 'v-c');
+    af(ana8.total_contrato === 7200, 'el segundo clic del RENGLÓN tocó a Ana, que no se eligió: ' + ana8.total_contrato);
+  } catch (e) {
+    // Con nombre y en ROJO: una caída aquí dejaría [9]…[12] sin ejercitar y
+    // escondería justo el candado que se pretendía medir.
+    af(false, 'la sección del botón de renglón se CAYÓ: ' + e.message);
+  }
+
   // ── [9] 🔒 NI BAJAS NI AMBIGUOS TAMPOCO POR RENGLÓN ───────────────────────
   console.log('\n[9] el renglón no es la puerta trasera');
   const baja = await correr({ confirmar: true, solo: 'bajas', claves: ['zulema fria'] });

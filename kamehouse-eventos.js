@@ -683,14 +683,22 @@ async function excelAplicarVistaPrevia() {
   const d = await _excelAplicar({});
   if (!d) return;
   const panel = document.getElementById('excel-aplicar-panel');
-  panel.innerHTML = _excelAplicarPreviaHtml(d);
+  panel.innerHTML = _excelAplicarPreviaHtml(d, {});
 }
 
 // El segundo clic. Solo aquí se escribe.
-async function excelAplicarConfirmar() {
-  const b = document.getElementById('excel-aplicar-ok');
+//
+// 🔒 EL ALCANCE VIAJA EN EL BOTÓN QUE PINTÓ LA VISTA PREVIA, no en una variable
+// de módulo. Si se perdiera, el segundo clic mandaría el plan GLOBAL después de
+// haber enseñado UN renglón — enseñar uno y escribir diez es peor que no
+// preguntar. Al leerlo del `dataset` del botón que el usuario acaba de ver, lo
+// que se confirma es exactamente lo que se enseñó.
+async function excelAplicarConfirmar(btn) {
+  const b = btn || document.getElementById('excel-aplicar-ok');
+  let alcance = {};
+  try { alcance = JSON.parse((b && b.dataset && b.dataset.alcance) || '{}'); } catch (_) { alcance = {}; }
   if (b) { b.disabled = true; b.textContent = 'Aplicando…'; }
-  const d = await _excelAplicar({ confirmar: true });
+  const d = await _excelAplicar({ confirmar: true, ...alcance });
   if (!d) return;
   document.getElementById('excel-aplicar-panel').innerHTML = _excelAplicarHechoHtml(d);
   // El careo se vuelve a pintar: después de escribir, lo que había en pantalla
@@ -698,18 +706,29 @@ async function excelAplicarConfirmar() {
   excelCarear();
 }
 
-// El botón de renglón: un solo nombre, un solo montón.
+// El botón de renglón: un solo nombre, un solo montón — Y LOS MISMOS DOS CLICS.
+//
+// 🔴 ASÍ NO ERA. Esta función llamaba a `_excelAplicar({confirmar:true, …})` de
+// un golpe, tres líneas debajo del comentario que dice «Dos clics SIEMPRE». Es
+// la forma más cara del comentario que se contradice con el código que explica
+// — y aquí escribía DINERO.
+//
+// Y pesa justo aquí más que en el botón global: el renglón existe SOLO para la
+// clase que se SACÓ del clic global por pedir mirada humana —el «$0» tecleado
+// sobre un total bueno y el EXACTO de la libreta—. El botón que más tenía que
+// preguntar era el único que no preguntaba.
 async function excelAplicarUno(monton, nombre) {
   if (!nombre) return;
-  const d = await _excelAplicar({ confirmar: true, solo: monton, claves: [nombre] });
+  const alcance = { solo: monton, claves: [nombre] };
+  const d = await _excelAplicar(alcance);          // SIN `confirmar`: solo pregunta.
   if (!d) return;
-  const hechos = ((d.resultado || {})[monton] || []).length;
-  showToast(hechos ? `Aplicado: ${nombre}` : `No había nada que aplicar para ${nombre}`, hechos ? 'success' : 'error');
-  excelCarear();
+  const panel = document.getElementById('excel-aplicar-panel');
+  if (panel) panel.innerHTML = _excelAplicarPreviaHtml(d, alcance);
 }
 
-function _excelAplicarPreviaHtml(d) {
+function _excelAplicarPreviaHtml(d, alcance) {
   const p = d.plan || {}, r = d.resumen || {};
+  const unRenglon = !!(alcance && alcance.claves && alcance.claves.length);
   const fila = (izq, der) =>
     `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0">
        <span>${izq}</span><span style="font-family:'JetBrains Mono',monospace;white-space:nowrap">${der}</span></div>`;
@@ -734,8 +753,12 @@ function _excelAplicarPreviaHtml(d) {
       Una baja es una persona y espera firma; elegir entre dos homónimos sería inventar el dato que falta.
       Al confirmar, el servidor <b>vuelve a correr el careo</b> y escribe sobre ese resultado, no sobre esta lista.
     </div>
-    <button class="btn btn-primary" id="excel-aplicar-ok" onclick="excelAplicarConfirmar()">
-      Sí, aplicar: ${r.abonos} abono(s) por ${_evtMxn(r.monto_abonos)} · ${r.totales} total(es) · ${r.altas} alta(s)
+    <button class="btn btn-primary" id="excel-aplicar-ok"
+            data-alcance="${_evtEsc(JSON.stringify(alcance || {}))}"
+            onclick="excelAplicarConfirmar(this)">
+      ${unRenglon
+        ? `Sí, aplicar solo a ${_evtEsc(alcance.claves[0])}`
+        : `Sí, aplicar: ${r.abonos} abono(s) por ${_evtMxn(r.monto_abonos)} · ${r.totales} total(es) · ${r.altas} alta(s)`}
     </button>
   </div>`;
 }

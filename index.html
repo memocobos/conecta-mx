@@ -2609,6 +2609,20 @@ body.pf-barra-viva .wa-float{bottom:104px}
   font-size:7.5px;font-weight:900;letter-spacing:.1em;line-height:1;
   padding:3px 5px;border-bottom-right-radius:var(--r-chip,999px)}
 .hs-agotado .hs-img{filter:brightness(.5) grayscale(1)}
+/* [LAND-2c] EL SELLO DE «PRÓXIMAMENTE», GEMELO DEL DE AGOTADO.
+   Misma construcción a propósito —colgado de `.hs-item`, nunca de `.hs-media`:
+   `showInitials` reescribe la portada entera cuando falla la foto del artista
+   y ya se llevó un sello por delante una vez (ver la nota de `.hs-ag`)—, pero
+   en el AMARILLO con el que el catálogo YA pinta «Próximamente»: el mismo
+   `#e8ff4c` de `.ev-tag.tpronto` y del badge AVÍSAME. No se inventa un color;
+   si el catálogo cambia el suyo, esto queda a la vista en el careo.
+   La letra va un punto más chica que en AGOTADO porque la palabra es tres
+   veces más larga y a 50px de ancho de miniatura se salía. */
+.hs-prox{position:absolute;left:0;top:0;z-index:3;pointer-events:none;
+  background:var(--c-amarillo);color:#000;font-family:'Montserrat',sans-serif;
+  font-size:6.5px;font-weight:900;letter-spacing:.06em;line-height:1;
+  padding:3px 4px;border-bottom-right-radius:var(--r-chip,999px)}
+.hs-proximo .hs-img{filter:brightness(.6)}
 .hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:rgba(232,255,76,.1);border-color:rgba(232,255,76,.35)}
 .hs-mas-n{font-family:var(--font-display);font-size:21px;font-weight:900;color:var(--c-amarillo);line-height:1}
@@ -4157,6 +4171,10 @@ var _landTick = null;
   // RENDERIZADA: si algún día divergen, truena.
   function esAgotado(ev){ return !!_evVeredicto(ev).isAg; }
   function esPasado(ev){ return !!_evVeredicto(ev).isPast; }
+  // [LAND-2c] Misma fuente, misma regla: `proximamente` y `pronto` son los dos
+  // estados que el catálogo rotula «Próximamente». Un evento en preventa no
+  // puede salir en la tira disfrazado de comprable.
+  function esProximo(ev){ var v=_evVeredicto(ev); return !!(v.isProxi||v.isPronto); }
 
   function proximosPorFecha(){
     return EV.filter(function(e){return !e.listOnly&&dsEfectivo(e)&&!esPasado(e);})
@@ -4186,9 +4204,13 @@ var _landTick = null;
   // enseñar son ellos.
   function elegirTira(univ,grandeId,dsGrande){
     var out=[], vistos={}, fuentes=[];
-    function meter(e){
+    // [LAND-2c] CADA MINIATURA SE LLEVA LA VÍA POR LA QUE ENTRÓ. El render la
+    // necesita para decidir el chip, y re-adivinarla allá con otra condición
+    // («¿está agotado y en el top?») sería una segunda regla que un día dice
+    // algo distinto de ésta. Aquí ya se sabe: se manda, no se deduce.
+    function meter(e,via){
       if(!e||e.id===grandeId||vistos[e.id])return false;
-      out.push(e); vistos[e.id]=1; return true;
+      out.push({ev:e,via:via}); vistos[e.id]=1; return true;
     }
 
     // 1) Los agotados de la ventana, por fecha. `univ` ya viene ordenado, así
@@ -4198,19 +4220,19 @@ var _landTick = null;
       var e=univ[i];
       if(dsGrande&&dsEfectivo(e)>dsGrande)break;
       if(!esAgotado(e))continue;
-      if(meter(e))porAgotado=true;
+      if(meter(e,'agotados'))porAgotado=true;
     }
     if(porAgotado)fuentes.push('agotados');
 
     // 2) El top llena lo que sobre, en su orden.
     var porId={}; univ.forEach(function(x){porId[x.id]=x;});
     var top=idsDelTop(), porTop=false;
-    for(var j=0;j<top.length&&out.length<3;j++){ if(meter(porId[top[j]]))porTop=true; }
+    for(var j=0;j<top.length&&out.length<3;j++){ if(meter(porId[top[j]],'top'))porTop=true; }
     if(porTop)fuentes.push('top');
 
     // 3) El respaldo por cercanía de fecha cierra.
     var porFecha=false;
-    for(var k=0;k<univ.length&&out.length<3;k++){ if(meter(univ[k]))porFecha=true; }
+    for(var k=0;k<univ.length&&out.length<3;k++){ if(meter(univ[k],'fecha'))porFecha=true; }
     if(porFecha)fuentes.push('fecha');
 
     // `data-fuente` dice QUÉ VÍAS armaron la tira, no cuál «ganó»: con tres
@@ -4229,6 +4251,21 @@ var _landTick = null;
   // Así que el agotado toma el MISMO camino que el catálogo ya usa para los
   // estados que no se cotizan solos (proceso, solo-viaje): WhatsApp, con el
   // número de la constante WA. Decisión de Memo, 19-sep.
+  // [LAND-2c] UN «PRÓXIMAMENTE» NO SE COTIZA: TODAVÍA NO HAY QUÉ VENDER.
+  // La puerta es la que toma SU TARJETA en el catálogo, medida en la tarjeta
+  // real y no deducida del código: `abrirWaitlistModal(ev)` —el AVÍSAME/lista
+  // de espera—, que recibe el EVENTO, no el id.
+  // ⚠️ La medición dejó ver una asimetría del catálogo: con `st:'proximamente'`
+  // la tarjeta abre el AVÍSAME, pero con `st:'pronto'` —que el catálogo rotula
+  // igual, «Próximamente»— cae en `showDetail`, o sea el cotizador. Espejar eso
+  // aquí sería pintar PRÓXIMAMENTE y abrir el cotizador: exactamente la trampa
+  // que esta tuerca vino a cerrar. Los dos van al AVÍSAME. Hoy no hay ni un
+  // evento en `pronto`, así que no cambia nada en vivo; queda dicho en la PR.
+  function avisame(ev){
+    if(typeof abrirWaitlistModal==='function'){abrirWaitlistModal(ev);return;}
+    informes(ev);   // sin modal, WhatsApp: nunca el cotizador
+  }
+
   function informes(ev){
     var msg='Hola! Me interesa el tour de '+ev.a+' ('+ev.f+'). Me dan informes?';
     window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
@@ -4285,16 +4322,21 @@ var _landTick = null;
     strip.setAttribute('data-fuente',el.fuente);
     if(!el.items.length){strip.style.display='none';return;}
     strip.style.display='';
-    el.items.forEach(function(e){
-      var ag=esAgotado(e);
+    el.items.forEach(function(x){
+      var e=x.ev, via=x.via;
+      var ag=esAgotado(e), px=!ag&&esProximo(e);
       var it=document.createElement('button');
-      it.type='button'; it.className='hs-item'+(ag?' hs-agotado':'');
+      it.type='button'; it.className='hs-item'+(ag?' hs-agotado':'')+(px?' hs-proximo':'');
       // El ancla por id, como la tarjeta del catálogo (`data-id`): es lo que
       // deja carear miniatura contra tarjeta sin adivinar por el nombre.
       it.setAttribute('data-id',e.id);
       var m=document.createElement('div'); m.className='hs-media';
       var b=document.createElement('div'); b.className='hs-body';
-      var n=(typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
+      // [LAND-2c] SIN CHIP PARA QUIEN ENTRÓ POR AGOTADO. El sello ya cuenta la
+      // historia y el chip le comía el ancho al nombre: medido, Young Miko
+      // salía «YOUNG …» por un «#8» que no aportaba nada. Los que entran POR
+      // el top sí lo conservan — la vía la manda `elegirTira`, no se re-deduce.
+      var n=(via!=='agotados'&&typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
       // [LAND-1d] El rango va DENTRO del nombre, no encima. Suelto ocupaba su
       // propio renglón y crecía la tira 21px — y en producción SIEMPRE está,
       // porque el top sí llega. Ver la nota del CSS.
@@ -4305,12 +4347,13 @@ var _landTick = null;
       // [LAND-2] EL SELLO NO SE CUELGA DE LA PORTADA. Ver la nota del CSS:
       // `showInitials` reescribe `.hs-media` entera cuando la foto del artista
       // falla, y se llevaba el sello por delante en una carrera de red.
-      if(ag){
+      if(ag||px){
         var sello=document.createElement('span');
-        sello.className='hs-ag'; sello.textContent='AGOTADO';
+        sello.className=ag?'hs-ag':'hs-prox';
+        sello.textContent=ag?'AGOTADO':'PRÓXIMAMENTE';
         it.appendChild(sello);
       }
-      it.onclick=ag?function(){informes(e);}:function(){abrir(e.id);};
+      it.onclick=ag?function(){informes(e);}:px?function(){avisame(e);}:function(){abrir(e.id);};
       strip.appendChild(it);
     });
     // [LAND-2] N SE CUENTA, NO SE RESTA. El letrero promete «los que quedan a
@@ -4319,7 +4362,7 @@ var _landTick = null;
     // salen de la cuenta de lo comprable. Medido el 19-sep con los tres
     // agotados de septiembre en la tira: la resta decía +46 con 49 eventos a
     // la venta escondidos. Ahora se cuenta quién falta de verdad.
-    var enTira={}; el.items.forEach(function(e){enTira[e.id]=1;});
+    var enTira={}; el.items.forEach(function(x){enTira[x.ev.id]=1;});
     var n=venta.filter(function(e){return e.id!==grandeId&&!enTira[e.id];}).length;
     if(n>0){
       var mas=document.createElement('a');
@@ -4336,10 +4379,21 @@ var _landTick = null;
   }
 
   var MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  // [LAND-2c] EL AÑO, CUANDO NO ES EL CORRIENTE. «2 sep» de un evento de 2027
+  // se leía igual que uno de la semana que viene. Los del año en curso se
+  // quedan cortitos, que es lo normal y lo que ocupa menos.
+  // ⚠️ Esta `fechaCorta` es la DEL HERO y tiene UN solo llamador: la tira. En
+  // index.html vive otra con el mismo nombre y otra firma —`fechaCorta(ev)`,
+  // del generador del banner de noticias, en su propio ámbito— y rol.html tiene
+  // la suya. Son tres funciones distintas con el mismo nombre: este cambio no
+  // las toca. El barrido va en la PR.
+  // El año se lee en CADA llamada, no una vez al cargar: una pestaña abierta
+  // que cruza el 31 de diciembre seguiría creyendo que estamos en el anterior.
   function fechaCorta(ds){
     if(!ds)return '';
     var p=ds.split('-');
-    return parseInt(p[2],10)+' '+MESC[parseInt(p[1],10)-1];
+    var corta=parseInt(p[2],10)+' '+MESC[parseInt(p[1],10)-1];
+    return p[0]===String(new Date().getFullYear())?corta:corta+' '+p[0];
   }
 
   // El botón de WhatsApp toma el número de la MISMA constante WA que ya usan

@@ -240,6 +240,15 @@ async function mirar(dirBase, mutaciones, top) {
     const caja = (el) => { if (!el) return null; const r = el.getBoundingClientRect();
       return { x: r.left, y: r.top, w: r.width, h: r.height }; };
     const encima = (a, b) => !!(a && b) && !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+    // ¿el sello cubre el CENTRO del cartel? Vale para los dos sellos: el de
+    // PRÓXIMAMENTE es tres veces más largo que el de AGOTADO y es el que más
+    // riesgo tiene de comerse la foto en 50px de alto.
+    const tapaCartel = (it, sello) => {
+      const cs = caja(sello), cm = caja(it.querySelector('.hs-media'));
+      if (!cs || !cm) return false;
+      const cx = cm.x + cm.w / 2, cy = cm.y + cm.h / 2;
+      return cx >= cs.x && cx <= cs.x + cs.w && cy >= cs.y && cy <= cs.y + cs.h;
+    };
 
     const strip = document.getElementById('hh-strip');
     const volcado = strip ? strip.innerHTML.slice(0, 1200) : '(sin tira)';
@@ -259,6 +268,8 @@ async function mirar(dirBase, mutaciones, top) {
           return !!q && q.offsetHeight > 0 && q.offsetWidth > 0; })(),
         proxTxt: (it.querySelector('.hs-prox') || {}).textContent || '',
         proxFondo: it.querySelector('.hs-prox') ? getComputedStyle(it.querySelector('.hs-prox')).backgroundColor : '',
+        proxTapaCartel: tapaCartel(it, it.querySelector('.hs-prox')),
+        proxTapaNombre: encima(caja(it.querySelector('.hs-prox')), caja(nom)),
         selloTapaNombre: encima(caja(sello), caja(nom)),
         // 🔒 «Sin tapar el nombre» NO se puede falsear: `.hs-media` recorta con
         // overflow:hidden y el nombre vive FUERA, en `.hs-media`+`.hs-body`
@@ -268,12 +279,7 @@ async function mirar(dirBase, mutaciones, top) {
         // el `::after` de `.ev-card` (inset:0, 26px) borraría el cartel entero
         // en 50px de alto. Eso se mide por el CENTRO del cartel, sin inventar
         // ningún umbral: si el sello lo cubre, la miniatura dejó de ser una foto.
-        selloTapaCartel: (() => {
-          const cs = caja(sello), cm = caja(it.querySelector('.hs-media'));
-          if (!cs || !cm) return false;
-          const cx = cm.x + cm.w / 2, cy = cm.y + cm.h / 2;
-          return cx >= cs.x && cx <= cs.x + cs.w && cy >= cs.y && cy <= cs.y + cs.h;
-        })(),
+        selloTapaCartel: tapaCartel(it, sello),
         dataId: it.getAttribute('data-id') || '',
         destino: clicar(it),
       };
@@ -658,6 +664,8 @@ const amarillo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0
       af(itQ.proxTxt.trim() === 'PRÓXIMAMENTE', `[12b] el sello de «${unProxi.id}» dice «${itQ.proxTxt.trim()}», no «PRÓXIMAMENTE»`);
       af(amarillo(itQ.proxFondo), `[12b] el sello de «${unProxi.id}» es ${itQ.proxFondo}, no el amarillo con que el catálogo pinta «Próximamente»`);
       af(!itQ.sello, `[12b] «${unProxi.id}» no está agotado y lleva TAMBIÉN el sello de agotado`);
+      af(!itQ.proxTapaCartel, `[12b] el sello de «${unProxi.id}» tapa el centro del cartel: la miniatura dejó de enseñar la foto`);
+      af(!itQ.proxTapaNombre, `[12b] el sello de «${unProxi.id}» se encima con el nombre`);
       // 🔒 La puerta, medida contra la que toma la TARJETA REAL del catálogo.
       af(itQ.destino.ruta === 'waitlist',
          `[12b] tocar «${unProxi.id}» aterrizó en ${itQ.destino.ruta}, y su tarjeta del catálogo abre la lista de espera`);

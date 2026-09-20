@@ -36,7 +36,10 @@ async function leerBase(eventoId) {
   const sb = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
   const enc = encodeURIComponent;
   const sp = new URLSearchParams();
-  sp.set('select', 'id,nombre,notas,tipo_viajero,zona_boleto,tipo_paquete,abonado_previo');
+  // [CUADRE-1a] `total_contrato` se suma al select para el séptimo montón.
+  // `notas` YA venía —la usa el filtro de «ya no aparece»— y ahora además
+  // dice si el total es un DERIVADO de TOTAL-1 o un exacto de la libreta.
+  sp.set('select', 'id,nombre,notas,tipo_viajero,zona_boleto,tipo_paquete,abonado_previo,total_contrato');
   sp.append('evento_id', 'eq.' + eventoId);
   sp.set('limit', '5000');
   // Un solo `or=` en la URL. DOS `or=` en la misma consulta se combinan de una
@@ -71,6 +74,12 @@ async function leerBase(eventoId) {
   return { viajeros: filas.map((v) => ({
     id: v.id, nombre: v.nombre, zona: v.zona_boleto, paquete: v.tipo_paquete,
     abonado: Number(v.abonado_previo || 0) + (suma.get(v.id) || 0),
+    // [CUADRE-1a] Se pasan CRUDOS. El `total_contrato` NULL viaja como null y
+    // no como 0 — `carear` necesita distinguir «el contrato es de cero pesos»
+    // de «todavía no se sabe cuánto», y un `|| 0` aquí borraría esa diferencia
+    // antes de que nadie pudiera usarla.
+    total_contrato: v.total_contrato == null ? null : Number(v.total_contrato),
+    notas: v.notas || '',
   })) };
 }
 
@@ -157,6 +166,25 @@ exports.handler = async (event) => {
     ...r,
     totales: { nuevos: r.nuevos.length, pagos: r.pagos.length, bajas: r.bajas.length,
                iguales: r.iguales.length, apartados: r.apartados.length, ambiguos: r.ambiguos.length,
+               // [CUADRE-1a] El conteo del séptimo montón vive AQUÍ ADENTRO, con
+               // los otros seis. ⚠️ `d.totales` NO es un montón: es este objeto
+               // de conteos, y la pantalla lo lee como `const t = d.totales`.
+               // Por eso el montón nuevo se llama `totales_contrato` y no
+               // `totales` — bautizarlo así habría dejado a los seis de antes
+               // sin sus cuentas, en silencio.
+               totales_contrato: r.totales_contrato.length,
+               totales_contrato_derivados: r.totales_contrato.filter((x) => x.derivado).length,
+               // ⚠️ MEDIDO EL 20-SEP SOBRE 10 EVENTOS REALES: 20 de los 78
+               // renglones del montón (26 %) traen `excel_total` en CERO
+               // EXPLÍCITO — un «$0» tecleado en la celda Total, casi siempre
+               // una fórmula que todavía no se llenó. NO se filtran, porque
+               // «$0» es un número y filtrarlo sería inventar una regla que
+               // Memo no dio; se CUENTAN, para que se vean como la clase que
+               // son y no como 20 diferencias sueltas.
+               // 🔒 Y queda dicho para CUADRE-1b: APLICAR uno de éstos pondría
+               // en cero un total bueno. La fase que escriba tiene que
+               // decidirlo a propósito, no heredarlo de aquí.
+               totales_contrato_en_cero: r.totales_contrato.filter((x) => x.excel_total === 0).length,
                apartados_zona_sin_talla: zonaSinTalla.length,
                apartados_filas: r.apartados.reduce((a, x) => a + (x.filas || 0), 0) },
   }) };

@@ -275,11 +275,14 @@ function mapearLibro(personasLibro, mapeos, eventoId) {
 // Pa'l Norte, y la misma que dos filas dentro de una pestaña.
 //
 // 🔒 EL TOTAL VIENE SOLO DE LA PESTAÑA. El libro no lo lleva, así que:
-//   · si la persona está en las dos, su total es el de la pestaña, intacto;
-//   · si vive SOLO en el libro, su total es `null` — NO cero. Es el mismo hueco
-//     de CUADRE-1a: la ausencia no es un cero, y con `total:null` la persona no
-//     entra al montón de totales ni puede darse de alta con un contrato
-//     inventado (1b la salta con motivo).
+//   · si la persona está en las DOS, su total es el de la pestaña, INTACTO —
+//     🔒 el libro jamás pisa a la pestaña, y desde CUADRE-2c eso tiene dientes:
+//     antes se cumplía solo porque el libro no traía total, hoy SÍ lo trae y
+//     aun así pierde;
+//   · si vive SOLO en el libro, su total es su «Costo al Publico» (CUADRE-2c,
+//     decisión de Memo del 20-sep). Si el libro tampoco lo sabe, `null` — NO
+//     cero: el mismo hueco de CUADRE-1a, y con él 1b la salta con motivo en vez
+//     de darla de alta con un contrato inventado.
 //
 // Y cada persona carga su PROCEDENCIA. No es adorno: cuando una fila trae las
 // dos fuentes, la pantalla puede decir de dónde salió el dinero en vez de
@@ -301,9 +304,22 @@ function fundirNumerologia(personasPestana, personasLibro) {
     }
     out.set(n.clave, {
       nombre: n.nombre, clave: n.clave, abonado: Number(n.abonado || 0), filas: 1,
-      zona: '', paquete: '', talla: '',
-      // El hueco manda: solo en el libro = no sabemos su total.
-      total: null,
+      // [CUADRE-2c] LA ZONA Y EL PAQUETE SALEN DEL LIBRO. «Tipo de Boleto» es
+      // la zona, y el paquete es CHEAP porque esto ES la venta directa de Memo
+      // —boleto solo, sin viaje—. Sin estos dos, CUADRE-1b los salta: su alta
+      // pasa por `viajero_migrar`, que exige los dos.
+      zona: n.zona || '', paquete: 'cheap', talla: '',
+      // 🔒 [CUADRE-2c] EL «Costo al Publico» DEL LIBRO ES SU CONTRATO.
+      // Decisión de Memo, firmada el 20-sep. CUADRE-2 nació con `total: null`
+      // aquí porque su diseño decía que el libro no llevaba contrato — y MEDIR
+      // la rejilla lo desmintió: sí lo lleva, en la misma columna que TOTAL-1
+      // tecleó a mano como «la libreta». Con ella, las ~39 personas que solo
+      // existen en Numerología pueden darse de alta en vez de saltarse.
+      //
+      // Y el hueco SIGUE mandando cuando el libro tampoco sabe: un
+      // `costo_publico` null es «no sé», no cero, y esa persona sigue sin
+      // poder darse de alta — que es lo correcto.
+      total: (n.costo_publico == null) ? null : Number(n.costo_publico),
       boletos_numerologia: Number(n.boletos || 0),
       pestanas: [], fuentes: ['numerologia'],
     });

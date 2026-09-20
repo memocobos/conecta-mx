@@ -52,11 +52,11 @@ const conPreludio = (filas) => [...Array.from({ length: 10 }, () => ['', '']), C
 // que el total venga SIEMPRE de la pestaña de las chicas.
 const LIBRO = () => ([
   // [a] la MISMA persona que en la pestaña: su dinero se SUMA.
-  { nombre: 'Esmeralda Estefania Hernandez Lopez', abonado: 2000, boletos: 1, evento_libro: 'Karol G', fecha_libro: '' },
+  { nombre: 'Esmeralda Estefania Hernandez Lopez', abonado: 2000, boletos: 1, evento_libro: 'Karol G', fecha_libro: '', zona: 'Poniente Baja', costo_publico: 4000 },
   // vive SOLO en el libro → alta candidata, pero SIN total (el libro no lo trae).
-  { nombre: 'José Santos', abonado: 19000, boletos: 7, evento_libro: 'Karol G', fecha_libro: '' },
+  { nombre: 'José Santos', abonado: 19000, boletos: 7, evento_libro: 'Karol G', fecha_libro: '', zona: 'Poniente Baja', costo_publico: 19000 },
   // [b] fila de OTRA fecha del mismo artista: mapea a karolg#1, no a éste.
-  { nombre: 'Nancy Ruiz', abonado: 5000, boletos: 2, evento_libro: 'Karol G', fecha_libro: '7 de noviembre' },
+  { nombre: 'Nancy Ruiz', abonado: 5000, boletos: 2, evento_libro: 'Karol G', fecha_libro: '7 de noviembre', zona: 'VIP A', costo_publico: 8000 },
   // [b] SIN MAPEO: el libro trae eventos viejos que la siembra no mapea.
   { nombre: 'Feid Fan', abonado: 3000, boletos: 1, evento_libro: 'Feid', fecha_libro: '' },
   { nombre: 'Otro Viejo', abonado: 1200, boletos: 1, evento_libro: 'Travis Scott', fecha_libro: '2024' },
@@ -122,16 +122,39 @@ const MAPEOS = () => ([
     // [a] LAS DOS FUENTES: 1,000 de la pestaña + 2,000 del libro = 3,000.
     const esm = por(/Esmeralda/);
     af(esm && esm.abonado === 3000, 'Esmeralda: abonado ' + (esm && esm.abonado) + ', se esperaban 3000 (1,000 pestaña + 2,000 libro)');
-    af(esm && esm.total === 4500, 'Esmeralda: el total salió ' + (esm && esm.total) + ' y debe venir de LA PESTAÑA (4500): el libro no lleva total');
+    // 🔒 LA REGLA INTACTA, Y AHORA CON DIENTES: EL LIBRO JAMÁS PISA A LA
+    // PESTAÑA. Antes esto se cumplía solo porque el libro no traía total; hoy
+    // SÍ lo trae ($4,000 en el fixture) y aun así manda el de la pestaña
+    // ($4,500). El control positivo está adentro del propio caso: si el libro
+    // pisara, se vería 4000.
+    af(esm && esm.total === 4500, 'Esmeralda: el total salió ' + (esm && esm.total)
+       + ' y debe ser el de LA PESTAÑA (4500), no el del libro (4000): el libro jamás pisa a la pestaña');
     af(esm && Array.isArray(esm.fuentes) && esm.fuentes.includes('pestana') && esm.fuentes.includes('numerologia'),
        'Esmeralda no carga sus DOS procedencias: ' + JSON.stringify(esm && esm.fuentes));
-    // Quien vive SOLO en el libro entra, pero SIN total — el hueco manda.
+    // [CUADRE-2c] Quien vive SOLO en el libro entra CON SU CONTRATO.
+    // 🔒 Decisión de Memo firmada el 20-sep: el «Costo al Publico» del libro ES
+    // el contrato de esa persona. La premisa original de CUADRE-2 —«el libro no
+    // lleva total»— resultó falsa al MEDIR la rejilla: sí lo lleva, y es la
+    // misma columna que TOTAL-1 tecleó a mano como «la libreta». Con ella, las
+    // ~39 personas que solo existen en Numerología pueden darse de alta en vez
+    // de saltarse por falta de total.
     const jose = por(/José/);
     af(!!jose, 'quien vive SOLO en el libro no entró al lado-Excel');
-    af(jose && jose.total === null,
+    af(jose && jose.total === 19000,
        'José vive solo en el libro y su total salió ' + JSON.stringify(jose && jose.total)
-       + ': el libro NO lleva total de contrato, así que es null — no cero');
+       + ': tiene que ser su «Costo al Publico» (19000), que el parser ya lee');
+    af(jose && jose.zona === 'Poniente Baja',
+       'la zona del solo-libro sale del «Tipo de Boleto»: ' + JSON.stringify(jose && jose.zona));
+    af(jose && jose.paquete === 'cheap',
+       'el solo-libro es la venta DIRECTA de Memo: su paquete es CHEAP, y salió ' + JSON.stringify(jose && jose.paquete));
     af(jose && jose.fuentes.length === 1 && jose.fuentes[0] === 'numerologia', 'José no declara su única procedencia');
+    // 🔒 EL HUECO SIGUE MANDANDO cuando el libro tampoco sabe: un
+    // `costo_publico` null es «no sé», no cero — y esa persona sigue sin poder
+    // darse de alta, que es lo correcto.
+    const sinCosto = N.fundirNumerologia([], [{ nombre: 'Sin Costo', clave: 'sin costo',
+      abonado: 500, boletos: 1, zona: 'General', costo_publico: null }])[0];
+    af(sinCosto && sinCosto.total === null,
+       'sin «Costo al Publico» el total tiene que seguir siendo null y salió ' + JSON.stringify(sinCosto && sinCosto.total));
     // Quien vive solo en la pestaña no se toca.
     const solo = por(/Solo Pestaña/);
     af(solo && solo.abonado === 700 && solo.total === 3000, 'a quien solo está en la pestaña le movieron el dinero');
@@ -421,6 +444,43 @@ const MAPEOS = () => ([
   } catch (e) {
     af(false, 'la sección del careo CON tercera fuente se CAYÓ: ' + e.message);
   }
+
+  // ── [4d] EL PAGO DE 2c: el solo-libro YA SE PUEDE DAR DE ALTA ────────────
+  // Es el punto de la tuerca. Con `total: null` CUADRE-1b los SALTABA con
+  // motivo («la pestaña no trae su Total»); con su «Costo al Publico» entran
+  // como alta. Se mide por el PLANIFICADOR REAL de 1b, no por la fusión.
+  console.log('\n[4d] el solo-libro, por el planificador de CUADRE-1b');
+  try {
+    const { planear } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-aplicar.js'));
+    const { correrCareo } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-careo-correr.js'));
+    const red5 = redFalsa({ conNumerologia: true });
+    global.fetch = red5.fetchFalso;
+    process.env.NUMEROLOGIA_SCRIPT_URL = 'https://numero.test/exec';
+    process.env.NUMEROLOGIA_SCRIPT_TOKEN = 't';
+    const careo = await correrCareo(EVENTO);
+    const plan = planear(careo, {});
+    const alta = (plan.altas || []).find((x) => /José/.test(x.nombre));
+    const salto = (plan.saltados || []).find((x) => /José/.test(x.nombre));
+    console.log('    José: ' + (alta ? `ALTA total=${alta.total_contrato} paquete=${alta.tipo_paquete} zona=${alta.zona_boleto}`
+      : salto ? 'SALTADO — ' + salto.motivo : 'no aparece'));
+    af(!!alta, 'José vive solo en el libro y NO se planeó su alta'
+       + (salto ? ' (se saltó: ' + salto.motivo + ')' : ''));
+    af(alta && alta.total_contrato === 19000, 'José: total_contrato ' + (alta && alta.total_contrato) + ', el libro dice 19000');
+    af(alta && alta.tipo_paquete === 'cheap', 'José: paquete ' + (alta && alta.tipo_paquete) + ' — la venta directa de Memo es CHEAP');
+    af(alta && alta.zona_boleto === 'Poniente Baja', 'José: zona ' + (alta && alta.zona_boleto));
+    af(alta && alta.abonado_previo === 19000, 'José: abonado_previo ' + (alta && alta.abonado_previo) + ', el libro dice 19000');
+    af(alta && !alta.total_pendiente, 'José trae contrato de verdad: no puede nacer marcado como pendiente');
+    // CONTROL POSITIVO del caso: sin «Costo al Publico», sigue saltándose.
+    const careo2 = JSON.parse(JSON.stringify(careo));
+    careo2.montones = careo.montones;
+    const jp = careo2.personas.find((x) => /José/.test(x.nombre));
+    jp.total = null;
+    const plan2 = planear(careo2, {});
+    const salto2 = (plan2.saltados || []).find((x) => /José/.test(x.nombre));
+    console.log('    CONTROL POSITIVO (sin costo en el libro): ' + (salto2 ? 'saltado ✓' : 'SE COLÓ ✗'));
+    af(!!salto2 && /Total/i.test(salto2.motivo),
+       'sin contrato en NINGUNA de las dos fuentes, el alta tiene que seguir saltándose con motivo');
+  } catch (e) { af(false, 'la sección del solo-libro se CAYÓ: ' + e.message); }
 
   // ── [4c] EL RELOJ: no se trae el libro si no hay nada que mapear ──────────
   // ⏱ MEDIDO CONTRA PRODUCCIÓN: la cosecha del libro cuesta ~2.1 s en CADA

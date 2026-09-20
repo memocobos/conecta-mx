@@ -807,6 +807,160 @@ function _excelAplicarPreviaHtml(d, alcance) {
   </div>`;
 }
 
+// ═══ [CUADRE-3] «ACTUALIZAR TODO» ═══════════════════════════════════════════
+// Un clic, todos los eventos. Los mismos DOS clics de siempre: el primero
+// recorre y PREGUNTA, el segundo recorre y escribe.
+//
+// ⏱ EL BUCLE VIVE AQUÍ, y lo impuso el reloj: medido contra producción, el
+// recorrido completo son ~496 s en serie y Netlify corta a los 10. El servidor
+// atiende TANDAS DE 10 EN PARALELO (~5 s cada una) y este bucle las va pidiendo
+// con `desde`. ~11 vueltas, ~60 s, con la barra avanzando.
+//
+// 🔒 LO ÚNICO QUE SUBE DE AQUÍ ES UN ÍNDICE. Jamás montos: el plan que se
+// acumula abajo es para PINTAR, y no se le devuelve al servidor. Cada tanda
+// recalcula su careo y escribe sobre ESE resultado.
+let _excelTodoCorriendo = false;
+
+async function _excelTodoRecorrer(confirmar, alAvanzar) {
+  const acc = { eventos: [], total: null, vueltas: 0 };
+  let desde = 0;
+  for (;;) {
+    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
+      method: 'POST', body: JSON.stringify({ desde, tanda: 10, confirmar }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    acc.eventos.push(...(d.eventos || []));
+    acc.total = d.total; acc.vueltas++;
+    if (alAvanzar) alAvanzar(acc.eventos.length, d.total);
+    if (d.hecho) return acc;
+    // 🔒 Si la continuación no avanzara, esto sería un bucle infinito contra
+    // producción. Se corta con nombre en vez de girar para siempre.
+    if (d.siguiente <= desde) throw new Error('La continuación no avanzó (desde ' + desde + '): se corta para no girar en vacío.');
+    desde = d.siguiente;
+  }
+}
+
+function _excelTodoSumar(eventos) {
+  const s = { abonos: 0, monto: 0, totales: 0, altas: 0, negativas: 0, saltados: 0, errores: 0,
+              esc_abonos: 0, esc_totales: 0, esc_altas: 0, esc_errores: 0 };
+  for (const e of eventos) {
+    if (e.error) { s.errores++; continue; }
+    const p = e.plan || {}, r = e.resultado || null;
+    s.abonos += (p.abonos || []).length;
+    s.monto += (p.abonos || []).reduce((a, x) => a + x.monto, 0);
+    s.totales += (p.totales || []).length;
+    s.altas += (p.altas || []).length;
+    s.negativas += (p.negativas || []).length;
+    s.saltados += (p.saltados || []).length;
+    if (r) { s.esc_abonos += (r.abonos || []).length; s.esc_totales += (r.totales || []).length;
+             s.esc_altas += (r.altas || []).length; s.esc_errores += (r.errores || []).length; }
+  }
+  return s;
+}
+
+async function excelActualizarTodo() {
+  if (_excelTodoCorriendo) return;
+  const panel = document.getElementById('excel-todo-panel');
+  const btn = document.getElementById('excel-todo-btn');
+  _excelTodoCorriendo = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Recorriendo…'; }
+  try {
+    const acc = await _excelTodoRecorrer(false, (n, t) => {
+      if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>
+        Recorriendo los eventos… <b>${n}</b> de <b>${t || '?'}</b>. Todavía no se ha escrito nada.</div>`;
+    });
+    if (panel) panel.innerHTML = _excelTodoPreviaHtml(acc);
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}</div>`;
+  } finally {
+    _excelTodoCorriendo = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Actualizar TODO'; }
+  }
+}
+
+async function excelActualizarTodoConfirmar() {
+  if (_excelTodoCorriendo) return;
+  const panel = document.getElementById('excel-todo-panel');
+  const b = document.getElementById('excel-todo-ok');
+  _excelTodoCorriendo = true;
+  if (b) { b.disabled = true; b.textContent = 'Aplicando…'; }
+  try {
+    const acc = await _excelTodoRecorrer(true, (n, t) => {
+      if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>
+        Aplicando… <b>${n}</b> de <b>${t || '?'}</b> evento(s).</div>`;
+    });
+    if (panel) panel.innerHTML = _excelTodoHechoHtml(acc);
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}
+      <div style="font-size:11px;margin-top:6px">Lo que ya se aplicó, aplicado está: vuelve a correr «Actualizar TODO» — el segundo clic no repite nada porque el careo se recalcula.</div></div>`;
+  } finally {
+    _excelTodoCorriendo = false;
+  }
+}
+
+// La tabla por evento. Solo se listan los que TIENEN algo que hacer: con 106
+// eventos, pintar los 90 que ya cuadran escondería los 16 que importan.
+function _excelTodoTabla(eventos, conResultado) {
+  const filas = eventos.filter((e) => e.error
+    || ((e.plan.abonos || []).length + (e.plan.totales || []).length + (e.plan.altas || []).length) > 0);
+  if (!filas.length) return `<div style="font-size:12px;color:var(--ts);padding:6px 0">— ningún evento tiene nada que aplicar. Todo cuadra.</div>`;
+  return `<div style="display:grid;gap:3px;margin-top:6px">` + filas.map((e) => {
+    if (e.error) return `<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <span style="color:var(--red)">${_evtEsc(e.evento_id)}</span>
+      <span style="font-size:11px;color:var(--red)">[${_evtEsc(e.error.codigo || '')}] ${_evtEsc(String(e.error.mensaje || '').slice(0, 90))}</span></div>`;
+    const p = e.plan, r = e.resultado;
+    const monto = (p.abonos || []).reduce((a, x) => a + x.monto, 0);
+    return `<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <span><b style="color:var(--tp)">${_evtEsc(e.evento_id)}</b></span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px">
+        ${(p.abonos || []).length ? `<span style="color:var(--green)">${(p.abonos || []).length} abono(s) ${_evtMxn(monto)}</span>` : ''}
+        ${(p.totales || []).length ? ` · <span style="color:var(--blue,#0000cd)">${(p.totales || []).length} total(es)</span>` : ''}
+        ${(p.altas || []).length ? ` · <span style="color:var(--yellow,#e8ff4c)">${(p.altas || []).length} alta(s)</span>` : ''}
+        ${conResultado && r && (r.errores || []).length ? ` · <span style="color:var(--red)">${(r.errores || []).length} error(es)</span>` : ''}
+      </span></div>`;
+  }).join('') + `</div>`;
+}
+
+function _excelTodoPreviaHtml(acc) {
+  const s = _excelTodoSumar(acc.eventos);
+  return `<div class="card" style="padding:14px;border:1px solid var(--orange)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--orange)">
+      esto es lo que va a pasar en los ${acc.total} eventos — todavía NO se ha escrito nada
+    </div>
+    <div style="font-size:13px;margin:8px 0">
+      <b style="color:var(--green)">${s.abonos}</b> abono(s) por <b>${_evtMxn(s.monto)}</b> ·
+      <b style="color:var(--blue,#0000cd)">${s.totales}</b> total(es) ·
+      <b style="color:var(--yellow,#e8ff4c)">${s.altas}</b> alta(s)
+      ${s.errores ? ` · <b style="color:var(--red)">${s.errores}</b> evento(s) que no se pudieron leer` : ''}
+    </div>
+    <div style="font-size:11px;color:var(--ts)">
+      No se aplican: <b>${s.negativas}</b> diferencia(s) negativa(s) (el sistema va adelante del Excel) y
+      <b>${s.saltados}</b> renglón(es) saltado(s) —los «$0» tecleados y los totales EXACTOS de la libreta,
+      que van uno por uno desde el careo de su evento.
+      <b style="color:var(--tp)">Las bajas y los ambiguos no se aplican nunca.</b>
+    </div>
+    ${_excelTodoTabla(acc.eventos, false)}
+    <button class="btn btn-primary" id="excel-todo-ok" style="margin-top:10px" onclick="excelActualizarTodoConfirmar()">
+      Sí, aplicar en los ${acc.total} eventos
+    </button>
+  </div>`;
+}
+
+function _excelTodoHechoHtml(acc) {
+  const s = _excelTodoSumar(acc.eventos);
+  return `<div class="card" style="padding:14px;border:1px solid var(--green)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--green)">hecho · ${acc.total} eventos</div>
+    <div style="font-size:13px;margin:8px 0">
+      <b>${s.esc_abonos}</b> abono(s) por <b>${_evtMxn(s.monto)}</b> ·
+      <b>${s.esc_totales}</b> total(es) corregido(s) · <b>${s.esc_altas}</b> alta(s).
+      ${s.esc_errores ? `<span style="color:var(--red)"> · ${s.esc_errores} error(es) al escribir</span>` : ''}
+      ${s.errores ? `<span style="color:var(--red)"> · ${s.errores} evento(s) no se pudieron leer</span>` : ''}
+    </div>
+    ${_excelTodoTabla(acc.eventos, true)}
+  </div>`;
+}
+
 function _excelAplicarHechoHtml(d) {
   const r = d.resultado || {}, s = d.resumen || {};
   const li = (x) => `<div style="font-size:13px;padding:2px 0">· ${_evtEsc(x.nombre)}</div>`;

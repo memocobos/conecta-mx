@@ -207,5 +207,120 @@ function planear(careo, opciones) {
   return { abonos, totales, altas, negativas, saltados };
 }
 
-module.exports = { planear, hoyReynosa, porQueVaAdelante,
+
+// ── LA EJECUCIÓN DEL PLAN ───────────────────────────────────────────────────
+// [CUADRE-3] Sacada del handler de 1b para que el botón de UN evento y el de
+// TODOS escriban por la MISMA puerta. Dos rutinas de escritura no serían «dos
+// iguales», serían «dos que todavía no divergen» — y la que divergiera
+// escribiría dinero con otro criterio. Es la misma razón por la que la tubería
+// del careo vive en `_lib/excel-careo-correr`.
+//
+// ⚠️ NO decide NADA: todo lo que se escribe ya lo decidió `planear`. Aquí solo
+// se obra el plan, y por eso las tres reglas de Memo no se repiten aquí — no
+// tendrían dónde aplicarse.
+// Cuántos PATCH en paralelo.
+//
+// ⏱ SUBIDO DE 8 A 24 POR UNA MEDICIÓN DE CUADRE-3, no por gusto. El recorrido
+// completo destapó que `dalemix` trae 224 totales por corregir: a 8 por tanda
+// son 28 rondas secuenciales × ~175 ms = ~4.9 s SOLO de escritura, encima de
+// los ~5 s que cuesta su careo — arriba del corte de 10 s de Netlify. A 24 son
+// ~10 rondas, ~1.7 s, y cabe con holgura.
+//
+// Son PATCH de UNA fila por `id`, contra PostgREST con service key: 24 a la vez
+// no es carga, y el `Promise.all` sigue esperando a cada tanda antes de la
+// siguiente — no se sueltan 224 de golpe.
+const TANDA = 24;
+
+async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, authHeader, SB_URL }) {
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  const sb = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+  const hoy = hoyReynosa();
+  // ⚠️ `quien` llega POR PARÁMETRO y sale del TOKEN en el handler — nunca del
+  // cliente. El anti-spoofing no se relajó al mudarse: se movió el sitio donde
+  // se lee, no de dónde.
+  const resultado = { abonos: [], totales: [], altas: [], errores: [] };
+
+  // ── 1. LOS ABONOS, EN UN SOLO INSERT ──────────────────────────────────────
+  // Un arreglo en un POST: una sola ida y vuelta para todos. Sin `on_conflict`
+  // (regla de la casa) — la idempotencia la da el re-careo, no la base.
+  if (plan.abonos.length) {
+    const filas = plan.abonos.map((x) => ({
+      viajero_id: x.viajero_id, monto: x.monto, fecha: hoy, capturado_por: quien,
+      nota: `Careo Excel ${(x.pestanas && x.pestanas[0]) || pestanaNombre} ${hoy}`,
+    }));
+    const r = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
+      method: 'POST', headers: { ...sb, Prefer: 'return=representation' }, body: JSON.stringify(filas),
+    });
+    if (!r.ok) resultado.errores.push({ paso: 'abonos', detalle: (await r.text()).slice(0, 300) });
+    else {
+      const puestas = await r.json().catch(() => []);
+      resultado.abonos = plan.abonos.map((x, i) => ({ nombre: x.nombre, viajero_id: x.viajero_id,
+        monto: x.monto, abono_id: (puestas[i] || {}).id || null }));
+    }
+  }
+
+  // ── 2. LOS TOTALES, UN PATCH POR FILA ─────────────────────────────────────
+  // No hay bulk update con valores distintos que no sea un upsert, y el upsert
+  // está prohibido en esta casa. Se paralelizan por tandas para caber en el
+  // reloj de Netlify.
+  //
+  // 🔒 LA NOTA SE ANEXA, NO PISA. La nota vieja dice de dónde salió el total
+  // derivado; borrarla dejaría la fila sin su historia justo cuando cambia.
+  for (let i = 0; i < plan.totales.length; i += TANDA) {
+    const tanda = plan.totales.slice(i, i + TANDA);
+    await Promise.all(tanda.map(async (x) => {
+      const notas = `${x.notas_previas || ''} · Total de pestaña (careo ${hoy})`.replace(/^ · /, '').slice(0, 1000);
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+        // ⚠️ SOLO estas dos columnas. `abonado_previo` está CONGELADO (VJ-3) y
+        // no se menciona siquiera: lo que no se nombra no se puede pisar.
+        body: JSON.stringify({ total_contrato: x.excel_total, notas }),
+      });
+      if (!r.ok) { resultado.errores.push({ paso: 'total', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
+      const filas = await r.json().catch(() => []);
+      resultado.totales.push({ nombre: x.nombre, viajero_id: x.viajero_id,
+        de: x.sistema_total, a: x.excel_total, tocadas: filas.length });
+    }));
+  }
+
+  // ── 3. LAS ALTAS, POR LA PUERTA DE SIEMPRE ────────────────────────────────
+  // 🔒 NO HAY INSERT NUEVO AQUÍ. Se invoca el handler REAL de
+  // `admin-coordi-asignaciones` con la acción `viajero_migrar` —la misma que
+  // usa el alta a mano del panel—, con el token del admin que apretó el botón.
+  // Así el alta hereda TODO: su lista de roles, sus validaciones campo por
+  // campo, el candado de que el evento exista, el sello `tipo_viajero:'cliente'`
+  // del que depende `consumeBoleto`, y el aviso del doble descuento de MIG-1b.
+  // Copiar el INSERT habría sido una segunda puerta que envejece sola.
+  if (plan.altas.length) {
+    const asign = require('../admin-coordi-asignaciones');   // vive un nivel arriba: este lib está en _lib/
+    for (const x of plan.altas) {
+      const ev2 = {
+        httpMethod: 'POST',
+        headers: { origin, authorization: authHeader || '' },
+        body: JSON.stringify({
+          accion: 'viajero_migrar', evento_id: eventoId, nombre: x.nombre,
+          tipo_paquete: x.tipo_paquete, zona_boleto: x.zona_boleto,
+          total_contrato: x.total_contrato, abonado_previo: x.abonado_previo,
+          talla_playera: x.talla_playera || '',
+          notas: `Alta por careo Excel ${(x.pestanas && x.pestanas[0]) || pestanaNombre} ${hoy}`
+               + (x.origen === 'apartado' ? ' · apartado sin abonar (si está en el Excel, va)' : '')
+               // La marca que hace que el careo de mañana la vuelva a levantar:
+               // nació con el $0 de la pestaña, que no es un contrato de cero.
+               + (x.total_pendiente ? ' · ⚠ total pendiente (la pestaña decía $0)' : ''),
+        }),
+      };
+      const r2 = await asign.handler(ev2);
+      let c2 = {}; try { c2 = JSON.parse(r2.body); } catch (_) {}
+      if (r2.statusCode !== 200 || !c2.viajero) {
+        resultado.errores.push({ paso: 'alta', nombre: x.nombre, status: r2.statusCode, detalle: String(c2.error || '').slice(0, 200) });
+        continue;
+      }
+      resultado.altas.push({ nombre: x.nombre, viajero_id: c2.viajero.id, origen: x.origen,
+        via: 'viajero_migrar', aviso_doble_descuento: c2.aviso_doble_descuento || null });
+    }
+  }
+  return resultado;
+}
+
+module.exports = { planear, hoyReynosa, porQueVaAdelante, ejecutarPlan,
                    MONTONES_APLICABLES, PAQUETES_MIGRAR };

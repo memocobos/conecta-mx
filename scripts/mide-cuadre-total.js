@@ -356,7 +356,7 @@ const CASO = () => ({
     throw new Error('llaves desbalanceadas en ' + nombre);
   };
   const pintar = new Function(
-    recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n' + recortar('_excelCareoHtml')
+    recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n' + recortar('_excelFuenteNumerologia') + '\n' + recortar('_excelChipFuentes') + '\n' + recortar('_excelCareoHtml')
     + '\nreturn _excelCareoHtml;')();
   const html = pintar(d);
   // ASERCIONES SOBRE EL HTML IMPRESO, no sobre el fuente.

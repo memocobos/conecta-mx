@@ -27,12 +27,45 @@ const CELDA_ENCABEZADO = 'Nombre';
 // error inútil («no lo encontré en 5000 filas» no ayuda a nadie).
 const MAX_FILAS_ENCABEZADO = 30;
 
-function leerEnv() {
-  const url = process.env.EXCEL_SCRIPT_URL;
-  const token = process.env.EXCEL_SCRIPT_TOKEN;
+// ── LAS DOS PUERTAS ─────────────────────────────────────────────────────────
+// [CUADRE-2] Hay DOS exceles y por lo tanto DOS puertas:
+//   · las PESTAÑAS de las chicas (una por evento) — la de siempre;
+//   · el libro corrido de NUMEROLOGÍA, pestaña «Boletos», donde Memo anota los
+//     CHEAP que cobra directo.
+//
+// 🔒 SON DOS DESPLIEGUES DEL MISMO `.gs`, NO UN `.gs` QUE RECIBE LA HOJA. El
+// `excel-cosechador.gs` está atado a SU hoja A PROPÓSITO: el SID no viaja de
+// fuera, y así una URL filtrada no puede pedirle que lea CUALQUIER hoja de
+// Drive. Abrir esa puerta para ahorrarse un despliegue cambiaría un candado
+// real por comodidad. Cada despliegue trae su par de env vars.
+const FUENTES = {
+  pestanas: {
+    url: 'EXCEL_SCRIPT_URL', token: 'EXCEL_SCRIPT_TOKEN',
+    // El último candado de forma: si no está la celda «Nombre», no es la hoja.
+    exigeEncabezado: true,
+    comoSePone: 'Se ponen al desplegar el Apps Script desde el Excel de las chicas (ver apps-script/excel-cosechador.gs).',
+  },
+  numerologia: {
+    url: 'NUMEROLOGIA_SCRIPT_URL', token: 'NUMEROLOGIA_SCRIPT_TOKEN',
+    // 🔒 EL LIBRO NO TIENE UN ENCABEZADO: TIENE 55. Es una pila de bloques, uno
+    // por evento, cada uno con el suyo — y OCHO de ellos ni siquiera rotulan
+    // «Nombre». Exigir aquí una celda única sería rechazar la hoja BUENA:
+    // medido, `cosechar` contestaba SIN_ENCABEZADO sobre la pestaña real. La
+    // guarda de forma de esta fuente vive en su parser, que exige «Costo al
+    // Publico» + «Separo» para reconocer un bloque.
+    exigeEncabezado: false,
+    comoSePone: 'Se ponen al desplegar el MISMO apps-script/excel-cosechador.gs una SEGUNDA vez, ahora desde el Excel «Numerología» de Memo, y guardar su /exec y su token con estos nombres.',
+  },
+};
+
+function leerEnv(fuente) {
+  const f = FUENTES[fuente || 'pestanas'];
+  if (!f) return { error: { codigo: 'FUENTE_DESCONOCIDA', mensaje: `No existe la fuente «${fuente}».` } };
+  const url = process.env[f.url];
+  const token = process.env[f.token];
   if (!url || !token) {
     return { error: { codigo: 'SIN_CONFIG',
-      mensaje: 'Faltan EXCEL_SCRIPT_URL / EXCEL_SCRIPT_TOKEN en Netlify. Se ponen al desplegar el Apps Script (ver apps-script/excel-cosechador.gs).' } };
+      mensaje: `Faltan ${f.url} / ${f.token} en Netlify. ${f.comoSePone}` } };
   }
   return { url, token };
 }
@@ -66,10 +99,12 @@ function buscarEncabezado(filas) {
 //   { ok:false, codigo, mensaje, pestanas? }
 // `pestana` vacío = solo el catálogo de pestañas (ahí no hay encabezado que
 // buscar, y pedirlo sería inventar un fallo).
-async function cosechar({ pestana } = {}, fetchImpl) {
-  const env = leerEnv();
-  if (env.error) return { ok: false, ...env.error };
+async function cosechar({ pestana, fuente } = {}, fetchImpl) {
+  const env = leerEnv(fuente);
+  if (env.error) return { ok: false, fuente: fuente || 'pestanas', ...env.error };
   const _fetch = fetchImpl || fetch;
+
+  const nombreVar = (FUENTES[fuente || 'pestanas'] || {}).url;
 
   let r, texto;
   try {
@@ -82,7 +117,10 @@ async function cosechar({ pestana } = {}, fetchImpl) {
     texto = await r.text();
   } catch (e) {
     return { ok: false, codigo: 'SIN_RESPUESTA',
-      mensaje: 'No se pudo hablar con el Apps Script (' + (e && e.message) + '). Revisa que EXCEL_SCRIPT_URL siga viva.' };
+      // El mensaje nombra LA VAR DE ESTA FUENTE. Decir «revisa EXCEL_SCRIPT_URL»
+      // cuando la que falló es la de Numerología manda a arreglar lo que no
+      // está roto — el mismo pecado que esta lib lleva evitando desde 1a.
+      mensaje: 'No se pudo hablar con el Apps Script (' + (e && e.message) + '). Revisa que ' + nombreVar + ' siga viva.' };
   }
 
   if (pareceHtml(texto)) {
@@ -115,6 +153,12 @@ async function cosechar({ pestana } = {}, fetchImpl) {
     return { ok: false, codigo: 'SIN_FILAS', mensaje: 'El Apps Script no devolvió filas para "' + pestana + '".' };
   }
 
+  if (FUENTES[fuente || 'pestanas'].exigeEncabezado === false) {
+    return { ok: true, pestana, filas, n_filas: filas.length, encabezado: null,
+             fuente: fuente || 'pestanas',
+             pestanas: Array.isArray(json.pestanas) ? json.pestanas : [], leido_en: json.leido_en };
+  }
+
   const encabezado = buscarEncabezado(filas);
   if (!encabezado) {
     return { ok: false, codigo: 'SIN_ENCABEZADO',
@@ -127,4 +171,5 @@ async function cosechar({ pestana } = {}, fetchImpl) {
            pestanas: Array.isArray(json.pestanas) ? json.pestanas : [], leido_en: json.leido_en };
 }
 
-module.exports = { cosechar, buscarEncabezado, pareceHtml, CELDA_ENCABEZADO, MAX_FILAS_ENCABEZADO };
+module.exports = { cosechar, buscarEncabezado, pareceHtml, leerEnv, FUENTES,
+                   CELDA_ENCABEZADO, MAX_FILAS_ENCABEZADO };

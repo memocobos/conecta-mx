@@ -547,6 +547,49 @@ function _evtEsc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+// [CUADRE-2a] EL ESTADO DE LA TERCERA FUENTE, SIEMPRE DICHO.
+// Que no esté configurada NO es un error del careo — pero callarlo sí sería un
+// hueco: el careo se vería igual de verde con el libro de Memo dentro que
+// fuera, y ésa es exactamente la ceguera que costó $1,081,021 invisibles
+// durante siete días. Un careo verde no ve lo que ninguno de sus dos lados
+// tiene, así que la pantalla dice CUÁNTOS lados está mirando.
+function _excelFuenteNumerologia(n) {
+  if (!n) return '';
+  const caja = (color, txt) => `<div style="font-size:11px;color:var(--ts);padding:4px 0;border-left:2px solid ${color};padding-left:8px;margin:6px 0">${txt}</div>`;
+  if (n.configurada === false) {
+    return caja('var(--ts)', `<b style="color:var(--tp)">Numerología (los CHEAP que cobra Memo) todavía NO entra a este careo.</b>
+      Este careo mira DOS lados: la pestaña de las chicas y el sistema.
+      <span style="opacity:.8">${_evtEsc(n.motivo || '')}</span>`);
+  }
+  if (n.error) {
+    return caja('var(--red)', `<b style="color:var(--red)">La hoja de Numerología no contestó bien</b>
+      [${_evtEsc(n.error.codigo || '')}] ${_evtEsc(n.error.mensaje || '')}`);
+  }
+  if (n.sin_siembra) {
+    return caja('var(--ts)', `<b style="color:var(--tp)">Numerología no se leyó para este evento</b> —
+      ${_evtEsc(n.motivo || '')} <span style="opacity:.8">Se siembra en <code>numerologia_eventos</code>.</span>`);
+  }
+  if (n.parser_pendiente) {
+    return caja('var(--orange)', `<b style="color:var(--orange)">La hoja de Numerología ya responde</b>
+      (${n.filas_libro} fila(s) en el libro, ${n.mapeos} mapeo(s) sembrado(s)) —
+      falta el lector del libro corrido. <span style="opacity:.8">${_evtEsc(n.motivo || '')}</span>`);
+  }
+  const sm = n.sin_mapeo || [];
+  return caja('var(--green)', `<b style="color:var(--green)">Numerología DENTRO del careo</b> —
+    ${(n.personas || []).length} persona(s) de este evento salen del libro de Memo.
+    ${sm.length ? `<br><b style="color:var(--orange)">${sm.length}</b> grupo(s) del libro sin mapear a ningún evento
+      (${sm.map(x => _evtEsc(x.evento_libro + (x.fecha_libro ? ' / ' + x.fecha_libro : '')) + ' ×' + x.filas).join(' · ')})
+      — no se carean ni se inventan: se siembran en <code>numerologia_eventos</code>.` : ''}`);
+}
+
+// El chip de procedencia. Solo se pinta cuando la fila trae LAS DOS fuentes:
+// ahí es donde el número de la pantalla no cuadra con ninguna de las dos hojas
+// por separado, y no decirlo mandaría a Bulma a buscar el error en la pestaña.
+function _excelChipFuentes(fuentes) {
+  if (!Array.isArray(fuentes) || fuentes.length < 2) return '';
+  return ` <span data-chip="fuentes" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-left:4px">pestaña + numerología</span>`;
+}
+
 function _evtMxn(n) {
   return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
@@ -586,10 +629,11 @@ function _excelCareoHtml(d) {
     </div>
     <div id="excel-aplicar-panel"></div>
     ${pest}
+    ${_excelFuenteNumerologia(d.numerologia)}
     ${cab('nuevos — en el Excel, no en el sistema', t.nuevos, 'var(--green)')}
     ${lista(d.nuevos, n => fila(`${_evtEsc(n.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(n.zona || '')} ${_evtEsc(n.paquete || '')}</span>`, _evtMxn(n.abonado)))}
     ${cab('pagos — montos distintos', t.pagos, 'var(--orange)')}
-    ${lista(d.pagos, p => fila(_evtEsc(p.nombre), `${_evtMxn(p.base)} → ${_evtMxn(p.excel)} <b style="color:${p.diferencia > 0 ? 'var(--green)' : 'var(--red)'}">${p.diferencia > 0 ? '+' : ''}${_evtMxn(p.diferencia)}</b>`))}
+    ${lista(d.pagos, p => fila(_evtEsc(p.nombre) + _excelChipFuentes(p.fuentes), `${_evtMxn(p.base)} → ${_evtMxn(p.excel)} <b style="color:${p.diferencia > 0 ? 'var(--green)' : 'var(--red)'}">${p.diferencia > 0 ? '+' : ''}${_evtMxn(p.diferencia)}</b>`))}
     ${cab('bajas — en el sistema, ya no en el Excel', t.bajas, 'var(--red)')}
     ${lista(d.bajas, b => fila(_evtEsc(b.nombre), _evtMxn(b.abonado)))}
     <div style="font-size:11px;color:var(--ts);margin-top:4px">Una baja NO se borra ni se marca desde aquí: se nombra y espera firma.</div>
@@ -745,7 +789,7 @@ function _excelAplicarPreviaHtml(d, alcance) {
     ${grupo('totales a corregir', p.totales || [], (x) => fila(_evtEsc(x.nombre) + ' <span style="font-size:10px;color:var(--ts)">derivado</span>', `${x.sistema_total == null ? 'sin total' : _evtMxn(x.sistema_total)} → ${_evtMxn(x.excel_total)}`), 'var(--blue,#0000cd)')}
     ${grupo('altas', p.altas || [], (x) => fila(`${_evtEsc(x.nombre)} <span style="font-size:11px;color:var(--ts)">${_evtEsc(x.zona_boleto)} ${_evtEsc(x.tipo_paquete)}${x.origen === 'apartado' ? ' · apartado' : ''}</span>`, `total ${_evtMxn(x.total_contrato)} · abonado ${_evtMxn(x.abonado_previo)}`), 'var(--yellow,#e8ff4c)')}
     ${grupo('NO se van a aplicar (el sistema va adelante del Excel)', p.negativas || [], (x) => fila(
-        `${_evtEsc(x.nombre)}${x.numerologia ? ' <span style="font-size:10px;color:var(--tp);border:1px solid currentColor;border-radius:3px;padding:0 4px">Numerología</span>' : ''}`,
+        `${_evtEsc(x.nombre)}${x.numerologia ? ` <span data-chip="numerologia" style="font-size:10px;color:var(--tp);border:1px solid currentColor;border-radius:3px;padding:0 4px">Numerología${x.numerologia_por === 'nota' ? ' (por la nota del 19-sep)' : ''}</span>` : ''}`,
         `${_evtMxn(x.sistema)} vs Excel ${_evtMxn(x.excel)} <b style="color:var(--red)">${_evtMxn(x.diferencia)}</b>`), 'var(--red)')}
     ${grupo('se saltan, con su motivo', p.saltados || [], (x) => fila(_evtEsc(x.nombre), `<span style="font-size:11px;color:var(--ts)">${_evtEsc(x.motivo)}</span>`), 'var(--ts)')}
     <div style="font-size:11px;color:var(--ts);margin:10px 0">

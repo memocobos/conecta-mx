@@ -17,6 +17,7 @@
 
 const { cosechar } = require('./cosecha-excel');
 const { parsearPestana, carear } = require('./excel-careo');
+const { mapearLibro, fundirNumerologia, PESTANA_LIBRO } = require('./numerologia');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -135,14 +136,71 @@ async function correrCareo(eventoId) {
     }
   }
 
+  // ── 2.5 [CUADRE-2a] LA TERCERA FUENTE ────────────────────────────────────
+  // El lado-Excel deja de ser «la pestaña» y pasa a ser «la pestaña + el libro
+  // de Memo». Mientras no exista, el careo sigue exactamente como estaba: la
+  // ausencia de una fuente NO es un error del careo, y decir cuál falta es más
+  // útil que tronar.
+  const numerologia = await traerNumerologia(eventoId, sb);
+  let personasLado = [...personas.values()];
+  if (numerologia.personas && numerologia.personas.length) {
+    personasLado = fundirNumerologia(personasLado, numerologia.personas);
+  } else {
+    // Sin tercera fuente, todos vienen de la pestaña — y se dice, para que la
+    // pantalla no tenga que adivinar la procedencia por ausencia.
+    personasLado = personasLado.map((p) => ({ ...p, fuentes: ['pestana'] }));
+  }
+
   // 3. El lado del sistema.
   const base = await leerBase(eventoId, sb);
   if (base.error) return { error: { status: 502, mensaje: base.error } };
 
   // 4. Los montones.
-  const montones = carear([...personas.values()], base.viajeros);
-  return { ok: true, pestanas: detallePestanas, personas: [...personas.values()],
-           viajeros: base.viajeros, montones };
+  const montones = carear(personasLado, base.viajeros);
+  return { ok: true, pestanas: detallePestanas, personas: personasLado,
+           viajeros: base.viajeros, montones, numerologia };
+}
+
+// ── traerNumerologia ────────────────────────────────────────────────────────
+// Devuelve SIEMPRE un objeto que se puede pintar, nunca una excepción:
+//   { configurada:false, motivo }                    — no hay despliegue todavía
+//   { configurada:true, parser_pendiente:true, … }   — hay hoja, falta CUADRE-2b
+//   { configurada:true, personas, sin_mapeo, … }     — cuando 2b exista
+//   { configurada:true, error }                      — la hoja contestó mal
+//
+// 🔒 NINGUNO DE ESOS ESTADOS TUMBA EL CAREO. Un careo que se cae por una fuente
+// que falta deja a Bulma sin la herramienta entera por algo que ni siquiera es
+// suyo; y un careo que se cae en silencio sería peor. Se dice el estado y se
+// sigue con lo que hay.
+async function traerNumerologia(eventoId, sb) {
+  const c = await cosechar({ pestana: PESTANA_LIBRO, fuente: 'numerologia' });
+  if (!c.ok && c.codigo === 'SIN_CONFIG') {
+    return { configurada: false, motivo: c.mensaje, personas: [], sin_mapeo: [] };
+  }
+  if (!c.ok) {
+    return { configurada: true, personas: [], sin_mapeo: [],
+      error: { codigo: c.codigo, mensaje: c.mensaje, pista: c.pista } };
+  }
+
+  // El mapeo libro→slug, de la TABLA. Se lee aquí y no antes para no gastar una
+  // ida y vuelta cuando la fuente ni siquiera está desplegada.
+  const mr = await fetch(`${SB_URL}/rest/v1/numerologia_eventos?activa=is.true&select=nombre_libro,fecha_libro,evento_id,activa&limit=5000`, { headers: sb });
+  const mapeos = mr.ok ? (await mr.json().catch(() => [])) : [];
+
+  // ⚠️ AQUÍ VA EL PARSER DE CUADRE-2b, y hoy NO EXISTE a propósito: escribirlo
+  // pide los encabezados REALES de «Boletos», que no se pueden medir hasta que
+  // Memo despliegue el segundo Apps Script. Inventarlos —y el fixture que los
+  // probara— daría un verde que solo demuestra que soy consistente conmigo
+  // mismo. Así que este estado se DICE, con la hoja ya en la mano:
+  return { configurada: true, parser_pendiente: true,
+    // La forma queda ESTABLE desde ya —vacía, pero presente— para que 2b solo
+    // tenga que llenarla y la pantalla no cambie de contrato con el parser.
+    personas: [], sin_mapeo: [],
+    filas_libro: Array.isArray(c.filas) ? c.filas.length : 0,
+    mapeos: Array.isArray(mapeos) ? mapeos.length : 0,
+    motivo: 'La hoja de Numerología ya responde, pero el lector del libro corrido es CUADRE-2b: '
+          + 'se escribe midiendo los encabezados reales de la pestaña «' + PESTANA_LIBRO + '», no suponiéndolos.',
+    primeras_filas: Array.isArray(c.filas) ? c.filas.slice(0, 3) : [] };
 }
 
 module.exports = { correrCareo, leerBase, SB_URL };

@@ -66,6 +66,9 @@ exports.handler = async (event) => {
     ok: true, evento_id: eventoId,
     pestanas: detallePestanas,
     excel: { personas: personas.length },
+    // [CUADRE-2a] El estado de la TERCERA fuente, siempre dicho: no estar
+    // configurada no es un error del careo, pero callarlo sí sería un hueco.
+    numerologia: careo.numerologia,
     base: { viajeros: base.viajeros.length },
     ...r,
     totales: { nuevos: r.nuevos.length, pagos: r.pagos.length, bajas: r.bajas.length,

@@ -273,7 +273,12 @@ function carear(personasExcel, viajerosBase) {
     if (!v) { nuevos.push({ nombre: p.nombre, abonado: p.abonado, zona: p.zona, paquete: p.paquete, filas: p.filas }); continue; }
     const dif = Math.round((p.abonado - Number(v.abonado || 0)) * 100) / 100;
     if (Math.abs(dif) > TOLERANCIA_MXN) {
-      pagos.push({ nombre: p.nombre, viajero_id: v.id, excel: p.abonado, base: Number(v.abonado || 0), diferencia: dif });
+      // [CUADRE-2a] `fuentes` se AÑADE, no sustituye nada: las llaves que los
+      // consumidores ya leen (`excel`, `base`, `diferencia`) siguen tal cual.
+      // Sin ella, una suma pestaña+libro no cuadra con NINGUNA de las dos hojas
+      // por separado y manda a buscar el error donde no está.
+      pagos.push({ nombre: p.nombre, viajero_id: v.id, excel: p.abonado,
+        base: Number(v.abonado || 0), diferencia: dif, fuentes: p.fuentes || ['pestana'] });
     } else {
       iguales.push({ nombre: p.nombre, viajero_id: v.id, abonado: p.abonado });
     }

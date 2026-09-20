@@ -71,11 +71,24 @@ function hoyReynosa() {
   }).format(new Date());
 }
 
-// ¿La fila del sistema trae los pagos de Numerología? No decide nada —la
-// negativa no se aplica venga de donde venga— pero deja que la pantalla diga
-// POR QUÉ el sistema va adelante, en vez de enseñar un descuadre mudo.
-function traeNumerologia(notas) {
-  return /numerolog/i.test(String(notas || ''));
+// ¿Por qué el sistema va ADELANTE del Excel en esta fila? No decide nada —la
+// negativa no se aplica venga de donde venga— pero deja que la pantalla lo diga
+// en vez de enseñar un descuadre mudo.
+//
+// [CUADRE-2a] MANDA LA FUENTE VIVA, y la marca vieja de `notas` queda de
+// RESPALDO. El orden importa y por eso no se hizo el cambio a secas: la fuente
+// viva todavía no existe —el parser del libro es 2b—, así que cambiar hoy a
+// «solo fuente viva» BORRARÍA el rótulo que hoy funciona y dejaría a Bulma con
+// el descuadre mudo durante toda la ventana entre las dos tuercas. Cuando 2b
+// entre, `fuentes` traerá 'numerologia' y el respaldo dejará de alcanzarse solo.
+//
+// ⏳ La marca de `notas` se retira cuando la fuente viva cubra esas ~159 filas
+// —no antes—, y se retira MIDIENDO que ya no queda ninguna que solo ella vea.
+function porQueVaAdelante(persona, notas) {
+  const viva = !!(persona && Array.isArray(persona.fuentes) && persona.fuentes.includes('numerologia'));
+  if (viva) return { numerologia: true, por: 'fuente' };
+  if (/numerolog/i.test(String(notas || ''))) return { numerologia: true, por: 'nota' };
+  return { numerologia: false, por: null };
 }
 
 // planear(careo, opciones) → { abonos, totales, altas, negativas, saltados }
@@ -102,8 +115,10 @@ function planear(careo, opciones) {
     const v = vPorId.get(g.viajero_id);
     if (g.diferencia <= TOLERANCIA_MXN) {
       // 🔒 NEGATIVA: nunca se aplica. Se NOMBRA, que es distinto de callarla.
+      const pq = porQueVaAdelante(porClave.get(clave), v && v.notas);
       negativas.push({ nombre: g.nombre, viajero_id: g.viajero_id, excel: g.excel,
-        sistema: g.base, diferencia: g.diferencia, numerologia: traeNumerologia(v && v.notas) });
+        sistema: g.base, diferencia: g.diferencia,
+        numerologia: pq.numerologia, numerologia_por: pq.por });
       continue;
     }
     if (!quiere('abonos') || !elegida(clave)) continue;
@@ -192,5 +207,5 @@ function planear(careo, opciones) {
   return { abonos, totales, altas, negativas, saltados };
 }
 
-module.exports = { planear, hoyReynosa, traeNumerologia,
+module.exports = { planear, hoyReynosa, porQueVaAdelante,
                    MONTONES_APLICABLES, PAQUETES_MIGRAR };

@@ -629,7 +629,7 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
   // exacto de la libreta— y NO donde sí llega: un botón de más ahí invita a
   // aplicar a mano lo que ya se aplicó en bola.
   const pintarCareo = new Function(recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n'
-    + recortar('_excelCareoHtml') + '\nreturn _excelCareoHtml;')();
+    + recortar('_excelFuenteNumerologia') + '\n' + recortar('_excelChipFuentes') + '\n' + recortar('_excelCareoHtml') + '\nreturn _excelCareoHtml;')();
   const redC = redFalsa(SEMILLA(), null);
   global.fetch = redC.fetchFalso;
   for (const f of ['admin-excel-careo.js', '_lib/excel-careo-correr.js', '_lib/excel-careo.js', '_lib/cosecha-excel.js']) {

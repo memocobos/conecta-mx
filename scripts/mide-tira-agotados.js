@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
 
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
-const BASE = sh(`git rev-parse ${process.env.BASE || '66527e9'}`);   // el merge de #737
+const BASE = sh(`git rev-parse ${process.env.BASE || '5215107'}`);   // el merge de #738
 const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
 
 let ok = 0, mal = 0; const fallos = [];
@@ -229,14 +229,26 @@ async function mirar(dirBase, mutaciones, top) {
 
     // ── Los dobles del BORDE. Nada más se simula: el manejador que corre es el real.
     let aterrizo = null;
-    const showReal = window.showDetail, openReal = window.open;
+    const showReal = window.showDetail, openReal = window.open, wlReal = window.abrirWaitlistModal;
     window.showDetail = (id) => { aterrizo = { ruta: 'ficha', id }; };
     window.open = (url) => { aterrizo = { ruta: 'wa', url }; return null; };
+    // [LAND-2c] La puerta del «próximamente» en el catálogo, medida en la
+    // tarjeta real: `abrirWaitlistModal(ev)` — recibe el EVENTO, no el id.
+    window.abrirWaitlistModal = (ev) => { aterrizo = { ruta: 'waitlist', id: ev && ev.id }; };
     const clicar = (el) => { aterrizo = null; el.click(); return aterrizo || { ruta: 'nada' }; };
 
     const caja = (el) => { if (!el) return null; const r = el.getBoundingClientRect();
       return { x: r.left, y: r.top, w: r.width, h: r.height }; };
     const encima = (a, b) => !!(a && b) && !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+    // ¿el sello cubre el CENTRO del cartel? Vale para los dos sellos: el de
+    // PRÓXIMAMENTE es tres veces más largo que el de AGOTADO y es el que más
+    // riesgo tiene de comerse la foto en 50px de alto.
+    const tapaCartel = (it, sello) => {
+      const cs = caja(sello), cm = caja(it.querySelector('.hs-media'));
+      if (!cs || !cm) return false;
+      const cx = cm.x + cm.w / 2, cy = cm.y + cm.h / 2;
+      return cx >= cs.x && cx <= cs.x + cs.w && cy >= cs.y && cy <= cs.y + cs.h;
+    };
 
     const strip = document.getElementById('hh-strip');
     const volcado = strip ? strip.innerHTML.slice(0, 1200) : '(sin tira)';
@@ -250,6 +262,14 @@ async function mirar(dirBase, mutaciones, top) {
         sello: visible,
         selloTxt: sello ? sello.textContent.trim() : '',
         selloFondo: sello ? getComputedStyle(sello).backgroundColor : '',
+        // [LAND-2c] Lo que el cliente LEE de fecha, y el sello de próximamente.
+        fecha: (it.querySelector('.hs-fecha') || {}).textContent || '',
+        prox: (() => { const q = it.querySelector('.hs-prox');
+          return !!q && q.offsetHeight > 0 && q.offsetWidth > 0; })(),
+        proxTxt: (it.querySelector('.hs-prox') || {}).textContent || '',
+        proxFondo: it.querySelector('.hs-prox') ? getComputedStyle(it.querySelector('.hs-prox')).backgroundColor : '',
+        proxTapaCartel: tapaCartel(it, it.querySelector('.hs-prox')),
+        proxTapaNombre: encima(caja(it.querySelector('.hs-prox')), caja(nom)),
         selloTapaNombre: encima(caja(sello), caja(nom)),
         // 🔒 «Sin tapar el nombre» NO se puede falsear: `.hs-media` recorta con
         // overflow:hidden y el nombre vive FUERA, en `.hs-media`+`.hs-body`
@@ -259,12 +279,7 @@ async function mirar(dirBase, mutaciones, top) {
         // el `::after` de `.ev-card` (inset:0, 26px) borraría el cartel entero
         // en 50px de alto. Eso se mide por el CENTRO del cartel, sin inventar
         // ningún umbral: si el sello lo cubre, la miniatura dejó de ser una foto.
-        selloTapaCartel: (() => {
-          const cs = caja(sello), cm = caja(it.querySelector('.hs-media'));
-          if (!cs || !cm) return false;
-          const cx = cm.x + cm.w / 2, cy = cm.y + cm.h / 2;
-          return cx >= cs.x && cx <= cs.x + cs.w && cy >= cs.y && cy <= cs.y + cs.h;
-        })(),
+        selloTapaCartel: tapaCartel(it, sello),
         dataId: it.getAttribute('data-id') || '',
         destino: clicar(it),
       };
@@ -276,7 +291,7 @@ async function mirar(dirBase, mutaciones, top) {
     const grande = grandeVisible && slot ? clicar(slot) : { ruta: 'nada' };
     const masN = (document.querySelector('.hs-mas-n') || {}).textContent || '';
 
-    window.showDetail = showReal; window.open = openReal;
+    window.showDetail = showReal; window.open = openReal; window.abrirWaitlistModal = wlReal;
 
     // 🔒 EL CANDADO: el veredicto que usa el hero, contra la TARJETA RENDERIZADA.
     const candado = univ.map((e) => {
@@ -287,7 +302,8 @@ async function mirar(dirBase, mutaciones, top) {
     return {
       colisionNombre: colision,
       univ: univ.map((e) => { const v = _evVeredicto(e);
-        return { id: e.id, ds: dsEf(e), ag: v.isAg, proxi: v.isProxi || v.isPronto, nombre: limpio(e.a) }; }),
+        return { id: e.id, ds: dsEf(e), ag: v.isAg, proxi: v.isProxi || v.isPronto,
+                 soloProxi: v.isProxi, nombre: limpio(e.a) }; }),
       aLaVenta: aLaVenta.map((e) => e.id),
       items,
       grande,
@@ -312,6 +328,9 @@ async function mirar(dirBase, mutaciones, top) {
 // a mano que se pudra cuando pase septiembre.
 const esperados = (foto) => foto.univ.filter((e) => e.id !== (foto.grande && foto.grande.id)).slice(0, 3);
 const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] === '255' && m[1] === '40' && m[2] === '59'; };
+// El amarillo con que el CATÁLOGO pinta «Próximamente» (.ev-tag.tpronto y el
+// badge AVÍSAME): #e8ff4c = var(--c-amarillo). No se inventa un color nuevo.
+const amarillo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] === '232' && m[1] === '255' && m[2] === '76'; };
 
 (async () => {
   const dirB = extraer(BASE), dirH = extraer(HEAD);
@@ -461,22 +480,10 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     limpio(G, '-grande');
   }
 
-  // ── AVISO, NO ASERCIÓN: lo que la tuerca no nombró ────────────────────────
-  // El universo nuevo excluye pasados, listOnly y la tarjeta grande — y nada
-  // más. Eso mete en la tira estados que ANTES no podían entrar, porque el
-  // filtro «a la venta» los dejaba fuera: los `proximamente`, que no se pueden
-  // comprar y NO llevan sello (el sello es solo para AGOTADO). En el catálogo
-  // esos van con su etiqueta «Próximamente» y su badge AVÍSAME; en la tira
-  // saldrían pelados. Hoy no alcanzan la tira por fecha, pero el TOP sí puede
-  // subirlos: los más buscados incluyen lo que la gente clickea, y un evento en
-  // lista de espera se clickea.
-  // No se falla por esto —es exactamente el universo que la tuerca pidió— pero
-  // queda contado a la vista para que sea una decisión y no un descubrimiento.
-  const proxis = H.univ.filter((e) => e.proxi);
-  if (proxis.length) {
-    console.log(`   ⚠️  ${proxis.length} «próximamente» en el universo de la tira, sin sello que los distinga: ${proxis.map((e) => e.id + ' ' + e.ds).join(', ')}`);
-    console.log(`       (hoy ninguno llega por fecha; por el top sí podrían)`);
-  }
+  // ⚠️ [LAND-2c] AQUÍ VIVÍA EL AVISO de los «próximamente» que el universo nuevo
+  // admitía sin nada que los distinga. Dejó de ser un aviso: ahora llevan su
+  // propio sello y su propia puerta, y se exige en [12b]. El otro «queda dicho»
+  // —que `fechaCorta` no decía el año— se exige en [12c].
 
   // ══ [8] EL CAMINO REAL DE PRODUCCIÓN ═════════════════════════════════════
   // ⚠️ ESTA ES LA ASERCIÓN QUE FALTÓ EN #737, Y POR ESO LA TUERCA NO SIRVIÓ EN
@@ -602,6 +609,109 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     selloVsCard(X, '-mezcla');
   }
 
+  // ══ [12] LAS TRES DECISIONES DE LAND-2c ══════════════════════════════════
+
+  // [12a] SIN CHIP PARA QUIEN ENTRÓ POR AGOTADO.
+  // Young Miko va #8 en el top real Y gana su lugar por la ventana. El chip le
+  // comía el ancho al nombre («YOUNG …» en vez de «Young Miko»), y el sello ya
+  // cuenta la historia. Los que entran POR el top sí lo conservan — eso lo
+  // exigen [9b] y [10c], que corren en el mismo careo.
+  const enTopYVentana = ventana.filter((e) => TOP_REAL.indexOf(e.id) >= 0);
+  af(enTopYVentana.length > 0,
+     `[12a] ningún agotado de la ventana está en el top: no se puede probar que el chip se retire`);
+  enTopYVentana.forEach((e) => {
+    const it = P.items.find((x) => x.dataId === e.id);
+    af(!!it && !it.rank,
+       `[12a] «${e.id}» entró por la ventana (va #${TOP_REAL.indexOf(e.id) + 1} en el top) y sale con chip «${it ? it.rank : '—'}»`);
+  });
+
+  // 🔒 CONTROL POSITIVO DE [12a], LOS DOS LADOS CON EL MISMO TOP SERVIDO.
+  // Con TOP_REAL, BASE llena los 3 lugares desde el top y el agotado de la
+  // ventana ni aparece: no hay contra qué comparar. Así que se sirve un top
+  // CORTO que incluye al agotado — con dos ids el top no llena los 3 y BASE lo
+  // saca por esa vía, con su chip. HEAD, con EXACTAMENTE el mismo top, lo saca
+  // por la ventana y sin chip. La diferencia es la tuerca, no el montaje.
+  const victima = enTopYVentana[0];
+  if (victima) {
+    const topCorto = [TOP_REAL.find((id) => id !== victima.id && H.univ.some((e) => e.id === id)), victima.id].filter(Boolean);
+    const CB = await mirar(dirB, null, topCorto);
+    const CH = await mirar(dirH, null, topCorto);
+    limpio(CB, '-BASE-chip'); limpio(CH, '-HEAD-chip');
+    const itCB = CB.items.find((x) => x.dataId === victima.id);
+    const itCH = CH.items.find((x) => x.dataId === victima.id);
+    console.log(`   chip · top corto [${topCorto.join(', ')}] · BASE «${itCB ? itCB.rank || '(sin chip)' : '(no sale)'}» → HEAD «${itCH ? itCH.rank || '(sin chip)' : '(no sale)'}»`);
+    af(!!itCB && !!itCB.rank,
+       `[12a] BASE tampoco le pone chip a «${victima.id}» con el top corto: el control positivo no prueba nada`);
+    af(!!itCH && !itCH.rank,
+       `[12a] HEAD le sigue poniendo chip a «${victima.id}», que entra por la ventana`);
+  }
+
+  // [12b] EL SELLO «PRÓXIMAMENTE» Y SU PUERTA.
+  // Hoy ningún proxi llega por fecha (son de 2027), así que se SIEMBRA por el
+  // top —que es como llegaría de verdad— y se despeja la ventana con
+  // `listOnly`, igual que en [11].
+  const unProxi = H.univ.find((e) => e.soloProxi);
+  af(!!unProxi, `[12b] no hay ningún «próximamente» en el universo: el sello no se puede medir hoy`);
+  if (unProxi) {
+    const topSembrado = [unProxi.id].concat(TOP_REAL.filter((id) => id !== unProxi.id));
+    const Q = await mirar(dirH, delante.concat(enBorde ? [enBorde.id] : []).map((id) => [id, '@listonly']), topSembrado);
+    limpio(Q, '-proxi');
+    console.log(`   proxi sembrado en el top · tira: ${Q.items.map((i) => i.nombre + (i.sello ? ' [AGOTADO]' : '') + (i.prox ? ' [PRÓXIMAMENTE]' : '') + ' · ' + i.fecha).join(' | ')}`);
+    const itQ = Q.items.find((x) => x.dataId === unProxi.id);
+    af(!!itQ, `[12b] «${unProxi.id}» va #1 en el top sembrado y no salió en la tira`);
+    if (itQ) {
+      af(itQ.prox, `[12b] «${unProxi.id}» es «próximamente» y su miniatura NO trae sello visible`);
+      af(itQ.proxTxt.trim() === 'PRÓXIMAMENTE', `[12b] el sello de «${unProxi.id}» dice «${itQ.proxTxt.trim()}», no «PRÓXIMAMENTE»`);
+      af(amarillo(itQ.proxFondo), `[12b] el sello de «${unProxi.id}» es ${itQ.proxFondo}, no el amarillo con que el catálogo pinta «Próximamente»`);
+      af(!itQ.sello, `[12b] «${unProxi.id}» no está agotado y lleva TAMBIÉN el sello de agotado`);
+      af(!itQ.proxTapaCartel, `[12b] el sello de «${unProxi.id}» tapa el centro del cartel: la miniatura dejó de enseñar la foto`);
+      af(!itQ.proxTapaNombre, `[12b] el sello de «${unProxi.id}» se encima con el nombre`);
+      // 🔒 La puerta, medida contra la que toma la TARJETA REAL del catálogo.
+      af(itQ.destino.ruta === 'waitlist',
+         `[12b] tocar «${unProxi.id}» aterrizó en ${itQ.destino.ruta}, y su tarjeta del catálogo abre la lista de espera`);
+      af(itQ.destino.ruta !== 'ficha', `[12b] un «próximamente» abrió el COTIZADOR`);
+    }
+    // 🔒 CONTROL POSITIVO: el mismo catálogo y el mismo top, en BASE.
+    const QB = await mirar(dirB, delante.concat(enBorde ? [enBorde.id] : []).map((id) => [id, '@listonly']), topSembrado);
+    limpio(QB, '-BASE-proxi');
+    const itQB = QB.items.find((x) => x.dataId === unProxi.id);
+    af(!!itQB, `[12b] «${unProxi.id}» tampoco sale en BASE: el control positivo no tiene contra qué comparar`);
+    if (itQB) {
+      af(!itQB.prox, `[12b] BASE ya sella los «próximamente»: el sello no es de esta tuerca`);
+      af(itQB.destino.ruta === 'ficha',
+         `[12b] BASE ya NO abre el cotizador con un «próximamente» (aterriza en ${itQB.destino.ruta}): la puerta no es de esta tuerca`);
+    }
+  }
+
+  // [12c] EL AÑO EN LA FECHA, EN LOS DOS SENTIDOS.
+  // Un evento de otro año imprime el año; uno del año corriente, no.
+  const anioHoy = new Date().getFullYear();
+  const deOtroAnio = H.univ.find((e) => Number(e.ds.slice(0, 4)) !== anioHoy);
+  af(!!deOtroAnio, `[12c] todo el universo es del año corriente: el año en la fecha no se puede medir hoy`);
+  if (deOtroAnio) {
+    const topAnio = [deOtroAnio.id].concat(TOP_REAL.filter((id) => id !== deOtroAnio.id));
+    const Y = await mirar(dirH, delante.concat(enBorde ? [enBorde.id] : []).map((id) => [id, '@listonly']), topAnio);
+    limpio(Y, '-anio');
+    console.log(`   fechas impresas · ${Y.items.map((i) => i.dataId + ': «' + i.fecha + '»').join(' | ')}`);
+    const itY = Y.items.find((x) => x.dataId === deOtroAnio.id);
+    af(!!itY, `[12c] «${deOtroAnio.id}» (${deOtroAnio.ds}) no salió en la tira`);
+    if (itY) af(new RegExp('\\b' + deOtroAnio.ds.slice(0, 4) + '\\b').test(itY.fecha),
+       `[12c] «${deOtroAnio.id}» es de ${deOtroAnio.ds.slice(0, 4)} y su fecha dice «${itY.fecha}», sin año`);
+    // …y al revés: los del año corriente siguen cortitos.
+    const delAnio = Y.items.filter((x) => { const e = Y.univ.find((u) => u.id === x.dataId);
+      return e && Number(e.ds.slice(0, 4)) === anioHoy; });
+    af(delAnio.length > 0, `[12c] en esa tira no quedó ningún evento del año corriente: el control al revés no se corrió`);
+    delAnio.forEach((x) => af(!/\d{4}/.test(x.fecha),
+      `[12c] «${x.dataId}» es de ${anioHoy} y su fecha dice «${x.fecha}»: el año sobra`));
+    // 🔒 CONTROL POSITIVO: el mismo evento, el mismo top, en BASE, sin año.
+    const YB = await mirar(dirB, delante.concat(enBorde ? [enBorde.id] : []).map((id) => [id, '@listonly']), topAnio);
+    limpio(YB, '-BASE-anio');
+    const itYB = YB.items.find((x) => x.dataId === deOtroAnio.id);
+    af(!!itYB, `[12c] «${deOtroAnio.id}» tampoco sale en BASE: el control positivo no tiene contra qué comparar`);
+    if (itYB) af(!/\d{4}/.test(itYB.fecha),
+      `[12c] BASE ya imprime el año («${itYB.fecha}»): el año no es de esta tuerca`);
+  }
+
   // ── [7] CONTROL POSITIVO: BASE TIENE QUE FALLAR ───────────────────────────
   const B = await mirar(dirB, null);
   limpio(B, '-BASE');
@@ -620,24 +730,14 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   // el arreglo. El control positivo se re-apunta al camino donde LAND-2b sí
   // cambia algo —el del top— en [7d] y [7e].
 
-  // [7d] 🔒 EL CONTROL POSITIVO DE LAND-2b, EN EL CAMINO REAL.
-  // Con el top REAL contestando, BASE tiene que dejar fuera a los agotados de
-  // la ventana: ahí el top gana los 3 lugares. Si BASE no falla esto, el careo
-  // no prueba que LAND-2b arregle nada.
-  const PB = await mirar(dirB, null, TOP_REAL);
-  limpio(PB, '-BASE-produccion');
-  console.log(`   BASE con el top REAL · tira: ${PB.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (${PB.masN})`);
-  const enBase = new Set(PB.items.map((x) => x.dataId || x.nombre.toUpperCase()));
-  af(ventana.filter((e) => !enBase.has(e.id)).length > 0,
-     `[7d] BASE ya mete a los agotados de la ventana con el top real: no había nada que arreglar en LAND-2b`);
-  af(!PB.items.some((x) => x.sello),
-     `[7d] BASE ya sella con el top real: el sello por esa vía no es de esta tuerca`);
-
-  // [7e] Y el «+N más» tiene que moverse EN ESE CAMINO: en BASE el top mete 3
-  // vendibles y los descuenta; en HEAD los 3 lugares son agotados, que no salen
-  // de la cuenta de lo comprable. Si no diverge, la tira trae la misma gente.
-  af(PB.masN !== P.masN,
-     `[7e] con el top real el «+N más» no se movió (${PB.masN} → ${P.masN}): la tira trae la misma gente que antes`);
+  // ⚠️ [LAND-2c] AQUÍ VIVÍAN [7d] Y [7e]: el control positivo de LAND-2b contra
+  // `66527e9`, que exigía que BASE dejara fuera a los agotados de la ventana
+  // con el top real y contara +46. La tuerca movió el BASE al merge de #738,
+  // donde eso YA ESTÁ: las dos son falsas por construcción, no por un defecto.
+  // Es la tercera vez que pasa lo mismo al mover el BASE, y el patrón es el
+  // del libro: un control positivo caduca cuando su pasado se vuelve presente.
+  // Lo que LAND-2b arregló se sigue exigiendo sobre HEAD en [8]…[11]; el
+  // control positivo se re-apunta a lo que LAND-2c cambia, en [12].
 
   console.log(`\n   ${ok} verdes · ${mal} rojos`);
   if (mal) { console.log('\n   ROJOS:'); fallos.forEach((f) => console.log('   ✗ ' + f)); }

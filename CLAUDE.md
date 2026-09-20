@@ -167,6 +167,39 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✅ **SERIE LAND-2 CERRADA (19-sep-2026, #737/#738/#739): la portada dejó de
+  mentir.** Tres tuercas, `npm run mide:tira-agotados` (**150 aserciones, el
+  primer careo VERSIONADO del hero**), cero SQL. Ninguna tocó `heroALaVenta` ni
+  la tarjeta grande.
+  - **LAND-2** (#737) — la tira del hero deja de filtrar «a la venta»: su
+    universo son los **próximos por fecha**, agotados incluidos, con sello
+    AGOTADO. El problema medido: la portada decía «Próximo evento: Natanael
+    Cano, 2 oct» mientras Young Miko (19 sep), The Neighbourhood (23 sep) y
+    Stray Kids (25 sep) ocurrían antes y no salían en ningún lado.
+  - **LAND-2b** (#738) — **los agotados próximos le ganan el lugar al top.**
+    🔴 #737 quedó servido y **en vivo no cambió nada**: el universo se abrió
+    pero el ORDEN quedó igual, y el top contesta siempre con vendibles. El
+    orden pasa a ser **ventana de agotados `[hoy … la fecha de la tarjeta
+    grande, inclusive]` → top → respaldo por fecha**.
+  - **LAND-2c** (#739) — las tres decisiones de Memo: sin chip #N para quien
+    entró por la ventana, sello **PRÓXIMAMENTE** con su propia puerta, y el año
+    en la fecha cuando no es el año en curso.
+  - 🔒 **El veredicto de la tira NO se copia: se pregunta a `_evVeredicto`**, la
+    misma función que decide la clase `.agotado` de la tarjeta del catálogo.
+    `heroALaVenta` (de LAND-1) sí es una copia a mano; el careo la vigila
+    evento por evento contra la tarjeta RENDERIZADA.
+  - 🔒 **El candado hero↔catálogo de LAND-1 no existía**: vivía como comentario
+    y su arnés nunca se versionó. Nació en #737, versionado.
+  - ⚠️ **Lo que costó la lección**: el careo de #737 midió que el camino del top
+    FUNCIONA pero nunca exigió que por ahí **salieran** los agotados. El
+    «antes/después» de esa PR era el respaldo, que producción no toma. Desde
+    #738 el careo sirve el top REAL (`event-clicks`) y exige el resultado en
+    ese camino, no la maquinaria.
+  - ⚠️ **Un control positivo caduca cuando su pasado se vuelve presente**: al
+    mover el BASE del careo tres veces (e6633b1 → #737 → #738), las aserciones
+    «BASE no hace X» se volvieron falsas **por construcción**. Se retiran con su
+    razón ESCRITA en el código, nunca en silencio.
+
 - ✅ **ÉPOCA DE AGOSTO CERRADA (26-28 ago 2026, #603-#630): cinco series, todas
   en producción, cada una con su arnés anclado a dos commits y su careo doble
   de la casa.**
@@ -616,6 +649,32 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **No cuelgues NADA de `.hs-media` (ni de la portada de una tarjeta).**
+  `showInitials()` —el fallback de la foto del artista, **asíncrono**— hace
+  `imgEl.parentElement.innerHTML = ...` y **reescribe la portada entera** cuando
+  la API no contesta. El sello AGOTADO vivía ahí y se iba con ella: medido, la
+  tira quedaba con «AGOTADO» en Stray Kids y sin él en Young Miko y The
+  Neighbourhood, según a quién le fallara la foto y cuándo — **un evento
+  agotado se anunciaba como disponible por una carrera de red.** Lo que debe
+  sobrevivir cuelga del **hermano** (`.hs-item`), no del interior. La pregunta
+  no es «¿quién escribe aquí ahora?» sino **«¿quién puede reescribir esto
+  alguna vez?»**.
+- 🔒 **Un AGOTADO no abre la ficha, y un PRÓXIMAMENTE tampoco.** Medido:
+  `showDetail()` sobre un agotado abre el **cotizador completo** —viajeros, los
+  4 paquetes, «elige tus opciones para ver tu cotización»— sin una sola zona
+  libre detrás y sin decir AGOTADO. El catálogo cierra esa puerta a propósito
+  (`if(!isPast&&!isAg)` le quita el onclick). Las puertas buenas, medidas en la
+  tarjeta real: **agotado → WhatsApp** (lo que el catálogo ya hace con
+  `proceso`/`solo-viaje`), **próximamente → `abrirWaitlistModal(ev)`** (el
+  AVÍSAME; recibe el EVENTO, no el id).
+  ⚠️ Asimetría del catálogo, por si muerde: `st:'proximamente'` abre el AVÍSAME,
+  pero `st:'pronto'` —**rotulado igual**, «Próximamente»— cae en `showDetail`.
+  En la tira los dos van al AVÍSAME. Hoy hay **0 eventos en `pronto`**.
+- 🔒 **Hay TRES `fechaCorta` distintas con el mismo nombre.** La del **hero**
+  (`index.html`, dentro de la IIFE de LAND-1, firma `fechaCorta(ds)`, **un solo
+  llamador**: la tira) — es la que dice el año desde #739. La del **banner de
+  noticias** (`index.html`, otra IIFE, firma `fechaCorta(ev)`, usa `MESES3`). Y
+  la de **`rol.html`**. Antes de tocar «la» fechaCorta, barre las tres.
 - 🚌 **Para dejar un evento vendiendo SOLO VIAJE: agota sus zonas Y prende
   `rideOnly`.** Las dos cosas, no una. Agotar las zonas a secas hace que el
   auto-semáforo marque la tarjeta AGOTADO y la cierre —aunque el RIDE siga a la

@@ -578,9 +578,13 @@ function _excelCareoHtml(d) {
      </div>`).join('');
 
   return `<div class="card" style="padding:16px">
-    <div style="font-size:12px;color:var(--ts);margin-bottom:4px">
-      Excel: <b style="color:var(--tp)">${d.excel.personas}</b> persona(s) · Sistema: <b style="color:var(--tp)">${d.base.viajeros}</b> viajero(s)
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--ts);margin-bottom:4px">
+        Excel: <b style="color:var(--tp)">${d.excel.personas}</b> persona(s) · Sistema: <b style="color:var(--tp)">${d.base.viajeros}</b> viajero(s)
+      </div>
+      <button class="btn" id="excel-aplicar-btn" onclick="excelAplicarVistaPrevia()">Aplicar el careo…</button>
     </div>
+    <div id="excel-aplicar-panel"></div>
     ${pest}
     ${cab('nuevos — en el Excel, no en el sistema', t.nuevos, 'var(--green)')}
     ${lista(d.nuevos, n => fila(`${_evtEsc(n.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(n.zona || '')} ${_evtEsc(n.paquete || '')}</span>`, _evtMxn(n.abonado)))}
@@ -617,7 +621,14 @@ function _excelCareoHtml(d) {
           ? ` <span data-chip="derivado" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-left:4px">derivado</span>`
           : ''),
       `${x.sistema_total == null ? '<span style="color:var(--ts)">sin total</span>' : _evtMxn(x.sistema_total)} → ${_evtMxn(x.excel_total)} `
-      + `<b style="color:${x.derivado ? 'var(--ts)' : 'var(--orange)'}">${x.diferencia > 0 ? '+' : ''}${_evtMxn(x.diferencia)}</b>`))}
+      + `<b style="color:${x.derivado ? 'var(--ts)' : 'var(--orange)'}">${x.diferencia > 0 ? '+' : ''}${_evtMxn(x.diferencia)}</b>`
+      // El clic global solo toca los DERIVADOS con monto. A los otros dos —el
+      // «$0» tecleado y el EXACTO de la libreta— se les pone su propio botón:
+      // se aplican de uno en uno y con un humano mirando, que es justo lo que
+      // los saca del montón global.
+      + ((x.derivado && x.excel_total > 0) ? ''
+          : ` <button class="btn btn-sm" data-aplicar-uno="${_evtEsc(x.nombre)}" style="margin-left:8px;font-size:10px;padding:1px 6px"
+                 onclick="excelAplicarUno('totales', this.dataset.aplicarUno)">aplicar</button>`)))}
     <div style="font-size:11px;color:var(--ts);margin-top:4px">
       <b style="color:var(--tp)">La verdad es la columna «Total» de la pestaña</b> — trae el hotel y los upgrades adentro.
       ${t.totales_contrato ? `De los ${t.totales_contrato}, <b style="color:var(--tp)">${t.totales_contrato_derivados}</b> son sobre un total <b>derivado</b> del catálogo:
@@ -632,5 +643,113 @@ function _excelCareoHtml(d) {
       <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">iguales · ${t.iguales}</summary>
       <div style="padding-top:8px">${lista(d.iguales, i => fila(_evtEsc(i.nombre), _evtMxn(i.abonado)))}</div>
     </details>
+  </div>`;
+}
+
+// ═══ [CUADRE-1b] EL BOTÓN QUE APLICA ════════════════════════════════════════
+// Dos clics SIEMPRE: el primero PREGUNTA (vista previa con nombres y montos),
+// el segundo escribe. El patrón del puente al Portal — un número pelón no se
+// confirma, y aquí lo que se confirma es dinero de personas con nombre.
+//
+// 🔒 AQUÍ NO VIAJA NI UN MONTO. Se manda `evento_id` y, si acaso, qué montón y
+// qué nombres. El servidor vuelve a correr el careo COMPLETO y escribe sobre
+// SU resultado: un JSON viejo de esta pantalla diciendo «págale $5,000 a
+// Fulano» llegaría firmado por un admin de verdad y nadie podría distinguirlo
+// del bueno. Por eso la vista previa que se pinta abajo es informativa, y el
+// aplicar NO se la devuelve al servidor.
+async function _excelAplicar(cuerpo) {
+  const eventoId = (document.getElementById('selector-evento') || {}).value || '';
+  if (!eventoId) { showToast('Elige primero un evento', 'error'); return null; }
+  const panel = document.getElementById('excel-aplicar-panel');
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Recalculando el careo…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-excel-aplicar', {
+      method: 'POST', body: JSON.stringify({ evento_id: eventoId, ...cuerpo }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(d.error || ('Error ' + r.status))}`
+        + (d.codigo ? ` <span style="opacity:.7">[${_evtEsc(d.codigo)}]</span>` : '') + `</div>`;
+      return null;
+    }
+    return d;
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}</div>`;
+    return null;
+  }
+}
+
+async function excelAplicarVistaPrevia() {
+  const d = await _excelAplicar({});
+  if (!d) return;
+  const panel = document.getElementById('excel-aplicar-panel');
+  panel.innerHTML = _excelAplicarPreviaHtml(d);
+}
+
+// El segundo clic. Solo aquí se escribe.
+async function excelAplicarConfirmar() {
+  const b = document.getElementById('excel-aplicar-ok');
+  if (b) { b.disabled = true; b.textContent = 'Aplicando…'; }
+  const d = await _excelAplicar({ confirmar: true });
+  if (!d) return;
+  document.getElementById('excel-aplicar-panel').innerHTML = _excelAplicarHechoHtml(d);
+  // El careo se vuelve a pintar: después de escribir, lo que había en pantalla
+  // ya es el pasado.
+  excelCarear();
+}
+
+// El botón de renglón: un solo nombre, un solo montón.
+async function excelAplicarUno(monton, nombre) {
+  if (!nombre) return;
+  const d = await _excelAplicar({ confirmar: true, solo: monton, claves: [nombre] });
+  if (!d) return;
+  const hechos = ((d.resultado || {})[monton] || []).length;
+  showToast(hechos ? `Aplicado: ${nombre}` : `No había nada que aplicar para ${nombre}`, hechos ? 'success' : 'error');
+  excelCarear();
+}
+
+function _excelAplicarPreviaHtml(d) {
+  const p = d.plan || {}, r = d.resumen || {};
+  const fila = (izq, der) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0">
+       <span>${izq}</span><span style="font-family:'JetBrains Mono',monospace;white-space:nowrap">${der}</span></div>`;
+  const grupo = (titulo, arr, pinta, color) => `
+    <div style="margin-top:10px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${color}">${titulo} · ${arr.length}</div>
+      ${arr.length ? arr.map(pinta).join('') : '<div style="font-size:12px;color:var(--ts)">— ninguno</div>'}
+    </div>`;
+  return `<div class="card" style="padding:14px;margin-top:12px;border:1px solid var(--orange)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--orange)">
+      esto es lo que va a pasar — todavía NO se ha escrito nada
+    </div>
+    ${grupo('abonos a registrar', p.abonos || [], (x) => fila(_evtEsc(x.nombre), `${_evtMxn(x.sistema)} → ${_evtMxn(x.excel)}  <b style="color:var(--green)">+${_evtMxn(x.monto)}</b>`), 'var(--green)')}
+    ${grupo('totales a corregir', p.totales || [], (x) => fila(_evtEsc(x.nombre) + ' <span style="font-size:10px;color:var(--ts)">derivado</span>', `${x.sistema_total == null ? 'sin total' : _evtMxn(x.sistema_total)} → ${_evtMxn(x.excel_total)}`), 'var(--blue,#0000cd)')}
+    ${grupo('altas', p.altas || [], (x) => fila(`${_evtEsc(x.nombre)} <span style="font-size:11px;color:var(--ts)">${_evtEsc(x.zona_boleto)} ${_evtEsc(x.tipo_paquete)}${x.origen === 'apartado' ? ' · apartado' : ''}</span>`, `total ${_evtMxn(x.total_contrato)} · abonado ${_evtMxn(x.abonado_previo)}`), 'var(--yellow,#e8ff4c)')}
+    ${grupo('NO se van a aplicar (el sistema va adelante del Excel)', p.negativas || [], (x) => fila(
+        `${_evtEsc(x.nombre)}${x.numerologia ? ' <span style="font-size:10px;color:var(--tp);border:1px solid currentColor;border-radius:3px;padding:0 4px">Numerología</span>' : ''}`,
+        `${_evtMxn(x.sistema)} vs Excel ${_evtMxn(x.excel)} <b style="color:var(--red)">${_evtMxn(x.diferencia)}</b>`), 'var(--red)')}
+    ${grupo('se saltan, con su motivo', p.saltados || [], (x) => fila(_evtEsc(x.nombre), `<span style="font-size:11px;color:var(--ts)">${_evtEsc(x.motivo)}</span>`), 'var(--ts)')}
+    <div style="font-size:11px;color:var(--ts);margin:10px 0">
+      <b style="color:var(--tp)">Las BAJAS y los AMBIGUOS no se aplican nunca</b> — ni desde aquí ni por renglón.
+      Una baja es una persona y espera firma; elegir entre dos homónimos sería inventar el dato que falta.
+      Al confirmar, el servidor <b>vuelve a correr el careo</b> y escribe sobre ese resultado, no sobre esta lista.
+    </div>
+    <button class="btn btn-primary" id="excel-aplicar-ok" onclick="excelAplicarConfirmar()">
+      Sí, aplicar: ${r.abonos} abono(s) por ${_evtMxn(r.monto_abonos)} · ${r.totales} total(es) · ${r.altas} alta(s)
+    </button>
+  </div>`;
+}
+
+function _excelAplicarHechoHtml(d) {
+  const r = d.resultado || {}, s = d.resumen || {};
+  const li = (x) => `<div style="font-size:13px;padding:2px 0">· ${_evtEsc(x.nombre)}</div>`;
+  return `<div class="card" style="padding:14px;margin-top:12px;border:1px solid var(--green)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--green)">hecho</div>
+    <div style="font-size:13px;margin:6px 0">
+      ${s.abonos} abono(s) por <b>${_evtMxn(s.monto_abonos)}</b> · ${s.totales} total(es) corregido(s) · ${s.altas} alta(s).
+    </div>
+    ${(r.abonos || []).map(li).join('')}
+    ${(r.altas || []).map((x) => `<div style="font-size:13px;padding:2px 0">· alta: ${_evtEsc(x.nombre)}${x.aviso_doble_descuento ? ` <span style="color:var(--orange);font-size:11px">⚠ ${_evtEsc(x.aviso_doble_descuento.mensaje)}</span>` : ''}</div>`).join('')}
+    ${(r.errores || []).length ? `<div class="alert alert-error" style="margin-top:8px">${(r.errores).map((e) => _evtEsc(e.paso + (e.nombre ? ' · ' + e.nombre : '') + ': ' + (e.detalle || ''))).join('<br>')}</div>` : ''}
   </div>`;
 }

@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
 
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
-const BASE = sh(`git rev-parse ${process.env.BASE || 'e6633b1'}`);
+const BASE = sh(`git rev-parse ${process.env.BASE || '66527e9'}`);   // el merge de #737
 const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
 
 let ok = 0, mal = 0; const fallos = [];
@@ -116,6 +116,33 @@ function mutarSemaforo(html, id) {
   return html.slice(0, ini) + nueva + html.slice(fin);
 }
 
+// [LAND-2b] SACAR DEL UNIVERSO SIN MOVER LA TARJETA GRANDE. Desagotar a un
+// evento cercano lo vuelve el próximo a la venta y se lleva la tarjeta grande
+// —y con ella el tope de la ventana—, así que no sirve para medir el BORDE de
+// la ventana. `listOnly` lo saca del universo de la tira dejando la grande
+// donde está.
+function mutarListOnly(html, id) {
+  const anc = `\n  {id:'${id}',`;
+  const i = html.indexOf(anc);
+  if (i < 0) throw new Error(`mutarListOnly: no encontré la ficha de ${id}`);
+  if (/listOnly/.test(html.slice(i, i + 200))) return html;
+  return html.slice(0, i + anc.length) + 'listOnly:true,' + html.slice(i + anc.length);
+}
+
+// [LAND-2b] DESAGOTAR DE VERDAD. No basta con vaciar el `st`: si las zonas
+// siguen en `ag:1` el auto-semáforo vuelve a agotarlo y el control se mediría a
+// sí mismo. Quita el `ag:1` de todas las zonas Y vacía el st.
+function mutarDesagotar(html, id) {
+  const ini = html.indexOf(`\n  {id:'${id}',`);
+  if (ini < 0) throw new Error(`mutarDesagotar: no encontré la ficha de ${id}`);
+  const sig = html.indexOf(`\n  {id:'`, ini + 3);
+  const fin = sig < 0 ? html.length : sig;
+  const ficha = html.slice(ini, fin);
+  const nueva = ficha.replace(/,ag:1/g, '').replace(/,st:'[^']*'/, ",st:''");
+  if (nueva === ficha) throw new Error(`mutarDesagotar: ${id} no cambió`);
+  return html.slice(0, ini) + nueva + html.slice(fin);
+}
+
 async function mirar(dirBase, mutaciones, top) {
   // Copia del commit con el catálogo que pida el caso. El navegador arranca de
   // cero contra ella: es una publicación distinta, no un estado inyectado.
@@ -123,7 +150,10 @@ async function mirar(dirBase, mutaciones, top) {
   for (const f of ARCHIVOS.split(' ')) fs.copyFileSync(path.join(dirBase, f), path.join(dir, f));
   if (mutaciones && mutaciones.length) {
     let html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
-    for (const [id, st] of mutaciones) html = (st === '@semaforo') ? mutarSemaforo(html, id) : mutarSt(html, id, st);
+    for (const [id, st] of mutaciones) html =
+      (st === '@semaforo') ? mutarSemaforo(html, id) :
+      (st === '@desagotar') ? mutarDesagotar(html, id) :
+      (st === '@listonly') ? mutarListOnly(html, id) : mutarSt(html, id, st);
     fs.writeFileSync(path.join(dir, 'index.html'), html);
   }
   const s = await servir(dir, top);
@@ -141,12 +171,20 @@ async function mirar(dirBase, mutaciones, top) {
   // un defecto. Ahora se espera a que la tira TENGA miniaturas y a que el
   // navegador haya terminado de cargar; si no llegan, el careo se cae a gritos
   // en vez de medir a medias.
-  await page.waitForFunction(
-    () => document.readyState === 'complete' &&
-          typeof EV !== 'undefined' &&
-          document.querySelectorAll('.ev-card').length > 0 &&
-          document.querySelectorAll('#hh-strip .hs-item').length > 0,
-    null, { timeout: 15000 });
+  // ⚠️ LA ESPERA NO PUEDE MATAR EL CAREO. Existe para no medir antes de tiempo,
+  // pero si vence hay que MEDIR IGUAL y que lo diga una aserción: un sabotaje
+  // que dejaba la tira vacía tumbaba la corrida entera con un timeout y se
+  // llevaba por delante todas las secciones de abajo, que ni se ejercitaron.
+  // Es la ley del libro: un arnés que se cae no reporta.
+  let esperaVencida = false;
+  try {
+    await page.waitForFunction(
+      () => document.readyState === 'complete' &&
+            typeof EV !== 'undefined' &&
+            document.querySelectorAll('.ev-card').length > 0 &&
+            document.querySelectorAll('#hh-strip .hs-item').length > 0,
+      null, { timeout: 12000 });
+  } catch (e) { esperaVencida = true; }
   // Y un respiro para que cualquier repintado tardío del hero haya ocurrido
   // ANTES de la foto: lo que se mide es la tira asentada, no una a mitad.
   await page.waitForTimeout(400);
@@ -159,10 +197,17 @@ async function mirar(dirBase, mutaciones, top) {
   // el careo entero con un timeout en vez de reportar.)
   if (top) {
     try {
+      // ⚠️ [LAND-2b] EL ASCENSO YA NO SE RECONOCE POR LA FUENTE. Antes se
+      // esperaba a `data-fuente === 'top'`, pero ahora el top puede llegar y NO
+      // ganar un solo lugar (los agotados próximos van primero): esa espera se
+      // agotaría en el caso normal y mediría la tira ANTES del ascenso. La
+      // señal honesta es que el top llegó y el hero se volvió a construir.
       await page.waitForFunction(
-        () => document.getElementById('hh-strip').getAttribute('data-fuente') === 'top',
+        () => typeof _top10Ids !== 'undefined' && _top10Ids.length > 0 &&
+              document.querySelectorAll('#hh-strip .hs-item').length > 0,
         null, { timeout: 8000 });
-    } catch (e) { /* lo dice [8a], no una excepción */ }
+    } catch (e) { /* lo dicen las aserciones, no una excepción */ }
+    await page.waitForTimeout(250);
   }
 
   const foto = await page.evaluate(() => {
@@ -258,6 +303,7 @@ async function mirar(dirBase, mutaciones, top) {
 
   await nav.close(); s.close();
   foto.errores = errores;
+  foto.esperaVencida = esperaVencida;
   return foto;
 }
 
@@ -277,8 +323,10 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   af(H.errores.length === 0, `[0] HEAD tiró errores de página: ${H.errores.join(' | ')}`);
   // Toda carga que el careo mire tiene que estar limpia: un error de página en
   // un CONTROL lo volvería un renglón verde sobre una página rota.
-  const limpio = (foto, etiqueta) => af(foto.errores.length === 0,
-    `[0${etiqueta}] la página tiró errores: ${foto.errores.join(' | ')}`);
+  const limpio = (foto, etiqueta) => {
+    af(foto.errores.length === 0, `[0${etiqueta}] la página tiró errores: ${foto.errores.join(' | ')}`);
+    af(!foto.esperaVencida, `[0${etiqueta}] la tira nunca llegó a pintar miniaturas (la espera venció): se midió lo que hubiera`);
+  };
   limpio(H, '');
   af(!H.colisionNombre, `[0] dos eventos próximos comparten nombre corto («${H.colisionNombre}»): la llave no sirve`);
 
@@ -430,36 +478,128 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
     console.log(`       (hoy ninguno llega por fecha; por el top sí podrían)`);
   }
 
-  // ── [8] EL CAMINO DE PRODUCCIÓN: LA TIRA QUE MANDA EL TOP ─────────────────
-  // Todo lo de arriba midió el RESPALDO por fecha, porque sin endpoint el top
-  // llega vacío. Producción es al revés: el top contesta y la tira sale de él
-  // —LAND-1d ya lo había anotado, y por no medirlo con el top puesto sus
-  // números del pliegue salieron 21px optimistas. Aquí se sirve el contrato
-  // real y se mide la tira que el cliente ve de verdad.
-  // El top se ARMA con lo que hoy no saldría por fecha: un agotado lejano y dos
-  // a la venta. Así el mismo caso prueba el sello, el chip #N y el control al
-  // revés por el camino bueno.
-  const agLejano = H.univ.find((e) => e.ag && !esp.some((x) => x.id === e.id) && e.id !== H.grande.id);
-  const ventaLejana = H.univ.filter((e) => !e.ag && e.id !== H.grande.id).slice(-2).map((e) => e.id);
-  af(!!agLejano, `[8] no hay un agotado fuera de los 3 próximos para armar el top: el caso no se pudo montar`);
-  if (agLejano) {
-    const elTop = [agLejano.id, ventaLejana[0], ventaLejana[1]].filter(Boolean);
-    const T = await mirar(dirH, null, elTop);
-    limpio(T, '-top');
-    console.log(`   top servido [${elTop.join(', ')}] · tira: ${T.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}`);
-    af(T.fuente === 'top', `[8a] con el top servido la tira dice fuente «${T.fuente}», no «top»`);
-    elTop.forEach((id, i) => {
-      const it = T.items.find((x) => x.dataId === id);
-      af(!!it, `[8a] «${id}» va #${i + 1} en el top y no salió en la tira`);
-      if (!it) return;
-      af(it.rank === '#' + (i + 1), `[8b] «${id}» va #${i + 1} en el top y su chip dice «${it.rank || '(ninguno)'}»`);
+  // ══ [8] EL CAMINO REAL DE PRODUCCIÓN ═════════════════════════════════════
+  // ⚠️ ESTA ES LA ASERCIÓN QUE FALTÓ EN #737, Y POR ESO LA TUERCA NO SIRVIÓ EN
+  // VIVO. Aquel careo midió que el camino del top FUNCIONA —fuente, chips,
+  // sello por esa vía— pero nunca exigió que por ahí SALIERAN los agotados
+  // próximos. En producción el top contesta y trae 3 vendibles, llena los 3
+  // lugares, y Young Miko, The Neighbourhood y Stray Kids quedaban fuera igual
+  // que antes. El «antes/después» de aquella PR era el RESPALDO, que producción
+  // no toma nunca.
+  //
+  // TOP_REAL es el top de VERDAD, tal como lo devolvió
+  // `/.netlify/functions/event-clicks` de conectareynosa.mx el 19-sep-2026 tras
+  // el merge de #737. Es una FOTO —si el ranking cambia, este careo no lo ve—
+  // pero lo que se asegura NO sale de la foto: las expectativas se derivan del
+  // EV del commit. La foto solo pone al top A CONTESTAR, que es lo que en
+  // producción pasa siempre y en el careo no pasaba nunca.
+  // 🔒 Young Miko va #8 en este top: por ranking JAMÁS alcanzaría la tira.
+  const TOP_REAL = ['julion', 'titodoble', 'alfredito', 'natanael', 'frontera',
+                    'payasonicos', 'monlaferte', 'youngmiko', 'alvarodiaz', 'karolg'];
+
+  // La ventana, derivada del EV: agotados con fecha entre hoy y la de la
+  // tarjeta grande INCLUSIVE, por fecha, hasta 3.
+  const dsGrande = (H.univ.find((e) => e.id === H.grande.id) || {}).ds || '';
+  const ventana = H.univ.filter((e) => e.ag && e.ds <= dsGrande && e.id !== H.grande.id).slice(0, 3);
+  console.log(`   ventana de agotados [hoy … ${dsGrande}]: ${ventana.map((e) => e.id + ' ' + e.ds).join(' · ') || '(ninguno)'}`);
+  af(ventana.length > 0, `[8] hoy no hay agotados entre hoy y la fecha de la grande: este careo no puede probar LAND-2b`);
+
+  const P = await mirar(dirH, null, TOP_REAL);
+  limpio(P, '-produccion');
+  console.log(`   con el top REAL contestando · tira: ${P.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (fuente ${P.fuente}, ${P.masN})`);
+
+  // [8a] Los agotados de la ventana ganan los primeros lugares, EN ORDEN DE FECHA.
+  ventana.forEach((e, i) => {
+    const it = P.items[i];
+    af(!!it && it.dataId === e.id,
+       `[8a] con el top real, el lugar ${i + 1} lo ocupa «${it ? it.dataId : '—'}» y le tocaba a «${e.id}» (${e.ds}, agotado y antes o el mismo día que la grande)`);
+    if (it && it.dataId === e.id) af(it.sello, `[8a] «${e.id}» ganó su lugar por agotado y no lleva sello`);
+  });
+  // [8b] La grande no se mueve por más que el top la empuje.
+  af(P.grande.id === H.grande.id, `[8b] el top real cambió la tarjeta grande: ${H.grande.id} → ${P.grande.id}`);
+  af(/agotados/.test(P.fuente || ''), `[8b] con la ventana llena la fuente dice «${P.fuente}» y no menciona los agotados`);
+  selloVsCard(P, '-produccion');
+
+  // [8c] Los lugares que SOBREN los llena el top, en su orden.
+  const yaPuestos = new Set([H.grande.id, ...ventana.map((e) => e.id)]);
+  const delTop = TOP_REAL.filter((id) => !yaPuestos.has(id) && H.univ.some((e) => e.id === id));
+  for (let i = 0; i < 3 - ventana.length; i++) {
+    const it = P.items[ventana.length + i];
+    af(!!it && it.dataId === delTop[i],
+       `[8c] el lugar ${ventana.length + i + 1} sobra de la ventana y le tocaba al top («${delTop[i]}»), salió «${it ? it.dataId : '—'}»`);
+  }
+
+  // ══ [9] CONTROL AL REVÉS · SIN AGOTADOS PRÓXIMOS, EL TOP LLENA LOS 3 ══════
+  // Se desagotan TODOS los agotados del universo (st vacío Y zonas libres: con
+  // el `ag:1` puesto el auto-semáforo los revive y el control se mediría solo).
+  // Sin nadie en la ventana la tira tiene que ser el top puro, con sus chips y
+  // sin un sello — exactamente como se comportaba antes de esta tuerca.
+  const D = await mirar(dirH, H.univ.filter((e) => e.ag).map((e) => [e.id, '@desagotar']), TOP_REAL);
+  limpio(D, '-sin-agotados');
+  console.log(`   sin agotados próximos · tira: ${D.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (fuente ${D.fuente})`);
+  af(D.univ.filter((e) => e.ag).length === 0, `[9] el montaje falló: quedaron ${D.univ.filter((e) => e.ag).length} agotados tras desagotarlos`);
+  af(D.fuente === 'top', `[9a] sin agotados próximos la tira dice fuente «${D.fuente}», no «top»`);
+  const delTopD = TOP_REAL.filter((id) => id !== D.grande.id && D.univ.some((e) => e.id === id)).slice(0, 3);
+  delTopD.forEach((id, i) => {
+    const it = D.items[i];
+    af(!!it && it.dataId === id, `[9a] sin agotados, el lugar ${i + 1} le tocaba a «${id}» (#${TOP_REAL.indexOf(id) + 1} del top) y salió «${it ? it.dataId : '—'}»`);
+    if (it && it.dataId === id) af(it.rank === '#' + (TOP_REAL.indexOf(id) + 1),
+      `[9b] «${id}» va #${TOP_REAL.indexOf(id) + 1} en el top y su chip dice «${it.rank || '(ninguno)'}»`);
+  });
+  af(!D.items.some((x) => x.sello), `[9c] sin agotados en el catálogo la tira sigue pintando sellos`);
+
+  // ══ [11] EL BORDE DE LA VENTANA · «INCLUSIVE» TIENE QUE SER OBSERVABLE ═══
+  // La regla dice [hoy … la fecha de la grande, INCLUSIVE]. Con el catálogo de
+  // hoy ese «inclusive» NO SE PUEDE FALSEAR: los tres agotados de la ventana
+  // caen antes del 2-oct y llenan los lugares, así que Iron Maiden —que cae el
+  // MISMO día que la grande— queda cuarto y no cabe. Probado: cambiar el corte
+  // de `>` a `>=` dejaba el careo en 100 verdes. Una regla que no se puede
+  // romper no se está midiendo.
+  //
+  // Se despeja el borde sacando del universo a los agotados que están DELANTE,
+  // con `listOnly` — no desagotándolos: desagotar a uno cercano lo vuelve el
+  // próximo a la venta, se lleva la tarjeta grande y con ella el tope de la
+  // ventana, que es justo lo que se quiere dejar quieto.
+  const enBorde = H.univ.find((e) => e.ag && e.ds === dsGrande && e.id !== H.grande.id);
+  const delante = H.univ.filter((e) => e.ag && e.ds < dsGrande).map((e) => e.id);
+  af(!!enBorde, `[11] no hay un agotado en la fecha exacta de la grande: el «inclusive» de la ventana no se puede medir hoy`);
+  if (enBorde) {
+    const W = await mirar(dirH, delante.map((id) => [id, '@listonly']), TOP_REAL);
+    limpio(W, '-borde');
+    console.log(`   borde de la ventana (fuera ${delante.join(', ')}) · tira: ${W.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (fuente ${W.fuente})`);
+    af(W.grande.id === H.grande.id, `[11] el montaje movió la tarjeta grande: ${H.grande.id} → ${W.grande.id}`);
+    const it = W.items.find((x) => x.dataId === enBorde.id);
+    af(!!it, `[11a] «${enBorde.id}» cae el MISMO día que la grande (${dsGrande}) y la ventana lo dejó fuera: «inclusive» no se está cumpliendo`);
+    if (it) af(it.sello, `[11a] «${enBorde.id}» entró por la ventana y no lleva sello`);
+    // Y lo de MÁS ALLÁ del borde sigue fuera: la ventana tiene tope.
+    const masAlla = H.univ.filter((e) => e.ag && e.ds > dsGrande).map((e) => e.id);
+    af(masAlla.length > 0, `[11b] no hay agotados después de la fecha de la grande: el TOPE de la ventana no se puede medir hoy`);
+    masAlla.forEach((id) => af(!W.items.some((x) => x.dataId === id),
+      `[11b] «${id}» cae DESPUÉS de la grande y la ventana se lo llevó igual: el tope no existe`));
+  }
+
+  // ══ [10] LA MEZCLA · un agotado en la ventana y el top llenando el resto ══
+  // Prueba que el sello y el chip #N CONVIVEN y que el corte entre las dos vías
+  // cae donde debe. Se desagotan todos menos el primero de la ventana.
+  const quedaUno = ventana[0];
+  if (quedaUno && H.univ.filter((e) => e.ag).length > 1) {
+    const X = await mirar(dirH, H.univ.filter((e) => e.ag && e.id !== quedaUno.id).map((e) => [e.id, '@desagotar']), TOP_REAL);
+    limpio(X, '-mezcla');
+    console.log(`   un solo agotado · tira: ${X.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (fuente ${X.fuente})`);
+    const it0 = X.items[0];
+    af(!!it0 && it0.dataId === quedaUno.id, `[10a] el único agotado de la ventana no ganó el primer lugar: salió «${it0 ? it0.dataId : '—'}»`);
+    if (it0) af(it0.sello, `[10a] el único agotado de la ventana no lleva sello`);
+    af(X.items.length === 3, `[10b] la tira quedó con ${X.items.length} miniaturas: el top no completó los lugares que sobraron`);
+    af(X.items.slice(1).every((x) => !x.sello), `[10b] los lugares que llenó el top salieron sellados`);
+    const restoTop = TOP_REAL.filter((id) => id !== X.grande.id && id !== quedaUno.id && X.univ.some((e) => e.id === id)).slice(0, 2);
+    restoTop.forEach((id, i) => {
+      const it = X.items[1 + i];
+      af(!!it && it.dataId === id, `[10c] el lugar ${2 + i} le tocaba al top («${id}») y salió «${it ? it.dataId : '—'}»`);
+      if (it && it.dataId === id) af(it.rank === '#' + (TOP_REAL.indexOf(id) + 1),
+        `[10c] «${id}» llenó su lugar por el top y su chip dice «${it.rank || '(ninguno)'}»`);
     });
-    const itAg = T.items.find((x) => x.dataId === agLejano.id);
-    if (itAg) af(itAg.sello, `[8c] «${agLejano.id}» entró por el top estando agotado y no lleva sello`);
-    af(T.items.some((x) => !x.sello), `[8d] el top trajo dos eventos a la venta y la tira los selló igual`);
-    selloVsCard(T, '-top');
-    // La tarjeta grande no depende del top: sigue siendo el próximo a la venta.
-    af(T.grande.id === H.grande.id, `[8e] el top cambió la tarjeta grande: ${H.grande.id} → ${T.grande.id}`);
+    af(/agotados/.test(X.fuente || '') && /top/.test(X.fuente || ''), `[10d] la fuente dice «${X.fuente}» y la tira se armó con las dos vías`);
+    selloVsCard(X, '-mezcla');
   }
 
   // ── [7] CONTROL POSITIVO: BASE TIENE QUE FALLAR ───────────────────────────
@@ -470,14 +610,34 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   console.log(`   BASE · tarjeta grande: ${B.grande.id} · tira: ${B.items.map(i=>i.nombre).join(' · ')}  (+N ${B.masN})`);
   af(espB.some((e) => e.ag),
      `[7] BASE no tiene agotados próximos que mostrar: el control positivo no prueba nada`);
-  af(!B.items.some((i) => i.sello),
-     `[7a] BASE ya pinta sellos: el sello no es de esta tuerca`);
-  const nombresBase = new Set(B.items.map((i) => i.nombre.toUpperCase()));
-  const agotadosOmitidos = espB.filter((e) => e.ag && !nombresBase.has(e.nombre.toUpperCase()));
-  af(agotadosOmitidos.length > 0,
-     `[7b] BASE ya muestra a los agotados próximos: no había nada que arreglar`);
-  af(B.masN !== H.masN,
-     `[7c] el «+N más» no se movió (${B.masN} → ${H.masN}): la resta vieja y la nueva no divergen hoy`);
+  // ⚠️ [LAND-2b] AQUÍ VIVÍAN [7a], [7b] Y [7c]: el control positivo de LAND-2
+  // contra `e6633b1`, que exigía que BASE no sellara, omitiera a los agotados
+  // próximos y contara distinto el «+N». La tuerca movió el BASE al merge de
+  // #737, donde todo eso YA ESTÁ: esas tres aserciones pasaron a ser falsas por
+  // construcción, no por un defecto.
+  // No es un hueco de cobertura: el sello, el universo y el «+N» se siguen
+  // exigiendo sobre HEAD en [1]…[6]; lo que cambió es contra qué pasado se mide
+  // el arreglo. El control positivo se re-apunta al camino donde LAND-2b sí
+  // cambia algo —el del top— en [7d] y [7e].
+
+  // [7d] 🔒 EL CONTROL POSITIVO DE LAND-2b, EN EL CAMINO REAL.
+  // Con el top REAL contestando, BASE tiene que dejar fuera a los agotados de
+  // la ventana: ahí el top gana los 3 lugares. Si BASE no falla esto, el careo
+  // no prueba que LAND-2b arregle nada.
+  const PB = await mirar(dirB, null, TOP_REAL);
+  limpio(PB, '-BASE-produccion');
+  console.log(`   BASE con el top REAL · tira: ${PB.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (${PB.masN})`);
+  const enBase = new Set(PB.items.map((x) => x.dataId || x.nombre.toUpperCase()));
+  af(ventana.filter((e) => !enBase.has(e.id)).length > 0,
+     `[7d] BASE ya mete a los agotados de la ventana con el top real: no había nada que arreglar en LAND-2b`);
+  af(!PB.items.some((x) => x.sello),
+     `[7d] BASE ya sella con el top real: el sello por esa vía no es de esta tuerca`);
+
+  // [7e] Y el «+N más» tiene que moverse EN ESE CAMINO: en BASE el top mete 3
+  // vendibles y los descuenta; en HEAD los 3 lugares son agotados, que no salen
+  // de la cuenta de lo comprable. Si no diverge, la tira trae la misma gente.
+  af(PB.masN !== P.masN,
+     `[7e] con el top real el «+N más» no se movió (${PB.masN} → ${P.masN}): la tira trae la misma gente que antes`);
 
   console.log(`\n   ${ok} verdes · ${mal} rojos`);
   if (mal) { console.log('\n   ROJOS:'); fallos.forEach((f) => console.log('   ✗ ' + f)); }

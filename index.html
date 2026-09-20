@@ -4163,25 +4163,59 @@ var _landTick = null;
              .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
   }
 
-  function elegirTira(univ,grandeId){
-    var porId={}; univ.forEach(function(e){porId[e.id]=e;});
-    var top=idsDelTop(), out=[];
-    for(var i=0;i<top.length&&out.length<3;i++){
-      var e=porId[top[i]];
-      if(e&&e.id!==grandeId)out.push(e);   // el que ya es la tarjeta grande no se repite
+  // ⚠️ [LAND-2b] LOS AGOTADOS PRÓXIMOS VAN PRIMERO, ANTES QUE EL TOP.
+  // LAND-2 abrió el universo pero dejó el ORDEN como estaba: el top elegía
+  // primero. Y el top contesta siempre en producción con eventos vendibles, así
+  // que llenaba los 3 lugares y los agotados nunca salían — la tuerca no se
+  // notó en vivo. Medido el 19-sep tras el merge de #737: el top real traía
+  // julion (522 clics), titodoble (210) y alfredito (193), y Young Miko iba
+  // #8: por ranking JAMÁS alcanzaba la tira.
+  //
+  // El orden es: agotados de la ventana → top → respaldo por fecha.
+  //
+  // LA VENTANA es [hoy … la fecha de la tarjeta grande], INCLUSIVE. Es la
+  // definición del engaño que esto arregla: un agotado que ocurre ANTES o el
+  // mismo día que «el próximo evento» desmiente a la tarjeta grande. Uno
+  // posterior no desmiente nada y se gana su lugar como cualquiera, por top o
+  // por fecha. Hoy entran Young Miko (19 sep), Neighbourhood (23 sep) y Stray
+  // Kids (25 sep); Iron Maiden cae el mismo 2-oct que la grande, califica, y
+  // queda CUARTO: la fecha manda y no caben más de tres.
+  //
+  // Sin tarjeta grande no hay ventana que acotar (`dsGrande` vacío) y califican
+  // todos los agotados próximos: es justo el día en que lo único que queda por
+  // enseñar son ellos.
+  function elegirTira(univ,grandeId,dsGrande){
+    var out=[], vistos={}, fuentes=[];
+    function meter(e){
+      if(!e||e.id===grandeId||vistos[e.id])return false;
+      out.push(e); vistos[e.id]=1; return true;
     }
-    if(out.length===3)return {items:out,fuente:'top'};
-    // Respaldo: se completa por cercanía de fecha, sin repetir.
-    // ⚠️ Arranca en j=0, no en j=1. Antes el universo era `venta` y su primer
-    // elemento ERA la tarjeta grande, así que saltárselo bastaba. Ahora el
-    // primero del universo puede ser un agotado —hoy lo es— y saltarlo por
-    // posición se comería justo al evento que la tuerca vino a rescatar: la
-    // grande se descarta POR ID.
-    var vistos={}; out.forEach(function(e){vistos[e.id]=1;});
-    for(var j=0;j<univ.length&&out.length<3;j++){
-      if(univ[j].id!==grandeId&&!vistos[univ[j].id]){out.push(univ[j]);vistos[univ[j].id]=1;}
+
+    // 1) Los agotados de la ventana, por fecha. `univ` ya viene ordenado, así
+    //    que al pasarse de la fecha de la grande no queda ninguno más.
+    var porAgotado=false;
+    for(var i=0;i<univ.length&&out.length<3;i++){
+      var e=univ[i];
+      if(dsGrande&&dsEfectivo(e)>dsGrande)break;
+      if(!esAgotado(e))continue;
+      if(meter(e))porAgotado=true;
     }
-    return {items:out,fuente:out.length&&idsDelTop().length?'mixta':'fecha'};
+    if(porAgotado)fuentes.push('agotados');
+
+    // 2) El top llena lo que sobre, en su orden.
+    var porId={}; univ.forEach(function(x){porId[x.id]=x;});
+    var top=idsDelTop(), porTop=false;
+    for(var j=0;j<top.length&&out.length<3;j++){ if(meter(porId[top[j]]))porTop=true; }
+    if(porTop)fuentes.push('top');
+
+    // 3) El respaldo por cercanía de fecha cierra.
+    var porFecha=false;
+    for(var k=0;k<univ.length&&out.length<3;k++){ if(meter(univ[k]))porFecha=true; }
+    if(porFecha)fuentes.push('fecha');
+
+    // `data-fuente` dice QUÉ VÍAS armaron la tira, no cuál «ganó»: con tres
+    // fuentes en cascada, un solo nombre miente en cuanto se mezclan.
+    return {items:out,fuente:fuentes.join('+')||'fecha'};
   }
 
   // [LAND-2] UN AGOTADO NO ABRE LA FICHA.
@@ -4211,6 +4245,7 @@ var _landTick = null;
     var univ=proximosPorFecha();
     var ev=venta[0]||null;
     var grandeId=ev?ev.id:'';
+    var dsGrande=ev?dsEfectivo(ev):'';   // [LAND-2b] el tope de la ventana de agotados
 
     // [LAND-2] LA TIRA SOBREVIVE A LA TARJETA GRANDE. Antes, sin nada a la
     // venta, este `return` apagaba las dos. Ahora el universo de la tira no
@@ -4245,7 +4280,7 @@ var _landTick = null;
     }
 
     // ── La tira ──
-    var el=elegirTira(univ,grandeId);
+    var el=elegirTira(univ,grandeId,dsGrande);
     strip.innerHTML='';
     strip.setAttribute('data-fuente',el.fuente);
     if(!el.items.length){strip.style.display='none';return;}

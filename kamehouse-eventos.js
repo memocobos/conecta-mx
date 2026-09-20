@@ -565,6 +565,10 @@ function _excelFuenteNumerologia(n) {
     return caja('var(--red)', `<b style="color:var(--red)">La hoja de Numerología no contestó bien</b>
       [${_evtEsc(n.error.codigo || '')}] ${_evtEsc(n.error.mensaje || '')}`);
   }
+  if (n.sin_siembra) {
+    return caja('var(--ts)', `<b style="color:var(--tp)">Numerología no se leyó para este evento</b> —
+      ${_evtEsc(n.motivo || '')} <span style="opacity:.8">Se siembra en <code>numerologia_eventos</code>.</span>`);
+  }
   if (n.parser_pendiente) {
     return caja('var(--orange)', `<b style="color:var(--orange)">La hoja de Numerología ya responde</b>
       (${n.filas_libro} fila(s) en el libro, ${n.mapeos} mapeo(s) sembrado(s)) —

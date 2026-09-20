@@ -17,7 +17,7 @@
 
 const { cosechar } = require('./cosecha-excel');
 const { parsearPestana, carear } = require('./excel-careo');
-const { mapearLibro, fundirNumerologia, PESTANA_LIBRO } = require('./numerologia');
+const { mapearLibro, fundirNumerologia, parsearLibro, PESTANA_LIBRO } = require('./numerologia');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -173,6 +173,29 @@ async function correrCareo(eventoId) {
 // suyo; y un careo que se cae en silencio sería peor. Se dice el estado y se
 // sigue con lo que hay.
 async function traerNumerologia(eventoId, sb) {
+  // ⏱ EL ORDEN IMPORTA, Y LO IMPUSO EL RELOJ. Primero se preguntan los mapeos
+  // (~150 ms) y solo después se cosecha el libro (~2.1 s MEDIDOS contra
+  // producción). Al revés —que es como nació— el careo de CUALQUIER evento
+  // pagaba esos 2.1 s aunque no tuviera ni un mapeo sembrado: natanael pasó de
+  // ~3 s a 5.3-6.0 s en caliente y 10.4 s EN FRÍO, por encima del corte de 10 s
+  // de Netlify. Y es el MISMO libro para los 107 eventos.
+  //
+  // 🔒 No traer lo que no se puede usar no es un atajo: sin un mapeo sembrado
+  // para este evento, NINGUNA fila del libro podría carearse aquí — la única
+  // salida sería inventarle evento a alguien, que es justo lo que la tuerca
+  // prohíbe. Así que el trabajo no se ahorra: es que no lo había.
+  const mr = await fetch(`${SB_URL}/rest/v1/numerologia_eventos?activa=is.true&select=nombre_libro,fecha_libro,evento_id,activa&limit=5000`, { headers: sb });
+  const mapeos = mr.ok ? (await mr.json().catch(() => [])) : [];
+  const lista = Array.isArray(mapeos) ? mapeos : [];
+  const deEste = lista.filter((m) => m.evento_id === eventoId);
+  if (!deEste.length) {
+    return { configurada: true, sin_siembra: true, personas: [], sin_mapeo: [],
+      mapeos: lista.length,
+      motivo: lista.length
+        ? `A «${eventoId}» no le han sembrado ningún mapeo en numerologia_eventos, así que el libro de Memo no se leyó (son ~2 s por careo). Hay ${lista.length} mapeo(s) sembrado(s) para otros eventos.`
+        : 'Todavía no se ha sembrado numerologia_eventos, así que el libro de Memo no se leyó. La tabla y su siembra las corre Jane; sin ella ninguna fila del libro podría carearse sin inventarle evento a alguien.' };
+  }
+
   const c = await cosechar({ pestana: PESTANA_LIBRO, fuente: 'numerologia' });
   if (!c.ok && c.codigo === 'SIN_CONFIG') {
     return { configurada: false, motivo: c.mensaje, personas: [], sin_mapeo: [] };
@@ -182,25 +205,14 @@ async function traerNumerologia(eventoId, sb) {
       error: { codigo: c.codigo, mensaje: c.mensaje, pista: c.pista } };
   }
 
-  // El mapeo libro→slug, de la TABLA. Se lee aquí y no antes para no gastar una
-  // ida y vuelta cuando la fuente ni siquiera está desplegada.
-  const mr = await fetch(`${SB_URL}/rest/v1/numerologia_eventos?activa=is.true&select=nombre_libro,fecha_libro,evento_id,activa&limit=5000`, { headers: sb });
-  const mapeos = mr.ok ? (await mr.json().catch(() => [])) : [];
-
-  // ⚠️ AQUÍ VA EL PARSER DE CUADRE-2b, y hoy NO EXISTE a propósito: escribirlo
-  // pide los encabezados REALES de «Boletos», que no se pueden medir hasta que
-  // Memo despliegue el segundo Apps Script. Inventarlos —y el fixture que los
-  // probara— daría un verde que solo demuestra que soy consistente conmigo
-  // mismo. Así que este estado se DICE, con la hoja ya en la mano:
-  return { configurada: true, parser_pendiente: true,
-    // La forma queda ESTABLE desde ya —vacía, pero presente— para que 2b solo
-    // tenga que llenarla y la pantalla no cambie de contrato con el parser.
-    personas: [], sin_mapeo: [],
+  // El libro, leído con su propio parser (medido de la rejilla real el 20-sep).
+  const libro = parsearLibro(c.filas);
+  const m = mapearLibro(libro.personas, lista, eventoId);
+  return { configurada: true,
+    personas: m.personas, sin_mapeo: m.sinMapeo,
     filas_libro: Array.isArray(c.filas) ? c.filas.length : 0,
-    mapeos: Array.isArray(mapeos) ? mapeos.length : 0,
-    motivo: 'La hoja de Numerología ya responde, pero el lector del libro corrido es CUADRE-2b: '
-          + 'se escribe midiendo los encabezados reales de la pestaña «' + PESTANA_LIBRO + '», no suponiéndolos.',
-    primeras_filas: Array.isArray(c.filas) ? c.filas.slice(0, 3) : [] };
+    bloques: libro.bloques.length, personas_libro: libro.personas.length,
+    descartes: libro.descartes, mapeos: lista.length };
 }
 
 module.exports = { correrCareo, leerBase, SB_URL };

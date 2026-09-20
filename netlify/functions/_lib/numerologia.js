@@ -52,9 +52,163 @@
 //
 // Y el select que se hace es: `activa=is.true` +
 // `select=nombre_libro,fecha_libro,evento_id,activa`.
-const { normalizarNombre } = require('./excel-careo');
+const { normalizarNombre, leerDinero, esChatarra } = require('./excel-careo');
 
 const PESTANA_LIBRO = 'Boletos';
+
+// ── EL PARSER DEL LIBRO CORRIDO ─────────────────────────────────────────────
+// 🔒 MEDIDO DE LA REJILLA REAL el 20-sep-2026, no supuesto: 824 filas, 55
+// bloques, 454 personas con nombre, $1,829,538 abonados. Y la forma no se
+// parece en nada a lo que
+// cualquiera habría dibujado de memoria — de ahí que la casa mida primero.
+//
+// EL LIBRO NO ES UNA TABLA: ES UNA PILA DE BLOQUES, uno por evento.
+//
+//     ['Sleeping with Sirens']                          ← TÍTULO: una fila con
+//     ['Nombre','Fecha','Tipo de Boleto','Vendedor',…]     UNA sola celda llena
+//     ['Angel Gabriel Villela Sierra','','General',…]    ← las personas
+//     ['']                                              ← y otra vez
+//
+// LAS TRES TRAMPAS MEDIDAS, cada una con lo que habría costado:
+//
+//  1. ⚠️ LA COLUMNA [1] NO SIEMPRE ES «Fecha»: en 10 de los 47 bloques es
+//     «Codigo» (EDC, The Neighbourhood, J Balvin, Milo J, Zayn, Kali Uchis,
+//     Kenia Os, Lorde, Warped). Leerla por posición metería «jfe22d» donde va
+//     una fecha; ese par (evento, «jfe22d») no mapearía con nada y la persona
+//     DESAPARECERÍA del careo sin que nadie la nombrara. Se lee por ENCABEZADO,
+//     y el encabezado se relee EN CADA BLOQUE.
+//
+//  2. ⚠️ «Total» EN EL LIBRO NO ES EL TOTAL DE CONTRATO: es lo PAGADO. Es el
+//     nombre exactamente al revés que en las pestañas de las chicas, donde
+//     «Total» sí es el contrato. Medido con la aritmética: separo $800 + pagos
+//     $0 → «Total» $800 y «Resta» $4,500 sobre un «Costo al Publico» de $5,300.
+//     Confundirlos habría leído un abonado como un contrato en 489 filas.
+//     El contrato es «Costo al Publico» — la misma columna que TOTAL-1 tecleó
+//     a mano como «la libreta».
+//
+//  3. ⚠️ OCHO BLOQUES NO ROTULAN «Nombre». El primero usa «Talla Pa'l Norte» en
+//     la [1] y sus filas vienen de verdad sin nombre (155 descartes medidos);
+//     pero «Rosalia» y «Humbe» SÍ traen el nombre en la [0] con el encabezado
+//     empezando en [1]«Codigo». Por eso un bloque no se reconoce por la celda
+//     «Nombre» sino por traer «Costo al Publico» Y «Separo», y la [0] es el
+//     nombre por RESPALDO. Sin las dos cosas se perdían ONCE PERSONAS REALES y
+//     $55,400 con ellas.
+//
+//  4. ⚠️ LOS NOMBRES TRAEN COMILLAS PEGADAS («"Ivan Delgado"», «Jose iram
+//     urbina"»). La llave saldría `"ivan delgado"` y no casaría NUNCA con la
+//     pestaña: la persona se reportaría como nueva y el aplicar le daría de
+//     alta un duplicado con su dinero.
+//
+// Y el dinero se SUMA (separo + Pago 1…7) en vez de creerle a la columna
+// «Total» del libro — la misma regla que `parsearPestana`. Medido: coinciden en
+// el 99%, y las 5 filas que no difieren por $2 de redondeo.
+const CELDAS_DE_BLOQUE = ['costo al publico', 'separo'];
+
+function _txt(x) { return String(x == null ? '' : x).trim(); }
+
+// 🔒 LAS COMILLAS PEGADAS AL NOMBRE. Medido en la hoja real: el libro trae
+// «"Ivan Delgado"» y «Jose iram urbina"». `normalizarNombre` no las quita —y
+// NO se le tocan: es el protocolo probado contra 2,223 viajeros—, así que la
+// llave saldría `"ivan delgado"` y JAMÁS casaría con el `ivan delgado` de la
+// pestaña: la persona se reportaría como NUEVA y el aplicar le daría de alta un
+// duplicado con su dinero. Se limpia AQUÍ, que es donde vive la rareza.
+function _limpiarNombre(s) {
+  return _txt(s).replace(/^["'\s]+|["'\s]+$/g, '');
+}
+
+// ¿Esta fila es el encabezado de un bloque? Se pregunta por DOS celdas que
+// ningún renglón de persona lleva, no por la primera columna.
+function esEncabezadoDeBloque(fila) {
+  const norm = (fila || []).map((x) => normalizarNombre(_txt(x)));
+  return CELDAS_DE_BLOQUE.every((c) => norm.includes(c));
+}
+
+function mapearColumnasLibro(cabecera) {
+  const norm = (cabecera || []).map((x) => normalizarNombre(_txt(x)));
+  const idx = (n) => norm.indexOf(normalizarNombre(n));
+  const mapa = {
+    // 🔒 LA COLUMNA 0 ES EL NOMBRE AUNQUE EL ENCABEZADO NO LA ROTULE. Medido en
+    // la rejilla real: los bloques «Rosalia» y «Humbe» traen el encabezado sin
+    // la celda «Nombre» —arranca en [1]«Codigo»— y sus filas SÍ llevan el
+    // nombre en la [0]. Con `-1` se caían al montón de «sin nombre» ONCE
+    // PERSONAS REALES, con su dinero dentro. El corte de qué evento cuenta lo
+    // decide LA SIEMBRA; perder gente al parsear sería un corte accidental, que
+    // es el peor de todos porque nadie lo firmó.
+    //
+    // El respaldo es seguro: en el bloque irregular de Pa'l Norte la [0] viene
+    // VACÍA en sus ~198 filas, así que caen igual por «sin nombre».
+    nombre: idx('Nombre') >= 0 ? idx('Nombre') : 0,
+    fecha: idx('Fecha'), codigo: idx('Codigo'),
+    zona: idx('Tipo de Boleto'), vendedor: idx('Vendedor'),
+    costoPublico: idx('Costo al Publico'), separo: idx('Separo'),
+    total: idx('Total'), pagos: [],
+  };
+  for (let i = 0; i < norm.length; i++) if (/^pago \d+$/.test(norm[i])) mapa.pagos.push(i);
+  // Lo que SUMA al abonado, en un solo lugar. ⚠️ `total` y `costoPublico` NO
+  // entran: uno es el resultado de esta misma suma y el otro es el contrato.
+  mapa.dinero = [mapa.separo, ...mapa.pagos].filter((i) => i >= 0);
+  return mapa;
+}
+
+// parsearLibro(filas) → { personas, bloques, descartes }
+// Cada persona cumple el contrato que consume `mapearLibro`:
+//   { nombre, clave, abonado, boletos, evento_libro, fecha_libro, zona,
+//     codigo, costo_publico }
+function parsearLibro(filas) {
+  const personas = [], bloques = [];
+  const descartes = { chatarra: 0, sinNombre: 0, fueraDeBloque: 0 };
+  let mapa = null, tituloPendiente = '', bloqueActual = null;
+
+  for (const cruda of (filas || [])) {
+    const f = cruda || [];
+    const llenas = f.filter((x) => _txt(x) !== '').length;
+    if (!llenas) continue;
+
+    if (esEncabezadoDeBloque(f)) {
+      mapa = mapearColumnasLibro(f);
+      bloqueActual = { titulo: tituloPendiente || '(sin título)', personas: 0,
+                       tiene_nombre: normalizarNombre(_txt((f || [])[0])) === 'nombre', tiene_fecha: mapa.fecha >= 0 };
+      bloques.push(bloqueActual);
+      tituloPendiente = '';
+      continue;
+    }
+    // El TÍTULO del evento: una fila con UNA sola celda llena. No es una
+    // columna — es un renglón suelto, y por eso el evento no se puede leer de
+    // la fila de la persona.
+    if (llenas === 1) { tituloPendiente = _txt(f[0]) || _txt(f.find((x) => _txt(x))); continue; }
+
+    if (!mapa) { descartes.fueraDeBloque++; continue; }
+    const nombre = mapa.nombre >= 0 ? _limpiarNombre(f[mapa.nombre]) : '';
+    if (!nombre) { descartes.sinNombre++; continue; }
+    if (esChatarra(nombre)) { descartes.chatarra++; continue; }
+
+    const costo = mapa.costoPublico >= 0 ? f[mapa.costoPublico] : null;
+    // El mismo hueco de CUADRE-1a, en la otra hoja: una celda sin dígitos es
+    // «no sé», no un cero. Medido sobre las 454: NINGUNA se queda sin contrato
+    // legible, y 6 traen $0 exacto — que es un número, no un hueco. (El «10.6%»
+    // que puse aquí primero era mío: contaba el $0 como ausente y dividía entre
+    // un total que incluía las filas de título. Los números se computan.)
+    const costoLegible = /[0-9]/.test(_txt(costo));
+
+    personas.push({
+      nombre, clave: normalizarNombre(nombre),
+      abonado: mapa.dinero.reduce((a, c) => a + leerDinero(f[c]), 0),
+      boletos: 1,
+      evento_libro: bloqueActual ? bloqueActual.titulo : '',
+      // Solo si el bloque TIENE columna de fecha. En los 10 de «Codigo» esto
+      // queda vacío, que es lo correcto: esa gente no trae fecha, no trae
+      // «jfe22d» como fecha.
+      fecha_libro: mapa.fecha >= 0 ? _txt(f[mapa.fecha]) : '',
+      codigo: mapa.codigo >= 0 ? _txt(f[mapa.codigo]) : '',
+      zona: mapa.zona >= 0 ? _txt(f[mapa.zona]) : '',
+      // ⚠️ El contrato del libro. Se LEE y viaja como evidencia; quién manda
+      // entre éste y el de la pestaña lo decide `fundirNumerologia`.
+      costo_publico: costoLegible ? leerDinero(costo) : null,
+    });
+    if (bloqueActual) bloqueActual.personas++;
+  }
+  return { personas, bloques, descartes };
+}
 
 // ── EL MAPEO LIBRO → SLUG ───────────────────────────────────────────────────
 // 🔒 VIVE EN LA TABLA `numerologia_eventos`, NO EN CÓDIGO — el molde de
@@ -157,4 +311,5 @@ function fundirNumerologia(personasPestana, personasLibro) {
   return [...out.values()];
 }
 
-module.exports = { mapearLibro, fundirNumerologia, llave, PESTANA_LIBRO };
+module.exports = { mapearLibro, fundirNumerologia, llave, PESTANA_LIBRO,
+                   parsearLibro, mapearColumnasLibro, esEncabezadoDeBloque };

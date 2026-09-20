@@ -41,10 +41,19 @@ const MAX_FILAS_ENCABEZADO = 30;
 const FUENTES = {
   pestanas: {
     url: 'EXCEL_SCRIPT_URL', token: 'EXCEL_SCRIPT_TOKEN',
+    // El último candado de forma: si no está la celda «Nombre», no es la hoja.
+    exigeEncabezado: true,
     comoSePone: 'Se ponen al desplegar el Apps Script desde el Excel de las chicas (ver apps-script/excel-cosechador.gs).',
   },
   numerologia: {
     url: 'NUMEROLOGIA_SCRIPT_URL', token: 'NUMEROLOGIA_SCRIPT_TOKEN',
+    // 🔒 EL LIBRO NO TIENE UN ENCABEZADO: TIENE 55. Es una pila de bloques, uno
+    // por evento, cada uno con el suyo — y OCHO de ellos ni siquiera rotulan
+    // «Nombre». Exigir aquí una celda única sería rechazar la hoja BUENA:
+    // medido, `cosechar` contestaba SIN_ENCABEZADO sobre la pestaña real. La
+    // guarda de forma de esta fuente vive en su parser, que exige «Costo al
+    // Publico» + «Separo» para reconocer un bloque.
+    exigeEncabezado: false,
     comoSePone: 'Se ponen al desplegar el MISMO apps-script/excel-cosechador.gs una SEGUNDA vez, ahora desde el Excel «Numerología» de Memo, y guardar su /exec y su token con estos nombres.',
   },
 };
@@ -142,6 +151,12 @@ async function cosechar({ pestana, fuente } = {}, fetchImpl) {
   const filas = Array.isArray(json.filas) ? json.filas : null;
   if (!filas) {
     return { ok: false, codigo: 'SIN_FILAS', mensaje: 'El Apps Script no devolvió filas para "' + pestana + '".' };
+  }
+
+  if (FUENTES[fuente || 'pestanas'].exigeEncabezado === false) {
+    return { ok: true, pestana, filas, n_filas: filas.length, encabezado: null,
+             fuente: fuente || 'pestanas',
+             pestanas: Array.isArray(json.pestanas) ? json.pestanas : [], leido_en: json.leido_en };
   }
 
   const encabezado = buscarEncabezado(filas);

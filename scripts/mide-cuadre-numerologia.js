@@ -140,6 +140,130 @@ const MAPEOS = () => ([
     af(f.length === 3, 'la fusión devolvió ' + f.length + ' persona(s), se esperaban 3');
   }
 
+  // ── [1b] EL PARSER DEL LIBRO, MEDIDO DE LA REJILLA REAL ───────────────────
+  // Las tres cabeceras y las filas de abajo están copiadas LETRA POR LETRA de
+  // la pestaña «Boletos» real, cosechada el 20-sep-2026 (824 filas, 47 bloques,
+  // 489 personas). El libro NO es una tabla: es una PILA DE BLOQUES, uno por
+  // evento, cada uno con su propio título y su propio encabezado repetido.
+  console.log('\n[1b] el parser del libro (rejilla real)');
+  try { if (N) {
+    // La cabecera ESTÁNDAR (×36 de 47 bloques).
+    const CAB_STD = ['Nombre','Fecha','Tipo de Boleto','Vendedor','Costo Proveedor','Costo al Publico',
+      'Separo','Pago 1','Pago 2','Pago 3','Pago 4','Pago 5','Pago 6','Pago 7','Total','Resta','Ganancia','Pagado','Correo','Entregado'];
+    // La variante con CÓDIGO en la columna 1 (×10). Leer la [1] por POSICIÓN
+    // metería un código donde va una fecha.
+    const CAB_COD = CAB_STD.map((c, i) => (i === 1 ? 'Codigo' : c));
+    // El PRIMER bloque real, que NO tiene «Nombre» y usa «Talla Pa'l Norte».
+    const CAB_RARA = ['', "Talla Pa'l Norte", ' ', 'Vendedor', 'Costo Proveedor', 'Costo al Publico',
+      'Separo','Pago 1','Pago 2','Pago 3','Pago 4','Pago 5','Pago 6','Pago 7','Total','Resta','Ganancia','Pagado','Correo','Entregado'];
+    const fila = (cab, v) => { const f = new Array(cab.length).fill('');
+      for (const [c, x] of Object.entries(v)) { const i = cab.indexOf(c); if (i < 0) throw new Error('columna inexistente: ' + c); f[i] = x; } return f; };
+
+    const LIBRO_CRUDO = [
+      [''],
+      CAB_RARA,                                        // bloque irregular, sin nombres
+      fila(CAB_RARA, { "Talla Pa'l Norte": 'M', 'Separo': '$800', 'Pago 1': '$2,000', 'Total': '$2,800' }),
+      [''],
+      ['Karol G'],                                     // ← el título: UNA celda en col 0
+      CAB_STD,
+      fila(CAB_STD, { 'Nombre': 'Esmeralda Estefania Hernandez Lopez', 'Tipo de Boleto': 'Poniente Baja',
+        'Costo al Publico': '$4,500', 'Separo': '$1,000', 'Pago 1': '$1,000', 'Total': '$2,000' }),
+      fila(CAB_STD, { 'Nombre': 'Nancy Ruiz', 'Fecha': '7 de Noviembre', 'Tipo de Boleto': 'VIP A',
+        'Costo al Publico': '$8,000', 'Separo': '$1,000', 'Pago 1': '$4,000', 'Total': '$5,000' }),
+      // Basura REAL en la columna de fecha: son notas de envío, no fechas.
+      fila(CAB_STD, { 'Nombre': 'Rosa Envio', 'Fecha': 'se envio a reynosa', 'Tipo de Boleto': 'VIP A',
+        'Costo al Publico': '$8,000', 'Separo': '$500', 'Total': '$500' }),
+      [''],
+      ['The Neighbourhood'],
+      CAB_COD,                                         // ← aquí la [1] es CÓDIGO
+      fila(CAB_COD, { 'Nombre': 'Ana Codigo', 'Codigo': 'jfe22d', 'Tipo de Boleto': 'Perfiles A',
+        'Costo al Publico': '$5,100', 'Separo': '$500', 'Pago 1': '$600', 'Total': '$1,100' }),
+      [''],
+      ['Feid'],
+      CAB_STD,
+      fila(CAB_STD, { 'Nombre': 'Feid Fan', 'Tipo de Boleto': 'General', 'Separo': '$3,000', 'Total': '$3,000' }),
+      // «Costo al Publico» = $0 EXPLÍCITO. Medido: 6 filas reales lo traen así.
+      // Un cero tecleado es un NÚMERO, no un hueco — la misma distinción que
+      // sostiene todo CUADRE-1a, en la otra hoja.
+      fila(CAB_STD, { 'Nombre': 'Cero Tecleado', 'Tipo de Boleto': 'General',
+        'Costo al Publico': '$0', 'Separo': '$700', 'Total': '$700' }),
+    ];
+
+    const r = N.parsearLibro(LIBRO_CRUDO);
+    r.personas.forEach((p) => console.log(`    ${p.nombre.slice(0,32).padEnd(32)} ${JSON.stringify(p.evento_libro).padEnd(22)} fecha=${JSON.stringify(p.fecha_libro).padEnd(20)} abonado=${p.abonado} costo=${JSON.stringify(p.costo_publico)}`));
+    console.log('    bloques: ' + r.bloques.map((b) => `${b.titulo}×${b.personas}`).join(' · '));
+
+    af(r.personas.length === 6, 'el parser sacó ' + r.personas.length + ' persona(s), se esperaban 6');
+    // 🔒 EL BLOQUE IRREGULAR NO DA PERSONAS: sus filas no traen nombre.
+    af(!r.personas.some((p) => !p.nombre), 'salió una persona sin nombre del bloque irregular');
+    // 🔒 EL TÍTULO DEL BLOQUE ES EL EVENTO — y es una fila de UNA celda, no una columna.
+    const esm = r.personas.find((p) => /Esmeralda/.test(p.nombre));
+    af(esm && esm.evento_libro === 'Karol G', 'el evento no sale del TÍTULO del bloque: ' + JSON.stringify(esm && esm.evento_libro));
+    af(esm && esm.fecha_libro === '', 'Esmeralda no trae fecha y salió ' + JSON.stringify(esm && esm.fecha_libro));
+    // 🔒 EL DINERO SE SUMA (separo + pagos), como en la pestaña — no se le cree
+    // a la columna «Total» del libro. Medido: coinciden en 99%, y los 5 que no
+    // difieren por redondeo.
+    af(esm && esm.abonado === 2000, 'Esmeralda: abonado ' + (esm && esm.abonado) + ', se esperaban 2000 (separo 1,000 + pago 1,000)');
+    const nan = r.personas.find((p) => /Nancy/.test(p.nombre));
+    af(nan && nan.abonado === 5000, 'Nancy: abonado ' + (nan && nan.abonado) + ', se esperaban 5000');
+    // 🔒 LA FECHA DESAMBIGUA, y se lee POR ENCABEZADO.
+    af(nan && nan.fecha_libro === '7 de Noviembre', 'Nancy: fecha ' + JSON.stringify(nan && nan.fecha_libro));
+    // 🔒 LA COLUMNA [1] NO SIEMPRE ES FECHA: en 10 de los 47 bloques es CÓDIGO.
+    // Leerla por posición metería «jfe22d» donde va una fecha, y ese par
+    // (evento, «jfe22d») no mapearía con nada — la persona desaparecería del
+    // careo sin que nadie la nombrara.
+    const anaC = r.personas.find((p) => /Ana Codigo/.test(p.nombre));
+    af(anaC && anaC.fecha_libro === '',
+       'el bloque de CÓDIGO metió «' + (anaC && anaC.fecha_libro) + '» como fecha: la [1] se lee por ENCABEZADO, no por posición');
+    af(anaC && anaC.codigo === 'jfe22d', 'el código del bloque no viaja: ' + JSON.stringify(anaC && anaC.codigo));
+    // 🔒 EL «Costo al Publico» EXISTE en el libro — y se mide, no se supone.
+    af(esm && esm.costo_publico === 4500, 'el libro SÍ trae «Costo al Publico» y no se leyó: ' + JSON.stringify(esm && esm.costo_publico));
+    const cero = r.personas.find((p) => /Cero Tecleado/.test(p.nombre));
+    af(cero && cero.costo_publico === 0,
+       'un «Costo al Publico» de $0 TECLEADO salió ' + JSON.stringify(cero && cero.costo_publico)
+       + ' y debe ser 0: un cero escrito es un número, no un hueco — leerlo como ausencia borra la diferencia '
+       + 'entre «no sé cuánto cuesta» y «cuesta cero»');
+    const feid = r.personas.find((p) => /Feid/.test(p.nombre));
+    af(feid && feid.costo_publico === null,
+       'sin «Costo al Publico» legible tiene que ser null, no cero (10.6% de las filas reales): ' + JSON.stringify(feid && feid.costo_publico));
+    // La basura de la columna de fecha NO se limpia ni se inventa: viaja tal
+    // cual y acabará en `sin_mapeo`, que es donde se ve.
+    const env = r.personas.find((p) => /Rosa Envio/.test(p.nombre));
+    af(env && env.fecha_libro === 'se envio a reynosa',
+       'la nota de envío en la columna de fecha se tocó: ' + JSON.stringify(env && env.fecha_libro));
+    af(r.bloques.length === 4, 'contó ' + r.bloques.length + ' bloque(s), se esperaban 4 (el irregular + 3 con título)');
+
+    // 🔒 LA COLUMNA 0 ES EL NOMBRE AUNQUE EL ENCABEZADO NO LA ROTULE.
+    // Medido en la rejilla real: los bloques «Rosalia» y «Humbe» traen el
+    // encabezado SIN la celda «Nombre» —empieza en [1]«Codigo»— y aun así sus
+    // filas llevan el nombre en la [0]. Con `nombre: -1`, ONCE PERSONAS REALES
+    // se caían al montón de «sin nombre» y desaparecían del careo con su dinero
+    // dentro. El corte de qué evento cuenta lo decide LA SIEMBRA; perderlos al
+    // parsear sería un corte accidental, que es el peor de todos.
+    const CAB_SIN_ROTULO = ['', 'Codigo', 'Tipo de Boleto', 'Vendedor', 'Costo Proveedor', 'Costo al Publico',
+      'Separo','Pago 1','Pago 2','Pago 3','Pago 4','Pago 5','Pago 6','Pago 7','Total','Resta','Ganancia','Pagado','Correo','Entregado'];
+    const fr = (v) => { const f = new Array(CAB_SIN_ROTULO.length).fill('');
+      f[0] = v.nombre || ''; f[1] = v.codigo || ''; f[5] = v.costo || ''; f[6] = v.separo || ''; f[7] = v.pago || ''; return f; };
+    const r2 = N.parsearLibro([
+      ['Rosalia'], CAB_SIN_ROTULO,
+      // Los nombres vienen con COMILLAS PEGADAS en la hoja real
+      // («Jose iram urbina"», «"Ivan Delgado"»). Sin quitarlas, la llave del
+      // careo sería `"ivan delgado"` y NUNCA casaría con el `ivan delgado` de
+      // la pestaña: la persona saldría como NUEVA y se le daría de alta un
+      // duplicado con su dinero.
+      fr({ nombre: '"Ivan Delgado"', costo: '$2,600', separo: '$1,000', pago: '$400' }),
+      fr({ nombre: 'Jose iram urbina"', costo: '$5,800', separo: '$1,000', pago: '$1,200' }),
+    ]);
+    console.log('    bloque sin rótulo → ' + r2.personas.map((x) => `${JSON.stringify(x.nombre)}→${JSON.stringify(x.clave)}`).join(' · '));
+    af(r2.personas.length === 2, 'el bloque sin rótulo de «Nombre» dio ' + r2.personas.length
+       + ' persona(s) y sus filas SÍ traen nombre en la [0]: se están perdiendo con su dinero dentro');
+    af(r2.personas.some((x) => x.clave === 'ivan delgado'),
+       'la comilla se quedó en la llave: ' + JSON.stringify(r2.personas.map((x) => x.clave))
+       + ' — con ella la persona nunca casa con la pestaña y se le daría de alta un duplicado');
+    af(r2.personas.some((x) => x.clave === 'jose iram urbina'), 'la comilla del final tampoco se quitó');
+    af(r2.personas.every((x) => x.abonado > 0), 'el dinero del bloque sin rótulo no se leyó');
+  } } catch (e) { af(false, 'la sección del parser se CAYÓ: ' + e.message); }
+
   // ── [2b] (a) EL PUNTO ENTERO: la negativa esperada se vuelve CERO ─────────
   // Es la razón de ser de la tuerca. El 19-sep Jane aplicó el libro a mano, así
   // que el sistema quedó con $3,000 mientras la pestaña solo ve $1,000: hoy el
@@ -247,6 +371,98 @@ const MAPEOS = () => ([
     af(false, 'la sección del careo completo se CAYÓ: ' + e.message);
   }
 
+  // ── [4b] EL CAREO CON LA TERCERA FUENTE DENTRO, POR EL HANDLER ───────────
+  // Ahora que el parser existe, el camino completo se puede ejercitar: Apps
+  // Script → parser → mapeo → fusión → montones. Es el caso (b) de la tuerca y
+  // el remate del (a), medidos de punta a punta y no por partes.
+  console.log('\n[4b] el careo entero CON la tercera fuente');
+  let d2 = {};
+  try {
+    const red2 = redFalsa({ conNumerologia: true });
+    global.fetch = red2.fetchFalso;
+    for (const f of ['admin-excel-careo.js', '_lib/excel-careo-correr.js', '_lib/excel-careo.js',
+                     '_lib/cosecha-excel.js', '_lib/numerologia.js']) {
+      try { delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))]; } catch (_) {}
+    }
+    process.env.NUMEROLOGIA_SCRIPT_URL = 'https://numero.test/exec';
+    process.env.NUMEROLOGIA_SCRIPT_TOKEN = 't';
+    const mod2 = require(path.join(RAIZ, 'netlify/functions/admin-excel-careo.js'));
+    const r2 = await mod2.handler({ httpMethod: 'POST',
+      headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer x' },
+      body: JSON.stringify({ evento_id: EVENTO }) });
+    d2 = JSON.parse(r2.body);
+    const n = d2.numerologia || {};
+    console.log('    numerologia: configurada=' + n.configurada + ' · personas=' + (n.personas || []).length
+      + ' · sin_mapeo=' + (n.sin_mapeo || []).length + ' · bloques=' + n.bloques);
+    af(r2.statusCode === 200 && d2.ok, 'el careo con la tercera fuente no dio 200: ' + JSON.stringify(d2).slice(0, 200));
+    af(n.configurada === true, 'con las vars puestas, la fuente sigue diciéndose no configurada');
+
+    // (a) DE PUNTA A PUNTA: la negativa esperada se volvió CERO.
+    const sigue = (d2.pagos || []).find((x) => /Esmeralda/.test(x.nombre));
+    console.log('    Esmeralda: ' + (sigue ? `sigue sonando ${sigue.diferencia}` : 'CUADRA ✓')
+      + ' · fuentes=' + JSON.stringify(((d2.iguales || []).find((x) => /Esmeralda/.test(x.nombre)) || {}).nombre ? 'iguales' : '?'));
+    af(!sigue, 'por el handler, la fila SIGUE sonando: ' + (sigue ? sigue.diferencia : ''));
+
+    // (b) 🔒 UNA FILA DEL LIBRO SIN MAPEO NO PRODUCE NI NUEVO NI PAGO.
+    const sm = n.sin_mapeo || [];
+    console.log('    sin mapeo: ' + sm.map((x) => `${x.evento_libro}×${x.filas} ($${x.abonado})`).join(' · '));
+    af(sm.length > 0, 'el fixture siembra filas sin mapeo y no salió ninguna: el caso pasaría en hueco');
+    af(!(d2.nuevos || []).some((x) => /Feid Fan|Viejo/.test(x.nombre)),
+       'una fila del libro SIN MAPEO se coló como ALTA: eso es inventarle evento a alguien');
+    af(!(d2.pagos || []).some((x) => /Feid Fan|Viejo/.test(x.nombre)),
+       'una fila del libro SIN MAPEO se coló como PAGO');
+    af(sm.some((x) => /Feid/.test(x.evento_libro)) && sm.every((x) => x.filas > 0 && x.abonado > 0),
+       'el renglón informativo no trae el conteo y el dinero: sin ellos no se puede obrar');
+
+    // Quien vive SOLO en el libro y SÍ mapea entra como NUEVO — con su dinero.
+    const jose = (d2.nuevos || []).find((x) => /José/.test(x.nombre));
+    af(!!jose, 'quien vive solo en el libro y SÍ mapea no salió como nuevo');
+    af(jose && jose.abonado === 19000, 'José: abonado ' + (jose && jose.abonado) + ', el libro dice 19000');
+  } catch (e) {
+    af(false, 'la sección del careo CON tercera fuente se CAYÓ: ' + e.message);
+  }
+
+  // ── [4c] EL RELOJ: no se trae el libro si no hay nada que mapear ──────────
+  // ⏱ MEDIDO CONTRA PRODUCCIÓN: la cosecha del libro cuesta ~2.1 s en CADA
+  // careo, y es EL MISMO libro para los 107 eventos. Con él, natanael pasó de
+  // ~3 s a 5.3-6.0 s en caliente y 10.4 s EN FRÍO — por encima del corte de
+  // Netlify. Así que primero se preguntan los mapeos (~150 ms) y el libro solo
+  // se cosecha si este evento TIENE algo sembrado. Hoy, con la tabla sin
+  // sembrar, el careo cuesta exactamente lo que costaba ayer.
+  console.log('\n[4c] el reloj: sin siembra para este evento, no se toca el libro');
+  try {
+    const red3 = redFalsa({ conNumerologia: true, sinSiembra: true });
+    global.fetch = red3.fetchFalso;
+    for (const f of ['admin-excel-careo.js', '_lib/excel-careo-correr.js', '_lib/excel-careo.js',
+                     '_lib/cosecha-excel.js', '_lib/numerologia.js']) {
+      try { delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))]; } catch (_) {}
+    }
+    const mod3 = require(path.join(RAIZ, 'netlify/functions/admin-excel-careo.js'));
+    const r3 = await mod3.handler({ httpMethod: 'POST',
+      headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer x' },
+      body: JSON.stringify({ evento_id: EVENTO }) });
+    const d3 = JSON.parse(r3.body), n3 = d3.numerologia || {};
+    console.log('    libro cosechado: ' + red3.cosechasLibro + ' vez(ces) · numerologia: ' + JSON.stringify(n3).slice(0, 120));
+    af(r3.statusCode === 200 && d3.ok, 'el careo sin siembra no dio 200');
+    af(red3.cosechasLibro === 0,
+       'se cosechó el libro ' + red3.cosechasLibro + ' vez(ces) sin tener NADA sembrado para este evento: '
+       + 'son ~2.1 s regalados en cada careo de cada evento, y el reloj de Netlify corta a los 10');
+    af(n3.sin_siembra === true, 'no se dice que a este evento no le han sembrado mapeo: ' + JSON.stringify(n3));
+    af(/numerologia_eventos/.test(String(n3.motivo || '')), 'el motivo no dice DÓNDE se siembra');
+    // CONTROL POSITIVO: con siembra, el libro SÍ se cosecha.
+    const red4 = redFalsa({ conNumerologia: true });
+    global.fetch = red4.fetchFalso;
+    for (const f of ['admin-excel-careo.js', '_lib/excel-careo-correr.js', '_lib/excel-careo.js',
+                     '_lib/cosecha-excel.js', '_lib/numerologia.js']) {
+      try { delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))]; } catch (_) {}
+    }
+    await require(path.join(RAIZ, 'netlify/functions/admin-excel-careo.js')).handler({ httpMethod: 'POST',
+      headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer x' },
+      body: JSON.stringify({ evento_id: EVENTO }) });
+    console.log('    CONTROL POSITIVO (con siembra): libro cosechado ' + red4.cosechasLibro + ' vez(ces)');
+    af(red4.cosechasLibro === 1, 'CON siembra el libro no se cosechó: el cero de arriba no probaría nada');
+  } catch (e) { af(false, 'la sección del reloj se CAYÓ: ' + e.message); }
+
   // ── [5] LA PANTALLA, RENDERIZADA DE VERDAD ────────────────────────────────
   console.log('\n[5] la pantalla');
   const fuente = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-eventos.js'), 'utf8');
@@ -300,20 +516,21 @@ const MAPEOS = () => ([
 })().catch((e) => { console.error('ARNÉS CAÍDO:', e.message, '\\n', e.stack); process.exit(1); });
 
 // ── la red falsa (solo lo que [4] necesita) ─────────────────────────────────
-function redFalsa() {
+function redFalsa(opts) {
   const SB = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
   const tablas = {
     excel_pestanas: [{ evento_id: EVENTO, pestana: PESTANA, regla_zona: null, activa: true, notas: null }],
-    numerologia_eventos: MAPEOS(),
+    numerologia_eventos: (opts && opts.sinSiembra) ? [] : MAPEOS(),
     viajeros_evento: [
       { id: 'v-1', evento_id: EVENTO, nombre: 'Esmeralda Estefania Hernandez Lopez', tipo_viajero: 'cliente',
-        abonado_previo: 1000, total_contrato: 4500, notas: 'Migrado Excel', zona_boleto: 'Poniente Baja', tipo_paquete: 'cheap' },
+        abonado_previo: 3000, total_contrato: 4500, notas: 'Migrado Excel · Numerología 19-sep: +$2,000', zona_boleto: 'Poniente Baja', tipo_paquete: 'cheap' },
     ],
     abonos_viajero: [],
   };
   const excel = { [PESTANA]: conPreludio([
-    filaExcel({ 'Nombre': 'Esmeralda Estefania Hernandez Lopez', 'Paquete': 'CHEAP', 'Boleto': 'Poniente Baja', 'Separo': '$1,500', 'Total': '$4,500', 'TALLA': '-' }),
+    filaExcel({ 'Nombre': 'Esmeralda Estefania Hernandez Lopez', 'Paquete': 'CHEAP', 'Boleto': 'Poniente Baja', 'Separo': '$1,000', 'Total': '$4,500', 'TALLA': '-' }),
   ]) };
+  const cuenta = { libro: 0 };
   const filtrar = (filas, qs) => {
     let out = filas;
     for (const [campo, expr] of qs.entries()) {
@@ -326,7 +543,24 @@ function redFalsa() {
     }
     return out;
   };
+  const LIBRO_CRUDO = [
+    ['Karol G'],
+    ['Nombre','Fecha','Tipo de Boleto','Vendedor','Costo Proveedor','Costo al Publico','Separo','Pago 1','Total','Resta'],
+    ['Esmeralda Estefania Hernandez Lopez','','Poniente Baja','Memo','','$4,500','$1,000','$1,000','$2,000',''],
+    ['José Santos','','Poniente Baja','Memo','','$19,000','$10,000','$9,000','$19,000',''],
+    ['Nancy Ruiz','7 de noviembre','VIP A','Memo','','$8,000','$5,000','','$5,000',''],
+    [''],
+    ['Feid'],
+    ['Nombre','Fecha','Tipo de Boleto','Vendedor','Costo Proveedor','Costo al Publico','Separo','Pago 1','Total','Resta'],
+    ['Feid Fan','','General','Memo','','$3,000','$3,000','','$3,000',''],
+  ];
   const fetchFalso = async (url, opts) => {
+    if (String(url).startsWith('https://numero.test')) {
+      const c = JSON.parse(opts.body);
+      if (c.pestana === 'Boletos') cuenta.libro++;
+      if (c.pestana !== 'Boletos') return { ok: true, status: 200, text: async () => JSON.stringify({ ok: false, codigo: 'SIN_PESTANA', error: 'no existe' }) };
+      return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, filas: LIBRO_CRUDO, pestanas: ['Boletos'] }) };
+    }
     if (String(url).startsWith('https://script.test')) {
       const c = JSON.parse(opts.body);
       const filas = excel[c.pestana];
@@ -340,5 +574,5 @@ function redFalsa() {
     if (((opts && opts.method) || 'GET') !== 'GET') throw new Error('EL CAREO ESCRIBIÓ: ' + opts.method + ' a ' + tabla);
     return { ok: true, status: 200, json: async () => filtrar(tablas[tabla] || [], u.searchParams), text: async () => '' };
   };
-  return { tablas, fetchFalso };
+  return { tablas, fetchFalso, get cosechasLibro() { return cuenta.libro; } };
 }

@@ -79,6 +79,31 @@ exports.handler = async (event) => {
   const siguiente = desde + lote.length;
   const hecho = siguiente >= todos.length;
 
+  // ── [CUADRE-4] LOS NOMBRES BONITOS, EN UNA SOLA CONSULTA ─────────────────
+  // El Resumen enseña «Bruno Mars - The Romantic Tour», jamás `brunomars#0`:
+  // un slug en la pantalla del uso diario es lenguaje de la base, no del
+  // negocio. Medido el 20-sep: `eventos_meta` cubre los 63 slugs activos
+  // (63/63) y es la que lleva el nombre del TOUR — esferas trae el corto
+  // («Bruno Mars»), y difieren en 33 de los 63.
+  //
+  // ⚠️ SU `slug` VA SIN EL `#N`: la tabla dice `brunomars` y el careo habla de
+  // `brunomars#0`. Se busca primero la llave entera y luego la base, no al
+  // revés — si algún día existiera una fila con el `#N`, ésa es la específica.
+  //
+  // 🔒 UNA consulta para toda la tanda, no una por renglón. Con 967 abonos eso
+  // habría sido la tuerca que rompe el botón: la peor tanda ya mide 8.6 s de
+  // los 10 que da Netlify.
+  const bases = [...new Set(lote.flatMap((e) => [e, e.split('#')[0]]))];
+  let nombres = new Map();
+  try {
+    const nr = await fetch(`${SB_URL}/rest/v1/eventos_meta?slug=in.(${bases.map(encodeURIComponent).join(',')})&select=slug,nombre`, { headers: sb });
+    if (nr.ok) {
+      const filasN = await nr.json().catch(() => []);
+      nombres = new Map((Array.isArray(filasN) ? filasN : []).map((x) => [x.slug, x.nombre]));
+    }
+  } catch (_) { /* fails-soft: sin nombre bonito se cae al slug, no se cae el botón */ }
+  const nombreDe = (ev) => nombres.get(ev) || nombres.get(ev.split('#')[0]) || null;
+
   const quien = (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || (auth.user && auth.user.id) || 'careo';
   const authHeader = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
 
@@ -93,11 +118,17 @@ exports.handler = async (event) => {
     try {
       const careo = await correrCareo(eventoId);
       if (careo.error) {
-        return { evento_id: eventoId, error: { codigo: careo.error.codigo || 'ERROR', mensaje: careo.error.mensaje } };
+        return { evento_id: eventoId, nombre_evento: nombreDe(eventoId), error: { codigo: careo.error.codigo || 'ERROR', mensaje: careo.error.mensaje } };
       }
       const plan = planear(careo, {});
       const pestanaNombre = (careo.pestanas || []).map((p) => p.pestana).join(' + ');
-      const base = { evento_id: eventoId, pestanas: pestanaNombre, plan,
+      const base = { evento_id: eventoId, nombre_evento: nombreDe(eventoId), pestanas: pestanaNombre, plan,
+        // [CUADRE-4] LAS BAJAS VIAJAN COMO AVISO, NO COMO PLAN. No están en
+        // `planear` a propósito —JAMÁS se aplican: una baja es una persona y
+        // espera firma—, pero el Resumen tiene que poder NOMBRARLAS. Callarlas
+        // las volvería invisibles justo en la pantalla del uso diario.
+        // Solo nombre y saldo: lo que hace falta para reconocer a quién.
+        bajas: (careo.montones.bajas || []).map((b) => ({ nombre: b.nombre, abonado: b.abonado })),
         numerologia: careo.numerologia ? { configurada: careo.numerologia.configurada,
           sin_siembra: !!careo.numerologia.sin_siembra, personas: (careo.numerologia.personas || []).length } : null };
       if (!confirmar) return base;
@@ -107,7 +138,7 @@ exports.handler = async (event) => {
     } catch (e) {
       // Ni una excepción suelta: una que escapara tumbaría el `Promise.all` y
       // con él la tanda entera, incluidos los eventos que sí salieron bien.
-      return { evento_id: eventoId, error: { codigo: 'EXCEPCION', mensaje: String((e && e.message) || e).slice(0, 300) } };
+      return { evento_id: eventoId, nombre_evento: nombreDe(eventoId), error: { codigo: 'EXCEPCION', mensaje: String((e && e.message) || e).slice(0, 300) } };
     }
   }));
 

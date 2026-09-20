@@ -1321,3 +1321,159 @@ function _radCalMasDias(fecha, n) {
   const d = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
   return _radCalMedianoche(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
+// ═══ [CUADRE-4] «ACTUALIZAR» EN EL RESUMEN ══════════════════════════════════
+// El botón vivía dentro de Eventos → Comparar con Excel, donde nadie lo iba a
+// buscar. Aquí arriba, y hablando como Memo.
+//
+// 🔒 SON DOS LENTES DEL MISMO ENDPOINT, NO DOS TUBERÍAS. La vista técnica de
+// siete montones se queda en Eventos para el trabajo fino de Jane; ésta agrupa
+// por TIPO cruzando todos los eventos, que es la pregunta del uso diario: qué
+// lugares nuevos hay y qué abonos entraron. Las reglas de qué se escribe no se
+// tocan — las decide `planear`, en el servidor, igual que siempre.
+//
+// 🔒 Y LA REGLA DE ORO SIGUE: de aquí solo sube un ÍNDICE. Jamás montos.
+
+// Agrupa el recorrido por TIPO, no por evento. Cada renglón carga el nombre
+// bonito de SU evento para que la lista cruzada siga diciendo de dónde es cada
+// quien sin tener que agrupar por evento.
+function _resumenActualizarAgrupar(eventos) {
+  const g = { lugares: [], abonos: [], bajas: [], negativas: [], saltados: [], errores: [], monto: 0 };
+  for (const e of (eventos || [])) {
+    // ⚠️ El nombre bonito puede faltar (fails-soft del servidor). Se cae al
+    // slug antes que dejar el renglón sin decir de qué evento es: una lista
+    // cruzada sin evento es peor que un slug feo.
+    const tour = e.nombre_evento || e.evento_id;
+    if (e.error) { g.errores.push({ tour, evento_id: e.evento_id, codigo: e.error.codigo, mensaje: e.error.mensaje }); continue; }
+    const p = e.plan || {};
+    for (const a of (p.altas || [])) {
+      g.lugares.push({ tour, evento_id: e.evento_id, nombre: a.nombre, pagado: a.abonado_previo,
+        paquete: a.tipo_paquete, zona: a.zona_boleto, origen: a.origen, pendiente: !!a.total_pendiente });
+    }
+    for (const a of (p.abonos || [])) {
+      g.abonos.push({ tour, evento_id: e.evento_id, nombre: a.nombre, monto: a.monto, paquete: a.tipo_paquete });
+      g.monto += a.monto;
+    }
+    for (const b of (p.negativas || [])) {
+      g.negativas.push({ tour, evento_id: e.evento_id, nombre: b.nombre, diferencia: b.diferencia, numerologia: b.numerologia });
+    }
+    for (const s of (p.saltados || [])) g.saltados.push({ tour, evento_id: e.evento_id, nombre: s.nombre, motivo: s.motivo });
+    // Las bajas NO vienen en el plan y no pueden venir: jamás se aplican. El
+    // servidor las manda aparte, como aviso, para poder NOMBRARLAS aquí.
+    for (const b of (e.bajas || [])) g.bajas.push({ tour, evento_id: e.evento_id, nombre: b.nombre, abonado: b.abonado });
+  }
+  return g;
+}
+
+function _resumenActualizarHtml(g, totalEventos, hecho) {
+  const esc = _evtEsc, mxn = _evtMxn;
+  const fila = (izq, der) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+       <span>${izq}</span><span style="font-family:'JetBrains Mono',monospace;white-space:nowrap">${der}</span></div>`;
+  // `data-tour` es el ANCLA: el careo cuenta y lee las etiquetas por ella, no
+  // buscando el texto. Sin ancla, un `includes(slug)` da falsos positivos —
+  // contra producción el slug `arre` «apareció» dentro del apellido «Barrera».
+  const tour = (x) => `<span data-tour style="color:var(--ts);font-size:11px"> — ${esc(x.tour)}</span>`;
+  const chip = (t) => t ? ` <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--ts);border:1px solid currentColor;border-radius:3px;padding:0 4px">${esc(t)}</span>` : '';
+
+  const avisos = g.bajas.length + g.negativas.length + g.saltados.length + g.errores.length;
+  return `<div class="card" style="padding:16px;border:1px solid ${hecho ? 'var(--green)' : 'var(--orange)'}">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:${hecho ? 'var(--green)' : 'var(--orange)'}">
+      ${hecho ? 'listo' : 'esto es lo que va a entrar — todavía no se ha guardado nada'}
+    </div>
+    <div style="font-size:15px;margin:8px 0 12px">
+      <b style="color:var(--tp)">${g.lugares.length}</b> lugar${g.lugares.length === 1 ? '' : 'es'} nuevo${g.lugares.length === 1 ? '' : 's'} ·
+      <b style="color:var(--tp)">${g.abonos.length}</b> abono${g.abonos.length === 1 ? '' : 's'} por <b style="color:var(--green)">${mxn(g.monto)}</b>
+    </div>
+
+    ${g.lugares.length ? `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow,#e8ff4c);margin-top:10px">Lugares nuevos</div>
+    ${g.lugares.map((x) => fila(
+      `<b>${esc(x.nombre)}</b>${tour(x)}${chip(x.paquete)}${chip(x.zona)}${x.pendiente ? ' <span style="color:var(--orange);font-size:11px">⚠ falta su costo</span>' : ''}`,
+      `pagado ${mxn(x.pagado)}`)).join('')}` : ''}
+
+    ${g.abonos.length ? `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-top:14px">Nuevos abonos</div>
+    ${g.abonos.map((x) => fila(
+      `<b>${esc(x.nombre)}</b>${tour(x)}${chip(x.paquete)}`,
+      `<b style="color:var(--green)">+${mxn(x.monto)}</b>`)).join('')}` : ''}
+
+    ${(!g.lugares.length && !g.abonos.length) ? `<div style="font-size:13px;color:var(--ts);padding:6px 0">No hay nada nuevo que entrar. Todo cuadra.</div>` : ''}
+
+    ${avisos ? `
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">Avisos · ${avisos}</summary>
+      <div style="padding-top:8px">
+        ${g.bajas.map((x) => fila(`<b>${esc(x.nombre)}</b>${tour(x)}`,
+          `<span style="color:var(--red);font-size:12px">ya no está en el Excel${x.abonado ? ' · lleva ' + mxn(x.abonado) + ' pagados' : ''} — no se da de baja solo</span>`)).join('')}
+        ${g.negativas.map((x) => fila(`<b>${esc(x.nombre)}</b>${tour(x)}`,
+          `<span style="color:var(--ts);font-size:12px">aquí tenemos ${mxn(Math.abs(x.diferencia))} más que el Excel${x.numerologia ? ' (lo cobraste tú)' : ''} — no se toca</span>`)).join('')}
+        ${g.saltados.map((x) => fila(`<b>${esc(x.nombre)}</b>${tour(x)}`, `<span style="color:var(--ts);font-size:12px">${esc(String(x.motivo).split('—')[0].slice(0, 70))}</span>`)).join('')}
+        ${g.errores.map((x) => fila(`<b style="color:var(--red)">${esc(x.tour)}</b>`, `<span style="color:var(--red);font-size:12px">no se pudo leer su Excel</span>`)).join('')}
+      </div>
+    </details>` : ''}
+
+    ${hecho ? '' : `<button class="btn btn-primary" id="resumen-actualizar-ok" style="margin-top:12px" onclick="resumenActualizarConfirmar()">
+      Sí, guardar${g.lugares.length ? ` los ${g.lugares.length} lugar${g.lugares.length === 1 ? '' : 'es'}` : ''}${g.abonos.length ? ` y los ${g.abonos.length} abono${g.abonos.length === 1 ? '' : 's'}` : ''}
+    </button>`}
+  </div>`;
+}
+
+let _resumenActCorriendo = false;
+
+async function _resumenActRecorrer(confirmar, alAvanzar) {
+  const eventos = []; let desde = 0, total = null, vueltas = 0;
+  for (;;) {
+    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
+      method: 'POST', body: JSON.stringify({ desde, tanda: 10, confirmar }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    eventos.push(...(d.eventos || [])); total = d.total; vueltas++;
+    if (alAvanzar) alAvanzar(eventos.length, total);
+    if (d.hecho) return { eventos, total };
+    if (d.siguiente <= desde) throw new Error('La continuación no avanzó: se corta para no girar en vacío.');
+    desde = d.siguiente;
+    if (vueltas > 40) throw new Error('El recorrido no termina: se corta.');
+  }
+}
+
+async function resumenActualizar() {
+  if (_resumenActCorriendo) return;
+  const panel = document.getElementById('resumen-actualizar-panel');
+  const btn = document.getElementById('resumen-actualizar-btn');
+  _resumenActCorriendo = true;
+  if (panel) panel.style.display = '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Revisando…'; }
+  try {
+    const acc = await _resumenActRecorrer(false, (n, t) => {
+      if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>
+        Revisando el Excel… <b>${n}</b> de <b>${t || '?'}</b> eventos. Todavía no se ha guardado nada.</div>`;
+    });
+    if (panel) panel.innerHTML = _resumenActualizarHtml(_resumenActualizarAgrupar(acc.eventos), acc.total, false);
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}</div>`;
+  } finally {
+    _resumenActCorriendo = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Actualizar'; }
+  }
+}
+
+async function resumenActualizarConfirmar() {
+  if (_resumenActCorriendo) return;
+  const panel = document.getElementById('resumen-actualizar-panel');
+  const b = document.getElementById('resumen-actualizar-ok');
+  _resumenActCorriendo = true;
+  if (b) { b.disabled = true; b.textContent = 'Guardando…'; }
+  try {
+    const acc = await _resumenActRecorrer(true, (n, t) => {
+      if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>
+        Guardando… <b>${n}</b> de <b>${t || '?'}</b> eventos.</div>`;
+    });
+    if (panel) panel.innerHTML = _resumenActualizarHtml(_resumenActualizarAgrupar(acc.eventos), acc.total, true);
+    // El dinero de la pantalla ya es el pasado: se recarga.
+    if (typeof loadResumen === 'function') loadResumen();
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}
+      <div style="font-size:11px;margin-top:6px">Lo que ya se guardó, guardado está: vuelve a darle «Actualizar» — no repite nada.</div></div>`;
+  } finally { _resumenActCorriendo = false; }
+}

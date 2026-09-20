@@ -51,12 +51,22 @@ function semilla(opts) {
   // ev-tres: una BAJA (jamás) y un pago positivo.
   excel[PEST('ev-tres')] = conPreludio([
     filaExcel({ 'Nombre': 'Eva Tres', 'Paquete': 'PLUS', 'Boleto': 'Zona C', 'Separo': '$900', '1': '$100', 'Total': '$4,000' }),
+    // Un LUGAR NUEVO de verdad: está en el Excel y no en el sistema.
+    filaExcel({ 'Nombre': 'Fito Nuevo', 'Paquete': 'CHEAP', 'Boleto': 'Zona C', 'Separo': '$1,200', 'Total': '$3,300', 'TALLA': 'L' }),
   ]);
   return {
     __excel: excel,
     excel_pestanas: EVENTOS.map((ev) => ({ evento_id: ev, pestana: PEST(ev), regla_zona: null, activa: true, notas: null })),
     numerologia_eventos: [],
-    eventos_meta: EVENTOS.map((ev) => ({ slug: ev })),
+    // Los nombres BONITOS. Medido: `eventos_meta` los trae para los 63 slugs
+    // activos (63/63) y es la que lleva el nombre del TOUR —«Bruno Mars - The
+    // Romantic Tour»— mientras esferas trae el corto («Bruno Mars»). La vista
+    // del Resumen pide columna «Tour», así que manda ésta.
+    eventos_meta: [
+      { slug: 'ev-uno',  nombre: 'Ana Tour - Primera Gira' },
+      { slug: 'ev-dos',  nombre: 'Dos en Concierto' },
+      { slug: 'ev-tres', nombre: 'Tres Fest 2026' },
+    ],
     stock_ajustes: [], abonos_viajero: [],
     viajeros_evento: [
       { id: 'v-ana',  evento_id: 'ev-uno',  nombre: 'Ana Uno',  tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: 5000, notas: 'Migrado Excel', zona_boleto: 'Zona A', tipo_paquete: 'plus' },
@@ -330,6 +340,96 @@ const cuenta = (t, tabla) => (t[tabla] || []).length;
     af(/Todo cuadra/.test(htmlVacio), 'con nada que aplicar la pantalla no lo dice: una tabla vacía no es una respuesta');
     console.log('    previa ' + html.length + ' bytes · roto ✓ · vacío ✓');
   } catch (e) { af(false, 'la sección de pantalla se CAYÓ: ' + e.message); }
+
+  // ── [7] [CUADRE-4] LA VISTA DEL RESUMEN: por TIPO, y sin tecnicismos ─────
+  // Dos LENTES del mismo endpoint, no dos tuberías: la técnica de siete
+  // montones se queda en Eventos para Jane, y ésta —agrupada por tipo y
+  // cruzando todos los eventos— es la de Memo y Bulma en el Resumen.
+  console.log('\n[7] la vista simple del Resumen');
+  try {
+    const fuente4 = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-resumen.js'), 'utf8');
+    const corte4 = (n) => {
+      const m = new RegExp('(?:async\\s+)?function\\s+' + n + '\\s*\\(').exec(fuente4);
+      if (!m) throw new Error('no encontré ' + n + ' en kamehouse-resumen.js');
+      let prof = 0;
+      for (let k = fuente4.indexOf('{', m.index); k < fuente4.length; k++) {
+        if (fuente4[k] === '{') prof++; else if (fuente4[k] === '}' && --prof === 0) return fuente4.slice(m.index, k + 1);
+      }
+      throw new Error('llaves desbalanceadas en ' + n);
+    };
+    const fuenteE = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-eventos.js'), 'utf8');
+    const corteE = (n) => {
+      const m = new RegExp('(?:async\\s+)?function\\s+' + n + '\\s*\\(').exec(fuenteE);
+      let prof = 0;
+      for (let k = fuenteE.indexOf('{', m.index); k < fuenteE.length; k++) {
+        if (fuenteE[k] === '{') prof++; else if (fuenteE[k] === '}' && --prof === 0) return fuenteE.slice(m.index, k + 1);
+      }
+      throw new Error('no encontré ' + n);
+    };
+    const api4 = new Function(corteE('_evtEsc') + '\n' + corteE('_evtMxn') + '\n'
+      + corte4('_resumenActualizarAgrupar') + '\n' + corte4('_resumenActualizarHtml')
+      + '\nreturn { agrupar: _resumenActualizarAgrupar, html: _resumenActualizarHtml };')();
+
+    // Se pinta con la salida REAL del recorrido de [1], no con un objeto a mano.
+    const g = api4.agrupar(prev.eventos);
+    console.log('    lugares nuevos=' + g.lugares.length + ' · abonos=' + g.abonos.length
+      + ' · avisos: bajas=' + g.bajas.length + ' negativas=' + g.negativas.length + ' saltados=' + g.saltados.length);
+    af(g.lugares.length === 1, 'agrupó ' + g.lugares.length + ' lugar(es) nuevo(s), se esperaba 1 (Fito)');
+    af(g.abonos.length === 2, 'agrupó ' + g.abonos.length + ' abono(s), se esperaban 2 (Ana y Eva)');
+    // 🔒 CRUZA LOS EVENTOS: la vista es por TIPO, no por evento. Ana es de
+    // ev-uno y Eva de ev-tres, y salen en la MISMA lista.
+    const evsDeAbonos = new Set(g.abonos.map((x) => x.evento_id));
+    af(evsDeAbonos.size === 2, 'la lista de abonos no cruza eventos: ' + JSON.stringify([...evsDeAbonos]));
+
+    const html = api4.html(g, prev.total);
+    // 🔒 EL SLUG NO SE ENSEÑA. Memo lee «Tres Fest 2026», no «ev-tres»: un
+    // slug en la pantalla del uso diario es lenguaje de la base, no del negocio.
+    af(/Tres Fest 2026/.test(html) && /Ana Tour - Primera Gira/.test(html),
+       'la vista simple no pinta el nombre bonito del evento');
+    // 🔒 EL SLUG NO SE ENSEÑA — y se mide POR EL HECHO, no buscando la palabra.
+    // Un `html.includes(slug)` es un falso positivo esperando: contra
+    // producción, el slug `arre` «apareció» dentro del APELLIDO «Barrera» de
+    // tres personas. Lo que de verdad importa es qué se pinta en el LUGAR del
+    // tour, así que se extraen esas etiquetas y se exige que ninguna sea un
+    // slug. (Es «un prefijo no es un ancla», otra vez.)
+    const etiquetas = [...html.matchAll(/<span data-tour[^>]*> — ([^<]+)</g)].map((m) => m[1].trim());
+    const slugs = new Set(prev.eventos.map((e) => e.evento_id));
+    console.log('    etiquetas de tour pintadas: ' + JSON.stringify([...new Set(etiquetas)]));
+    af(etiquetas.length > 0, 'no se pintó NINGUNA etiqueta de tour: la aserción de abajo pasaría en hueco');
+    af(!etiquetas.some((t) => slugs.has(t)),
+       'EL SLUG SE COLÓ al lugar del tour: ' + JSON.stringify(etiquetas.filter((t) => slugs.has(t))));
+    af(etiquetas.every((t) => /Ana Tour|Dos en Concierto|Tres Fest/.test(t)),
+       'una etiqueta de tour no es un nombre bonito: ' + JSON.stringify(etiquetas));
+    // Los datos que Memo pidió ver en cada renglón.
+    // 🔒 La vista del uso diario tiene que decir que TODAVÍA NO GUARDÓ. La
+    // aserción de esto existía solo para la vista de Eventos: un sabotaje que
+    // borraba el aviso de ESTA pantalla pasaba verde.
+    af(/todav[ií]a no se ha guardado nada/i.test(html),
+       'la vista del Resumen no avisa de que aún no se ha guardado nada');
+    af(/Fito Nuevo/.test(html), 'el lugar nuevo no trae su nombre');
+    af(/cheap/i.test(html), 'el lugar nuevo no trae su paquete');
+    af(/Zona C/.test(html), 'el lugar nuevo no trae su zona');
+    af(/Ana Uno/.test(html) && /plus/i.test(html), 'el abono no trae nombre y paquete');
+    // El encabezado con los totales, en el idioma de Memo.
+    af(/1 lugar/.test(html) && /2 abonos/.test(html),
+       'el encabezado no dice «N lugares nuevos · N abonos por $X»');
+    af(/\$1,000/.test(html), 'el encabezado no trae el monto de los abonos');
+    // Los avisos, COLAPSADOS y sin tecnicismos.
+    af(/<details/.test(html), 'los avisos no van en un desplegable colapsado');
+    af(/Beto Uno/.test(html), 'la negativa no se nombra en los avisos');
+    af(/Zulema Baja/.test(html), 'la baja no se nombra en los avisos');
+    af(!/montón|ambiguos|totales_contrato|derivado/i.test(html.replace(/<details[\s\S]*/, '')),
+       'la parte de arriba usa lenguaje de auditoría, no el de Memo');
+    console.log('    HTML ' + html.length + ' bytes · sin slugs ✓');
+
+    // CONTROL POSITIVO del candado del slug: si el nombre bonito no llega,
+    // el slug SÍ aparece — así se sabe que la aserción de arriba puede morder.
+    const sinNombre = prev.eventos.map((e) => ({ ...e, nombre_evento: null }));
+    const htmlSin = api4.html(api4.agrupar(sinNombre), prev.total);
+    const etiqSin = [...htmlSin.matchAll(/<span data-tour[^>]*> — ([^<]+)</g)].map((m) => m[1].trim());
+    af(etiqSin.some((t) => slugs.has(t)),
+       'sin nombre bonito NO cae al slug en el lugar del tour: entonces la aserción de arriba no prueba nada');
+  } catch (e) { af(false, 'la sección de la vista del Resumen se CAYÓ: ' + e.message); }
 
   console.log('\n──────────────────────────────────────────────');
   console.log((mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' aserciones en verde, ' + mal + ' en rojo');

@@ -14,6 +14,7 @@
     "mide:color-tema": "node scripts/mide-color-tema.js",
     "mide:puente-portal": "node scripts/mide-puente-portal.js",
     "mide:consuelo-verdad": "node scripts/mide-consuelo-verdad.js",
-    "mide:tira-agotados": "node scripts/mide-tira-agotados.js"
+    "mide:tira-agotados": "node scripts/mide-tira-agotados.js",
+    "mide:cuadre-total": "node scripts/mide-cuadre-total.js"
   }
 }

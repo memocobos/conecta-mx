@@ -87,6 +87,21 @@ function mapearColumnas(filaEncabezado) {
     correo: idx('Correo'),
     celular: idx('Celular'),
     codigo: idx('Codigo'),
+    // [CUADRE-1a] LA COLUMNA DEL TOTAL DE CONTRATO. El encabezado se MIDIÓ
+    // contra el Apps Script de producción el 20-sep-2026, en ocho pestañas
+    // reales: las ocho lo escriben «Total», y es el total REAL por persona —
+    // trae el hotel adentro (Young Miko: Costo 5300 + Pago Hab 650 = Total
+    // $5,950), que es justo lo que al derivado del catálogo le falta.
+    //
+    // Se busca POR ENCABEZADO y no por posición porque LA POSICIÓN NO ES
+    // ESTABLE, también medido: va en la 21 en siete de las ocho y en la 22 en
+    // «Bruno Mars - 4 de diciembre», que trae una columna vacía de más antes de
+    // «Preventa». Contar celdas habría leído «Abonado» como si fuera el total.
+    //
+    // ⚠️ NO ENTRA A `mapa.dinero`. Ahí viven las columnas que se SUMAN para el
+    // abonado; meter el total ahí inflaría el abonado de todo el mundo y el
+    // montón de pagos se volvería basura. El total es otra cuenta.
+    total: idx('Total'),
     pagos: [],
   };
   for (let i = 0; i < celdas.length; i++) {
@@ -125,17 +140,36 @@ function parsearPestana(filas, encabezado, reglaZona) {
     if (reglaZona && normalizarNombre(zona) !== normalizarNombre(reglaZona)) { descartes.otraZona++; continue; }
 
     const abonado = mapa.dinero.reduce((a, c) => a + leerDinero(f[c]), 0);
+    // [CUADRE-1a] EL TOTAL DE LA FILA, Y EL HUECO DICHO APARTE.
+    //
+    // 🔒 UNA CELDA VACÍA NO ES UN TOTAL DE CERO. `leerDinero` contesta 0 tanto
+    // para '' como para '$0', y aquí esos dos son cosas distintas: «$0» es un
+    // contrato de cero pesos (143 filas reales de Karol G lo traen así) y ''
+    // es «no sé». Medido el 20-sep: 13 de 403 filas-persona no traen total
+    // legible, y la pestaña «Calle 24 - 3 de Sep» no lo trae en NINGUNA de sus
+    // 12 — leerlas como cero llenaría el montón con doce diferencias que no
+    // existen. Así que el hueco se mira en la celda CRUDA, antes de `leerDinero`.
+    const celdaTot = mapa.total >= 0 ? f[mapa.total] : null;
+    const totalLegible = mapa.total >= 0 && /[0-9]/.test(String(celdaTot == null ? '' : celdaTot));
+    const totalFila = totalLegible ? leerDinero(celdaTot) : 0;
     const clave = normalizarNombre(nombreCrudo);
     const ya = out.get(clave);
     if (ya) {
       // MISMA PERSONA, otra compra: se suma el dinero y se cuentan las filas.
       ya.abonado += abonado;
       ya.filas += 1;
+      // Dos boletos de la misma persona: los totales se SUMAN, igual que el
+      // abonado. Pero si a UNA de las filas le falta el total, la suma de las
+      // otras es un número que MIENTE por defecto — se marca incompleta y la
+      // persona acaba con `total: null`, que es la verdad: no se sabe.
+      ya.total += totalFila;
+      if (!totalLegible) ya.totalIncompleto = true;
       if (!ya.zona && zona) ya.zona = zona;
       if (!ya.talla && mapa.talla >= 0) ya.talla = String(f[mapa.talla] == null ? '' : f[mapa.talla]).trim();
     } else {
       out.set(clave, {
         nombre: nombreCrudo, clave, abonado, filas: 1, zona,
+        total: totalFila, totalIncompleto: !totalLegible,
         paquete: mapa.paquete >= 0 ? String(f[mapa.paquete] == null ? '' : f[mapa.paquete]).trim() : '',
         // [EXCEL-CAREO-FIX-1] La talla no se usa para decidir nada: viaja como
         // EVIDENCIA, para poder cuadrar el montón de apartados contra las 141
@@ -144,7 +178,13 @@ function parsearPestana(filas, encabezado, reglaZona) {
       });
     }
   }
-  return { personas: [...out.values()], mapa, descartes };
+  // El hueco se resuelve al final, una sola vez: quien traiga aunque sea una
+  // fila sin total legible sale con `total: null` — ausencia, no cero.
+  const personas = [...out.values()].map((p) => {
+    const { totalIncompleto, ...resto } = p;
+    return { ...resto, total: totalIncompleto ? null : p.total };
+  });
+  return { personas, mapa, descartes };
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────
@@ -177,6 +217,14 @@ function agruparBase(viajerosBase) {
     m.get(k).push(v);
   }
   return m;
+}
+
+// [CUADRE-1a] ¿El total del sistema es un DERIVADO del catálogo o un exacto de
+// la libreta? TOTAL-1 etiquetó en `notas` cada fila que derivó — las dos formas
+// que dejó («TOTAL-1: contrato derivado del catálogo…» y «sin paquete, derivado
+// como PLUS del catálogo») comparten la palabra, así que la palabra es la llave.
+function esDerivado(notas) {
+  return normalizarNombre(notas).includes('derivado');
 }
 
 function carear(personasExcel, viajerosBase) {
@@ -243,11 +291,55 @@ function carear(personasExcel, viajerosBase) {
       bajas.push({ nombre: v.nombre, viajero_id: v.id, abonado: Number(v.abonado || 0) });
     }
   }
+  // ── [CUADRE-1a] EL SÉPTIMO MONTÓN: LOS TOTALES DE CONTRATO ────────────────
+  // Va en PASADA APARTE, no dentro del `for` de arriba, y es a propósito: el
+  // bucle de los seis hace `continue` en ambiguos y en apartados, así que
+  // colgarse de él habría dejado fuera justo a los apartados — que son los que
+  // TOTAL-1 dejó con «⚠ total pendiente» esperando que el careo los cure. Un
+  // montón que habla de OTRA cuenta (lo que la persona DEBE, no lo que ha
+  // pagado) no tiene por qué heredar los saltos de la primera.
+  //
+  // 🔒 Y así los seis de antes quedan intactos: esta pasada no empuja a ninguno
+  // ni le estrena llaves a sus renglones.
+  //
+  // Quién NO entra, y por qué:
+  //   · `total: null` — la pestaña no trae la columna, o la celda vino vacía.
+  //     Un hueco NO es una diferencia de dinero.
+  //   · el que no está en el sistema — ya sale en `nuevos`; no hay contra qué
+  //     restar.
+  //   · el ambiguo — dos viajeros con ese nombre; elegir uno sería inventar.
+  //
+  // `derivado` sale de las notas de TOTAL-1 («contrato derivado del catálogo»):
+  // una diferencia sobre un derivado es ESPERADA —el derivado es un piso, sin
+  // hotel ni upgrades, y la pestaña gana—; sobre un exacto de la libreta es un
+  // cambio real que hay que mirar. Es la señal que separa el ruido del hallazgo.
+  const totalesContrato = [];
+  for (const p of enExcel.values()) {
+    if (p.total == null) continue;
+    const mismos = enBase.get(p.clave) || [];
+    if (mismos.length !== 1) continue;
+    const v = mismos[0];
+    // Un `total_contrato` NULL en la base no es cero: es «todavía no se sabe».
+    // Se dice como null y se resta como cero, que es lo que la pantalla ya hace
+    // con esas filas (cuenta-evento solo suma las que traen total). Así la fila
+    // pendiente SALE en el montón en vez de quedarse invisible otro mes.
+    const sis = (v.total_contrato == null || v.total_contrato === '') ? null : Number(v.total_contrato);
+    const dif = Math.round((p.total - (sis == null ? 0 : sis)) * 100) / 100;
+    if (Math.abs(dif) <= TOLERANCIA_MXN) continue;
+    totalesContrato.push({
+      nombre: p.nombre, viajero_id: v.id, excel_total: p.total, sistema_total: sis,
+      diferencia: dif, derivado: esDerivado(v.notas), filas: p.filas,
+      zona: p.zona, paquete: p.paquete,
+    });
+  }
+
   const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
   return { nuevos: nuevos.sort(porNombre), pagos: pagos.sort(porNombre),
            bajas: bajas.sort(porNombre), iguales: iguales.sort(porNombre),
-           apartados: apartados.sort(porNombre), ambiguos: ambiguos.sort(porNombre) };
+           apartados: apartados.sort(porNombre), ambiguos: ambiguos.sort(porNombre),
+           totales_contrato: totalesContrato.sort(porNombre) };
 }
 
 module.exports = { normalizarNombre, esChatarra, leerDinero, mapearColumnas,
-                   parsearPestana, carear, agruparBase, CHATARRA, TOLERANCIA_MXN };
+                   parsearPestana, carear, agruparBase, esDerivado,
+                   CHATARRA, TOLERANCIA_MXN };

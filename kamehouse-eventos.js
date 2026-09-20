@@ -504,7 +504,8 @@ function _evtExportCSV() {
 }
 // ═══ [EXCEL-BOTÓN-1b] EL CAREO CONTRA EL EXCEL ═══════════════════════════════
 // La herramienta que pone parejos al Excel y al sistema para poder apagar el
-// Excel. Pinta cuatro montones por nombre: NUEVOS · PAGOS · BAJAS · IGUALES.
+// Excel. Pinta SIETE montones por nombre: NUEVOS · PAGOS · BAJAS · IGUALES ·
+// APARTADOS · AMBIGUOS · TOTALES DE CONTRATO (CUADRE-1a).
 //
 // SOLO LEE. Ni marca las bajas ni aplica los pagos: aplicar es otra tuerca, y
 // tiene que serlo — una baja es una persona.
@@ -549,8 +550,11 @@ function _evtEsc(s) {
 function _evtMxn(n) {
   return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
-// Los cuatro montones. IGUALES va colapsado y con su cuenta: es el montón que
-// no hay que mirar, y ocupar la pantalla con él escondería los otros tres.
+// Los siete montones. IGUALES va colapsado y con su cuenta: es el montón que
+// no hay que mirar, y ocupar la pantalla con él escondería a los demás.
+// ⚠️ `d.totales` NO es un montón: es el objeto de CONTEOS (`t`). El montón de
+// CUADRE-1a se llama `d.totales_contrato`, y se llama así justamente porque el
+// nombre corto ya estaba ocupado por esta línea de aquí abajo.
 function _excelCareoHtml(d) {
   const t = d.totales || {};
   const cab = (titulo, n, color) =>
@@ -606,6 +610,24 @@ function _excelCareoHtml(d) {
       El careo NO elige por ti: adivinar cuál de los dos es sería inventar el dato que falta.
       Antes, el sistema se quedaba con UNO y el otro desaparecía del careo — con su deuda dentro.
     </div>
+    ${cab('totales de contrato — lo que la persona DEBE, no lo que ha pagado', t.totales_contrato, 'var(--blue,#0000cd)')}
+    ${lista(d.totales_contrato || [], x => fila(
+      `${_evtEsc(x.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(x.zona || 'sin zona')} ${_evtEsc(x.paquete || '')}${x.filas > 1 ? ` · ${x.filas} filas` : ''}</span>`
+      + (x.derivado
+          ? ` <span data-chip="derivado" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-left:4px">derivado</span>`
+          : ''),
+      `${x.sistema_total == null ? '<span style="color:var(--ts)">sin total</span>' : _evtMxn(x.sistema_total)} → ${_evtMxn(x.excel_total)} `
+      + `<b style="color:${x.derivado ? 'var(--ts)' : 'var(--orange)'}">${x.diferencia > 0 ? '+' : ''}${_evtMxn(x.diferencia)}</b>`))}
+    <div style="font-size:11px;color:var(--ts);margin-top:4px">
+      <b style="color:var(--tp)">La verdad es la columna «Total» de la pestaña</b> — trae el hotel y los upgrades adentro.
+      ${t.totales_contrato ? `De los ${t.totales_contrato}, <b style="color:var(--tp)">${t.totales_contrato_derivados}</b> son sobre un total <b>derivado</b> del catálogo:
+      ésos son un PISO y que difieran es lo ESPERADO. Los otros
+      <b style="color:var(--orange)">${t.totales_contrato - t.totales_contrato_derivados}</b> salen de la libreta de Memo — ahí una diferencia es un cambio real que hay que mirar.` : ''}
+      Quien no trae total en la pestaña NO sale aquí: un hueco no es una diferencia de dinero.
+      ${t.totales_contrato_en_cero ? `<br><b style="color:var(--orange)">${t.totales_contrato_en_cero}</b> de ellos traen <b>$0</b> tecleado en la pestaña — casi siempre una fórmula sin llenar, no un contrato de cero pesos.` : ''}
+      <b style="color:var(--tp)">Esta fase SOLO LEE</b>: no corrige ningún total.
+    </div>
+
     <details style="margin-top:14px">
       <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">iguales · ${t.iguales}</summary>
       <div style="padding-top:8px">${lista(d.iguales, i => fila(_evtEsc(i.nombre), _evtMxn(i.abonado)))}</div>

@@ -124,7 +124,12 @@ function planear(careo, opciones) {
     if (!quiere('abonos') || !elegida(clave)) continue;
     const p = porClave.get(clave);
     abonos.push({ clave, nombre: g.nombre, viajero_id: g.viajero_id, monto: g.diferencia,
-      excel: g.excel, sistema: g.base, pestanas: (p && p.pestanas) || [] });
+      excel: g.excel, sistema: g.base, pestanas: (p && p.pestanas) || [],
+      // [CUADRE-4] El paquete, para la vista del Resumen. Sale del viajero que
+      // YA está en la mano (`vPorId`): ni una consulta más. El reloj de los
+      // 10 s va en 8.6 en la peor tanda, así que una consulta por renglón sobre
+      // 967 abonos no es una opción — sería la tuerca que rompe el botón.
+      tipo_paquete: (v && v.paquete) || '', zona: (v && v.zona) || '' });
   }
 
   // ── 2. TOTALES DE CONTRATO ────────────────────────────────────────────────

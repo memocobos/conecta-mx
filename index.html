@@ -2563,7 +2563,7 @@ body.pf-barra-viva .wa-float{bottom:104px}
 
 /* ── 4 · LA TIRA ── */
 .hh-strip{display:flex;gap:6px;margin-top:11px}
-.hs-item{flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
+.hs-item{position:relative;flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
   background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);
   border-radius:var(--r-sm,8px);overflow:hidden;text-decoration:none;
   transition:border-color .2s,transform .2s}
@@ -2584,6 +2584,31 @@ body.pf-barra-viva .wa-float{bottom:104px}
   vertical-align:1px}
 .hs-name{font-size:9.5px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hs-fecha{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;white-space:nowrap}
+/* ═══ [LAND-2] EL SELLO DE AGOTADO EN LA MINIATURA ═══════════════════════
+   La tira dejó de filtrar «a la venta», así que ahora pasan agotados por aquí
+   y hay que decirlo sin apagar la foto.
+   ⚠️ NO se copia el `::after` de `.ev-card`: ese cubre la tarjeta ENTERA con
+   letra de 26px. Sobre una portada de 50px de alto eso borraría el cartel y la
+   miniatura se volvería un rectángulo rojo. Aquí el sello es una pastilla
+   chica pegada abajo de la foto.
+   El nombre NO puede quedar tapado por construcción: vive en `.hs-body`, que
+   es hermano de `.hs-media` y va DEBAJO. El careo igual lo mide con las cajas
+   —lo medido manda sobre lo razonado. */
+/* ⚠️ EL SELLO CUELGA DE `.hs-item`, NO DE `.hs-media`, Y ESO NO ES ESTÉTICA.
+   `showInitials()` —el fallback de la foto del artista, que corre ASÍNCRONO
+   cuando la API no contesta— hace `imgEl.parentElement.innerHTML = ...` y borra
+   la portada ENTERA. Con el sello adentro, el sello se iba con ella: medido, la
+   tira quedaba con «AGOTADO» en Stray Kids y sin él en Young Miko y The
+   Neighbourhood, según a quién le fallara la foto y cuándo. Un evento agotado
+   se anunciaba como disponible por una carrera de red.
+   Colgado del item es hermano de la portada y ningún repintado lo alcanza. Va
+   en la esquina de arriba porque el alto de `.hs-media` cambia en cada corte
+   (50/44/42/38/62/64px) y pegarlo abajo obligaría a perseguir seis números. */
+.hs-ag{position:absolute;left:0;top:0;z-index:3;pointer-events:none;
+  background:var(--c-rojo);color:#fff;font-family:'Montserrat',sans-serif;
+  font-size:7.5px;font-weight:900;letter-spacing:.1em;line-height:1;
+  padding:3px 5px;border-bottom-right-radius:var(--r-chip,999px)}
+.hs-agotado .hs-img{filter:brightness(.5) grayscale(1)}
 .hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:rgba(232,255,76,.1);border-color:rgba(232,255,76,.35)}
 .hs-mas-n{font-family:var(--font-display);font-size:21px;font-weight:900;color:var(--c-amarillo);line-height:1}
@@ -4099,33 +4124,80 @@ var _landTick = null;
   }
 
   // ═══ LA TIRA ═════════════════════════════════════════════════════════════
-  // Se alimenta de LOS MÁS BUSCADOS (event-clicks / CAT-4, ventana de 14 días)
-  // y muestra los 3 primeros DEL TOP QUE ESTÉN A LA VENTA — el top incluye
-  // pasados y agotados, así que se carea contra la misma regla sellada de la
-  // tarjeta, no contra una lista propia.
+  // [LAND-2] LA TIRA YA NO FILTRA «A LA VENTA». Su universo son los PRÓXIMOS
+  // POR FECHA —agotados incluidos—, sin pasados, sin listOnly y sin el que ya
+  // es la tarjeta grande.
+  //
+  // El motivo, medido el 19-sep-2026: la portada decía «próximo evento:
+  // Natanael Cano, 2 de octubre» mientras Young Miko (19 sep), The
+  // Neighbourhood (23 sep), Stray Kids (25 sep) e Iron Maiden (2 oct) —los
+  // cuatro agotados— ocurrían ANTES o el mismo día y no aparecían en ningún
+  // lado del hero. El cliente leía «lo próximo es en octubre» y era falso: lo
+  // próximo ya había volado. Decisión de Memo: el AGOTADO también vende.
+  //
+  // El orden de preferencia no cambia: primero LOS MÁS BUSCADOS (event-clicks /
+  // CAT-4, ventana de 14 días) y, si el top no llena tres, se completa por
+  // cercanía de fecha.
   //
   // FAILS-SOFT POR CONSTRUCCIÓN: la tira NACE con el respaldo (los 3 próximos
   // por fecha) y el top solo la ASCIENDE cuando llega. Si el endpoint no
-  // contesta, si tarda, o si su top no deja ningún evento vendible, no hay
-  // nada que hacer: lo que ya está pintado se queda. Por eso no hay ninguna
-  // rama de error que mantener — la tira no puede quedar en blanco.
+  // contesta, si tarda, o si su top no deja a nadie, lo que ya está pintado se
+  // queda. Por eso no hay ninguna rama de error que mantener — la tira no puede
+  // quedar en blanco.
   function idsDelTop(){
     return (typeof _top10Ids!=='undefined'&&Array.isArray(_top10Ids))?_top10Ids:[];
   }
-  function elegirTira(venta){
-    var porId={}; venta.forEach(function(e){porId[e.id]=e;});
+
+  // ⚠️ [LAND-2] EL VEREDICTO DE AGOTADO NO SE COPIA: SE PREGUNTA.
+  // `_evVeredicto` es la MISMA función que decide la clase `.agotado` de la
+  // tarjeta del catálogo —st, ev.agotado y el auto-semáforo por zonas viven
+  // ahí dentro, en un solo sitio. LAND-1 tuvo que copiar la regla a mano
+  // (heroALaVenta) y dejó el candado escrito como comentario; la tira no
+  // repite eso. El careo igual carea evento por evento contra la tarjeta
+  // RENDERIZADA: si algún día divergen, truena.
+  function esAgotado(ev){ return !!_evVeredicto(ev).isAg; }
+  function esPasado(ev){ return !!_evVeredicto(ev).isPast; }
+
+  function proximosPorFecha(){
+    return EV.filter(function(e){return !e.listOnly&&dsEfectivo(e)&&!esPasado(e);})
+             .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
+  }
+
+  function elegirTira(univ,grandeId){
+    var porId={}; univ.forEach(function(e){porId[e.id]=e;});
     var top=idsDelTop(), out=[];
     for(var i=0;i<top.length&&out.length<3;i++){
       var e=porId[top[i]];
-      if(e&&e.id!==venta[0].id)out.push(e);   // el que ya es la tarjeta grande no se repite
+      if(e&&e.id!==grandeId)out.push(e);   // el que ya es la tarjeta grande no se repite
     }
     if(out.length===3)return {items:out,fuente:'top'};
     // Respaldo: se completa por cercanía de fecha, sin repetir.
+    // ⚠️ Arranca en j=0, no en j=1. Antes el universo era `venta` y su primer
+    // elemento ERA la tarjeta grande, así que saltárselo bastaba. Ahora el
+    // primero del universo puede ser un agotado —hoy lo es— y saltarlo por
+    // posición se comería justo al evento que la tuerca vino a rescatar: la
+    // grande se descarta POR ID.
     var vistos={}; out.forEach(function(e){vistos[e.id]=1;});
-    for(var j=1;j<venta.length&&out.length<3;j++){
-      if(!vistos[venta[j].id]){out.push(venta[j]);vistos[venta[j].id]=1;}
+    for(var j=0;j<univ.length&&out.length<3;j++){
+      if(univ[j].id!==grandeId&&!vistos[univ[j].id]){out.push(univ[j]);vistos[univ[j].id]=1;}
     }
     return {items:out,fuente:out.length&&idsDelTop().length?'mixta':'fecha'};
+  }
+
+  // [LAND-2] UN AGOTADO NO ABRE LA FICHA.
+  // Medido antes de decidirlo: `showDetail()` sobre neighbourhood, straykids e
+  // ironmaiden abre el COTIZADOR COMPLETO —¿cuántos viajeros?, los 4 paquetes,
+  // «elige tus opciones para ver tu cotización»— y no dice AGOTADO en ningún
+  // lado. El catálogo cierra esa puerta a propósito: `if(!isPast&&!isAg)` le
+  // quita el onclick a la tarjeta y el CSS le pone pointer-events:none. El
+  // libro de `_evVeredicto` ya lo tenía escrito: «abrirle la tarjeta sería
+  // ofrecer paquetes fantasma».
+  // Así que el agotado toma el MISMO camino que el catálogo ya usa para los
+  // estados que no se cotizan solos (proceso, solo-viaje): WhatsApp, con el
+  // número de la constante WA. Decisión de Memo, 19-sep.
+  function informes(ev){
+    var msg='Hola! Me interesa el tour de '+ev.a+' ('+ev.f+'). Me dan informes?';
+    window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
   }
 
   function construir(){
@@ -4136,11 +4208,24 @@ var _landTick = null;
     if(!wrap||!slot||!strip)return;
 
     var venta=aLaVentaPorFecha();
-    if(!venta.length){wrap.style.display='none';strip.style.display='none';_destino=0;return;}
+    var univ=proximosPorFecha();
+    var ev=venta[0]||null;
+    var grandeId=ev?ev.id:'';
+
+    // [LAND-2] LA TIRA SOBREVIVE A LA TARJETA GRANDE. Antes, sin nada a la
+    // venta, este `return` apagaba las dos. Ahora el universo de la tira no
+    // depende de que algo se pueda comprar, y el día en que no quede nada a la
+    // venta es JUSTAMENTE el día en que lo único que hay para enseñar son los
+    // agotados que vienen. La tarjeta grande sí se apaga: su regla no cambió.
+    if(!ev){
+      wrap.style.display='none';
+      _destino=0;
+      if(_landTick){clearInterval(_landTick);_landTick=null;}
+    } else {
     wrap.style.display='';
 
     // ── La tarjeta grande: el más cercano a la venta ──
-    var ev=venta[0], ds=dsEfectivo(ev);
+    var ds=dsEfectivo(ev);
     var media=document.createElement('div'); media.className='hn-media';
     var body=document.createElement('div'); body.className='hn-body';
     body.innerHTML=
@@ -4157,16 +4242,21 @@ var _landTick = null;
     tick();
     if(_landTick)clearInterval(_landTick);
     _landTick=setInterval(tick,1000);
+    }
 
     // ── La tira ──
-    var el=elegirTira(venta);
+    var el=elegirTira(univ,grandeId);
     strip.innerHTML='';
     strip.setAttribute('data-fuente',el.fuente);
     if(!el.items.length){strip.style.display='none';return;}
     strip.style.display='';
     el.items.forEach(function(e){
+      var ag=esAgotado(e);
       var it=document.createElement('button');
-      it.type='button'; it.className='hs-item';
+      it.type='button'; it.className='hs-item'+(ag?' hs-agotado':'');
+      // El ancla por id, como la tarjeta del catálogo (`data-id`): es lo que
+      // deja carear miniatura contra tarjeta sin adivinar por el nombre.
+      it.setAttribute('data-id',e.id);
       var m=document.createElement('div'); m.className='hs-media';
       var b=document.createElement('div'); b.className='hs-body';
       var n=(typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
@@ -4177,12 +4267,25 @@ var _landTick = null;
                   '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
       it.appendChild(m); it.appendChild(b);
       pintarPortada(m,e,'hs-img','hs-ini');
-      it.onclick=function(){abrir(e.id);};
+      // [LAND-2] EL SELLO NO SE CUELGA DE LA PORTADA. Ver la nota del CSS:
+      // `showInitials` reescribe `.hs-media` entera cuando la foto del artista
+      // falla, y se llevaba el sello por delante en una carrera de red.
+      if(ag){
+        var sello=document.createElement('span');
+        sello.className='hs-ag'; sello.textContent='AGOTADO';
+        it.appendChild(sello);
+      }
+      it.onclick=ag?function(){informes(e);}:function(){abrir(e.id);};
       strip.appendChild(it);
     });
-    // N se CUENTA del EV, no se escribe: los que quedan a la venta después de
-    // los 4 que ya se ven.
-    var n=venta.length-1-el.items.length;
+    // [LAND-2] N SE CUENTA, NO SE RESTA. El letrero promete «los que quedan a
+    // la venta y no se ven», y la resta vieja (`venta.length-1-items.length`)
+    // descontaba CADA miniatura, incluidas las que ahora son agotados y no
+    // salen de la cuenta de lo comprable. Medido el 19-sep con los tres
+    // agotados de septiembre en la tira: la resta decía +46 con 49 eventos a
+    // la venta escondidos. Ahora se cuenta quién falta de verdad.
+    var enTira={}; el.items.forEach(function(e){enTira[e.id]=1;});
+    var n=venta.filter(function(e){return e.id!==grandeId&&!enTira[e.id];}).length;
     if(n>0){
       var mas=document.createElement('a');
       mas.className='hs-item hs-mas';

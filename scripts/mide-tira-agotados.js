@@ -116,6 +116,19 @@ function mutarSemaforo(html, id) {
   return html.slice(0, ini) + nueva + html.slice(fin);
 }
 
+// [LAND-2b] SACAR DEL UNIVERSO SIN MOVER LA TARJETA GRANDE. Desagotar a un
+// evento cercano lo vuelve el próximo a la venta y se lleva la tarjeta grande
+// —y con ella el tope de la ventana—, así que no sirve para medir el BORDE de
+// la ventana. `listOnly` lo saca del universo de la tira dejando la grande
+// donde está.
+function mutarListOnly(html, id) {
+  const anc = `\n  {id:'${id}',`;
+  const i = html.indexOf(anc);
+  if (i < 0) throw new Error(`mutarListOnly: no encontré la ficha de ${id}`);
+  if (/listOnly/.test(html.slice(i, i + 200))) return html;
+  return html.slice(0, i + anc.length) + 'listOnly:true,' + html.slice(i + anc.length);
+}
+
 // [LAND-2b] DESAGOTAR DE VERDAD. No basta con vaciar el `st`: si las zonas
 // siguen en `ag:1` el auto-semáforo vuelve a agotarlo y el control se mediría a
 // sí mismo. Quita el `ag:1` de todas las zonas Y vacía el st.
@@ -139,7 +152,8 @@ async function mirar(dirBase, mutaciones, top) {
     let html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
     for (const [id, st] of mutaciones) html =
       (st === '@semaforo') ? mutarSemaforo(html, id) :
-      (st === '@desagotar') ? mutarDesagotar(html, id) : mutarSt(html, id, st);
+      (st === '@desagotar') ? mutarDesagotar(html, id) :
+      (st === '@listonly') ? mutarListOnly(html, id) : mutarSt(html, id, st);
     fs.writeFileSync(path.join(dir, 'index.html'), html);
   }
   const s = await servir(dir, top);
@@ -157,12 +171,20 @@ async function mirar(dirBase, mutaciones, top) {
   // un defecto. Ahora se espera a que la tira TENGA miniaturas y a que el
   // navegador haya terminado de cargar; si no llegan, el careo se cae a gritos
   // en vez de medir a medias.
-  await page.waitForFunction(
-    () => document.readyState === 'complete' &&
-          typeof EV !== 'undefined' &&
-          document.querySelectorAll('.ev-card').length > 0 &&
-          document.querySelectorAll('#hh-strip .hs-item').length > 0,
-    null, { timeout: 15000 });
+  // ⚠️ LA ESPERA NO PUEDE MATAR EL CAREO. Existe para no medir antes de tiempo,
+  // pero si vence hay que MEDIR IGUAL y que lo diga una aserción: un sabotaje
+  // que dejaba la tira vacía tumbaba la corrida entera con un timeout y se
+  // llevaba por delante todas las secciones de abajo, que ni se ejercitaron.
+  // Es la ley del libro: un arnés que se cae no reporta.
+  let esperaVencida = false;
+  try {
+    await page.waitForFunction(
+      () => document.readyState === 'complete' &&
+            typeof EV !== 'undefined' &&
+            document.querySelectorAll('.ev-card').length > 0 &&
+            document.querySelectorAll('#hh-strip .hs-item').length > 0,
+      null, { timeout: 12000 });
+  } catch (e) { esperaVencida = true; }
   // Y un respiro para que cualquier repintado tardío del hero haya ocurrido
   // ANTES de la foto: lo que se mide es la tira asentada, no una a mitad.
   await page.waitForTimeout(400);
@@ -281,6 +303,7 @@ async function mirar(dirBase, mutaciones, top) {
 
   await nav.close(); s.close();
   foto.errores = errores;
+  foto.esperaVencida = esperaVencida;
   return foto;
 }
 
@@ -300,8 +323,10 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
   af(H.errores.length === 0, `[0] HEAD tiró errores de página: ${H.errores.join(' | ')}`);
   // Toda carga que el careo mire tiene que estar limpia: un error de página en
   // un CONTROL lo volvería un renglón verde sobre una página rota.
-  const limpio = (foto, etiqueta) => af(foto.errores.length === 0,
-    `[0${etiqueta}] la página tiró errores: ${foto.errores.join(' | ')}`);
+  const limpio = (foto, etiqueta) => {
+    af(foto.errores.length === 0, `[0${etiqueta}] la página tiró errores: ${foto.errores.join(' | ')}`);
+    af(!foto.esperaVencida, `[0${etiqueta}] la tira nunca llegó a pintar miniaturas (la espera venció): se midió lo que hubiera`);
+  };
   limpio(H, '');
   af(!H.colisionNombre, `[0] dos eventos próximos comparten nombre corto («${H.colisionNombre}»): la llave no sirve`);
 
@@ -522,6 +547,36 @@ const rojo = (s) => { const m = String(s).match(/[\d.]+/g) || []; return m[0] ==
       `[9b] «${id}» va #${TOP_REAL.indexOf(id) + 1} en el top y su chip dice «${it.rank || '(ninguno)'}»`);
   });
   af(!D.items.some((x) => x.sello), `[9c] sin agotados en el catálogo la tira sigue pintando sellos`);
+
+  // ══ [11] EL BORDE DE LA VENTANA · «INCLUSIVE» TIENE QUE SER OBSERVABLE ═══
+  // La regla dice [hoy … la fecha de la grande, INCLUSIVE]. Con el catálogo de
+  // hoy ese «inclusive» NO SE PUEDE FALSEAR: los tres agotados de la ventana
+  // caen antes del 2-oct y llenan los lugares, así que Iron Maiden —que cae el
+  // MISMO día que la grande— queda cuarto y no cabe. Probado: cambiar el corte
+  // de `>` a `>=` dejaba el careo en 100 verdes. Una regla que no se puede
+  // romper no se está midiendo.
+  //
+  // Se despeja el borde sacando del universo a los agotados que están DELANTE,
+  // con `listOnly` — no desagotándolos: desagotar a uno cercano lo vuelve el
+  // próximo a la venta, se lleva la tarjeta grande y con ella el tope de la
+  // ventana, que es justo lo que se quiere dejar quieto.
+  const enBorde = H.univ.find((e) => e.ag && e.ds === dsGrande && e.id !== H.grande.id);
+  const delante = H.univ.filter((e) => e.ag && e.ds < dsGrande).map((e) => e.id);
+  af(!!enBorde, `[11] no hay un agotado en la fecha exacta de la grande: el «inclusive» de la ventana no se puede medir hoy`);
+  if (enBorde) {
+    const W = await mirar(dirH, delante.map((id) => [id, '@listonly']), TOP_REAL);
+    limpio(W, '-borde');
+    console.log(`   borde de la ventana (fuera ${delante.join(', ')}) · tira: ${W.items.map((i) => (i.rank || '') + i.nombre + (i.sello ? ' [AGOTADO]' : '')).join(' · ')}  (fuente ${W.fuente})`);
+    af(W.grande.id === H.grande.id, `[11] el montaje movió la tarjeta grande: ${H.grande.id} → ${W.grande.id}`);
+    const it = W.items.find((x) => x.dataId === enBorde.id);
+    af(!!it, `[11a] «${enBorde.id}» cae el MISMO día que la grande (${dsGrande}) y la ventana lo dejó fuera: «inclusive» no se está cumpliendo`);
+    if (it) af(it.sello, `[11a] «${enBorde.id}» entró por la ventana y no lleva sello`);
+    // Y lo de MÁS ALLÁ del borde sigue fuera: la ventana tiene tope.
+    const masAlla = H.univ.filter((e) => e.ag && e.ds > dsGrande).map((e) => e.id);
+    af(masAlla.length > 0, `[11b] no hay agotados después de la fecha de la grande: el TOPE de la ventana no se puede medir hoy`);
+    masAlla.forEach((id) => af(!W.items.some((x) => x.dataId === id),
+      `[11b] «${id}» cae DESPUÉS de la grande y la ventana se lo llevó igual: el tope no existe`));
+  }
 
   // ══ [10] LA MEZCLA · un agotado en la ventana y el top llenando el resto ══
   // Prueba que el sello y el chip #N CONVIVEN y que el corte entre las dos vías

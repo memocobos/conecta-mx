@@ -69,6 +69,139 @@ exports.handler = async (event) => {
   const slugQ = encodeURIComponent(slug);
   const esEnsayo = slug === G.SLUG_ENSAYO;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // [SORTEO-RONDAS-1] EL MODO ENSAYO — y su blindaje EN LOS DOS SENTIDOS
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔒 LA MITAD DEL BLINDAJE YA EXISTÍA Y NO LO SABÍAMOS: las SEIS functions
+  // del módulo filtran duro por slug, así que giveaway-registro,
+  // giveaway-recordatorio, giveaway-consuelo y giveaway-foto NO PUEDEN VER una
+  // fila de ensayo. Un slug de ensayo es ESTRUCTURALMENTE INCAPAZ de mandar un
+  // correo. Eso no lo agrega esta tuerca; el careo lo AFIRMA, porque un candado
+  // que nadie carea es una nota.
+  //
+  // 🔒 LO QUE SÍ SE AGREGA: que estas tres acciones —que BORRAN y SIEMBRAN— no
+  // alcancen el slug real. Y no «validan»: se REHÚSAN. El slug real no es un
+  // caso a manejar aquí, es un caso a rechazar.
+  const ACCIONES_ENSAYO = ['ensayo_sembrar', 'ensayo_reiniciar', 'ensayo_borrar'];
+  if (ACCIONES_ENSAYO.includes(body.accion)) {
+    if (slug !== G.SLUG_ENSAYO) {
+      return G.json(403, headers, { ok: false,
+        error: 'Esta acción es SOLO del modo ensayo: manda modo:"ensayo".' });
+    }
+
+    // ── SEMBRAR: 24 participantes ficticios y 24 avatares generados ────────
+    if (body.accion === 'ensayo_sembrar') {
+      // Idempotente: si ya están los 24, no siembra otra vez.
+      const ry = await fetch(`${regBase}?slug=eq.${slugQ}&select=id`, { headers: G.sbHeaders() });
+      const ya = ry.ok ? (await ry.json().catch(() => [])) : [];
+      if (Array.isArray(ya) && ya.length >= 24) {
+        return G.json(200, headers, { ok: true, ensayo: true, sembrados: 0, ya: ya.length,
+          nota: 'El ensayo ya tenía 24 o más; usa ensayo_reiniciar para volver a girar.' });
+      }
+
+      // 🔒 NOMBRES INVENTADOS, JAMÁS DE GENTE REAL. Y con las cuatro FORMAS
+      // duras dentro (dos palabras, partículas, nombre compuesto), para que el
+      // ensayo ejercite el partir de nombres y no solo el camino fácil.
+      const NOMBRES = [
+        'Ana Ruiz', 'José Del Valle Ramos', 'Luz María Sandoval Peña',
+        'Beto Cárdenas', 'María de los Angeles Fuentes Ortiz', 'Sofi Lara',
+        'Carlos Enrique Villalobos de la Garza', 'Nayeli Ocampo', 'Tavo Meza',
+        'Rosa Isela Contreras Duarte', 'Iván Barrón', 'Paty Guzmán Ríos',
+        'Memo Salinas', 'Dulce Nayeli Zapata', 'Rafa del Bosque', 'Karina Solís Vega',
+        'Chuy Maldonado', 'Fer Escamilla Ruvalcaba', 'Brenda Yáñez', 'Toño Cepeda',
+        'Mayra Alejandra Robles', 'Pepe Quintanilla', 'Cinthia de León Marroquín', 'Lalo Tamez',
+      ];
+      // Ciudades MEZCLADAS: ejercita las DOS ramas del premio (PLUS/CHEAP).
+      const CIUDADES = ['Reynosa', 'Reynosa, Tamps.', 'Río Bravo', 'Monterrey', 'McAllen'];
+
+      // Los avatares: iniciales sobre color, generados aquí. 🔒 Nunca una foto
+      // de una persona real, ni siquiera de otro slug.
+      const COLORES = ['#2b3a1f', '#3a1f2b', '#1f2b3a', '#3a321f', '#2b1f3a', '#1f3a32'];
+      const filas = [];
+      const subidas = [];
+      for (let i = 0; i < 24; i++) {
+        const nombre = NOMBRES[i];
+        const p = ESC.partirNombre(nombre) || { nombre, apellido: '' };
+        const ini = (p.nombre.charAt(0) + (p.apellido.charAt(0) || '')).toUpperCase();
+        const col = COLORES[i % COLORES.length];
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480">'
+          + '<rect width="480" height="480" fill="' + col + '"/>'
+          + '<text x="240" y="300" font-family="Helvetica,Arial" font-size="210" font-weight="bold"'
+          + ' fill="#e8ff4c" text-anchor="middle">' + ini + '</text></svg>';
+        // 🔴 LA RUTA TIENE QUE PASAR EL REGEX DE `foto_url`:
+        // ^[a-z0-9-]+\/[a-f0-9]{12}\/[A-Za-z0-9-]+\.(jpg|png)$ — por eso el
+        // slug de ensayo va en minúsculas y el prefijo es de 12 hex. Si no
+        // pasara, las fotos del ensayo saldrían EN BLANCO sin un mensaje.
+        const pref = 'ee' + String(i).padStart(10, '0');
+        const ruta = `${slug}/${pref}/avatar-${i}.png`;
+        const r = await fetch(`${G.SB_URL}/storage/v1/object/giveaway-fotos/${encodeURI(ruta)}`, {
+          method: 'POST',
+          headers: Object.assign({}, G.sbHeaders(), { 'Content-Type': 'image/svg+xml' }),
+          body: svg,
+        });
+        if (r.ok) subidas.push(ruta);
+        filas.push({
+          slug, nombre, ciudad: CIUDADES[i % CIUDADES.length],
+          whatsapp: '8990000' + String(100 + i),
+          correo: 'ensayo' + i + '@ensayo.invalid',
+          instagram: 'ensayo_' + i,
+          foto_path: r.ok ? ruta : null,
+          // Mezclado a propósito: así el ensayo ejercita la tarjeta de
+          // INICIALES y no solo la de foto.
+          foto_estado: (i % 3 === 0) ? 'pendiente' : 'aprobada',
+          ip: 'ensayo', user_agent: 'ensayo',
+        });
+      }
+      // Insert directo, sin on_conflict.
+      const ri = await fetch(regBase, {
+        method: 'POST',
+        headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
+        body: JSON.stringify(filas),
+      });
+      if (!ri.ok) {
+        const t = await ri.text().catch(() => '');
+        return G.json(502, headers, { ok: false, error: 'No se pudo sembrar el ensayo: ' + t.slice(0, 200) });
+      }
+      return G.json(200, headers, { ok: true, ensayo: true, sembrados: filas.length,
+        avatares: subidas.length });
+    }
+
+    // ── REINICIAR: se van los GIROS, se quedan los participantes ──────────
+    // Es el botón que se va a picar veinte veces ensayando.
+    if (body.accion === 'ensayo_reiniciar') {
+      const r = await fetch(`${sorBase}?slug=eq.${slugQ}`,
+        { method: 'DELETE', headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }) });
+      if (!r.ok) return G.json(502, headers, { ok: false, error: 'No se pudo reiniciar el ensayo' });
+      const fuera = await r.json().catch(() => []);
+      return G.json(200, headers, { ok: true, ensayo: true,
+        giros_borrados: Array.isArray(fuera) ? fuera.length : 0 });
+    }
+
+    // ── BORRAR: todo, incluidos los archivos del bucket ───────────────────
+    if (body.accion === 'ensayo_borrar') {
+      await fetch(`${sorBase}?slug=eq.${slugQ}`, { method: 'DELETE', headers: G.sbHeaders() });
+      const rp = await fetch(`${regBase}?slug=eq.${slugQ}&select=foto_path`, { headers: G.sbHeaders() });
+      const rutas = ((rp.ok ? await rp.json().catch(() => []) : []) || [])
+        .map((x) => x && x.foto_path).filter(Boolean);
+      await fetch(`${regBase}?slug=eq.${slugQ}`, { method: 'DELETE', headers: G.sbHeaders() });
+      let borradas = 0;
+      for (let i = 0; i < rutas.length; i += 50) {
+        const lote = rutas.slice(i, i + 50);
+        // 🔒 EL MISMO CINTURÓN QUE EL BARRIDO: ni un borrado fuera del prefijo.
+        const intrusa = lote.find((x) => String(x).indexOf(slug + '/') !== 0);
+        if (intrusa) {
+          return G.json(409, headers, { ok: false,
+            error: 'Una ruta quedó fuera de «' + slug + '/»: ' + intrusa + '. No se borró nada más.' });
+        }
+        const rd = await fetch(`${G.SB_URL}/storage/v1/object/giveaway-fotos`, {
+          method: 'DELETE', headers: G.sbHeaders(), body: JSON.stringify({ prefixes: lote }),
+        });
+        if (rd.ok) borradas += lote.length;
+      }
+      return G.json(200, headers, { ok: true, ensayo: true, fotos_borradas: borradas });
+    }
+  }
+
   // ── GIRAR ────────────────────────────────────────────────────────────────
   if (body.accion === 'girar') {
     let todos = [], elegibles = [], sorteos = [];
@@ -617,6 +750,24 @@ exports.handler = async (event) => {
     let borradas = 0;
     for (let i = 0; i < huerfanas.length; i += 50) {
       const lote = huerfanas.slice(i, i + 50).map((o) => o.path);
+      // ═══ 🔒 SEGUNDO CANDADO, ANTES DE BORRAR ═══════════════════════════
+      //
+      // El PRIMERO es la DIAGONAL del prefijo al listar, y es una certeza, no
+      // una suposición: `karolg-bbva-2026-ensayo/…` NO empieza por
+      // `karolg-bbva-2026/` —en la posición 16 el prefijo tiene `/` y el
+      // candidato tiene `-`—, así que los avatares del ensayo quedan fuera
+      // bajo las DOS semánticas posibles del `object/list` de Supabase.
+      //
+      // Éste vuelve a comprobar cada ruta del lote contra el prefijo exacto y
+      // REHÚSA EL LOTE ENTERO nombrando la intrusa. El candado más barato es
+      // el que no deja llegar el dato; el segundo más barato es no borrar lo
+      // que no pediste.
+      const intrusa = lote.find((x) => String(x).indexOf(slug + '/') !== 0);
+      if (intrusa) {
+        return G.json(409, headers, { ok: false,
+          error: 'El barrido encontró una ruta fuera de «' + slug + '/»: ' + intrusa
+               + '. No se borró nada.' });
+      }
       const rd = await fetch(`${G.SB_URL}/storage/v1/object/${BUCKET}`, {
         method: 'DELETE', headers: G.sbHeaders(), body: JSON.stringify({ prefixes: lote }),
       });

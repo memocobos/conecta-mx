@@ -1203,6 +1203,109 @@ af(() => URLS.filter(function(x){ return /giveaway_registros/.test(x.u); })
         .every(function(x){ return /slug=eq\./.test(x.u); }),
    '🔴 foto_datauri leyó registros sin acotar por slug');
 
+
+// ═══ [12] EL ENSAYO: BLINDADO EN LOS DOS SENTIDOS ═══════════════════════════
+console.log('\n── [12] el ensayo: blindado en los dos sentidos ──');
+
+// ── (1) 🔴 LAS TRES ACCIONES NO ALCANZAN EL SLUG REAL, aunque se lo pidan.
+//        No «validan»: se REHÚSAN. El slug real no es un caso a manejar aquí.
+sembrarPadron();
+const nRealAntes = REG.length, nSorAntes = SOR.length;
+for (const acc of ['ensayo_sembrar', 'ensayo_reiniciar', 'ensayo_borrar']) {
+  const r1 = await llamar({ accion: acc });                       // modo ausente = real
+  af(() => r1.code === 403 && /ensayo/i.test(String(r1.d.error || '')),
+     '🔴 ' + acc + ' en modo REAL debe dar 403, dio ' + r1.code + ' ' + r1.d.error);
+  af(() => BORRADOS.length === 0 && INSERTS.length === 0,
+     '🔴 ' + acc + ' en modo real TOCÓ la base: ' + JSON.stringify(BORRADOS.concat(INSERTS)).slice(0, 90));
+  const r2 = await llamar({ accion: acc, modo: 'real' });
+  af(() => r2.code === 403, '🔴 ' + acc + " con modo:'real' debe dar 403, dio " + r2.code);
+  af(() => BORRADOS.length === 0 && INSERTS.length === 0, acc + " con modo:'real' tocó la base");
+}
+af(() => REG.length === nRealAntes && SOR.length === nSorAntes,
+   '🔴 el padrón real se movió: ' + REG.length + '/' + SOR.length);
+af(() => REG.every((r) => r.slug === G.SLUG), '🔴 apareció una fila que no es del slug real');
+
+// ── (2) 🔴 EL ENSAYO NO PUEDE ESCRIBIR EN EL SLUG REAL ───────────────────
+const sem = await llamar({ accion: 'ensayo_sembrar', modo: 'ensayo' });
+af(() => sem.code === 200 && sem.d.sembrados === 24,
+   'sembrar deja 24 ficticios, dio ' + sem.code + ' ' + sem.d.sembrados);
+af(() => REG.filter((r) => r.slug === G.SLUG_ENSAYO).length === 24,
+   'y están en la base con el slug de ensayo, hay ' + REG.filter((r) => r.slug === G.SLUG_ENSAYO).length);
+af(() => REG.filter((r) => r.slug === G.SLUG).length === nRealAntes,
+   '🔴 sembrar el ensayo TOCÓ el padrón real');
+// 🔒 Los nombres son inventados y los correos no pueden existir.
+const fichasEns = REG.filter((r) => r.slug === G.SLUG_ENSAYO);
+af(() => fichasEns.every((r) => /@ensayo\.invalid$/.test(String(r.correo || ''))),
+   '🔒 los correos del ensayo son .invalid: no puede llegarle a nadie');
+af(() => fichasEns.every((r) => !REG.some((x) => x.slug === G.SLUG && x.nombre === r.nombre)),
+   '🔒 ningún nombre del ensayo coincide con uno del padrón real');
+// 🔴 Y LAS RUTAS DE FOTO PASAN EL REGEX DE `foto_url`, que es el que decide si
+// la foto se puede firmar. Con mayúsculas en el slug saldrían EN BLANCO.
+const RE_FOTO = /^[a-z0-9-]+\/[a-f0-9]{12}\/[A-Za-z0-9-]+\.(jpg|png)$/;
+af(() => fichasEns.every((r) => RE_FOTO.test(String(r.foto_path || ''))),
+   '🔴 una ruta de avatar NO pasa el regex de foto_url: ' + String((fichasEns[0] || {}).foto_path));
+// Mezcla de estados: el ensayo tiene que ejercitar la tarjeta de INICIALES.
+af(() => fichasEns.some((r) => r.foto_estado === 'pendiente') && fichasEns.some((r) => r.foto_estado === 'aprobada'),
+   '🔒 el ensayo mezcla aprobadas y pendientes: si no, nunca se ve la tarjeta de iniciales');
+// Y las dos ramas del premio.
+af(() => fichasEns.some((r) => G.premioPorCiudad(r.ciudad) === 'PLUS')
+      && fichasEns.some((r) => G.premioPorCiudad(r.ciudad) === 'CHEAP'),
+   '🔒 el ensayo mezcla ciudades: si no, una de las dos ramas del premio nunca se prueba');
+// Idempotente.
+const sem2 = await llamar({ accion: 'ensayo_sembrar', modo: 'ensayo' });
+af(() => sem2.code === 200 && sem2.d.sembrados === 0, 'sembrar dos veces no duplica, dio ' + sem2.d.sembrados);
+
+// Un giro de ENSAYO escribe SOLO con el slug de ensayo.
+const gEns = await llamar({ accion: 'girar', modo: 'ensayo' });
+af(() => gEns.code === 200 && gEns.d.ensayo === true,
+   'el giro de ensayo sale 200 y se declara ensayo, dio ' + gEns.code);
+af(() => INSERTS.every((x) => x.slug === G.SLUG_ENSAYO),
+   '🔴 un giro de ENSAYO insertó una fila con el slug REAL');
+af(() => URLS.filter((x) => x.m !== 'GET').every((x) => x.u.indexOf(G.SLUG_ENSAYO) !== -1
+      || x.u.indexOf('slug=eq.' + encodeURIComponent(G.SLUG) + '&') === -1),
+   '🔴 una ESCRITURA del ensayo apuntó al slug real');
+af(() => SOR.filter((x) => x.slug === G.SLUG).length === nSorAntes,
+   '🔴 el ensayo agregó un giro al sorteo REAL');
+
+// Reiniciar: se van los giros, se quedan los participantes.
+const rei = await llamar({ accion: 'ensayo_reiniciar', modo: 'ensayo' });
+af(() => rei.code === 200, 'reiniciar sale 200, dio ' + rei.code);
+af(() => SOR.filter((x) => x.slug === G.SLUG_ENSAYO).length === 0, 'reiniciar borra los giros del ensayo');
+af(() => REG.filter((r) => r.slug === G.SLUG_ENSAYO).length === 24, 'y DEJA los 24 participantes');
+af(() => SOR.filter((x) => x.slug === G.SLUG).length === nSorAntes,
+   '🔴 reiniciar el ensayo borró un giro REAL');
+af(() => BORRADOS.every((x) => x.u.indexOf(G.SLUG_ENSAYO) !== -1),
+   '🔴 un DELETE del ensayo no llevaba el slug de ensayo: ' + JSON.stringify(BORRADOS));
+
+// ── (3) 🔒 LAS OTRAS FUNCTIONS NO PUEDEN VER EL ENSAYO ───────────────────
+// No es un candado nuevo: es el que YA estaba (las seis filtran por slug), y se
+// AFIRMA porque un candado que nadie carea es una nota. Se mide por HECHO: qué
+// URL pidieron, no qué dice su comentario.
+const lista12 = require(path.join(RAIZ, 'netlify/functions/giveaway-lista.js')).handler;
+URLS = [];
+await lista12({ httpMethod: 'GET', headers: { origin: 'https://conectareynosa.mx', 'x-admin-token': 'tok' } });
+af(() => URLS.filter((x) => /giveaway_registros/.test(x.u))
+        .every((x) => x.u.indexOf('slug=eq.' + encodeURIComponent(G.SLUG)) !== -1),
+   '🔒 giveaway-lista solo pregunta por el slug REAL');
+af(() => URLS.every((x) => x.u.indexOf(G.SLUG_ENSAYO) === -1),
+   '🔴 giveaway-lista mencionó el slug de ensayo');
+const reco12 = require(path.join(RAIZ, 'netlify/functions/giveaway-recordatorio.js')).handler;
+URLS = [];
+try { await reco12({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', 'x-admin-token': 'tok' }, body: '{}' }); } catch (e) {}
+af(() => URLS.every((x) => x.u.indexOf(G.SLUG_ENSAYO) === -1),
+   '🔴 giveaway-recordatorio mencionó el slug de ensayo — podría MANDAR CORREOS del ensayo');
+URLS = [];
+await llamarCons();
+af(() => URLS.every((x) => x.u.indexOf(G.SLUG_ENSAYO) === -1),
+   '🔴 giveaway-consuelo mencionó el slug de ensayo');
+
+// ── (4) 🔴 «LIMPIAR HUÉRFANAS» NO SE LLEVA LOS AVATARES DEL ENSAYO ───────
+// El PRIMER candado es la DIAGONAL del prefijo, y es una certeza de escritorio:
+// se comprueba aquí antes de confiar en ella.
+af(() => (G.SLUG_ENSAYO + '/x/a.png').indexOf(G.SLUG + '/') !== 0,
+   '🔴 el prefijo del slug real ALCANZA al del ensayo: la diagonal no salva nada');
+af(() => (G.SLUG + '/x/a.png').indexOf(G.SLUG + '/') === 0, 'y sí alcanza lo suyo (control positivo del prefijo)');
+
 // <<<SIGUIENTES-BLOQUES>>>
 
   completo = true;

@@ -41,6 +41,8 @@ let SIN_GIRO = false;         // para medir «Como funciona», que vive ANTES de
 let N = 66;                   // registrados, cuando no hay giro
 let RES = 'pendiente';        // el resultado PUBLICO del giro vivo
 let RESUELTOS = [];           // los `giros` que ve el publico
+let CUERPOS = [];             // lo que la pagina MANDO de verdad
+let QUERIES = [];             // y con que query
 
 function estado() {
   pedidos++;
@@ -68,7 +70,16 @@ function estado() {
 }
 const srv = http.createServer((q, r) => {
   const u = q.url.split('?')[0];
-  if (/giveaway-estado/.test(u)) { r.writeHead(200, {'Content-Type':'application/json'}); return r.end(JSON.stringify(estado())); }
+  if (/giveaway-estado/.test(u)) {
+    QUERIES.push(q.url);
+    const e = estado();
+    // Refleja el modo que le pidieron: la banda tiene que salir de AQUI, no de
+    // lo que la pagina crea.
+    e.modo = /modo=ensayo/.test(q.url) ? 'ensayo' : 'real';
+    if (e.modo === 'ensayo') { e.ultimo = null; e.total = 0; }
+    r.writeHead(200, {'Content-Type':'application/json'});
+    return r.end(JSON.stringify(e));
+  }
   // La puerta privada, lo justo para que `entrar()` abra el modo admin: el
   // careo tiene que poder VER los botones, no solo el fuente.
   if (/giveaway-sortear/.test(u)) {
@@ -76,7 +87,13 @@ const srv = http.createServer((q, r) => {
     q.on('data', (c) => { cuerpo += c; });
     return q.on('end', () => {
       let b = {}; try { b = JSON.parse(cuerpo || '{}'); } catch (_) {}
+      CUERPOS.push(b);
       r.writeHead(200, { 'Content-Type': 'application/json' });
+      if (/^ensayo_/.test(String(b.accion || ''))) {
+        if (b.modo !== 'ensayo') return r.end(JSON.stringify({ ok: false, error: 'SIN MODO ENSAYO' }));
+        return r.end(JSON.stringify({ ok: true, ensayo: true, sembrados: 24, avatares: 24,
+          giros_borrados: 1, fotos_borradas: 24 }));
+      }
       if (b.accion === 'estado_admin') {
         return r.end(JSON.stringify({ ok: true, cadena: [],
           ultimo: { sorteo_id: 'g1', intento: 1, resultado: RES, nombre: rondas.orden[0].nombre,
@@ -326,6 +343,72 @@ const foto = (pg) => pg.evaluate(() => ({
   af(errsF.length === 0, 'errores en F: ' + JSON.stringify(errsF.slice(0, 3)));
   await pg.close();
   RES = 'pendiente'; RESUELTOS = [];
+
+  // ── G · LA BANDA DE ENSAYO Y SUS TRES CONTROLES ────────────────────────
+  console.log('\n── G · la banda de ENSAYO y sus controles ──');
+  ARRANQUE = Date.now() - 125000; TOPE = Infinity; RES = 'pendiente'; RESUELTOS = [];
+  CUERPOS = []; QUERIES = [];
+  pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
+  const errsG = []; pg.on('pageerror', (e) => errsG.push(e.message));
+  // Se acepta el confirm sin pensar: lo que se mide es que el `modo` viaje,
+  // no el dialogo.
+  pg.on('dialog', (d) => d.accept());
+  await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(2000);
+  const bandaVis = () => pg.evaluate(() => { const b = document.getElementById('banda-ensayo');
+    return { visible: !!(b && !b.hidden && b.offsetParent !== null),
+             alto: b ? Math.round(b.getBoundingClientRect().height) : 0,
+             txt: b ? b.textContent.trim() : null,
+             interruptor: !!document.querySelector('#ens-modo'),
+             ctrl: !!document.querySelector('#ens-ctrl:not([hidden])') }; });
+  let bg = await bandaVis();
+  af(bg.visible === false, '🔴 sin modo ensayo la banda NO se ve');
+  af(bg.ctrl === false, 'y los controles del ensayo tampoco');
+  // Sin token no hay interruptor a la vista (vive dentro del panel de admin).
+  af(!(await pg.evaluate(() => { const a = document.getElementById('admin');
+    return !!(a && a.offsetParent !== null); })), '🔒 sin token el panel de admin no está');
+
+  await pg.click('#llave'); await pg.fill('#tok', 'tok'); await pg.press('#tok', 'Enter');
+  await pg.waitForTimeout(1200);
+  await pg.check('#ens-modo');
+  await pg.waitForTimeout(2500);
+  bg = await bandaVis();
+  console.log('   con modo ensayo ', JSON.stringify(bg));
+  af(bg.visible === true, '🔴 con modo ensayo la banda TIENE que verse');
+  af(bg.alto >= 28, 'y ser grande (>=28px de alto), midió ' + bg.alto);
+  af(/ENSAYO/i.test(bg.txt || ''), 'y decir ENSAYO, dijo ' + bg.txt);
+  af(bg.ctrl === true, 'los tres controles aparecen');
+  // 🔒 Y la GET del estado llevó el modo: la banda no es cosmética, el
+  // servidor está contestando datos de ensayo.
+  af(QUERIES.some((x) => /modo=ensayo/.test(x)),
+     '🔴 ninguna consulta del estado llevó modo=ensayo');
+
+  // 🔒 LOS TRES CONTROLES MANDAN `modo:"ensayo"` SIEMPRE. Medido sobre los
+  // cuerpos que SALIERON del navegador, no leyendo el fuente.
+  CUERPOS = [];
+  for (const id of ['#ens-sembrar', '#ens-reiniciar', '#ens-borrar']) {
+    await pg.click(id);
+    await pg.waitForTimeout(900);
+  }
+  const deEnsayo = CUERPOS.filter((b) => /^ensayo_/.test(String(b.accion || '')));
+  console.log('   cuerpos de ensayo:', JSON.stringify(deEnsayo.map((b) => [b.accion, b.modo])));
+  af(deEnsayo.length === 3, 'los tres controles mandaron su acción, hubo ' + deEnsayo.length);
+  af(deEnsayo.every((b) => b.modo === 'ensayo'),
+     '🔴 un control de ensayo salió SIN modo:"ensayo" — habría tocado lo REAL');
+  // Y TODO lo que la página manda en modo ensayo lo lleva, no solo esos tres.
+  af(CUERPOS.every((b) => b.modo === 'ensayo'),
+     '🔴 alguna petición en modo ensayo salió sin `modo`: ' + JSON.stringify(CUERPOS.filter((b) => b.modo !== 'ensayo').slice(0, 3)));
+
+  // Al apagarlo, la banda se va y el modo deja de viajar.
+  CUERPOS = []; QUERIES = [];
+  await pg.uncheck('#ens-modo');
+  await pg.waitForTimeout(2500);
+  bg = await bandaVis();
+  af(bg.visible === false, '🔴 al apagar el ensayo la banda se va');
+  af(QUERIES.length > 0 && !QUERIES.some((x) => /modo=ensayo/.test(x)),
+     '🔴 apagado el ensayo, el modo NO puede seguir viajando');
+  af(errsG.length === 0, 'errores en G: ' + JSON.stringify(errsG.slice(0, 3)));
+  await pg.close();
 
   await nav.close(); srv.close();
   console.log('\n' + (mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' en verde, ' + mal + ' en rojo');

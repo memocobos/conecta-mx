@@ -20,6 +20,11 @@ const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };
 
 const http = require('http');
 const { chromium } = require('playwright');
+// ⚠️ ANTES de requerir el lib: `_lib/giveaway` lee las env vars AL CARGARSE.
+// Puestas después, `faltaEnv()` detendría al handler antes de las guardas que
+// esta prueba quiere medir, y el rojo sería del entorno, no del código.
+process.env.PORTAL_SUPABASE_URL = process.env.PORTAL_SUPABASE_URL || 'https://pt.test';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || 'k';
 const G = require(path.join(RAIZ, 'netlify/functions/_lib/giveaway.js'));
 
 // Sirve el árbol de trabajo para abrir la página como la abre la gente.
@@ -106,24 +111,51 @@ function servir() {
   // SIGUIENTE, así que el cron del «1 de octubre» dispara el 2 en UTC. La
   // comparación de la función es contra el día EN REYNOSA, y eso es lo que la
   // salva — pero hay que probarlo, no suponerlo.
-  console.log('\n    ¿qué día cree la función que es, en cada disparo?');
+  // ── LOS INSTANTES REALES EN QUE DISPARA EL SCHEDULE ─────────────────────
+  // 🔒 Y SE LE PREGUNTA A LA FUNCIÓN, NO A UNA COPIA. La primera versión de
+  // esta sección RE-IMPLEMENTABA aquí la comparación `hoyReynosa !== DIA` —
+  // o sea, medía mi copia de la regla y no la regla. Si yo me equivocaba en
+  // las dos, el verde no decía nada. Ahora se congela el reloj en cada
+  // instante UTC y se INVOCA el handler real.
+  //
+  // ⚠️ Las 9 PM de Reynosa son las 02:00 UTC del día SIGUIENTE, así que el
+  // disparo del «1 de octubre» lleva fecha UTC del 2. Eso es lo que se prueba.
+  console.log('\n    los INSTANTES REALES del schedule (UTC), contra el handler:');
   const DIA = String(G.SORTEO).slice(0, 10);
   af(DIA === '2026-10-01', 'DIA_SORTEO sale ' + DIA + ' y debe ser 2026-10-01 (la fecha EN REYNOSA)');
-  let aciertos = 0;
-  for (const dia of ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03']) {
-    if (!pm) break;
-    const [Y, M, D] = dia.split('-').map(Number);
-    // El disparo UTC que corresponde a ese día de Reynosa: el cron es 01:30 UTC,
-    // o sea el día siguiente en UTC.
-    const disparo = new Date(Date.UTC(Y, M - 1, D + 1, parseInt(pm[2], 10), parseInt(pm[1], 10), 0));
-    const hoyReynosa = disparo.toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
-    const manda = hoyReynosa === DIA;
-    const debe = dia === '2026-10-01';
-    console.log(`      disparo ${disparo.toISOString()} → en Reynosa es ${hoyReynosa} → ${manda ? 'MANDA' : 'se rehúsa'}`);
-    af(manda === debe, `el ${dia} el cron ${manda ? 'MANDA' : 'se rehúsa'} y debería ${debe ? 'mandar' : 'rehusarse'}`);
-    if (manda === debe) aciertos++;
+
+  const INSTANTES = [
+    ['2026-10-01T01:30:00Z', false, 'en Reynosa es el 30-sep, 8:30 PM'],
+    ['2026-10-02T01:30:00Z', true,  'en Reynosa es el 1-oct, 8:30 PM'],
+    ['2026-10-03T01:30:00Z', false, 'en Reynosa es el 2-oct, 8:30 PM'],
+  ];
+  const DateReal = Date;
+  const fetchReal = global.fetch;
+  for (const [iso, debeMandar, nota] of INSTANTES) {
+    const fijo = DateReal.parse(iso);
+    // Reloj congelado: `new Date()` sin argumentos y `Date.now()` devuelven el
+    // instante de la prueba; todo lo demás se comporta igual.
+    class DateFalso extends DateReal {
+      constructor(...a) { if (a.length === 0) super(fijo); else super(...a); }
+      static now() { return fijo; }
+    }
+    global.Date = DateFalso;
+    // La red no se toca: si el handler pasara las dos guardas, leería Supabase.
+    // Se le da una lista VACÍA para que llegue hasta el final sin mandar nada.
+    let leyoBase = false;
+    global.fetch = async () => { leyoBase = true; return { ok: true, status: 200, json: async () => [], text: async () => '[]' }; };
+    delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/giveaway-recordatorio.js'))];
+    const mod = require(path.join(RAIZ, 'netlify/functions/giveaway-recordatorio.js'));
+    let cuerpo = {};
+    try { cuerpo = JSON.parse((await mod.handler()).body || '{}'); } catch (e) { cuerpo = { error: e.message }; }
+    global.Date = DateReal; global.fetch = fetchReal;
+    const mando = !cuerpo.saltado;
+    console.log(`      ${iso}  (${nota})  →  ${mando ? 'MANDA' : 'se rehúsa: ' + cuerpo.saltado}`);
+    af(mando === debeMandar,
+       `el disparo ${iso} ${mando ? 'MANDA' : 'se rehúsa (' + cuerpo.saltado + ')'} y debería `
+       + (debeMandar ? 'MANDAR' : 'rehusarse') + ' — ' + nota);
+    if (debeMandar) af(leyoBase, 'el disparo bueno no llegó siquiera a leer el padrón');
   }
-  af(aciertos === 4 || !pm, 'la prueba de los cuatro días no pasó entera');
 
   // ── [3] EL SLUG NUEVO, Y NATANAEL SIN MEZCLARSE ──────────────────────────
   console.log('\n[3] el slug');

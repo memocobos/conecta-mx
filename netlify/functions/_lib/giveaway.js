@@ -11,9 +11,14 @@ const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || process.env.PORTAL_SUP
 
 // El único giveaway de esta versión. Se valida contra la entrada para que la
 // function no sea un buzón abierto a cualquier slug inventado.
-// [GIVEAWAY-NATA-1, 6-sep-2026] El módulo despierta para NATANAEL CANO
-// (2-oct-2026, Estadio Walmart Park, Mty). El de melanie queda como pasado.
-const SLUG = 'natanael-tumbada-2026';
+// [GIVEAWAY-NATA-1, 6-sep-2026] El módulo despertó para NATANAEL CANO.
+// [GIVEAWAY-KG-1, 21-sep-2026] Ahora es KAROL G — 7 de noviembre de 2026,
+// Estadio BBVA, Monterrey. Natanael queda como pasado, igual que melanie antes.
+//
+// 🔒 EL SLUG NUEVO NO BORRA NADA: los registros y los sorteos se filtran por
+// `slug` en las seis functions, así que las filas de Natanael siguen ahí,
+// enteras, y simplemente dejan de ser las del giveaway activo.
+const SLUG = 'karolg-bbva-2026';
 
 // ⚠️ REYNOSA NO ES MONTERREY. Reynosa vive en America/Matamoros, que SÍ trae
 // horario de verano (es zona fronteriza, se alinea con Texas); Monterrey vive
@@ -34,8 +39,30 @@ const SLUG = 'natanael-tumbada-2026';
 // ⚠️ Las horas concretas NO se repiten en este comentario: las dicen las dos
 // constantes de abajo, y un letrero que las repita es el que se queda viejo —
 // éste ya decía «11:00 AM / 12:00 PM» de la época de melanie.
-const CIERRE = '2026-09-13T19:00:00-05:00';   // domingo 13-sep, 7:00 PM Reynosa
-const SORTEO = '2026-09-13T20:00:00-05:00';   // domingo 13-sep, 8:00 PM, en vivo
+// [GIVEAWAY-KG-1] Firmado por Memo el 21-sep-2026: jueves 1-oct, cierre a las
+// 8:00 PM y sorteo a las 9:00 PM de Reynosa. El 1-oct Reynosa SIGUE en horario
+// de verano (corre hasta el 1-nov), así que el offset es -05:00 — en Monterrey
+// esas mismas horas son 7:00 PM y 8:00 PM, que es como lo dice la pantalla.
+const CIERRE = '2026-10-01T20:00:00-05:00';   // jueves 1-oct, 8:00 PM Reynosa
+const SORTEO = '2026-10-01T21:00:00-05:00';   // jueves 1-oct, 9:00 PM, en vivo
+
+// ⏰ EL CRON DEL RECORDATORIO SE MUEVE CON `SORTEO`, Y NO SOLO.
+//
+// La FECHA sí deriva de aquí: `giveaway-recordatorio` se rehúsa si el día en
+// Reynosa no es el del sorteo. Pero LA HORA del disparo vive en `netlify.toml`,
+// en UTC, y ésa es una SEGUNDA FUENTE que nadie sincroniza sola.
+//
+// ⚠️ Y el cambio de día muerde: las 9 PM de Reynosa son las 02:00 UTC del DÍA
+// SIGUIENTE, así que el cron del «1 de octubre» se escribe con la hora del 2.
+// Lo que salva la comparación es que la función pregunta por el día EN REYNOSA,
+// no en UTC — pero eso se PRUEBA, no se supone (el careo lo corre contra el
+// 30-sep, 1-oct, 2-oct y 3-oct).
+//
+// Hoy: ventana de 40 minutos y `schedule = "30 1 * * *"` (01:30 UTC = 8:30 PM
+// de Reynosa), o sea 30 minutos dentro de la ventana por cada lado. Si estas
+// fechas cambian, EL SCHEDULE CAMBIA CON ELLAS — y el careo truena si dejan de
+// caer uno dentro del otro.
+const RECORDATORIO_VENTANA_MIN = 40;
 
 const ALLOWED_ORIGINS = ['https://conectareynosa.mx', 'https://www.conectareynosa.mx'];
 const ALLOWED_ORIGINS_DEV = ['http://localhost:8888', 'http://localhost:3999', 'http://127.0.0.1:8888'];
@@ -152,13 +179,19 @@ function esDeReynosa(ciudad) {
 function premioPorCiudad(ciudad) {
   return esDeReynosa(ciudad) ? 'PLUS' : 'CHEAP';
 }
+// [GIVEAWAY-KG-1] El premio es para la fecha del 7 DE NOVIEMBRE (`karolg#1`).
+// Va explícito porque Karol G tiene TRES fechas en el Estadio BBVA —6, 7 y 8—
+// y sin decirlo el ganador puede creer que elige.
+// La ZONA concreta (Club Seat Oriente o Poniente) la asigna Conecta según
+// disponibilidad: en el catálogo son dos zonas distintas y el copy dice «Club
+// Seat» a secas.
 const PREMIOS = {
-  PLUS:  'Paquete PLUS · boleto Zona Tumbada + transporte + hospedaje + Kit Conecta',
-  CHEAP: 'Boleto Zona Tumbada + Kit Conecta',
+  PLUS:  'Paquete PLUS · boleto Club Seat para el 7 de noviembre + transporte + hospedaje + Kit Conecta',
+  CHEAP: 'Boleto Club Seat para el 7 de noviembre + Kit Conecta',
 };
 
 module.exports = {
-  SB_URL, SB_KEY, SLUG, CIERRE, SORTEO,
+  SB_URL, SB_KEY, SLUG, CIERRE, SORTEO, RECORDATORIO_VENTANA_MIN,
   normalizarCiudad, esDeReynosa, premioPorCiudad, PREMIOS,
   corsCheck, cabeceras, json, faltaEnv, sbHeaders,
   registroCerrado, tokenAdminValido, ipDe,

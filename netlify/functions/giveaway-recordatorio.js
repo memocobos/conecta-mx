@@ -26,7 +26,9 @@ const SITE = process.env.URL || 'https://conectareynosa.mx';
 const DIA_SORTEO = String(G.SORTEO).slice(0, 10);   // '2026-08-05'
 // Ventana desde que abre el disparo hasta la hora del sorteo: si Netlify se
 // retrasa, el correo sigue teniendo sentido. Pasada la hora del giro, no.
-const ABRE_MS = Date.parse(G.SORTEO) - 30 * 60 * 1000;   // 30 min antes
+// [GIVEAWAY-KG-1] La ventana sale de `_lib` para que el careo pueda carearla
+// contra el `schedule` de netlify.toml: eran dos números que nadie cruzaba.
+const ABRE_MS = Date.parse(G.SORTEO) - G.RECORDATORIO_VENTANA_MIN * 60 * 1000;
 const CIERRA_MS = Date.parse(G.SORTEO);
 
 function escapeHtml(s) {

@@ -1150,6 +1150,21 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
          (el EV cuenta 42 pasados y el Excel dice 58: dos cifras distintas,
          ninguna consultable en vivo). -->
     <p class="hh-proof"><b>13</b> años de experiencia</p>
+    <!-- [VIAJEROS-CONTADOR-1] Nace VACÍO y ESCONDIDO. Lo llena
+         `viajeros-contador`; si el fetch falla, este bloque SE BORRA DEL DOM
+         entero (fail-soft, como el overlay de stock). Un «0 viajeros» o un
+         número inventado en la portada es peor que no decir nada. -->
+    <div class="hh-vcount" id="hh-vcount" hidden>
+      <!-- ⚰️ AQUÍ VIVÍA «Nos han acompañado», y se quitó el 21-sep-2026 por
+           decisión de Memo con la palabra de Jane: HABLA EN PASADO, y la pieza
+           dice justo lo contrario — «y contando». La pieza arranca en el
+           número. No se repone sin su palabra: el careo lo vigila. -->
+      <div class="hh-vc-n">
+        <span class="hh-vc-num" id="hh-vc-num">0</span>
+        <span class="hh-vc-lbl">viajeros y contando</span>
+      </div>
+      <div class="hh-vc-anios" id="hh-vc-anios"></div>
+    </div>
     <div class="hh-strip" id="hh-strip" style="display:none"></div>
     <div class="hh-ctas">
       <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
@@ -2564,12 +2579,38 @@ body.pf-barra-viva .wa-float{bottom:104px}
   background:var(--c-rojo);color:#fff;border:0;border-radius:var(--r-btn,12px);
   font-family:'Montserrat',sans-serif;font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
 
-/* ── 3 · PRUEBA SOCIAL ── SOLO cifras que la casa ya sostiene: los 58 tours
-   los afirma Memo desde el Excel y los 13 años ya los dice el marquee de
-   arriba. El conteo de VIAJEROS no existe en ningún campo del sistema, así
-   que no aparece: entra el día que Memo dé el número. */
+/* ── 3 · PRUEBA SOCIAL ── SOLO cifras que la casa ya sostiene.
+   ⚰️ Este bloque decía «el conteo de VIAJEROS no existe en ningún campo del
+   sistema, así que no aparece: entra el día que Memo dé el número». Ese día
+   llegó: VIAJEROS-CONTADOR-1 (21-sep-2026). El número ya no se da a mano —
+   sale VIVO de la misma fuente que el Resumen. Se deja dicho para que nadie
+   lo revuelva leyendo un commit viejo. */
 .hh-proof{margin:11px 0 0;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.62)}
 .hh-proof b{color:var(--c-amarillo);font-weight:900}
+
+/* ── 3b · EL CONTADOR DE VIAJEROS ────────────────────────────────────────────
+   🔒 EL NÚMERO NO ESTÁ AQUÍ NI EN EL HTML: lo trae `viajeros-contador`. Un
+   número tecleado en la portada es un número que envejece solo — es la misma
+   enfermedad de los letreros que esta casa ya pagó dos veces este mes.
+   🔒 LA TIPOGRAFÍA ES `--font-display` (Barlow Condensed 900), NO Kaneda. El
+   sitio solo carga Barlow Condensed + Montserrat: pedir Kaneda caería a
+   Montserrat EN SILENCIO y rompería la identidad creyendo conservarla. Es la
+   misma nota que ya vive junto al wizard, y por la misma razón.
+   `tabular-nums` no es adorno: el count-up cambia el dígito 60 veces por
+   segundo y sin ancho fijo el renglón entero baila. */
+.hh-vcount{margin:13px 0 0}
+.hh-vc-n{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.hh-vc-num{font-family:var(--font-display);font-weight:900;line-height:.9;
+  font-size:clamp(40px,8.4vw,62px);color:var(--c-amarillo);
+  font-variant-numeric:tabular-nums;letter-spacing:.005em}
+.hh-vc-lbl{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:900;
+  letter-spacing:.11em;text-transform:uppercase;color:rgba(255,255,255,.82)}
+.hh-vc-anios{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.hh-vc-anio{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.06em;color:rgba(255,255,255,.58);
+  border:1px solid rgba(255,255,255,.14);border-radius:3px;padding:3px 8px;
+  font-variant-numeric:tabular-nums}
+.hh-vc-anio b{color:rgba(255,255,255,.88);font-weight:900}
 
 /* ── 4 · LA TIRA ── */
 .hh-strip{display:flex;gap:6px;margin-top:11px}
@@ -2736,6 +2777,15 @@ body.pf-barra-viva .wa-float{bottom:104px}
   .hn-faltan{margin-top:6px;padding:3px 9px}
   .hn-cta{margin-top:8px;padding:9px}
   .hh-proof{margin-top:8px}
+  /* [VIAJEROS-CONTADOR-1] En 390px el hero ya va apretado: el número baja de
+     tamaño y los renglones de año se pegan, pero NADA se esconde — el desglose
+     es el registro permanente y esconderlo en el teléfono, que es por donde
+     entra casi todo el tráfico, sería no tenerlo. */
+  .hh-vcount{margin-top:9px}
+  .hh-vc-num{font-size:clamp(34px,10.5vw,44px)}
+  .hh-vc-lbl{font-size:10px;letter-spacing:.08em}
+  .hh-vc-anios{margin-top:5px;gap:5px}
+  .hh-vc-anio{font-size:9.5px;padding:2px 6px}
   .hh-strip{margin-top:8px}
   .hs-media{height:42px}
   .hh-ctas{margin-top:8px;gap:6px;flex-wrap:nowrap}
@@ -2794,12 +2844,19 @@ body.pf-barra-viva .wa-float{bottom:104px}
   .hh-grid{
     display:grid;
     grid-template-columns:minmax(0,1fr) minmax(320px,420px);
-    grid-template-rows:auto auto auto 1fr;
+    /* [VIAJEROS-CONTADOR-1] El contador necesita SU renglón. Sin área
+       asignada caía a una fila implícita AL FONDO —debajo de los CTA y medio
+       fuera del pliegue—, aunque en el DOM va justo después de la prueba.
+       En móvil no se nota, porque ahí la rejilla es flujo normal: el defecto
+       vivía SOLO en escritorio. Medir «se ve» y «no se desborda» no lo cazaba;
+       hay que medir DÓNDE. */
+    grid-template-rows:auto auto auto auto 1fr;
     grid-template-areas:
-      "kicker  evento"
-      "titulo  evento"
-      "prueba  evento"
-      "botones tira";
+      "kicker   evento"
+      "titulo   evento"
+      "prueba   evento"
+      "viajeros evento"
+      "botones  tira";
     column-gap:clamp(32px,5vw,72px);
     align-items:start;
   }
@@ -2811,6 +2868,7 @@ body.pf-barra-viva .wa-float{bottom:104px}
   .hh-title   {grid-area:titulo;margin-bottom:14px;font-size:clamp(52px,7.6vw,124px)}
   .hh-next-wrap{grid-area:evento;margin-top:0}
   .hh-proof   {grid-area:prueba;margin-top:0;font-size:12px}
+  .hh-vcount  {grid-area:viajeros;margin-top:14px}
   .hh-strip   {grid-area:tira;margin-top:14px}
   .hh-ctas    {grid-area:botones;margin-top:22px;align-self:start}
   .hn-media{height:176px}
@@ -7448,6 +7506,95 @@ function skipOnboarding(){
   }catch(e){
     // Cualquier tropiezo: la marquesina se queda con su lema. Nunca en blanco.
   }
+})();
+
+/* ═══ [VIAJEROS-CONTADOR-1] EL ACUMULADO DE VIAJEROS EN LA PORTADA ═════════
+   Decisión de Memo (20-sep-2026): la portada presume los viajeros reales.
+
+   🔒 EL NÚMERO SE PIDE, NO SE TECLEA. Sale de `viajeros-contador`, que a su
+   vez le pregunta a la MISMA función que produce el total del Resumen
+   (`cuentasDeTodos`). Si algún día ese criterio cambia, la portada cambia con
+   él sin que nadie toque este archivo — que es justo lo que no pasaba con los
+   letreros que esta casa lleva dos semanas despegando a mano.
+
+   🔒 FAIL-SOFT DURO: cualquier tropiezo —red, 5xx, JSON raro, total que no es
+   número— BORRA la pieza del DOM. No la esconde: la borra. Un «0 viajeros» en
+   la portada es peor que no decir nada, y un bloque escondido es un bloque que
+   alguien puede volver a enseñar por accidente.
+
+   🔒 EL COUNT-UP ES RENDER POR EVENTO, NO ANIMACIÓN INFINITA: corre UNA vez
+   por carga, al entrar al viewport, y se acabó. No cae bajo la regla de
+   SCROLL-2 (lo que anima POR FRAME de forma continua), y por eso puede tocar
+   `textContent`. El ancho no baila porque el número va en `tabular-nums`.
+   Con `prefers-reduced-motion` no hay cuenta: el número aparece ya puesto. */
+(function(){
+  var caja = document.getElementById('hh-vcount');
+  if (!caja) return;
+  var elNum = document.getElementById('hh-vc-num');
+  var elAnios = document.getElementById('hh-vc-anios');
+  var fuera = function(){ try { caja.remove(); } catch(e) { caja.hidden = true; } };
+  if (!elNum || !elAnios) return fuera();
+
+  var fmt = function(n){ return Number(n).toLocaleString('es-MX'); };
+
+  function pintarAnios(porAnio){
+    var anios = Object.keys(porAnio || {}).filter(function(a){ return /^\d{4}$/.test(a); }).sort();
+    // Un solo año no es un "desglose": es el total otra vez, con más letra.
+    // El renglón nace cuando hay DOS, que es cuando empieza a contar historia.
+    if (anios.length < 2) return;
+    elAnios.innerHTML = '';
+    anios.forEach(function(a){
+      var d = document.createElement('span');
+      d.className = 'hh-vc-anio';
+      d.textContent = a + ': ';
+      var b = document.createElement('b');
+      b.textContent = fmt(porAnio[a]);
+      d.appendChild(b);
+      elAnios.appendChild(d);
+    });
+  }
+
+  function contarHasta(total){
+    var quieto = false;
+    try { quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e) {}
+    if (quieto || !window.requestAnimationFrame){ elNum.textContent = fmt(total); return; }
+    var DUR = 1100, t0 = null;
+    // easeOutCubic: arranca rápido y frena — el número "aterriza" en vez de
+    // cortarse de golpe.
+    var suave = function(x){ return 1 - Math.pow(1 - x, 3); };
+    function paso(t){
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / DUR);
+      elNum.textContent = fmt(Math.round(total * suave(k)));
+      if (k < 1) requestAnimationFrame(paso);
+      // 🔒 El último fotograma escribe el valor EXACTO, no el redondeo de la
+      // curva: `Math.round(total * 1)` es total, pero dejarlo implícito sería
+      // confiar en que k llega a 1 clavado. Se escribe a mano.
+      else elNum.textContent = fmt(total);
+    }
+    requestAnimationFrame(paso);
+  }
+
+  function arrancar(total){
+    if (!window.IntersectionObserver){ contarHasta(total); return; }
+    var io = new IntersectionObserver(function(ents){
+      for (var i = 0; i < ents.length; i++){
+        if (ents[i].isIntersecting){ io.disconnect(); contarHasta(total); return; }
+      }
+    }, { threshold: 0.35 });
+    io.observe(caja);
+  }
+
+  fetch('/.netlify/functions/viajeros-contador')
+    .then(function(r){ if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+    .then(function(j){
+      var total = j && j.ok ? Number(j.total) : NaN;
+      if (!isFinite(total) || total <= 0) throw new Error('total ilegible');
+      pintarAnios(j.por_anio);
+      caja.hidden = false;
+      arrancar(total);
+    })
+    .catch(fuera);
 })();
 </script>
 </body>

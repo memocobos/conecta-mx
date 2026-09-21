@@ -22,6 +22,7 @@
     "mide:stock-vivo": "node scripts/mide-stock-vivo.js",
     "mide:boletos": "node scripts/mide-boletos.js",
     "mide:giveaway-karolg": "node scripts/mide-giveaway-karolg.js",
-    "mide:luces-placa": "node scripts/mide-luces-placa.js"
+    "mide:luces-placa": "node scripts/mide-luces-placa.js",
+    "mide:viajeros-contador": "node scripts/mide-viajeros-contador.js"
   }
 }

@@ -1306,6 +1306,89 @@ af(() => (G.SLUG_ENSAYO + '/x/a.png').indexOf(G.SLUG + '/') !== 0,
    '🔴 el prefijo del slug real ALCANZA al del ensayo: la diagonal no salva nada');
 af(() => (G.SLUG + '/x/a.png').indexOf(G.SLUG + '/') === 0, 'y sí alcanza lo suyo (control positivo del prefijo)');
 
+
+// ═══ [13] 🔴 EL CONTROL POSITIVO DEL PR ENTERO: **BASE SÍ FILTRA** ══════════
+//
+// Sin esto, los mil verdes de arriba no distinguen «lo arreglé» de «no estoy
+// midiendo». Se saca el árbol de BASE con `git archive` y se corre SU
+// `giveaway-estado` con el MISMO mock: tiene que soltar el nombre del ganador
+// desde el instante cero, que es justo el spoiler que esta tuerca cierra.
+//
+// 🔒 BASE ES UN COMMIT FIJO, no `main`. Cuando esto se mergee, `main` va a
+// traer el arreglo y el control positivo se pondría en ROJO solo, diciendo «en
+// BASE no se filtra nada» — un control positivo CADUCA cuando su pasado se
+// vuelve presente. Es lo que le pasó a mide:luces-placa.
+console.log('\n── [13] control positivo: BASE SÍ filtra al ganador ──');
+const { execSync } = require('child_process');
+const os = require('os');
+const BASE = process.env.BASE || '52660aa';
+let dirBase = null;
+try {
+  const sha = execSync('git rev-parse ' + BASE, { cwd: RAIZ, encoding: 'utf8' }).trim();
+  dirBase = require('fs').mkdtempSync(require('path').join(os.tmpdir(), 'base-' + sha.slice(0, 7) + '-'));
+  execSync('git archive ' + sha + ' | tar -x -C ' + dirBase, { cwd: RAIZ, shell: '/bin/bash' });
+  console.log('    BASE = ' + sha.slice(0, 9) + ' extraído');
+} catch (e) {
+  af(false, '🔴 no se pudo extraer el árbol de BASE (' + BASE + '): ' + e.message);
+}
+// 🔒 EL LADO DE HEAD SE DICE EN VOZ ALTA. Este careo mide el ÁRBOL DE TRABAJO
+// (que es lo que quieres de un vigilante vivo), no un commit congelado — pero
+// entonces el verde no vale nada si no se sabe QUÉ árbol midió. Se imprime el
+// sha y si está sucio, para que el veredicto no sea ambiguo nunca.
+//
+// ⏳ ANTES DEL MERGE: aquí se ancla `HEAD` al sha del merge y se corre una vez
+// más, para dejar un verdadero careo entre DOS COMMITS que no caduque. Mientras
+// la PR vive, el árbol de trabajo es lo correcto.
+try {
+  const shaHead = execSync('git rev-parse --short HEAD', { cwd: RAIZ, encoding: 'utf8' }).trim();
+  const sucio = execSync('git status --porcelain -- sorteo.html sorteo-tiempos.js netlify/functions scripts',
+    { cwd: RAIZ, encoding: 'utf8' }).trim();
+  console.log('    HEAD medido = ÁRBOL DE TRABAJO sobre ' + shaHead
+            + (sucio ? '  ⚠️ CON CAMBIOS SIN COMMITEAR:\n      ' + sucio.split('\n').join('\n      ') : '  (limpio)'));
+} catch (e) { console.log('    (no se pudo leer el sha de HEAD: ' + e.message + ')'); }
+if (dirBase) {
+  const estadoBase = require(path.join(dirBase, 'netlify/functions/giveaway-estado.js')).handler;
+  // El MISMO escenario del bloque [9]: un giro recién creado.
+  const fila13 = await girarYFijar(0);
+  const rBase = await estadoBase(evG({}));
+  let dBase = {}; try { dBase = JSON.parse(rBase.body || '{}'); } catch (_) {}
+  console.log('    BASE en t=0 → ultimo.nombre = ' + JSON.stringify(dBase.ultimo && dBase.ultimo.nombre));
+  af(() => rBase.statusCode === 200, 'el estado de BASE contesta 200, dio ' + rBase.statusCode);
+  af(() => dBase.ultimo && dBase.ultimo.nombre === fila13.ganador_nombre,
+     '🔴 CONTROL POSITIVO EN ROJO: en BASE el nombre del ganador NO sale en t=0, '
+     + 'así que este careo no distingue «lo arreglé» de «no estoy midiendo». Dio '
+     + JSON.stringify(dBase.ultimo && dBase.ultimo.nombre));
+  af(() => dBase.ultimo && dBase.ultimo.folio != null,
+     '🔴 CONTROL POSITIVO: en BASE el folio del ganador también salía en t=0');
+  // Y HEAD, en el MISMO instante, NO lo suelta. Los dos lados, medidos juntos.
+  const rHead = await pedir({});
+  af(() => rHead.d.ultimo && rHead.d.ultimo.nombre === null,
+     '🔴 en HEAD, mismo instante, el nombre TIENE que venir en null; vino '
+     + JSON.stringify(rHead.d.ultimo && rHead.d.ultimo.nombre));
+  af(() => rHead.crudo.indexOf(fila13.ganador_nombre + '"') === -1
+        || rHead.d.ultimo.rondas.some((x) => x.miembros.length > 1),
+     'y no aparece identificable en ningún otro campo');
+
+  // Lo que BASE no tenía, para que el resto del PR también tenga su contraste.
+  const libBase = path.join(dirBase, 'netlify/functions/_lib/sorteo-escalera.js');
+  af(() => !require('fs').existsSync(libBase), 'en BASE no existía _lib/sorteo-escalera');
+  af(() => !require('fs').existsSync(path.join(dirBase, 'sorteo-tiempos.js')),
+     'en BASE no existía sorteo-tiempos.js');
+  const gBase = require(path.join(dirBase, 'netlify/functions/_lib/giveaway.js'));
+  af(() => gBase.SLUG_ENSAYO === undefined, 'en BASE no existía el slug de ensayo');
+  af(() => typeof gBase.slugDe !== 'function', 'ni `slugDe`');
+  const htmlBase = require('fs').readFileSync(path.join(dirBase, 'sorteo.html'), 'utf8');
+  af(() => htmlBase.indexOf('mosaico-caja') === -1, 'en BASE no había mosaico');
+  af(() => htmlBase.indexOf('como-func') === -1, 'ni bloque de «Cómo funciona»');
+  af(() => htmlBase.indexOf('nocumple') === -1, 'ni tercer botón');
+  af(() => htmlBase.indexOf('banda-ensayo') === -1, 'ni banda de ensayo');
+  // Y el consuelo de BASE tomaba «el último giro», sin filtrar por acepto.
+  const consBase = require('fs').readFileSync(
+    path.join(dirBase, 'netlify/functions/giveaway-consuelo.js'), 'utf8');
+  af(() => consBase.indexOf('resultado=eq.acepto') === -1,
+     '🔴 CONTROL POSITIVO: en BASE el consuelo NO filtraba por acepto');
+}
+
 // <<<SIGUIENTES-BLOQUES>>>
 
   completo = true;

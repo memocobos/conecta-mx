@@ -70,7 +70,22 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.42);margin:-8px 0 14px}
 
 /* Las luces perimetrales. Son 14 puntos absolutos con --i para desfasarlas. */
-.luces{position:absolute;inset:6px;pointer-events:none;border-radius:18px}
+.luces{position:absolute;inset:6px;pointer-events:none;border-radius:18px;z-index:1}
+/* [LUCES-PLACA-1] LA PLACA VA ENCIMA DE LAS LUCES. `.placa` y `.luces` son las
+   dos posicionadas y ninguna traía z-index, asi que mandaba el ORDEN DEL DOM —y
+   `.luces` va despues—: dos focos se pintaban sobre el letrero, uno en la «C»
+   de CONECTA y otro en la «X» de MX. Medido en el navegador con
+   `elementFromPoint`, que contesta quien pinta de verdad: decia `SPAN` y
+   `placa-mx`. La fila de arriba ademas SALTA las columnas del centro, para que
+   el brillo no se asome por los bordes del letrero. */
+.placa{z-index:2}
+/* [LUCES-PLACA-1] UNA COLUMNA SE COLOCA POR SU CENTRO, NO POR SU BORDE. Con el
+   borde, `left:8%` y `right:8%` NO son simetricos: el ancho del foco se cuenta
+   hacia adentro de un lado y hacia afuera del otro. Por eso el ultimo foco de
+   abajo quedaba a 33px de su vecino y los demas a 60px — 27px de desnivel,
+   medido. Con `left` + translateX(-50%) el porcentaje ES el centro y las dos
+   filas caen en la misma rejilla. */
+.luz-col{transform:translateX(-50%)}
 .luz{position:absolute;width:7px;height:7px;border-radius:50%;
   background:#5a4a12;box-shadow:0 0 5px rgba(232,255,76,.25);
   animation:latir 2.4s ease-in-out infinite;animation-delay:calc(var(--i) * .16s)}
@@ -502,7 +517,28 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       <div class="placa-mx">MX.</div>
     </div>
     <div class="placa-sub">Sorteo en vivo</div>
-    <div class="luces" aria-hidden="true"><i class="luz" style="--i:0;top:0;left:8%"></i><i class="luz" style="--i:1;top:0;left:26%"></i><i class="luz" style="--i:2;top:0;left:44%"></i><i class="luz" style="--i:3;top:0;left:62%"></i><i class="luz" style="--i:4;top:0;left:80%"></i><i class="luz" style="--i:5;top:50%;right:0;margin-top:-3px"></i><i class="luz" style="--i:6;bottom:0;right:8%"></i><i class="luz" style="--i:7;bottom:0;left:80%"></i><i class="luz" style="--i:8;bottom:0;left:62%"></i><i class="luz" style="--i:9;bottom:0;left:44%"></i><i class="luz" style="--i:10;bottom:0;left:26%"></i><i class="luz" style="--i:11;bottom:0;left:8%"></i><i class="luz" style="--i:12;top:50%;left:0;margin-top:-3px"></i><i class="luz" style="--i:13;top:0;right:0"></i></div>
+    <div class="luces" aria-hidden="true">
+      <!-- 🔒 `--i` NO es el orden del DOM: es el RECORRIDO del brillo por el
+           marco, en manecillas del reloj (arriba izq→der · costado derecho ·
+           abajo der→izq · costado izquierdo). Se agrupa por fila para poder
+           leerlo, y el desfase se numera aparte. -->
+      <!-- ARRIBA: la misma rejilla, SIN las columnas del centro (ahí va la placa) -->
+      <i class="luz luz-col" style="--i:0;top:0;left:5%"></i>
+      <i class="luz luz-col" style="--i:1;top:0;left:20%"></i>
+      <i class="luz luz-col" style="--i:2;top:0;left:80%"></i>
+      <i class="luz luz-col" style="--i:3;top:0;left:95%"></i>
+      <!-- los costados, centrados en el canto -->
+      <i class="luz" style="--i:4;top:50%;right:0;margin-top:-3.5px"></i>
+      <i class="luz" style="--i:12;top:50%;left:0;margin-top:-3.5px"></i>
+      <!-- ABAJO: la rejilla COMPLETA; sus columnas coinciden con las de arriba -->
+      <i class="luz luz-col" style="--i:11;bottom:0;left:5%"></i>
+      <i class="luz luz-col" style="--i:10;bottom:0;left:20%"></i>
+      <i class="luz luz-col" style="--i:9;bottom:0;left:35%"></i>
+      <i class="luz luz-col" style="--i:8;bottom:0;left:50%"></i>
+      <i class="luz luz-col" style="--i:7;bottom:0;left:65%"></i>
+      <i class="luz luz-col" style="--i:6;bottom:0;left:80%"></i>
+      <i class="luz luz-col" style="--i:5;bottom:0;left:95%"></i>
+    </div>
 
     <div class="rodillos">
       <div class="rod" id="rod-0"><div class="rod-win"></div><div class="rod-tira" id="tira-0"></div></div>

@@ -9,6 +9,10 @@
 // giveaway-sortear, que sí exige token.
 
 const G = require('./_lib/giveaway');
+// [SORTEO-RONDAS-1] `partirNombre` y el FOLIO se mudaron a _lib/sorteo-escalera:
+// aquí eran locales y ningún arnés podía medir las cuatro formas duras que el
+// padrón real delató, ni carear el folio contra el que guarda la escalera.
+const ESC = require('./_lib/sorteo-escalera');
 
 // Columnas que SÍ pueden viajar a cualquiera. Whitelist, no lista negra: si
 // mañana alguien agrega una columna sensible a la tabla, esto no la filtra
@@ -30,32 +34,16 @@ const COLS_PUBLICAS = 'id,intento,resultado,ganador_nombre,total_participantes,c
 // El orden alfabético hace el trabajo de un shuffle SIN aleatoriedad: nada de
 // Math.random en este archivo, para que el candado de "el navegador no escoge"
 // siga siendo trivial de auditar.
-// PARTIR EL NOMBRE. En México los apellidos son DOS y van al final, pero hay
-// dos casos que una regla simple parte mal — los dos salieron del padrón real,
-// no de ejemplos inventados:
+// PARTIR EL NOMBRE: vive en `_lib/sorteo-escalera`, con las cuatro formas duras
+// que el padrón real delató documentadas allá y CAREADAS allá. No se repiten
+// aquí: dos copias de la misma explicación son dos copias que pueden divergir,
+// y la que se queda vieja es la que nadie corre.
 //
-//   · dos palabras: "Juan Pérez" → "Juan" / "Pérez" (15 de las 70 colas)
-//   · partículas:   "Juan Del Ángel Pérez" → "Juan" / "Del Ángel Pérez"
-//                   "Jorge Monserrath Lopez de Leon" → "… Monserrath" / "Lopez de Leon"
-//                   "María de los Angeles Izaguirre Cruz" → "María de los Angeles" / "Izaguirre Cruz"
-//
-// (a) Si los dos últimos EMPIEZAN con partícula, en realidad son UN apellido
-//     ("de Leon"), así que hace falta una palabra más para el otro.
-// (b) Si lo que queda justo antes es partícula, es parte del apellido.
-//
-// El servidor y la página parten IGUAL: si difieren, el rodillo del apellido
-// gira con valores que nunca contienen al ganador.
-const PARTICULAS = /^(de|del|la|las|los|y|da|di)$/i;
-function partirNombre(completo) {
-  const p = String(completo || '').trim().split(/\s+/).filter(Boolean);
-  if (!p.length) return null;
-  if (p.length === 1) return { nombre: p[0], apellido: '' };
-  if (p.length === 2) return { nombre: p[0], apellido: p[1] };
-  let corte = p.length - 2;
-  if (corte > 1 && PARTICULAS.test(p[corte])) corte--;
-  while (corte > 1 && PARTICULAS.test(p[corte - 1])) corte--;
-  return { nombre: p.slice(0, corte).join(' '), apellido: p.slice(corte).join(' ') };
-}
+// 🔒 Lo que sí es de aquí: el servidor y la PÁGINA parten igual. `sorteo.html`
+// tiene su gemelo `partir()` para los rodillos, y si difieren el rodillo del
+// apellido gira con valores que nunca contienen al ganador. Eso lo carea
+// `npm run mide:giveaway-karolg`.
+const partirNombre = ESC.partirNombre;
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -103,8 +91,10 @@ exports.handler = async (event) => {
   // es el #1. Se calcula aquí y se sirve ya resuelto; el id del registro nunca
   // sale.
   const filas = Array.isArray(registros) ? registros : [];
-  const folioPorId = {};
-  filas.forEach((r, i) => { if (r && r.id) folioPorId[String(r.id)] = i + 1; });
+  // [SORTEO-RONDAS-1] La MISMA definición que usa `girar` para guardar el folio
+  // en la escalera. Contados distinto, el número del mosaico y el del tercer
+  // rodillo dirían cosas diferentes en cámara.
+  const folioPorId = ESC.folios(filas);
 
   const giros = (Array.isArray(sorteos) ? sorteos : []).map(s => ({
     id: s.id,

@@ -102,4 +102,156 @@ function pozoDeReGiro(rondas, quemados, elegiblesVivos) {
   return { pozo: [], escalon: null };
 }
 
-module.exports = { alAzar, revolver, construirEscalera, pozoDeReGiro };
+// ── EL FOLIO: la posición en el orden de registro ──────────────────────────
+// 🔒 UNA SOLA DEFINICIÓN. Vivía suelto dentro de giveaway-estado.js y ahora lo
+// necesitan DOS lugares: la escalera (para guardarlo) y la respuesta pública
+// (para ordenar por él). Contados distinto, el número del mosaico y el del
+// tercer rodillo dirían cosas diferentes en cámara.
+//
+// ⚠️ CUENTA A LOS ELIMINADOS. El folio es «el N-ésimo en inscribirse», y eso no
+// cambia porque después se le dé de baja: recalcularlo sin ellos le movería el
+// folio a todos los que entraron después. `registrosPorCreado` viene ordenado
+// por `creado_at.asc` y SIN filtros.
+function folios(registrosPorCreado) {
+  const m = {};
+  (Array.isArray(registrosPorCreado) ? registrosPorCreado : [])
+    .forEach((r, i) => { if (r && r.id) m[String(r.id)] = i + 1; });
+  return m;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTIR EL NOMBRE — mudado desde giveaway-estado.js
+//
+// Allá era local y ningún arnés podía tocarlo, así que las cuatro formas duras
+// que el padrón REAL delató vivían documentadas en un comentario y no medidas.
+// Aquí se exporta y se carea. En México los apellidos son DOS y van al final,
+// con dos excepciones que salieron del padrón, no de ejemplos inventados:
+//
+//   · dos palabras: "Juan Pérez"                          → "Juan" / "Pérez"
+//   · partículas:   "Juan Del Ángel Pérez"                → "Juan" / "Del Ángel Pérez"
+//                   "Jorge Monserrath Lopez de Leon"      → "…Monserrath" / "Lopez de Leon"
+//                   "María de los Angeles Izaguirre Cruz" → "María de los Angeles" / "Izaguirre Cruz"
+//
+// (a) si los dos últimos EMPIEZAN con partícula, en realidad son UN apellido
+// (b) si lo que queda justo antes es partícula, es parte del apellido
+//
+// ⚠️ sorteo.html tiene su propio `partir()` para los RODILLOS, ya careado contra
+// éste. Mudar esta copia NO crea un gemelo nuevo: quita uno que no se podía
+// medir.
+const PARTICULAS = /^(de|del|la|las|los|y|da|di)$/i;
+function partirNombre(completo) {
+  const p = String(completo || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return null;
+  if (p.length === 1) return { nombre: p[0], apellido: '' };
+  if (p.length === 2) return { nombre: p[0], apellido: p[1] };
+  let corte = p.length - 2;
+  if (corte > 1 && PARTICULAS.test(p[corte])) corte--;
+  while (corte > 1 && PARTICULAS.test(p[corte - 1])) corte--;
+  return { nombre: p.slice(0, corte).join(' '), apellido: p.slice(corte).join(' ') };
+}
+
+// «Ana M.» — lo que ve el público de un finalista. El nombre COMPLETO es solo
+// del ganador, y sale por otro campo (`ultimo.nombre`), con su propio gateo.
+function nombreCorto(completo) {
+  const p = partirNombre(completo);
+  if (!p) return '';
+  if (!p.apellido) return p.nombre;
+  return p.nombre + ' ' + p.apellido.charAt(0).toUpperCase() + '.';
+}
+
+// «AM» — para la tarjeta de quien NO tiene foto aprobada. Nunca una tarjeta
+// muda: sin foto hay iniciales.
+function iniciales(completo) {
+  const p = partirNombre(completo);
+  if (!p) return '';
+  return (p.nombre.charAt(0) + (p.apellido.charAt(0) || '')).toUpperCase();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA PROYECCIÓN PÚBLICA — el gateo por tiempo y el orden neutro
+//
+// 🔴 DOS COSAS QUE ESTA FUNCIÓN EXISTE PARA EVITAR:
+//
+// 1. EL SPOILER. Antes de esto la respuesta traía `ganador_nombre` desde el
+//    segundo cero y el show dura 2:12: cualquiera con la consola abierta sabía
+//    el ganador dos minutos antes que la cámara. Aquí cada ronda sale SOLO
+//    cuando le toca, con un margen corto de adelanto.
+//
+// 2. EL ORDEN. `rondas.orden` está en orden de REVOLTURA, o sea que su primer
+//    elemento ES el ganador. Publicar ese orden sería publicar la respuesta.
+//    Cada ronda se re-ordena por FOLIO, que es la posición en el orden de
+//    registro y no tiene nada que ver con la revoltura.
+//
+// El reloj entra como PARÁMETRO (`transcurridoMs`) para que se pueda congelar
+// en un careo: un arnés que lee Date.now() mide otra corrida.
+//
+// `fotoDeId(id) -> url | null` lo inyecta el llamador, que es quien sabe qué
+// fotos están APROBADAS y quien puede firmar. Aquí no hay IO.
+function proyectarRondas(o) {
+  const rondas = (o && o.rondas) || null;
+  const esc = (rondas && Array.isArray(rondas.escalones)) ? rondas.escalones : [];
+  const orden = (rondas && Array.isArray(rondas.orden)) ? rondas.orden : [];
+  const mm = (o && Array.isArray(o.momentos)) ? o.momentos : [];
+  const margen = Number((o && o.margenMs) || 0);
+  const t = Number((o && o.transcurridoMs) || 0);
+  const fotoDeId = (o && o.fotoDeId) || function () { return null; };
+
+  const libera = (k) => Math.max(0, (mm[k] || 0) - margen);
+
+  const out = [];
+  let siguiente = null;
+  for (let k = 0; k < esc.length; k++) {
+    if (t < libera(k)) {
+      if (siguiente === null) siguiente = libera(k) - t;
+      continue;
+    }
+    const miembros = orden.slice(0, esc[k])
+      // 🔒 AQUÍ MUERE EL ORDEN DE LA REVOLTURA. El `slice()` de arriba ya
+      // devolvió copia, así que el `sort` no puede mutar la columna guardada.
+      .sort((a, b) => (Number(a.folio) || 0) - (Number(b.folio) || 0))
+      .map((r) => ({
+        folio: Number(r.folio) || null,
+        corto: nombreCorto(r.nombre),
+        ini: iniciales(r.nombre),
+        // Se re-declara en CADA ronda —con null explícito— para que un
+        // «invalidar» posterior llegue a quien ya está mirando.
+        foto: fotoDeId(r.id) || null,
+      }));
+    out.push({ i: k, tam: esc[k], miembros });
+  }
+
+  // Se calcula del RELOJ, no de `out.length`: así no depende de un invariante
+  // del ciclo de arriba.
+  const ganador_liberado = esc.length > 0 && t >= libera(esc.length - 1);
+
+  return { rondas: out, rondas_totales: esc.length,
+           siguiente_ronda_en_ms: siguiente, ganador_liberado };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EL `resultado` QUE VE EL PÚBLICO — tres valores, no cuatro
+//
+// 🔴 `no_contesto` y `no_cumple` son hechos DISTINTOS y la base los distingue
+// (uno no dio señales; el otro SÍ contestó pero no cumple las bases). En
+// pantalla los dos dicen lo mismo —«Se vuelve a girar»— por orden de Memo.
+//
+// Pero la puerta pública NO puede afirmar `no_contesto` sobre alguien que sí
+// contestó: sería la etiqueta equivocada sobre un hecho real, en público, con
+// nombre — el defecto de `metodo_separo`. Por eso se derivan a un tercer valor
+// neutro, y el motivo verdadero viaja SOLO por `estado_admin`, que exige token.
+//
+// Y con el ganador sin revelar TODO dice `pendiente`: si Memo pica un botón a
+// media animación, la puerta pública no puede anunciar que ya se resolvió —la
+// página se saltaría el show y quien mira vería el final antes del final.
+function resultadoPublico(resultado, ganadorLiberado) {
+  if (!ganadorLiberado) return 'pendiente';
+  if (resultado === 'acepto') return 'acepto';
+  if (resultado === 'pendiente') return 'pendiente';
+  return 'se_regira';            // no_contesto | no_cumple
+}
+
+module.exports = {
+  alAzar, revolver, construirEscalera, pozoDeReGiro, folios,
+  PARTICULAS, partirNombre, nombreCorto, iniciales,
+  proyectarRondas, resultadoPublico,
+};

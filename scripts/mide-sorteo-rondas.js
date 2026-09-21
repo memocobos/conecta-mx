@@ -294,6 +294,182 @@ af(() => ESC.pozoDeReGiro(RD, new Set(['r1']), PADRON).escalon === 0, 'con [1] e
 af(() => ESC.pozoDeReGiro(null, new Set(), []).escalon === null, 'sin escalera ni padrón: escalon null');
 af(() => ESC.pozoDeReGiro(RF, null, PADRON).escalon === 3, 'sin Set de quemados no truena');
 
+// ═══ [4] LA PROYECCIÓN PÚBLICA: GATEO, FOLIO Y NOMBRES CORTOS ═══════════════
+console.log('\n── [4] la proyección pública: gateo, folio y nombres cortos ──');
+
+// ── Las FORMAS duras del padrón REAL (las que ya están escritas en
+// giveaway-estado.js). Formas reales, no ejemplos míos: los ejemplos inventados
+// comparten mis sesgos, y el padrón real delató una regla que 8 ejemplos míos
+// habrían aprobado.
+[
+  ['Juan Pérez',                          'Juan',                 'Pérez',           'Juan P.',                 'JP'],
+  ['Juan Del Ángel Pérez',                'Juan',                 'Del Ángel Pérez', 'Juan D.',                 'JD'],
+  ['Jorge Monserrath Lopez de Leon',      'Jorge Monserrath',     'Lopez de Leon',   'Jorge Monserrath L.',     'JL'],
+  ['María de los Angeles Izaguirre Cruz', 'María de los Angeles', 'Izaguirre Cruz',  'María de los Angeles I.', 'MI'],
+  ['Ana',                                 'Ana',                  '',                'Ana',                     'A'],
+].forEach((c) => {
+  const pr = ESC.partirNombre(c[0]);
+  af(() => pr && pr.nombre === c[1] && pr.apellido === c[2],
+     'partirNombre("' + c[0] + '") dio ' + JSON.stringify(pr));
+  af(() => ESC.nombreCorto(c[0]) === c[3],
+     'nombreCorto("' + c[0] + '") dio "' + ESC.nombreCorto(c[0]) + '", se esperaba "' + c[3] + '"');
+  af(() => ESC.iniciales(c[0]) === c[4],
+     'iniciales("' + c[0] + '") dio "' + ESC.iniciales(c[0]) + '", se esperaba "' + c[4] + '"');
+});
+af(() => ESC.partirNombre('') === null, 'partirNombre("") es null');
+af(() => ESC.nombreCorto('') === '', 'nombreCorto("") es cadena vacía, no truena');
+af(() => ESC.iniciales('') === '', 'iniciales("") es cadena vacía');
+
+// ── EL FOLIO: una sola definición, y CUENTA A LOS ELIMINADOS ───────────────
+const fol = ESC.folios([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+af(() => fol.a === 1 && fol.b === 2 && fol.c === 3, 'folios() numera desde 1 en orden de llegada');
+af(() => Object.keys(ESC.folios(null)).length === 0, 'folios(null) no truena');
+
+// ── EL GATEO, con el reloj como PARÁMETRO ──────────────────────────────────
+const MOM = TI.momentos([24, 12, 6, 3, 1]);      // [0, 18700, 46700, 74700, 116700]
+const MAR = TI.T.MARGEN_ADELANTO_MS;             // 2000
+const proj = (t, foto) => ESC.proyectarRondas({
+  rondas: RF, momentos: MOM, margenMs: MAR, transcurridoMs: t,
+  fotoDeId: foto || (() => null),
+});
+
+// Los seis instantes del acta.
+[[0, 1, false], [13000, 1, false], [30000, 2, false],
+ [60000, 3, false], [95000, 4, false], [200000, 5, true]].forEach((c) => {
+  const r = proj(c[0]);
+  af(() => r.rondas.length === c[1],
+     '🔴 en t=' + c[0] + ' ms se publicaron ' + r.rondas.length + ' rondas, se esperaban ' + c[1]);
+  af(() => r.ganador_liberado === c[2],
+     '🔴 en t=' + c[0] + ' ms ganador_liberado=' + r.ganador_liberado + ', se esperaba ' + c[2]);
+  af(() => r.rondas_totales === 5, 'rondas_totales debe ser 5 siempre, dio ' + r.rondas_totales);
+});
+
+// 🔴 EL SPOILER, DICHO COMO ASERCIÓN. Se mide sobre el JSON COMPLETO
+// serializado, no campo por campo: un campo nuevo que alguien agregue mañana
+// también cae aquí.
+[0, 13000, 30000, 60000, 95000].forEach((t) => {
+  const r = proj(t);
+  const crudo = JSON.stringify(r);
+  af(() => r.rondas.every((x) => x.tam >= 3),
+     '🔴 en t=' + t + ' salió una ronda de menos de 3: eso SEÑALA al ganador');
+  af(() => crudo.indexOf('"id"') === -1,
+     '🔒 la proyección NO puede llevar el id del registro (t=' + t + ')');
+  af(() => !/whatsapp|correo|instagram|foto_path|descarte|nombre"/i.test(crudo),
+     '🔒 dato privado o nombre completo en la proyección (t=' + t + ')');
+});
+const r95 = proj(95000);
+af(() => r95.rondas.length === 4 && r95.rondas[3].tam === 3,
+   'en t=95 s la última ronda publicada debe ser la de 3');
+af(() => r95.rondas.every((x) => x.tam !== 1),
+   '🔴 EL GANADOR VIAJÓ ANTES DEL GIRO FINAL — es el mínimo no negociable');
+
+// `siguiente_ronda_en_ms`: para que la página programe un latido dirigido.
+af(() => proj(0).siguiente_ronda_en_ms === 16700,
+   'en t=0 la siguiente ronda es en 16700, dio ' + proj(0).siguiente_ronda_en_ms);
+af(() => proj(13000).siguiente_ronda_en_ms === 3700,
+   'en t=13000 falta 3700, dio ' + proj(13000).siguiente_ronda_en_ms);
+af(() => proj(200000).siguiente_ronda_en_ms === null,
+   'con todo publicado, siguiente_ronda_en_ms es null');
+
+// ── 🔒 ORDEN POR FOLIO, NUNCA POR REVOLTURA ────────────────────────────────
+// `RF.orden` tiene los folios 1..24 EN ESE MISMO ORDEN, así que ahí los dos
+// órdenes coinciden y la aserción no diría nada. Se usa una escalera con la
+// revoltura AL REVÉS: si la proyección conservara el orden de revoltura, los
+// folios saldrían 24,23,22…
+const ordenRev = [];
+for (let i = 24; i >= 1; i--) ordenRev.push({ id: 'r' + i, nombre: 'N' + i + ' A' + i, folio: i });
+const RREV = { v: 1, escalones: [24, 12, 6, 3, 1], orden: ordenRev };
+const pRev = ESC.proyectarRondas({ rondas: RREV, momentos: MOM, margenMs: MAR,
+                                   transcurridoMs: 200000, fotoDeId: () => null });
+pRev.rondas.forEach((x) => {
+  const folios = x.miembros.map((m) => m.folio);
+  af(() => folios.every((f, i) => i === 0 || f > folios[i - 1]),
+     '🔴 la ronda ' + x.i + ' NO viene ordenada por folio: ' + folios.join(','));
+});
+af(() => pRev.rondas[0].miembros[0].folio === 1,
+   '🔴 con la revoltura al revés el primero por folio sigue siendo el 1 — si dice 24, se está publicando el orden de la revoltura');
+// 🔒 Y `orden` NO se mutó: es la columna que se guardó.
+af(() => RREV.orden[0].folio === 24, '🔒 proyectarRondas MUTÓ el `orden` que le dieron');
+
+// ── 🔒 LA POSICIÓN DEL GANADOR EN EL MOSAICO ES UNIFORME ───────────────────
+// Ordenar por folio hace que el rango del ganador entre los 24 sea uniforme.
+// Sin esta aserción, «el ganador no es siempre la primera tarjeta» se cumpliría
+// con una distribución cargada al principio, que es igual de delatora.
+const POSN = 12000;
+const posG = new Array(24).fill(0);
+for (let i = 0; i < POSN; i++) {
+  const e = ESC.construirEscalera(PADRON, esc66);
+  const p1 = ESC.proyectarRondas({ rondas: e, momentos: MOM, margenMs: MAR,
+                                   transcurridoMs: 0, fotoDeId: () => null });
+  posG[p1.rondas[0].miembros.findIndex((m) => m.folio === e.orden[0].folio)]++;
+}
+const x2p = chi2(posG, POSN / 24);
+console.log('    posición del ganador en el mosaico: χ² ' + x2p.toFixed(1) + ' (gl 23) · min '
+          + Math.min.apply(null, posG) + ' · max ' + Math.max.apply(null, posG));
+// χ² con 23 gl: el crítico a p=0.001 ronda 49.7. 70 es holgado a propósito.
+af(() => x2p < 70, '🔴 la posición del ganador en el mosaico NO es uniforme: χ² ' + x2p.toFixed(1));
+af(() => posG.every((c) => c > 0), 'alguna posición del mosaico nunca tocó al ganador');
+// Control positivo: si se ordenara por revoltura, el ganador SIEMPRE sería el 0.
+const posSesgo = new Array(24).fill(0);
+for (let i = 0; i < 600; i++) {
+  const e = ESC.construirEscalera(PADRON, esc66);
+  posSesgo[e.orden.findIndex((m) => m.folio === e.orden[0].folio)]++;   // orden de REVOLTURA
+}
+af(() => chi2(posSesgo, 600 / 24) > 300,
+   '🔴 CONTROL POSITIVO EN ROJO: el careo no distingue el orden de revoltura del orden por folio');
+
+// ── Las fotos: solo las que el llamador declara aprobadas ─────────────────
+const conFoto = ESC.proyectarRondas({
+  rondas: RF, momentos: MOM, margenMs: MAR, transcurridoMs: 200000,
+  fotoDeId: (id) => (Number(String(id).slice(1)) % 2 === 0 ? 'https://firmada/' + id : null),
+});
+const m0 = conFoto.rondas[0].miembros;
+af(() => m0.filter((m) => m.foto).length === 12,
+   'deben salir 12 fotos de 24, dio ' + m0.filter((m) => m.foto).length);
+af(() => m0.every((m) => m.foto || m.ini), '🔒 sin foto aprobada SIEMPRE hay iniciales — nunca una tarjeta muda');
+af(() => m0.filter((m) => m.folio % 2).every((m) => m.foto === null),
+   '🔒 una foto NO aprobada salió en público');
+// 🔒 Se re-declara en CADA ronda: así un «invalidar» a media transmisión llega
+// a quien ya está mirando (el apretón tiene que poder viajar).
+af(() => conFoto.rondas.every((x) => x.miembros.every((m) => 'foto' in m)),
+   '🔒 alguna ronda no re-declara `foto`: el apretón posterior no llegaría');
+
+// ── Escaleras cortas y el caso degenerado ─────────────────────────────────
+const M31 = TI.momentos([3, 1]);
+const P31 = { v: 1, escalones: [3, 1], orden: ordenFijo.slice(0, 3) };
+af(() => ESC.proyectarRondas({ rondas: P31, momentos: M31, margenMs: MAR, transcurridoMs: 0, fotoDeId: () => null }).rondas.length === 1,
+   'con [3,1] en t=0 sale solo la ronda de 3');
+af(() => ESC.proyectarRondas({ rondas: P31, momentos: M31, margenMs: MAR, transcurridoMs: 40000, fotoDeId: () => null }).ganador_liberado === true,
+   'con [3,1] en t=40 s el ganador ya salió');
+// 🔴 EL CASO DEGENERADO: con [1] el único escalón ES el ganador, así que en
+// t=0 NO puede salir nada. Es lo que la fórmula de momentos() protege.
+const M1 = TI.momentos([1]);
+const P1 = { v: 1, escalones: [1], orden: ordenFijo.slice(0, 1) };
+af(() => ESC.proyectarRondas({ rondas: P1, momentos: M1, margenMs: MAR, transcurridoMs: 0, fotoDeId: () => null }).rondas.length === 0,
+   '🔴 con [1] en t=0 NO puede salir el ganador');
+af(() => ESC.proyectarRondas({ rondas: P1, momentos: M1, margenMs: MAR, transcurridoMs: 1000, fotoDeId: () => null }).ganador_liberado === true,
+   'con [1] en t=1 s (tras CUENTA_321−MARGEN=700) ya salió');
+// Sin escalera: no truena y no inventa.
+af(() => ESC.proyectarRondas({ rondas: null, momentos: [], margenMs: MAR, transcurridoMs: 9e9 }).rondas.length === 0,
+   'sin escalera la proyección va vacía');
+af(() => ESC.proyectarRondas({}).ganador_liberado === false, 'sin nada, ganador_liberado es false');
+
+// ── `resultadoPublico`: los dos descartes se ven IGUAL ────────────────────
+af(() => ESC.resultadoPublico('pendiente',   true) === 'pendiente',  'pendiente → pendiente');
+af(() => ESC.resultadoPublico('acepto',      true) === 'acepto',     'acepto → acepto');
+af(() => ESC.resultadoPublico('no_contesto', true) === 'se_regira',  'no_contesto → se_regira');
+af(() => ESC.resultadoPublico('no_cumple',   true) === 'se_regira',  '🔴 no_cumple → se_regira');
+// 🔒 Con el ganador SIN revelar, todo dice `pendiente`: si Memo pica un botón a
+// media animación, la puerta pública no puede anunciar que ya se resolvió.
+['pendiente', 'acepto', 'no_contesto', 'no_cumple'].forEach((rr) => {
+  af(() => ESC.resultadoPublico(rr, false) === 'pendiente',
+     '🔴 con el ganador sin revelar, "' + rr + '" debe salir como pendiente');
+});
+// 🔒 La palabra `cumple` no puede salir por la puerta pública NUNCA.
+af(() => ['pendiente', 'acepto', 'no_contesto', 'no_cumple']
+      .every((rr) => ESC.resultadoPublico(rr, true).indexOf('cumple') === -1),
+   '🔒 la cadena "cumple" se filtró al valor público');
+
 completo = true;
 marcador();
 process.exit(mal ? 1 : 0);

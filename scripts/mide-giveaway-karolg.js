@@ -806,6 +806,227 @@ function servir() {
   } catch (e) { af(false, 'la sección de la cuadrícula se CAYÓ: ' + e.message); }
 
   af(errores.length === 0, 'la página tiró errores de JS: ' + JSON.stringify(errores.slice(0, 3)));
+
+  // ── [9] 🔴 EL BARRIDO DE RESTOS DE LA ÉPOCA ANTERIOR ─────────────────────
+  // ORDEN DE MEMO (21-sep): «si las fechas vivían en cuatro copias, quiero un
+  // barrido de restos medido sobre lo SERVIDO, no por grep del repo».
+  //
+  // POR QUÉ EXISTE, en tres mordidas documentadas:
+  //   · melanie → Natanael: el párrafo del rescate siguió anunciando «el 6 de
+  //     agosto en Arena Monterrey» (RESCATE-FECHA-1 lo cazó suelto).
+  //   · Natanael → Karol G: el <title>, las DOS fechas del 13-sep, el rescate
+  //     entero (artista, fecha, venue y el ?text= del WhatsApp) y el link
+  //     `/?evento=natanael` se quedaron. Más el correo del recordatorio, que
+  //     anunciaba «las 12:00 PM» desde la época de melanie — DOS giveaways
+  //     mintiendo, porque ese correo solo se renderiza el día del sorteo.
+  //
+  // 🔒 SE BARRE EL TEXTO QUE LA GENTE VE (`innerText`) Y LOS ATRIBUTOS QUE
+  // MANDAN (título, og:*, href), NO EL HTML CRUDO. Un comentario que explica
+  // «esto sustituye a lo de Natanael» CONTIENE la palabra, y barrer el fuente
+  // lo acusaría: es la aserción de ausencia que se caza sola. El comentario es
+  // documentación buena y se queda.
+  const PROHIBIDAS = [
+    'natanael', 'tumbada', 'walmart', 'melanie', 'hades',
+    '13 de septiembre', '2 de octubre', '6 de agosto',
+    'natanael-tumbada-2026',            // el slug viejo
+    '12:00 pm',                         // la hora del sorteo de melanie
+    // ⚠️ «8:00 PM hora de Reynosa» NO se prohíbe aunque fuera la hora del
+    // sorteo de Natanael: es la hora BUENA del CIERRE de Karol G y sale en las
+    // tres pantallas. Prohibirla puso el careo en rojo acusando texto correcto
+    // — el rojo del arnés suele ser mío. Lo que sí vigila la hora es [9c], que
+    // exige que las frases DIGAN lo que dice el lib.
+  ];
+  // El ?text= del WhatsApp viaja escapado: se busca también en esa forma.
+  const PROHIBIDAS_URL = ['natanael', 'walmart', 'melanie', 'tumbada'];
+
+  const restos = (texto) => PROHIBIDAS.filter((p) => String(texto || '').toLowerCase().includes(p));
+
+  console.log('\n[9] el barrido de restos, sobre lo SERVIDO');
+
+  // ── [9a] /giveaway, sus TRES estados ──────────────────────────────────────
+  // Los tres se fuerzan enseñando el bloque y escondiendo los otros: es lo que
+  // hace la página, y así el barrido ve el texto de los tres aunque hoy solo
+  // uno esté a la vista.
+  {
+    const pg = await nav.newPage();
+    await pg.goto(`http://127.0.0.1:${puerto}/giveaway.html`, { waitUntil: 'load' });
+    for (const [estado, visible] of [['abierto', 'form'], ['ya registrado', 'ok'], ['cerrado', 'cerrado']]) {
+      const r = await pg.evaluate((v) => {
+        ['form', 'ok', 'cerrado'].forEach((id) => {
+          const e = document.getElementById(id);
+          if (e) e.style.display = (id === v) ? 'block' : 'none';
+        });
+        const enlaces = [...document.querySelectorAll('a[href]')].map((a) => a.href);
+        return { texto: document.body.innerText, enlaces,
+                 titulo: document.title,
+                 og: [...document.querySelectorAll('meta[property^="og:"],meta[name="description"]')]
+                       .map((m) => m.content).join(' | ') };
+      }, visible);
+      const h = restos(r.texto + ' ' + r.titulo + ' ' + r.og);
+      const hu = r.enlaces.filter((u) => PROHIBIDAS_URL.some((p) => decodeURIComponent(u).toLowerCase().includes(p)));
+      console.log('    /giveaway · ' + estado + ': ' + (h.length || hu.length ? '❌ ' + h.concat(hu).join(', ') : '✅ limpio'));
+      af(h.length === 0, '/giveaway en «' + estado + '» todavía dice: ' + h.join(', '));
+      af(hu.length === 0, '/giveaway en «' + estado + '» enlaza a la época anterior: ' + hu.join(', '));
+    }
+    // 🔒 CONTROL POSITIVO: si le siembro la palabra, el barrido TIENE que verla.
+    // Sin esto, los ✅ de arriba no distinguen «está limpio» de «no estoy mirando».
+    const cazado = await pg.evaluate(() => {
+      document.getElementById('cerrado').style.display = 'block';
+      document.getElementById('cerrado').textContent = 'Todavía hay lugares para Natanael Cano';
+      return document.body.innerText;
+    });
+    af(restos(cazado).length > 0, 'el barrido NO caza una palabra sembrada: no está midiendo nada');
+    await pg.close();
+  }
+
+  // ── [9b] /sorteo, sus CINCO estados ───────────────────────────────────────
+  // 🔴 El que más importa es «el ganador aceptó»: es el único que enseña el
+  // bloque de rescate, y es justo donde vivían el artista, la fecha y el venue
+  // de la época anterior. Hoy /sorteo en producción sigue mostrando al ganador
+  // de Natanael, así que ese bloque es lo que la gente ve AHORA MISMO.
+  {
+    const ESTADOS = [
+      ['pre-sorteo, registro abierto',  { total: 40, sorteos: [], registro_cerrado: false }],
+      ['pre-sorteo, registro cerrado',  { total: 40, sorteos: [], registro_cerrado: true }],
+      ['ganador pendiente (reloj)',     { total: 40, registro_cerrado: true, ultimo: { id: 'g1', nombre: 'Ana Ruiz', folio: '0007', resultado: 'pendiente', creado_at: new Date().toISOString() }, sorteos: [] }],
+      ['ganador aceptó (rescate)',      { total: 40, registro_cerrado: true, ultimo: { id: 'g1', nombre: 'Ana Ruiz', folio: '0007', resultado: 'acepto', creado_at: new Date().toISOString() }, sorteos: [] }],
+      ['no contestó, se vuelve a girar',{ total: 40, registro_cerrado: true, ultimo: { id: 'g1', nombre: 'Ana Ruiz', folio: '0007', resultado: 'no_contesto', creado_at: new Date().toISOString() }, sorteos: [] }],
+    ];
+    for (const [rotulo, estado] of ESTADOS) {
+      const pg = await nav.newPage();
+      await pg.route('**/.netlify/functions/giveaway-estado*', (r) =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ...estado }) }));
+      await pg.route('**/.netlify/functions/giveaway-lista*', (r) =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, nombres: [] }) }));
+      await pg.goto(`http://127.0.0.1:${puerto}/sorteo.html`, { waitUntil: 'load' });
+      await pg.waitForTimeout(900);
+      const r = await pg.evaluate(() => {
+        // Se lee TODO el texto, incluido lo que está oculto: un bloque que hoy
+        // no se ve se enciende solo cuando el sorteo avanza, y entonces ya es
+        // tarde para descubrir que dice el nombre del giveaway pasado.
+        //
+        // 🔴 Y AL `<script>` SE LE QUITAN LOS COMENTARIOS. `textContent` de un
+        // <script> es su código fuente entero, así que el comentario que
+        // EXPLICA «esto se quedó en el 13-sep de Natanael» hacía rojo el
+        // barrido — la aserción de ausencia cazándose sola, otra vez. No se
+        // excluye el script completo, que perdería cobertura: un
+        // `var x = 'Natanael'` que la página pinte SÍ tiene que caer.
+        const sinComentarios = (t) => String(t)
+          .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+        const todo = [...document.querySelectorAll('body *')]
+          .filter((e) => !e.children.length)
+          .map((e) => (e.tagName === 'SCRIPT' || e.tagName === 'STYLE')
+            ? sinComentarios(e.textContent) : e.textContent)
+          .join(' \n ');
+        return { visible: document.body.innerText, todo, titulo: document.title,
+                 enlaces: [...document.querySelectorAll('a[href]')].map((a) => a.href) };
+      });
+      const h = restos(r.visible + ' ' + r.todo + ' ' + r.titulo);
+      const hu = r.enlaces.filter((u) => PROHIBIDAS_URL.some((p) => decodeURIComponent(u).toLowerCase().includes(p)));
+      console.log('    /sorteo · ' + rotulo + ': ' + (h.length || hu.length ? '❌ ' + h.concat(hu).join(', ') : '✅ limpio'));
+      af(h.length === 0, '/sorteo en «' + rotulo + '» todavía dice: ' + h.join(', '));
+      af(hu.length === 0, '/sorteo en «' + rotulo + '» enlaza a la época anterior: ' + hu.join(', '));
+
+      // 🔒 CONTROL POSITIVO POR EL MISMO CAMINO, y en cada estado. El de
+      // /giveaway prueba `restos()`; éste prueba el camino de /sorteo, que es
+      // OTRO: barre los elementos hoja —incluidos los OCULTOS— y le quita los
+      // comentarios al <script>. Un `sinComentarios` que se pasara de listo
+      // borraría texto bueno y dejaría los ✅ de arriba sin significado.
+      // Se siembra DENTRO del rescate, que es el bloque que estuvo sucio y que
+      // en cuatro de los cinco estados está oculto.
+      const sembrado = await pg.evaluate(() => {
+        const r = document.getElementById('rescate');
+        if (!r) return null;
+        const p = document.createElement('p');
+        p.textContent = 'Todavía hay lugares para Natanael Cano el 2 de octubre';
+        r.appendChild(p);
+        const sinC = (t) => String(t).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+        return [...document.querySelectorAll('body *')].filter((e) => !e.children.length)
+          .map((e) => (e.tagName === 'SCRIPT' || e.tagName === 'STYLE') ? sinC(e.textContent) : e.textContent)
+          .join(' \n ');
+      });
+      af(sembrado !== null, '/sorteo en «' + rotulo + '»: no existe #rescate, el control positivo no se pudo sembrar');
+      af(sembrado !== null && restos(sembrado).length >= 2,
+         '/sorteo en «' + rotulo + '»: el barrido NO caza lo sembrado en un bloque OCULTO — no está midiendo');
+      await pg.close();
+    }
+  }
+
+  // ── [9c] LAS FECHAS DE /sorteo SE DERIVAN, no se teclean ─────────────────
+  // El barrido de arriba caza la palabra «13 de septiembre». Esto es más
+  // fuerte: exige que las dos frases DIGAN la fecha del lib, así que mover
+  // `SORTEO` las mueve y no hay texto que se pueda quedar atrás.
+  {
+    const pg = await nav.newPage();
+    await pg.route('**/.netlify/functions/giveaway-estado*', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, total: 4, sorteos: [], registro_cerrado: false }) }));
+    await pg.goto(`http://127.0.0.1:${puerto}/sorteo.html`, { waitUntil: 'load' });
+    await pg.waitForTimeout(600);
+    const f = await pg.evaluate(() => ({
+      cuenta: (document.getElementById('cuenta-l') || {}).textContent,
+      espera: (document.getElementById('espera-cuando') || {}).textContent,
+    }));
+    console.log('    la frase derivada: "' + f.cuenta + '"');
+    console.log('    la de espera:      "' + f.espera + '"');
+    const dia = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'long' })
+      .format(new Date(Date.parse(G.SORTEO)));
+    af(!!f.cuenta && f.cuenta.includes(dia), 'la frase de la cuenta no dice «' + dia + '»: sale "' + f.cuenta + '"');
+    af(!!f.espera && f.espera.includes(dia), 'la frase de espera no dice «' + dia + '»: sale "' + f.espera + '"');
+    af(!!f.cuenta && /9:00 PM hora de Reynosa/.test(f.cuenta),
+       'la frase de la cuenta no dice la hora de Reynosa del lib: "' + f.cuenta + '"');
+    af(!!f.espera && /8:00 PM en Monterrey/.test(f.espera),
+       'la frase de espera no dice la hora de Monterrey (una menos): "' + f.espera + '"');
+    await pg.close();
+  }
+
+  // ── [9d] LOS DOS CORREOS, sobre el HTML RENDERIZADO ──────────────────────
+  // 🔒 SON DOS, NO TRES. No existe correo al ganador en ninguna function: al
+  // ganador se le habla por WhatsApp y el reloj de 10 minutos de /sorteo es la
+  // puerta. Medido contando llamadas a la API de Resend en las 7 functions del
+  // giveaway: solo `giveaway-recordatorio` y `giveaway-consuelo` mandan.
+  {
+    const cuantasMandan = fs.readdirSync(path.join(RAIZ, 'netlify/functions'))
+      .filter((f) => /^giveaway-.*\.js$/.test(f))
+      .filter((f) => fs.readFileSync(path.join(RAIZ, 'netlify/functions', f), 'utf8').includes('resend.com/emails'));
+    console.log('    functions del giveaway que mandan correo: ' + cuantasMandan.join(', '));
+    af(cuantasMandan.length === 2 && !cuantasMandan.some((f) => /ganador/.test(f)),
+       'cambió quién manda correo en el giveaway: ' + cuantasMandan.join(', '));
+
+    // El recordatorio se RENDERIZA con el instante real del cron.
+    const Module = require('module');
+    const F = path.join(RAIZ, 'netlify/functions/giveaway-recordatorio.js');
+    const m = new Module(F, null); m.filename = F; m.paths = Module._nodeModulePaths(path.dirname(F));
+    m._compile(fs.readFileSync(F, 'utf8') + '\nmodule.exports._probe={correoHtml,hora,faltanMin};', F);
+    const disparo = Date.parse('2026-10-02T01:30:00Z');
+    const html = m.exports._probe.correoHtml('Ana Sofía López', 'https://x/sorteo', disparo);
+    const texto = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    console.log('    recordatorio: "' + texto.slice(0, 150).trim() + '…"');
+    const hr = restos(texto);
+    af(hr.length === 0, 'el correo del recordatorio todavía dice: ' + hr.join(', '));
+    // Y que diga la hora BUENA, no solo que no diga la mala.
+    af(/9:00 PM hora de Reynosa/.test(texto) && /8:00 PM en Monterrey/.test(texto),
+       'el recordatorio no anuncia 9:00 PM Reynosa / 8:00 PM Monterrey: ' + texto.slice(0, 200));
+    af(/en 30 minutos/.test(texto),
+       'el recordatorio no dice «en 30 minutos», que es lo que falta desde el disparo real del cron');
+    // 🔒 Control positivo del render: si el lib dijera otra hora, el texto cambia.
+    af(m.exports._probe.hora('America/Matamoros') !== m.exports._probe.hora('America/Monterrey'),
+       'Reynosa y Monterrey dan la MISMA hora: el derivado no está mirando el huso');
+
+    // El consuelo: se comprueba a quién APUNTA, sin renderizarlo (su render pide
+    // la promo viva y el index servido, que son red de verdad; eso ya lo mide
+    // `mide-consuelo-verdad`). Aquí basta con que no apunte a la época pasada.
+    const c = fs.readFileSync(path.join(RAIZ, 'netlify/functions/giveaway-consuelo.js'), 'utf8');
+    const ev = /const EVENTO_SLUG = '([^']+)'/.exec(c);
+    const cod = /const CODIGO = '([^']+)'/.exec(c);
+    af(!!ev && !!cod, 'no encontré EVENTO_SLUG/CODIGO en el consuelo: la sección pasaría EN VACÍO');
+    console.log('    consuelo → evento "' + (ev && ev[1]) + '" · código "' + (cod && cod[1]) + '"');
+    af(!!ev && ev[1] === 'karolg', 'el consuelo apunta al evento ' + (ev && ev[1]) + ', no a karolg');
+    af(!!cod && cod[1] !== 'NATA', 'el consuelo sigue buscando el código NATA de la época anterior');
+    // Y que el nombre del artista NO esté tecleado en la plantilla.
+    af(!/no haber ganado el boleto para [A-Z]/.test(c),
+       'el consuelo volvió a teclear el nombre del artista en la plantilla; se deriva del catálogo');
+  }
+
   await nav.close(); srv.close();
 
   console.log('\n──────────────────────────────────────────────');

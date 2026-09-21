@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Sorteo en vivo · Natanael Cano · Conecta Reynosa</title>
+<title>Sorteo en vivo · Karol G · Conecta Reynosa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -485,7 +485,9 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
   <!-- La cuenta regresiva al giro. Se esconde sola cuando el sorteo arranca. -->
   <div class="cuenta" id="cuenta">
-    <div class="cuenta-l">El sorteo es el 13 de septiembre a las 8:00 PM hora de Reynosa</div>
+    <!-- [GIVEAWAY-KG-1] VACIO A PROPOSITO: lo escribe `fraseDelSorteo()` desde
+         SORTEO_TS. Tecleado aqui se quedo en el 13-sep de Natanael. -->
+    <div class="cuenta-l" id="cuenta-l"></div>
     <div class="cuenta-n" id="cuenta-n">—</div>
   </div>
 
@@ -521,7 +523,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   </div>
 
   <div class="espera" id="espera">
-    Todavía no se gira.<br>El sorteo es el <b>domingo 13 de septiembre a las 8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey).<br>
+    Todavía no se gira.<br>El sorteo es el <b id="espera-cuando"></b>.<br>
     Deja esta página abierta: se actualiza sola.
   </div>
 
@@ -558,14 +560,16 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
        Lo enciende pintarPanel(); nace apagado para que quien llegue con el
        JS caído no lea un consuelo por un sorteo que aún no pasa. -->
   <div class="rescate" id="rescate" style="display:none">
-    <h3>¿No ganaste? Todavía hay lugares para Natanael Cano</h3>
-    <!-- [RESCATE-FECHA-1] Este párrafo anunciaba «el 6 de agosto en Arena
-         Monterrey» — el evento de melanie, sobrevivió a GIVEAWAY-NATA-1. El h3
-         de arriba y el ?text= del botón de abajo ya decían Natanael Cano: era
-         la ÚNICA línea del bloque que seguía en la época anterior. -->
-    <p>Todavía quedan lugares para el <b>2 de octubre</b> en el <b>Estadio Walmart Park</b>, Monterrey. Escríbenos y te armamos tu paquete.</p>
+    <h3>¿No ganaste? Todavía hay lugares para Karol G</h3>
+    <!-- [RESCATE-FECHA-1 · GIVEAWAY-KG-1] Este bloque ya se quedó atrás DOS
+         veces: anunciaba melanie cuando el sorteo era de Natanael, y anunciaba
+         Natanael cuando el sorteo pasó a Karol G. Las tres líneas (h3, párrafo
+         y el ?text= del botón) nombran el evento y hay que moverlas JUNTAS.
+         El careo [9] las vigila sobre la página SERVIDA. Datos leídos del
+         catálogo: karolg, dsList 6/7/8-nov-2026, Estadio BBVA, Mty. -->
+    <p>Todavía quedan lugares para el <b>6, 7 y 8 de noviembre</b> en el <b>Estadio BBVA</b>, Monterrey. Escríbenos y te armamos tu paquete.</p>
     <a class="btn-rescate" target="_blank" rel="noopener"
-       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Natanael%20Cano%20el%202%20de%20octubre">
+       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Karol%20G%20en%20noviembre">
       <svg class="ic"><use href="#ic-wa"/></svg> Apartar mi lugar
     </a>
   </div>
@@ -663,7 +667,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
        sin puerta a quien llegue antes de que conteste la primera consulta. -->
   <nav class="navegar" style="justify-content:center;margin-top:34px" aria-label="Ir a otras páginas">
     <a class="nav-btn fuerte" id="ir-registro" href="/giveaway"><svg class="ic"><use href="#ic-lapiz"/></svg> Registrarme</a>
-    <a class="nav-btn" href="/?evento=natanael"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
+    <a class="nav-btn" href="/?evento=karolg"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
     <a class="nav-btn" href="/"><svg class="ic"><use href="#ic-casa"/></svg> Volver al inicio</a>
   </nav>
 
@@ -1334,6 +1338,44 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     $('ir-registro').style.display = (ahora() >= CIERRE_TS) ? 'none' : '';
   }
   puertaRegistro();
+
+  // ── [GIVEAWAY-KG-1] LA FRASE DEL SORTEO SE DERIVA, NO SE TECLEA ──────────
+  // 🔴 Estas dos líneas estuvieron TECLEADAS y se quedaron en el 13-sep de
+  // Natanael mientras SORTEO_TS decía otra cosa: la página anunciaba una fecha
+  // que ya había pasado. Es la misma forma que `flash_promo` era una COPIA y
+  // que el chip de PROMO-DERIVA-1 — letrero vivo = código vivo.
+  //
+  // Ahora salen de SORTEO_TS, que es el gemelo careado contra el lib, así que
+  // no queda ningún texto que se pueda quedar atrás: mover la fecha las mueve.
+  // El huso es America/Matamoros (Reynosa SÍ trae verano hasta el 1-nov);
+  // Monterrey va aparte porque dejó de cambiar en 2022 y en octubre están a
+  // exactamente una hora.
+  var TZ_REYNOSA = 'America/Matamoros', TZ_MTY = 'America/Monterrey';
+  function _fmtFecha(ts, tz, opts){
+    return new Intl.DateTimeFormat('es-MX', Object.assign({ timeZone: tz }, opts)).format(new Date(ts));
+  }
+  function _hora(ts, tz){
+    // es-MX da "9:00 p.m." con espacio fino; la página habla de "9:00 PM".
+    return _fmtFecha(ts, tz, { hour: 'numeric', minute: '2-digit', hour12: true })
+      .replace(/[  ]/g, ' ')
+      .replace(/\s*a\.?\s*m\.?\s*$/i, ' AM').replace(/\s*p\.?\s*m\.?\s*$/i, ' PM').trim();
+  }
+  function fraseDelSorteo(conDia){
+    var dia = _fmtFecha(SORTEO_TS, TZ_REYNOSA, conDia
+      ? { weekday: 'long', day: 'numeric', month: 'long' }
+      : { day: 'numeric', month: 'long' });
+    // es-MX mete coma tras el día de la semana («jueves, 1 de octubre»); dentro
+    // de la frase suena a encabezado de recibo, no a aviso.
+    return 'el ' + dia.replace(',', '') + ' a las ' + _hora(SORTEO_TS, TZ_REYNOSA) + ' hora de Reynosa';
+  }
+  (function pintarFrases(){
+    var l = $('cuenta-l');
+    if (l) l.textContent = 'El sorteo es ' + fraseDelSorteo(false);
+    // El de «espera» lleva el día de la semana y la hora de Monterrey: es el
+    // que lee quien llegó temprano y se va a quedar esperando.
+    var e = $('espera-cuando');
+    if (e) e.textContent = fraseDelSorteo(true) + ' (' + _hora(SORTEO_TS, TZ_MTY) + ' en Monterrey)';
+  })();
 
   // Los nombres de los rodillos se piden APARTE de la consulta de cada 4s:
   // esa solo pregunta si ya hubo giro. Pedir los 72 nombres cada 4 segundos

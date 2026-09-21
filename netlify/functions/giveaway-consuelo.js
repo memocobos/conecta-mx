@@ -50,7 +50,12 @@ const SITE = process.env.URL || 'https://conectareynosa.mx';
 // Portal habría contestado «no existe» sobre un código que sí existe.
 const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
-const CODIGO = 'NATA';   // QUÉ código se busca; el CONTENIDO se lee de la fila.
+// [GIVEAWAY-KG-1] ⏳ ESTE CÓDIGO TIENE QUE EXISTIR EN `promos_codigos` Y ESTAR
+// PUBLICADO desde Baba antes de apretar el botón. Mientras no lo esté, el
+// handler se REHÚSA con 409 diciendo por qué (las dos guardas de
+// CONSUELO-VERDAD-1: la fila viva y el `var PROMOS` del index SERVIDO), así
+// que un nombre que Memo quiera cambiar no puede mandar nada roto.
+const CODIGO = 'KAROL';   // QUÉ código se busca; el CONTENIDO se lee de la fila.
 
 // Devuelve { codigo, texto, expira } o { error } — nunca a medias.
 async function promoViva(codigo, ahoraMs) {
@@ -96,7 +101,7 @@ async function promoViva(codigo, ahoraMs) {
 //     diga.
 // 🔒 Si alguna de las dos no se puede derivar, NO SE MANDA NADA: un correo sin
 // fecha o con una inventada es exactamente lo que esta tuerca quita.
-const EVENTO_SLUG = 'natanael';
+const EVENTO_SLUG = 'karolg';
 const TZ_REYNOSA = 'America/Matamoros';
 
 function _partes(fecha, tz) {
@@ -182,6 +187,13 @@ function correoHtml(nombre, link, promo, evento) {
   const { codigo, texto } = promo || {};
   const validez = lineaValidez(promo && promo.expira);
   const cuando = fechaEvento(evento && evento.ds);
+  // [GIVEAWAY-KG-1] EL NOMBRE DEL ARTISTA TAMBIÉN SE DERIVA. Estaba tecleado
+  // («Natanael Cano») y es la MISMA forma que las dos fechas que esta tuerca ya
+  // corrigió: un letrero de la época anterior dentro de una plantilla que nadie
+  // vuelve a leer. Sale del catálogo, igual que la fecha, y si no se puede leer
+  // NO SE MANDA NADA — la regla de la casa en este archivo.
+  const artista = String((evento && evento.nombre) || '').trim();
+  if (!artista) throw new Error(`no se pudo leer el nombre de ${EVENTO_SLUG} del catálogo`);
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(ASUNTO)}</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
@@ -197,7 +209,7 @@ function correoHtml(nombre, link, promo, evento) {
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">No salió tu nombre</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:32px;line-height:1.05;color:#e8ff4c;text-transform:uppercase;margin:0 0 16px 0">${escapeHtml(primero)}, no te vamos a dejar con las ganas</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para Natanael Cano… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${escapeHtml(codigo)}</strong> y llévate <strong style="color:#e8ff4c">${escapeHtml(texto)}</strong>.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para ${escapeHtml(artista)}… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${escapeHtml(codigo)}</strong> y llévate <strong style="color:#e8ff4c">${escapeHtml(texto)}</strong>.</p>
         <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 20px 0">Aplica en <strong>PLUS</strong>, <strong>STAY</strong> y <strong>CHEAP</strong> (no aplica en RIDE).</p>
       </td></tr>
       <tr><td style="padding:0 26px 20px 26px">

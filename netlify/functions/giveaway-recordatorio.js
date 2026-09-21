@@ -8,9 +8,15 @@
 // día se sale sin mandar nada y lo dice en el log. Es el patrón del resto de
 // los crons de la casa.
 //
-// 11:55 AM de Reynosa = 16:55 UTC (America/Matamoros trae horario de verano en
-// agosto). El cron va a las 16:55 UTC y se permite una ventana, porque Netlify
-// no dispara al segundo exacto.
+// [GIVEAWAY-KG-1] 8:30 PM de Reynosa = 01:30 UTC del dia siguiente (Matamoros
+// trae horario de verano hasta el 1-nov). El cron va a las 01:30 UTC y se
+// permite una ventana, porque Netlify no dispara al segundo exacto.
+//
+// 🔴 Y TODO TEXTO DE HORA EN ESTE CORREO SE DERIVA DE `G.SORTEO`. Estuvo
+// TECLEADO y sobrevivio DOS giveaways mintiendo: decia «el sorteo es a las 12»
+// y «a las 12:00 PM hora de Reynosa» —cierto para melanie el 5-ago— mientras
+// Natanael giraba a las 8 PM y Karol G gira a las 9 PM. Nadie lo vio porque el
+// correo solo se renderiza el dia del sorteo, dentro de una ventana de 40 min.
 
 const G = require('./_lib/giveaway');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
@@ -20,6 +26,8 @@ const FROM = process.env.RESEND_FROM_CONTRATOS
   || process.env.RESEND_FROM_ROL
   || 'Conecta Reynosa <admin@conectareynosa.mx>';
 const SITE = process.env.URL || 'https://conectareynosa.mx';
+const TZ_REYNOSA = 'America/Matamoros';
+const TZ_MTY = 'America/Monterrey';
 
 // El día del sorteo, en fecha pura. Sale del mismo SORTEO de _lib para que no
 // haya dos fechas que mantener.
@@ -36,9 +44,32 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function correoHtml(nombre, link) {
+// ── [GIVEAWAY-KG-1] LAS HORAS, DERIVADAS ────────────────────────────────────
+// `hora()` pinta el instante del sorteo en el huso que se le pida. Reynosa es
+// America/Matamoros; Monterrey va aparte porque dejo de cambiar en 2022.
+function hora(tz) {
+  return new Intl.DateTimeFormat('es-MX', { timeZone: tz, hour: 'numeric',
+    minute: '2-digit', hour12: true }).format(new Date(Date.parse(G.SORTEO)))
+    .replace(/[\u202f\u00a0]/g, ' ')
+    .replace(/\s*a\.?\s*m\.?\s*$/i, ' AM').replace(/\s*p\.?\s*m\.?\s*$/i, ' PM').trim();
+}
+// «en 30 minutos», derivado del schedule REAL y no de un numero a mano. Se
+// redondea al multiplo de 5 mas cercano: el cron no dispara al segundo, asi
+// que prometer «en 27 minutos» seria mas preciso de lo que el reloj puede ser.
+function faltanMin(ahora) {
+  const m = Math.round((Date.parse(G.SORTEO) - ahora) / 60000 / 5) * 5;
+  return Math.max(5, m);
+}
+// El titular dice la hora a secas («a las 9»), sin minutos, cuando son en
+// punto: «el sorteo es a las 9:00» suena a recibo.
+function horaCorta(tz) {
+  return hora(tz).replace(/:00(?=\s)/, '');
+}
+
+function correoHtml(nombre, link, ahora) {
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>El sorteo es en 5 minutos</title></head>
+  const faltan = faltanMin(ahora);
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>El sorteo es en ${faltan} minutos</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
   <tr><td align="center" style="padding:24px 12px">
@@ -51,8 +82,8 @@ function correoHtml(nombre, link) {
       </td></tr>
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">Falta poco</div>
-        <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:34px;line-height:1;color:#e8ff4c;text-transform:uppercase;margin:0 0 14px 0">${escapeHtml(primero)}, el sorteo es a las 12</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Giramos <strong style="color:#e8ff4c">en 5 minutos</strong>, a las 12:00 PM hora de Reynosa (11:00 AM en Monterrey). Se ve en vivo desde esta página:</p>
+        <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:34px;line-height:1;color:#e8ff4c;text-transform:uppercase;margin:0 0 14px 0">${escapeHtml(primero)}, el sorteo es a las ${escapeHtml(horaCorta(TZ_REYNOSA))}</h1>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Giramos <strong style="color:#e8ff4c">en ${faltan} minutos</strong>, a las ${escapeHtml(hora(TZ_REYNOSA))} hora de Reynosa (${escapeHtml(hora(TZ_MTY))} en Monterrey). Se ve en vivo desde esta página:</p>
         <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0 0 24px 0">Si sales, tienes <strong>10 minutos</strong> para contestar tu WhatsApp. Tenlo a la mano.</p>
       </td></tr>
       <tr><td style="padding:8px 26px 28px 26px">
@@ -125,7 +156,8 @@ exports.handler = async () => {
     // `continue` lo va a volver a saltar. Se cuenta, no se toca.
     if (!correo) { sinCorreo++; continue; }
 
-    const ok = await enviar(correo, 'El sorteo es en 5 minutos — Conecta Reynosa', correoHtml(f.nombre, link));
+    const ok = await enviar(correo, `El sorteo es en ${faltanMin(ahora)} minutos — Conecta Reynosa`,
+      correoHtml(f.nombre, link, ahora));
     if (!ok) { fallidos++; continue; }
     enviados++;
 

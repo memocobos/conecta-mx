@@ -323,7 +323,12 @@ function disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto }) {
     if (!consumeBoleto(v.tipo_paquete, v.tipo_viajero)) return;
     const zona = String(v.zona_boleto || '').trim();
     if (!zona) return;
-    meter(stock, ev, zona, -1);
+    // [BOLETOS-1] CUÁNTO consume, no si consume. Una fila puede traer varios
+    // boletos: la pestaña lleva uno por renglón y el careo los funde por
+    // nombre. Son DOS los contadores de la casa y arreglar uno solo dejaría al
+    // sitio apagando zonas con un número y publicándolas con otro.
+    const nb = parseInt(v.boletos, 10);
+    meter(stock, ev, zona, -(Number.isInteger(nb) && nb > 0 ? nb : 1));
   });
   return stock;
 }

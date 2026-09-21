@@ -42,6 +42,12 @@ function semilla(opts) {
   excel[PEST('ev-uno')] = conPreludio([
     filaExcel({ 'Nombre': 'Ana Uno', 'Paquete': 'PLUS', 'Boleto': 'Zona A', 'Separo': '$500', '1': '$1,000', 'Total': '$5,000' }),
     filaExcel({ 'Nombre': 'Beto Uno', 'Paquete': 'PLUS', 'Boleto': 'Zona A', 'Separo': '$500', 'Total': '$5,000' }),
+    // [BOLETOS-1] Gaby: DOS renglones de la MISMA zona → sincronía de boletos.
+    // La pestaña lleva un renglón por boleto; su fila del sistema dice 1.
+    filaExcel({ 'Nombre': 'Gaby Dos', 'Paquete': 'PLUS', 'Boleto': 'Zona A', 'Separo': '$1,000', 'Total': '$5,000' }),
+    filaExcel({ 'Nombre': 'Gaby Dos', 'Paquete': 'PLUS', 'Boleto': 'Zona A', 'Separo': '$1,000', 'Total': '$5,000' }),
+    // [adenda] Chatarra: no es gente, pero ocupa boleto → `vendidos_fuera`.
+    filaExcel({ 'Nombre': 'Vendido Alex', 'Boleto': 'Zona A' }),
   ]);
   // ev-dos: un TOTAL derivado (sí entra) y uno EXACTO de libreta (no entra).
   excel[PEST('ev-dos')] = conPreludio([
@@ -71,6 +77,7 @@ function semilla(opts) {
     viajeros_evento: [
       { id: 'v-ana',  evento_id: 'ev-uno',  nombre: 'Ana Uno',  tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: 5000, notas: 'Migrado Excel', zona_boleto: 'Zona A', tipo_paquete: 'plus' },
       { id: 'v-beto', evento_id: 'ev-uno',  nombre: 'Beto Uno', tipo_viajero: 'cliente', abonado_previo: 2500, total_contrato: 5000, notas: 'Migrado Excel · Numerología 19-sep: +$2,000', zona_boleto: 'Zona A', tipo_paquete: 'plus' },
+      { id: 'v-gaby', evento_id: 'ev-uno',  nombre: 'Gaby Dos',  tipo_viajero: 'cliente', abonado_previo: 2000, total_contrato: 10000, notas: 'Migrado Excel', zona_boleto: 'Zona A', tipo_paquete: 'plus', boletos: 1 },
       { id: 'v-cris', evento_id: 'ev-dos',  nombre: 'Cris Dos', tipo_viajero: 'cliente', abonado_previo: 2000, total_contrato: 7200, notas: 'TOTAL-1: contrato derivado del catálogo (se afina contra la pestaña)', zona_boleto: 'Zona B', tipo_paquete: 'plus' },
       { id: 'v-dina', evento_id: 'ev-dos',  nombre: 'Dina Dos', tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: 4200, notas: 'Migrado Excel', zona_boleto: 'Zona B', tipo_paquete: 'plus' },
       { id: 'v-eva',  evento_id: 'ev-tres', nombre: 'Eva Tres', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4000, notas: 'Migrado Excel', zona_boleto: 'Zona C', tipo_paquete: 'plus' },
@@ -230,7 +237,7 @@ const cuenta = (t, tabla) => (t[tabla] || []).length;
     // 🔒 LA BAJA, JAMÁS.
     const zul = (t.viajeros_evento || []).find((v) => v.id === 'v-baja');
     af(zul && zul.abonado_previo === 3000 && !/careo/i.test(String(zul.notas)), 'el global tocó a la BAJA: ' + JSON.stringify(zul));
-    af(cuenta(t, 'viajeros_evento') === 6, 'el global dio de alta a alguien: ' + cuenta(t, 'viajeros_evento') + ' filas (eran 6)');
+    af(cuenta(t, 'viajeros_evento') === 7, 'el global dio de alta a alguien: ' + cuenta(t, 'viajeros_evento') + ' filas (eran 7)');
   }
 
   // ── [3] DOBLE CLIC GLOBAL: la segunda pasada no escribe ──────────────────
@@ -376,12 +383,28 @@ const cuenta = (t, tabla) => (t[tabla] || []).length;
       + ' · avisos: bajas=' + g.bajas.length + ' negativas=' + g.negativas.length + ' saltados=' + g.saltados.length);
     af(g.lugares.length === 1, 'agrupó ' + g.lugares.length + ' lugar(es) nuevo(s), se esperaba 1 (Fito)');
     af(g.abonos.length === 2, 'agrupó ' + g.abonos.length + ' abono(s), se esperaban 2 (Ana y Eva)');
+    af(g.boletos.length === 1, 'agrupó ' + g.boletos.length + ' corrección(es) de boletos, se esperaba 1 (Gaby)');
     // 🔒 CRUZA LOS EVENTOS: la vista es por TIPO, no por evento. Ana es de
     // ev-uno y Eva de ev-tres, y salen en la MISMA lista.
     const evsDeAbonos = new Set(g.abonos.map((x) => x.evento_id));
     af(evsDeAbonos.size === 2, 'la lista de abonos no cruza eventos: ' + JSON.stringify([...evsDeAbonos]));
 
     const html = api4.html(g, prev.total);
+    // [BOLETOS-1] La vista del Resumen lo reporta en el idioma de Memo.
+    // ⚠️ Estas aserciones vivían por error en la sección de la vista de
+    // EVENTOS, sobre su `html` — el mismo nombre de variable en otro alcance.
+    // Pasaban en rojo sin que el código tuviera la culpa.
+    af(/Boletos corregidos/.test(html), 'la vista simple no reporta los boletos corregidos');
+    af(/Gaby Dos/.test(html) && /1 → <b>2<\/b>/.test(html),
+       'el renglón de boletos no dice de cuántos a cuántos: ' + (html.match(/Gaby[\s\S]{0,220}/) || [''])[0].slice(0, 170));
+    af(/UN RENGLÓN POR BOLETO/.test(html), 'la pantalla no explica POR QUÉ había lugares de más');
+    // [adenda] Y los boletos de la casa, que no son personas.
+    af(g.fuera.length === 1, 'agrupó ' + g.fuera.length + ' zona(s) de chatarra, se esperaba 1');
+    af(/Boletos de la casa/.test(html), 'la vista simple no reporta los boletos de la casa');
+    af(/Zona A/.test(html) && /0 → <b>1<\/b>/.test(html), 'el renglón de chatarra no dice de cuántos a cuántos');
+    af(/no son viajeros, pero ocupan lugar/.test(html), 'la pantalla no explica qué son esos boletos');
+    // 🔒 Y NO se cuelan a las personas: «Vendido Alex» no puede salir como alta.
+    af(!/Vendido Alex/.test(html), 'la chatarra apareció como PERSONA en la vista: ' + (html.match(/Vendido[^<]{0,40}/) || [''])[0]);
     // 🔒 EL SLUG NO SE ENSEÑA. Memo lee «Tres Fest 2026», no «ev-tres»: un
     // slug en la pantalla del uso diario es lenguaje de la base, no del negocio.
     af(/Tres Fest 2026/.test(html) && /Ana Tour - Primera Gira/.test(html),

@@ -734,6 +734,16 @@ exports.handler = async (event) => {
       // ⚠️ Un abonado MAYOR que el total NO es un error: VJ-3 selló que los
       // saldos a favor son reales y no se corrigen. Se deja pasar a propósito.
 
+      // [BOLETOS-1] Cuántos boletos trae esta persona. La pestaña lleva UNA
+      // FILA POR BOLETO y el careo las funde por nombre, así que un alta puede
+      // nacer con 4. Se valida aquí, en la puerta, como todo lo demás: un
+      // número fuera de rango descontaría stock que no existe.
+      let nBoletos = 1;
+      if (body.boletos != null && String(body.boletos).trim() !== '') {
+        nBoletos = parseInt(body.boletos, 10);
+        if (!Number.isInteger(nBoletos) || nBoletos < 1) return bad(headers, 'boletos debe ser un entero mayor que cero');
+        if (nBoletos > 50) return bad(headers, 'boletos fuera de rango');
+      }
       const fila = {
         evento_id: eventoId,
         nombre,
@@ -742,6 +752,7 @@ exports.handler = async (event) => {
         total_contrato: total,
         abonado_previo: abonado,
         tipo_viajero: 'cliente',
+        boletos: nBoletos,
       };
       // Los opcionales, con la misma regla que viajero_editar: vacío es NULL,
       // nunca cadena vacía — '' se cuela en los filtros de "sin correo" y en

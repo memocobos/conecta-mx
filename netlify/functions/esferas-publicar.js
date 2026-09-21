@@ -191,7 +191,7 @@ exports.handler = async (event) => {
       const [compras, ajustes, viajeros] = await Promise.all([
         q('compras', 'evento_id,zona,cantidad'),
         q('stock_ajustes', 'evento_id,zona,vendidos_fuera'),
-        q('viajeros_evento', 'evento_id,zona_boleto,tipo_paquete,tipo_viajero'),
+        q('viajeros_evento', 'evento_id,zona_boleto,tipo_paquete,tipo_viajero,boletos'),   // [BOLETOS-1] cuántos, no cuántas filas
       ]);
       const stock = disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto });
       avisos_stock = avisosDelLote({ filas: esferas, stock });

@@ -167,6 +167,55 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **VIAJEROS-CONTADOR-1 EN PROD (21-sep-2026, #750): la portada presume los
+  viajeros reales.** «**2,468** viajeros y contando», con el desglose por año
+  debajo (**2026: 2,281 · 2027: 187**) como registro permanente. Endpoint
+  público `viajeros-contador`, `npm run mide:viajeros-contador` (69 aserciones),
+  **cero SQL**.
+  🔒 **EL CRITERIO NO SE GEMELEA: SE LE PREGUNTA AL RESUMEN.** El endpoint llama
+  a **`cuentasDeTodos` de `_lib/cuenta-evento`** y lee `totales.viajeros` — la
+  MISMA función que pinta el número del Palacio. Un `count(*)` propio habría
+  sido la **fórmula número trece** (AUD-1 encontró once maneras de decir «cuánto
+  dinero hay», todas coherentes consigo mismas hasta que alguien miró dos a la
+  vez), y encima a la vista de los clientes.
+  Medido antes de construir: **2468 en 742 ms, 88 eventos**, y la suma de los
+  por-evento da el mismo 2468. **El Portal aporta 0**, así que HOY el número son
+  en la práctica las filas de `viajeros_evento` — pero eso es un hecho de hoy,
+  no la regla.
+  **El año sale en CASCADA**: `esferas_eventos.fecha_inicio` → el `ds` del
+  catálogo servido → `ANIO_A_MANO`. 🔒 El paso 2 existe para no teclear fechas
+  que el sistema ya sabe: **melanie se resuelve sola** (no tiene fila en
+  esferas, pero su `ds` dice 2026-08-06), así que de los dos «a mano» del
+  encargo quedó uno.
+  ⚠️ **`palnorte` → 2026 ES UNA DECISIÓN FIRMADA DE MEMO, no una inferencia**, y
+  la evidencia apuntaba al otro lado: su ficha existe pero con `fecha_inicio`
+  NULL y su `ds` vacío; el evento se llama **«Tecate Pa´l Norte 2027»**, va en
+  `proximamente`, y sus **232 viajeros se dieron de alta en AGOSTO DE 2026** —
+  después de que pasara la edición 2026. Se le enseñaron los dos desgloses y
+  eligió 2026. **Para cambiarlo hace falta su palabra otra vez**, y el día que
+  Pa´l Norte tenga fecha en su ficha esa entrada SOBRA.
+  🔒 **NO ES KANEDA, es `--font-display`** (Barlow Condensed 900). El sitio solo
+  carga Barlow Condensed + Montserrat: pedir Kaneda cae a Montserrat **en
+  silencio**. El encargo la pedía por nombre.
+  🔒 **Fail-soft DURO**: cualquier tropiezo —red, 5xx, JSON raro, total que no
+  es número— **BORRA** la pieza del DOM. No la esconde: la borra.
+  🔒 El count-up es **render por evento, una vez por carga**: NO cae bajo la
+  regla de SCROLL-2, y por eso puede tocar `textContent`. En `tabular-nums`
+  para que el renglón no baile.
+  ⚠️ **Caché de CDN obligatorio** (`s-maxage=600`): esta respuesta la pide la
+  portada, que se lleva el tráfico del negocio entero.
+  ⚠️ **DOS LECCIONES DE MEDICIÓN, las dos rojos míos**: (a) en Playwright manda
+  la **ÚLTIMA** ruta registrada, y puse la específica primero — el contador
+  recibía un `{ok:true}` sin `total` y parecía defecto del código; (b) medir
+  «se ve» y «no se desborda» **no es medir DÓNDE**: en escritorio la pieza caía
+  al fondo, debajo de los CTA y medio fuera del pliegue, porque no tenía área en
+  la rejilla del hero — en móvil no se notaba. Hoy el careo exige el **orden
+  visual** en los dos anchos.
+  ⚰️ Se quitó el renglón «Nos han acompañado» (Memo + Jane): hablaba en PASADO
+  mientras la pieza dice «y contando». **Ninguna aserción lo exigía**, así que
+  no se jubiló nada — se AGREGÓ el candado que faltaba, porque una decisión que
+  vive solo en un comentario es un candado prometido.
+
 - 🔴 **DOS ROJOS ANOTADOS COMO TUERCAS PROPIAS (21-sep-2026, orden de Memo:
   «no los toques hoy»).** Los dos están en pie en `main` y **ninguno lo trajo
   una rama de esta sesión** — se midieron contra `origin/main` antes de decirlo.

@@ -578,6 +578,26 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
          candadito. Sale por `giveaway-sortear` (acción `padron`), no por
          `giveaway-lista`: esa otra devuelve nombres y nada más porque su
          carrusel SALE EN CÁMARA, y un teléfono ahí es un teléfono en pantalla. -->
+    <!-- [GIVEAWAY-KG-1] LA REVISIÓN DE FOTOS. Vive AQUÍ, dentro del modo
+         admin, y no en una página aparte: el token ya está pedido y en
+         memoria, y una segunda puerta sería un segundo sitio donde meter la
+         llave. Pensada para el teléfono: tarjetas, no tabla. -->
+    <button class="btn btn-ghost btn-sm" id="ver-fotos">Revisar fotos <span id="fotos-badge" class="fotos-badge" hidden></span></button>
+    <div id="fotos-caja" style="display:none;margin-top:14px">
+      <div class="fotos-filtros" id="fotos-filtros">
+        <button class="ffil activo" data-fil="pendiente">Pendientes</button>
+        <button class="ffil" data-fil="aprobada">Aprobadas</button>
+        <button class="ffil" data-fil="invalidada">Invalidadas</button>
+        <button class="ffil" data-fil="todas">Todas</button>
+      </div>
+      <div class="fotos-resumen" id="fotos-resumen">—</div>
+      <div class="fotos-grid" id="fotos-grid"></div>
+      <div class="huerf" id="huerf">
+        <button class="btn btn-ghost btn-sm" id="btn-huerf">Limpiar fotos huérfanas</button>
+        <span class="huerf-txt" id="huerf-txt"></span>
+      </div>
+    </div>
+
     <div id="padron-caja" style="display:none;margin-top:14px">
       <div class="admin-l" id="padron-resumen">Participantes</div>
       <div class="table-wrap"><table class="padron-tabla" id="padron-tabla"></table></div>
@@ -589,6 +609,38 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <style>
   /* [SORTEO-ADMIN-1] Se DECLARA: una clase que no existe es letra muerta y el
      texto sale sin estilo — ya mordió esta semana con `.alert-warn`. */
+  /* [GIVEAWAY-KG-1] La cuadrícula se diseña para el TELÉFONO: es donde Memo la
+     va a usar. Una fila por persona, en tarjeta, con la foto grande y los dos
+     botones al alcance del pulgar. En pantalla ancha entran dos o tres. */
+  .fotos-badge{display:inline-block;margin-left:6px;background:#ff283b;color:#fff;font-size:10px;
+    font-weight:900;padding:1px 6px;border-radius:9px}
+  .fotos-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .ffil{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);
+    font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;padding:7px 11px;
+    cursor:pointer;font-family:Montserrat,sans-serif}
+  .ffil.activo{background:rgba(232,255,76,.14);border-color:#e8ff4c;color:#e8ff4c}
+  .fotos-resumen{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;
+    font-family:'JetBrains Mono',monospace}
+  .fotos-grid{display:grid;gap:10px;grid-template-columns:1fr}
+  @media(min-width:700px){.fotos-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}}
+  .fcard{display:flex;gap:10px;padding:10px;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.12)}
+  .fcard.st-aprobada{border-color:rgba(136,234,78,.45)}
+  .fcard.st-invalidada{border-color:rgba(255,40,59,.45);opacity:.72}
+  .fcard img{width:84px;height:84px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,.06)}
+  .fcard-datos{flex:1;min-width:0;font-size:12px;line-height:1.5}
+  .fcard-nom{font-weight:900;font-size:13px}
+  .fcard-datos a{color:#8ab4ff}
+  .fcard-est{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+  .fcard-acc{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .facc{flex:1;min-width:88px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);
+    color:#fff;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;
+    padding:9px 6px;cursor:pointer;font-family:Montserrat,sans-serif}
+  .facc.ok{border-color:#88ea4e;color:#88ea4e}
+  .facc.no{border-color:#ff283b;color:#ff283b}
+  .facc.activo{background:rgba(255,255,255,.14)}
+  .huerf{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .huerf-txt{font-size:11px;color:rgba(255,255,255,.55)}
   .padron-tabla{width:100%;border-collapse:collapse;font-size:13px}
   .padron-tabla th,.padron-tabla td{padding:7px 9px;text-align:left;border-bottom:1px solid rgba(255,255,255,.10);vertical-align:top}
   .padron-tabla th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);font-weight:700}
@@ -1381,9 +1433,135 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
   $('g-ver').addEventListener('click', function(){ mostrarTel(!telVisible); });
 
+  // ═══ [GIVEAWAY-KG-1] LA CUADRÍCULA DE REVISIÓN ══════════════════════════
+  var FOTOS = [], filFoto = 'pendiente';
+
+  function estadoDe(r){ return r.foto_estado || 'pendiente'; }
+
+  function pintarFotos(){
+    var grid = $('fotos-grid');
+    var lista = FOTOS.filter(function(r){
+      // Una persona ya ELIMINADA del padrón no se revisa: ya está fuera por
+      // otra puerta, y enseñarla invita a «arreglarla» con un botón que no es.
+      if (r.eliminado_at) return false;
+      return filFoto === 'todas' || estadoDe(r) === filFoto;
+    });
+    var cuenta = { pendiente: 0, aprobada: 0, invalidada: 0 };
+    FOTOS.forEach(function(r){ if (!r.eliminado_at) cuenta[estadoDe(r)] = (cuenta[estadoDe(r)] || 0) + 1; });
+    $('fotos-resumen').textContent = cuenta.pendiente + ' pendientes · ' + cuenta.aprobada
+      + ' aprobadas · ' + cuenta.invalidada + ' invalidadas';
+    var b = $('fotos-badge');
+    if (cuenta.pendiente > 0){ b.hidden = false; b.textContent = cuenta.pendiente; } else { b.hidden = true; }
+
+    if (!lista.length){ grid.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,.5)">— ninguna aquí</div>'; return; }
+    grid.innerHTML = lista.map(function(r){
+      var est = estadoDe(r);
+      var ig = (r.instagram || '').replace(/^@+/, '');
+      return '<div class="fcard st-' + est + '" data-id="' + r.id + '">'
+        + '<img alt="" data-foto="' + (r.foto_path || '') + '">'
+        + '<div class="fcard-datos">'
+        +   '<div class="fcard-nom">' + esc(r.nombre || '') + '</div>'
+        +   '<div>' + esc(r.ciudad || '—') + '</div>'
+        +   (ig ? '<div><a href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener">@' + esc(ig) + '</a></div>' : '<div style="opacity:.5">sin Instagram</div>')
+        +   '<div>' + esc(r.whatsapp || '') + '</div>'
+        +   '<div class="fcard-est" style="color:' + (est === 'aprobada' ? '#88ea4e' : est === 'invalidada' ? '#ff283b' : 'rgba(255,255,255,.55)') + '">' + est + '</div>'
+        +   '<div class="fcard-acc">'
+        +     '<button class="facc ok' + (est === 'aprobada' ? ' activo' : '') + '" data-est="aprobada">Aprobar</button>'
+        +     '<button class="facc no' + (est === 'invalidada' ? ' activo' : '') + '" data-est="invalidada">Invalidar</button>'
+        +     (est !== 'pendiente' ? '<button class="facc" data-est="pendiente">Deshacer</button>' : '')
+        +   '</div>'
+        + '</div></div>';
+    }).join('');
+
+    // Las fotos se piden UNA POR UNA con su URL firmada: el bucket es privado
+    // y la firma dura diez minutos.
+    [].forEach.call(grid.querySelectorAll('img[data-foto]'), function(img){
+      var pth = img.getAttribute('data-foto');
+      if (!pth) return;
+      api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'foto_url', foto_path: pth }) })
+        .then(function(res){ if (res.j && res.j.url) img.src = res.j.url; })
+        .catch(function(){});
+    });
+  }
+  function esc(x){ return String(x == null ? '' : x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function cargarFotos(){
+    return api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'padron' }) })
+      .then(function(res){
+        if (!res.j || res.j.ok !== true) return;
+        FOTOS = res.j.participantes || res.j.padron || [];
+        pintarFotos();
+      });
+  }
+
+  if ($('ver-fotos')) $('ver-fotos').addEventListener('click', function(){
+    var caja = $('fotos-caja');
+    var abrir = caja.style.display === 'none';
+    caja.style.display = abrir ? 'block' : 'none';
+    if (abrir) cargarFotos();
+  });
+
+  [].forEach.call(document.querySelectorAll('#fotos-filtros .ffil'), function(b){
+    b.addEventListener('click', function(){
+      filFoto = b.getAttribute('data-fil');
+      [].forEach.call(document.querySelectorAll('#fotos-filtros .ffil'), function(x){ x.classList.toggle('activo', x === b); });
+      pintarFotos();
+    });
+  });
+
+  // 🔒 REVERSIBLE. Aprobar, invalidar y deshacer son el mismo movimiento: un
+  // dedazo en el teléfono no puede sacar a nadie del concurso.
+  $('fotos-grid').addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.facc') : null;
+    if (!b) return;
+    var card = b.closest('.fcard'); if (!card) return;
+    var id = card.getAttribute('data-id'), est = b.getAttribute('data-est');
+    b.disabled = true;
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'revisar_foto', id: id, estado: est }) })
+      .then(function(res){
+        b.disabled = false;
+        if (!res.j || res.j.ok !== true) return;
+        var f = FOTOS.filter(function(x){ return String(x.id) === String(id); })[0];
+        if (f) f.foto_estado = est;
+        pintarFotos();
+      }).catch(function(){ b.disabled = false; });
+  });
+
+  // El barrido de huérfanas: primero DICE cuántas, y borra al confirmar.
+  if ($('btn-huerf')) $('btn-huerf').addEventListener('click', function(){
+    var t = $('huerf-txt'); t.textContent = 'Contando…';
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'fotos_huerfanas' }) })
+      .then(function(res){
+        if (!res.j || res.j.ok !== true){ t.textContent = 'No se pudo contar'; return; }
+        var n = res.j.huerfanas;
+        if (!n){ t.textContent = 'No hay huérfanas (' + res.j.en_bucket + ' fotos, ' + res.j.usadas + ' en uso)'; return; }
+        if (!window.confirm('Hay ' + n + ' foto(s) sin registro, de más de ' + res.j.horas + ' horas.\n\n¿Borrarlas?')) {
+          t.textContent = n + ' huérfana(s) · no se borró nada'; return;
+        }
+        t.textContent = 'Borrando…';
+        api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'fotos_huerfanas_borrar' }) })
+          .then(function(r2){ t.textContent = (r2.j && r2.j.ok) ? ('Borradas ' + r2.j.borradas + ' de ' + r2.j.de) : 'No se pudo borrar'; });
+      }).catch(function(){ t.textContent = 'Se cayó la conexión'; });
+  });
+
   $('girar').addEventListener('click', function(){
     if (girando || !TOKEN) return;
     $('err').textContent = '';
+    // 🔒 AVISA, NO BLOQUEA (orden de Memo). Girar con fotos sin revisar es una
+    // decisión —puede que no dé tiempo, puede que dé igual— pero una decisión
+    // hay que poder tomarla SABIENDO. Se pregunta antes, con el número.
+    return api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'pendientes_foto' }) })
+      .then(function(res){
+        var n = (res.j && res.j.pendientes) || 0;
+        if (n > 0 && !window.confirm('Hay ' + n + ' foto(s) SIN REVISAR.\n\nSi giras ahora, esas personas entran al sorteo con su foto sin mirar.\n\n¿Girar de todos modos?')) {
+          return;
+        }
+        girarDeVerdad();
+      })
+      .catch(function(){ girarDeVerdad(); });   // si el conteo falla, no se estorba el giro
+  });
+
+  function girarDeVerdad(){
     $('girar').disabled = true; $('girar').textContent = 'Girando…';
     api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'girar' }) }).then(function(res){
       $('girar').disabled = false; $('girar').textContent = 'Girar otra vez';
@@ -1394,7 +1572,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       $('girar').disabled = false; $('girar').textContent = 'Girar';
       $('err').textContent = 'Se cayó la conexión';
     });
-  });
+  }
 
   function resolver(resultado){
     if (!TOKEN || !estado || !estado.ultimo) return;

@@ -238,6 +238,30 @@ function servir() {
      'la IP quedó escrita en la ruta: ' + okSub.cuerpo.foto_path);
   af(FOTO.prefijoDe('1.2.3.4') !== FOTO.prefijoDe('1.2.3.5'), 'dos IPs distintas dan el mismo prefijo: el freno contaría juntas a dos casas');
   af(FOTO.prefijoDe('1.2.3.4') === FOTO.prefijoDe('1.2.3.4'), 'la misma IP da prefijos distintos: el freno no contaría nada');
+  // 🔒 EL PREFIJO LLEVA UN SECRETO DEL SERVIDOR. Un hash a secas de una IPv4
+  // se revierte tabulando las 2³² direcciones —y la sal, si vive en el código,
+  // es pública—. Se mide como HECHO: con OTRO secreto, la MISMA IP tiene que
+  // dar OTRO prefijo. Si diera el mismo, el secreto no está en la cuenta.
+  const secretoOriginal = process.env.GIVEAWAY_ADMIN_TOKEN;
+  const conA = FOTO.prefijoDe('1.2.3.4');
+  process.env.GIVEAWAY_ADMIN_TOKEN = secretoOriginal + '-otro';
+  const conB = FOTO.prefijoDe('1.2.3.4');
+  process.env.GIVEAWAY_ADMIN_TOKEN = secretoOriginal;
+  console.log('    la misma IP con dos secretos: ' + conA + ' vs ' + conB);
+  af(conA !== conB,
+     'la MISMA IP da el mismo prefijo con otro secreto: el prefijo no lleva secreto, '
+     + 'y un hash de IPv4 sin llave se revierte tabulando las 2³² direcciones');
+  // Y sin secreto NO se cae a un hash simple: eso reintroduciría la debilidad
+  // en silencio, viéndose igual de bien.
+  process.env.GIVEAWAY_ADMIN_TOKEN = ''; process.env.JWT_SECRET = '';
+  const sinSecreto = FOTO.prefijoDe('1.2.3.4');
+  const subidaSin = await subir(jpegOk);
+  process.env.GIVEAWAY_ADMIN_TOKEN = secretoOriginal;
+  console.log('    sin secreto: prefijo=' + JSON.stringify(sinSecreto) + ' · subida → ' + subidaSin.res.statusCode);
+  af(sinSecreto === null, 'sin secreto se cayó a un hash simple: la debilidad vuelve sin que nadie lo note');
+  af(subidaSin.res.statusCode === 500 && subidaSin.cuerpo.codigo === 'SIN_SECRETO',
+     'sin secreto la subida NO se rehúsa: ' + JSON.stringify(subidaSin.cuerpo));
+  af(subidaSin.subido === null, 'sin secreto igual escribió en el bucket');
 
   // Un ejecutable con etiqueta de imagen: se rehúsa.
   const malo = await subir(noEsFoto, 'image/jpeg');
@@ -309,17 +333,40 @@ function servir() {
       headers: { get: () => null } });
     delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', archivo))];
     const mod = require(path.join(RAIZ, 'netlify/functions', archivo));
-    const r = await mod.handler(Object.assign({ httpMethod: 'GET', headers: { origin: 'https://conectareynosa.mx' } }, ev || {}));
+    const base = { httpMethod: 'GET', headers: { origin: 'https://conectareynosa.mx' } };
+    const r = await mod.handler(Object.assign(base, ev || {}, ev && ev.headers ? { headers: ev.headers } : {}));
     global.fetch = fetchReal2;
     return String(r.body || '');
   }
-  for (const f of ['giveaway-estado.js']) {
-    const cuerpo = await llamar(f);
-    console.log('    ' + f + ' → ' + cuerpo.slice(0, 90));
-    af(!/ana_secreta/.test(cuerpo), f + ' FILTRÓ el Instagram: ' + cuerpo.slice(0, 200));
-    af(!/foto_path|abc\.jpg/.test(cuerpo), f + ' FILTRÓ la ruta de la foto: ' + cuerpo.slice(0, 200));
-    af(!/8112345678/.test(cuerpo), f + ' filtró el WhatsApp');
+  // Las TRES puertas que puede tocar cualquiera desde internet, y las dos
+  // formas de la pública que devuelve nombres (los rodillos del sorteo).
+  const PUERTAS = [
+    ['giveaway-estado.js', {}],
+    ['giveaway-estado.js', { queryStringParameters: { rodillos: '1' } }],
+    ['giveaway-lista.js', {}],                                   // SIN token: debe rehusarse
+    ['giveaway-sortear.js', { httpMethod: 'POST', body: JSON.stringify({ accion: 'padron' }) }],   // SIN token
+  ];
+  for (const [f, ev] of PUERTAS) {
+    const cuerpo = await llamar(f, ev);
+    const etiqueta = f + (ev.queryStringParameters ? ' (rodillos)' : ev.body ? ' (padron sin token)' : '');
+    console.log('    ' + etiqueta.padEnd(38) + ' → ' + cuerpo.slice(0, 74));
+    // 🔒 LOS TRES DATOS PRIVADOS, sobre el JSON SERVIDO. No por grep del
+    // fuente: el comentario que explica por qué un campo no sale CONTIENE el
+    // nombre del campo, y ya van cuatro veces que eso caza un arnés.
+    af(!/ana_secreta/.test(cuerpo), etiqueta + ' FILTRÓ el Instagram: ' + cuerpo.slice(0, 200));
+    af(!/foto_path|abc\.jpg|karolg-bbva-2026\//.test(cuerpo), etiqueta + ' FILTRÓ la ruta de la foto: ' + cuerpo.slice(0, 200));
+    af(!/8112345678/.test(cuerpo), etiqueta + ' FILTRÓ el WhatsApp: ' + cuerpo.slice(0, 200));
+    af(!/a@b\.com/.test(cuerpo), etiqueta + ' filtró el correo');
   }
+  // Y el control positivo: por la puerta CON token, esos datos SÍ tienen que
+  // salir. Si no salieran, los ceros de arriba no probarían nada — estarían
+  // midiendo un endpoint que no devuelve nada de nada.
+  const conToken = await llamar('giveaway-sortear.js',
+    { httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', 'x-admin-token': TOKEN_PRUEBA },
+      body: JSON.stringify({ accion: 'padron' }) });
+  console.log('    con token (el admin)                  → ' + conToken.slice(0, 74));
+  af(/ana_secreta/.test(conToken) && /8112345678/.test(conToken),
+     'por la puerta CON token tampoco salen los datos: entonces las aserciones de arriba pasan en hueco');
 
   // ── [4d] 🔒 UNA FOTO INVALIDADA QUEDA FUERA DEL SORTEO ──────────────────
   // Y la exclusión va EN LA CONSULTA que alimenta el giro, no en un filtro del
@@ -596,6 +643,117 @@ function servir() {
     af(mLado && Math.max(Number(mLado[1]), Number(mLado[2])) <= 1080,
        'el lado mayor quedó por encima de 1080: ' + JSON.stringify(r.meta));
   } catch (e) { af(false, 'la sección de compresión se CAYÓ: ' + e.message); }
+
+  // ── [8] LA CUADRÍCULA DE REVISIÓN, EN EL NAVEGADOR ──────────────────────
+  // Se abre /sorteo, se le da el token y se pintan fotos de mentira por la red:
+  // el DOM que sale es el que Memo va a tocar con el pulgar.
+  console.log('\n[8] la cuadrícula de revisión');
+  try {
+    const page2 = await nav.newPage();
+    const errores2 = [];
+    page2.on('pageerror', (e) => errores2.push(e.message));
+    const PADRON = [
+      { id: 'p1', nombre: 'Ana Pendiente', ciudad: 'Reynosa', whatsapp: '8111111111', instagram: 'ana_ig', foto_path: 'karolg-bbva-2026/aaaaaaaaaaaa/1.jpg', foto_estado: 'pendiente', eliminado_at: null },
+      { id: 'p2', nombre: 'Beto Aprobado', ciudad: 'Monterrey', whatsapp: '8122222222', instagram: 'beto_ig', foto_path: 'karolg-bbva-2026/bbbbbbbbbbbb/2.jpg', foto_estado: 'aprobada', eliminado_at: null },
+      { id: 'p3', nombre: 'Cris Invalidada', ciudad: 'Río Bravo', whatsapp: '8133333333', instagram: 'cris_ig', foto_path: 'karolg-bbva-2026/cccccccccccc/3.jpg', foto_estado: 'invalidada', eliminado_at: null },
+      { id: 'p4', nombre: 'Dora Eliminada', ciudad: 'Reynosa', whatsapp: '8144444444', instagram: 'dora_ig', foto_path: 'karolg-bbva-2026/dddddddddddd/4.jpg', foto_estado: 'pendiente', eliminado_at: '2026-09-20T00:00:00Z' },
+    ];
+    const mandados = [];
+    await page2.route('**/.netlify/functions/giveaway-sortear', async (route) => {
+      const b = JSON.parse(route.request().postData() || '{}');
+      mandados.push(b);
+      let j = { ok: true };
+      if (b.accion === 'padron') j = { ok: true, participantes: PADRON };
+      else if (b.accion === 'foto_url') j = { ok: true, url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' };
+      else if (b.accion === 'revisar_foto') j = { ok: true, tocadas: 1, estado: b.estado };
+      else if (b.accion === 'pendientes_foto') j = { ok: true, pendientes: 2 };
+      else if (b.accion === 'fotos_huerfanas') j = { ok: true, huerfanas: 3, horas: 6, en_bucket: 9, usadas: 6 };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
+    });
+    await page2.route('**/.netlify/functions/giveaway-estado*', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, total: 4, sorteos: [], registro_cerrado: true }) }));
+    await page2.goto(`http://127.0.0.1:${puerto}/sorteo.html`, { waitUntil: 'load' });
+
+    const abierto = await page2.evaluate(async () => {
+      // El token se mete como lo mete un humano: por el formulario.
+      // El token se mete COMO LO MENTE UN HUMANO: se escribe y se da Enter.
+      // (No hay botón: la puerta es un input suelto. Buscar uno inventado
+      // dejaba el TOKEN en null y el botón de girar se rehusaba en silencio —
+      // el aviso de pendientes nunca salía y el caso pasaba en hueco.)
+      const t = document.getElementById('tok');
+      if (!t) return { falta: 'tok' };
+      t.value = 'token-de-prueba-del-careo';
+      t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      const vf = document.getElementById('ver-fotos');
+      if (!vf) return { falta: 'ver-fotos' };
+      if (document.getElementById('puerta').style.display !== 'none') return { falta: 'la puerta no se abrió con el token' };
+      vf.click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        tarjetas: document.querySelectorAll('#fotos-grid .fcard').length,
+        resumen: (document.getElementById('fotos-resumen') || {}).textContent || '',
+        badge: (document.getElementById('fotos-badge') || {}).textContent || '',
+        filtros: [...document.querySelectorAll('#fotos-filtros .ffil')].map((b) => b.textContent.trim()),
+      };
+    });
+    console.log('    ' + JSON.stringify(abierto));
+    af(!abierto.falta, 'no apareció el botón de revisar fotos: ' + abierto.falta);
+    // Filtro por defecto: PENDIENTES. Es lo que hay que mirar, y abrir en
+    // «todas» esconde el trabajo entre las ya resueltas.
+    af(abierto.tarjetas === 1, 'el filtro no abre en pendientes: salieron ' + abierto.tarjetas + ' tarjeta(s)');
+    // 🔒 LA ELIMINADA NO SE REVISA: ya está fuera por otra puerta, y enseñarla
+    // invita a «arreglarla» con un botón que no es el suyo.
+    af(/2 pendientes/.test(abierto.resumen) === false && /1 pendientes|1 pendiente/.test(abierto.resumen),
+       'la persona ELIMINADA se coló al conteo: ' + abierto.resumen);
+    af(abierto.badge === '1', 'el contador de pendientes dice ' + JSON.stringify(abierto.badge));
+    af(abierto.filtros.length === 4, 'faltan filtros: ' + JSON.stringify(abierto.filtros));
+
+    // Lo que la tarjeta enseña, y el link al perfil.
+    const tarjeta = await page2.evaluate(() => {
+      const c = document.querySelector('#fotos-grid .fcard');
+      return { txt: c.innerText, ig: (c.querySelector('a') || {}).href || '', img: !!(c.querySelector('img') || {}).src };
+    });
+    af(/Ana Pendiente/.test(tarjeta.txt) && /Reynosa/.test(tarjeta.txt) && /8111111111/.test(tarjeta.txt),
+       'la tarjeta no trae nombre, ciudad o WhatsApp: ' + JSON.stringify(tarjeta.txt));
+    af(/instagram\.com\/ana_ig/.test(tarjeta.ig), 'el Instagram no enlaza al perfil: ' + tarjeta.ig);
+    af(tarjeta.img, 'la foto no se pidió con su URL firmada');
+    af(mandados.some((m) => m.accion === 'foto_url'), 'no se pidió ninguna URL firmada');
+
+    // 🔒 REVERSIBLE DESDE LA PANTALLA.
+    const trasInvalidar = await page2.evaluate(async () => {
+      document.querySelector('#fotos-grid .fcard .facc.no').click();
+      await new Promise((r) => setTimeout(r, 250));
+      const b = document.querySelector('[data-fil="invalidada"]'); b.click();
+      await new Promise((r) => setTimeout(r, 150));
+      const c = document.querySelector('#fotos-grid .fcard');
+      return { hay: !!c, deshacer: !!(c && [...c.querySelectorAll('.facc')].some((x) => x.dataset.est === 'pendiente')) };
+    });
+    console.log('    tras invalidar: aparece en el filtro de invalidadas=' + trasInvalidar.hay
+      + ' · con botón de deshacer=' + trasInvalidar.deshacer);
+    af(trasInvalidar.hay, 'la invalidada no aparece en su filtro');
+    af(trasInvalidar.deshacer, 'NO HAY CÓMO DESHACER una invalidación: un dedazo sacaría a alguien del concurso');
+
+    // El aviso antes de girar: avisa y pide confirmar, NO bloquea.
+    // ⚠️ El `confirm` sale DESPUÉS de que `evaluate` regresa: el aviso cuelga de
+    // un `.then()`, no del clic. Esperarlo con un `sleep` dentro del evaluate
+    // lo perdía —salía vacío y el caso pasaba en hueco—. Se espera el EVENTO.
+    let preguntado = null;
+    const esperaDialogo = new Promise((res) => {
+      page2.once('dialog', async (d) => { preguntado = d.message(); await d.dismiss(); res(); });
+      setTimeout(res, 3000);
+    });
+    await page2.evaluate(() => document.getElementById('girar').click());
+    await esperaDialogo;
+    console.log('    al girar preguntó: ' + JSON.stringify(String(preguntado || '').slice(0, 60)));
+    af(/2 foto/.test(String(preguntado || '')), 'no avisó cuántas fotos quedan sin revisar: ' + preguntado);
+    af(/todos modos|de todas/i.test(String(preguntado || '')), 'el aviso no ofrece girar igual: bloquear no era la orden');
+    // Y al decir que NO, no giró.
+    af(!mandados.some((m) => m.accion === 'girar'), 'giró aunque se dijo que no en el aviso');
+
+    af(errores2.length === 0, '/sorteo tiró errores de JS: ' + JSON.stringify(errores2.slice(0, 3)));
+    await page2.close();
+  } catch (e) { af(false, 'la sección de la cuadrícula se CAYÓ: ' + e.message); }
 
   af(errores.length === 0, 'la página tiró errores de JS: ' + JSON.stringify(errores.slice(0, 3)));
   await nav.close(); srv.close();

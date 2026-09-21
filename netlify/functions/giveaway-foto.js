@@ -70,14 +70,42 @@ function tipoPorBytes(b) {
 // apretar más castigaría a gente real.
 const MAX_POR_IP_HORA = 12;
 
-// La IP no se escribe en la ruta: se HASHEA. El bucket es privado y solo lo
-// lee el service_role, pero un identificador de red en un nombre de archivo es
-// un dato personal que no hace falta guardar para contar.
-function prefijoDe(ip) {
-  const h = require('crypto').createHash('sha256').update(String(ip) + '|' + SLUG_SAL).digest('hex');
-  return h.slice(0, 12);
+// ── LA IP NO SE ESCRIBE EN LA RUTA: SE DERIVA CON UN SECRETO ────────────────
+//
+// 🔴 UN HASH A SECAS NO SIRVE AQUÍ, y la primera versión de esto lo tenía:
+// `sha256(ip + 'giveaway-foto')`. IPv4 son 2³² direcciones —unos pocos miles
+// de millones— y la sal estaba EN EL CÓDIGO, o sea pública: cualquiera con el
+// repo puede tabular las 4,294,967,296 y revertir el prefijo a la IP exacta en
+// minutos. Un hash solo esconde lo que tiene un espacio grande detrás.
+//
+// Con HMAC y un SECRETO DEL SERVIDOR no hay tabla que armar: sin la llave, las
+// 2³² no llevan a ninguna parte.
+//
+// 🔑 EL SECRETO ES `GIVEAWAY_ADMIN_TOKEN`, que YA EXISTE en Netlify. Se eligió
+// ése y no uno nuevo para no agregarle un paso manual a Memo — y entre los que
+// hay, es el del propio módulo: el giveaway ya NO FUNCIONA sin él (las puertas
+// de admin lo exigen), así que usarlo no estrena ningún modo de fallo.
+//
+// 🔒 Y NO SE USA EL SECRETO DIRECTO: se deriva una SUBCLAVE con su propio
+// propósito. Así, aunque alguien juntara pares (su IP, su prefijo) —cada quien
+// ve el suyo al subir—, lo que tendría enfrente sería la subclave, no el token
+// de admin. Separar propósitos cuesta una línea.
+const PROPOSITO_IP = 'giveaway-foto-ip-v1';
+
+function claveIp() {
+  const secreto = process.env.GIVEAWAY_ADMIN_TOKEN || process.env.JWT_SECRET || '';
+  if (!secreto) return null;
+  return require('crypto').createHmac('sha256', secreto).update(PROPOSITO_IP).digest();
 }
-const SLUG_SAL = 'giveaway-foto';
+
+// Devuelve null SIN SECRETO, y quien llama se rehúsa. 🔒 NO hay respaldo a un
+// hash simple: un respaldo silencioso reintroduciría exactamente la debilidad
+// que esto viene a cerrar, y nadie se enteraría — se vería igual de bien.
+function prefijoDe(ip) {
+  const k = claveIp();
+  if (!k) return null;
+  return require('crypto').createHmac('sha256', k).update(String(ip)).digest('hex').slice(0, 12);
+}
 
 // Lista lo que hay bajo un prefijo. Devuelve [] ante cualquier tropiezo: el
 // límite es un FRENO, no un candado — perder una subida real por una consulta
@@ -145,6 +173,13 @@ exports.handler = async (event) => {
   // ── El freno por IP, antes de escribir nada ──────────────────────────────
   const ip = G.ipDe(event);
   const pref = prefijoDe(ip);
+  if (!pref) {
+    // Sin secreto no se sube. Es preferible a guardar la IP en claro o a
+    // hashearla de forma reversible: las dos serían peores en silencio.
+    console.error('[giveaway-foto] falta GIVEAWAY_ADMIN_TOKEN (o JWT_SECRET) para derivar el prefijo');
+    return G.json(500, headers, { ok: false,
+      error: 'Todavía no está lista la subida de fotos. Avísale a Conecta.', codigo: 'SIN_SECRETO' });
+  }
   const yaSubidas = await listar(`${G.SLUG}/${pref}/`, 100);
   const haceUnaHora = Date.now() - 60 * 60 * 1000;
   const recientes = yaSubidas.filter((o) => {
@@ -202,3 +237,4 @@ module.exports.MAX_BYTES = MAX_BYTES;
 module.exports.tipoPorBytes = tipoPorBytes;
 module.exports.MAX_POR_IP_HORA = MAX_POR_IP_HORA;
 module.exports.prefijoDe = prefijoDe;
+module.exports.PROPOSITO_IP = PROPOSITO_IP;

@@ -229,8 +229,15 @@ function servir() {
   console.log('    subida buena → ' + okSub.res.statusCode + ' path=' + okSub.cuerpo.foto_path);
   af(okSub.res.statusCode === 200 && okSub.cuerpo.ok, 'una foto buena no se subió: ' + JSON.stringify(okSub.cuerpo));
   // 🔒 EL NOMBRE LO PONE EL SERVIDOR. Nada del cliente entra en la ruta.
-  af(/^karolg-bbva-2026\/[A-Za-z0-9-]+\.jpg$/.test(okSub.cuerpo.foto_path || ''),
-     'el path no lo generó el servidor con su forma: ' + okSub.cuerpo.foto_path);
+  af(/^karolg-bbva-2026\/[a-f0-9]{12}\/[0-9a-f-]{16,}\.jpg$/.test(okSub.cuerpo.foto_path || ''),
+     'el path no lo generó el servidor con su forma <slug>/<hash-de-ip>/<uuid>.jpg: ' + okSub.cuerpo.foto_path);
+  // 🔒 LA IP NO SE ESCRIBE EN LA RUTA: se HASHEA. El bucket es privado, pero un
+  // identificador de red en un nombre de archivo es un dato personal que no
+  // hace falta guardar para poder contar.
+  af(!/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(okSub.cuerpo.foto_path || ''),
+     'la IP quedó escrita en la ruta: ' + okSub.cuerpo.foto_path);
+  af(FOTO.prefijoDe('1.2.3.4') !== FOTO.prefijoDe('1.2.3.5'), 'dos IPs distintas dan el mismo prefijo: el freno contaría juntas a dos casas');
+  af(FOTO.prefijoDe('1.2.3.4') === FOTO.prefijoDe('1.2.3.4'), 'la misma IP da prefijos distintos: el freno no contaría nada');
 
   // Un ejecutable con etiqueta de imagen: se rehúsa.
   const malo = await subir(noEsFoto, 'image/jpeg');
@@ -252,6 +259,41 @@ function servir() {
   // Y una JUSTO por debajo sí pasa: el tope tiene que morder donde debe.
   const justa = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), Buffer.alloc(FOTO.MAX_BYTES - 2048, 7)]);
   af((await subir(justa)).res.statusCode === 200, 'frenó una foto que cabe: el tope muerde de más');
+
+  // ── [4b2] LOS DOS ÚNICOS, CON SU PROPIO MENSAJE ─────────────────────────
+  // Antes había un solo índice único y su texto decía «ese WhatsApp ya está
+  // registrado». Con el de `foto_path` encima, ese mismo texto habría mandado a
+  // la persona a revisar un WhatsApp que estaba bien.
+  console.log('\n[4b2] los choques de índice único');
+  async function registrar(detalleError) {
+    global.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.includes('/storage/v1/object/')) return { ok: true, status: 200, text: async () => '' };
+      if ((opts && opts.method) === 'POST' && u.includes('/giveaway_registros')) {
+        return { ok: false, status: 409, text: async () => detalleError, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => [], text: async () => '[]' };
+    };
+    delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/giveaway-registro.js'))];
+    const reg = require(path.join(RAIZ, 'netlify/functions/giveaway-registro.js'));
+    const r = await reg.handler({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx' },
+      body: JSON.stringify({ nombre: 'Ana Prueba', whatsapp: '8112345678', correo: 'a@b.com',
+        ciudad: 'Reynosa', instagram: 'ana_ig', foto_path: 'karolg-bbva-2026/abcdef012345/uno.jpg', acepto: true }) });
+    global.fetch = fetchReal2;
+    return JSON.parse(r.body || '{}');
+  }
+  const choqueWa = await registrar('duplicate key value violates unique constraint "giveaway_registros_slug_whatsapp_key" (23505)');
+  const choqueFoto = await registrar('duplicate key value violates unique constraint "giveaway_registros_foto_path_uniq" (23505)');
+  console.log('    choque de WhatsApp → ' + choqueWa.error);
+  console.log('    choque de foto     → ' + choqueFoto.error);
+  af(/WhatsApp/i.test(choqueWa.error || ''), 'el choque de WhatsApp no lo dice: ' + choqueWa.error);
+  af(/foto/i.test(choqueFoto.error || '') && !/WhatsApp/i.test(choqueFoto.error || ''),
+     'el choque de FOTO manda a revisar el WhatsApp, que estaba bien: ' + choqueFoto.error);
+  // Y la migración lleva el índice, con su `where` parcial.
+  const sql = fs.readFileSync(path.join(RAIZ, 'migraciones/GIVEAWAY-KG-1-fotos.sql'), 'utf8');
+  af(/create unique index[\s\S]*foto_path/.test(sql), 'la migración no crea el único de foto_path');
+  af(/where foto_path is not null/.test(sql),
+     'el único de foto_path no es PARCIAL: apilaría las ~600 filas viejas que lo tienen en NULL');
 
   // ── [4c] 🔒 LO PRIVADO NO SALE POR NINGUNA PUERTA PÚBLICA ───────────────
   // Se mide sobre el JSON SERVIDO, no por grep del fuente: el comentario que
@@ -327,6 +369,60 @@ function servir() {
     af(/eliminado_at=is\.null/.test(urlPadron || ''),
        'se perdió el `eliminado_at=is.null` de SORTEO-ADMIN-1 al meter el filtro nuevo');
     void r;
+  }
+
+  // ── [4e] LA REVISIÓN: reversible, y con su URL que caduca ───────────────
+  console.log('\n[4e] la cuadrícula de revisión');
+  {
+    const patches = [];
+    let firmaPedida = null;
+    const red = async (url, opts) => {
+      const u = String(url), met = (opts && opts.method) || 'GET';
+      if (u.includes('/storage/v1/object/sign/')) {
+        firmaPedida = JSON.parse(opts.body || '{}');
+        return { ok: true, status: 200, json: async () => ({ signedURL: '/object/sign/x?token=t' }), text: async () => '' };
+      }
+      if (met === 'PATCH') { patches.push({ url: u, cuerpo: JSON.parse(opts.body || '{}') });
+        return { ok: true, status: 200, json: async () => [{ id: 'r1' }], text: async () => '' }; }
+      return { ok: true, status: 200, json: async () => [], text: async () => '[]' };
+    };
+    async function admin(cuerpo) {
+      global.fetch = red;
+      delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/giveaway-sortear.js'))];
+      const m = require(path.join(RAIZ, 'netlify/functions/giveaway-sortear.js'));
+      const r = await m.handler({ httpMethod: 'POST',
+        headers: { origin: 'https://conectareynosa.mx', 'x-admin-token': TOKEN_PRUEBA },
+        body: JSON.stringify(cuerpo) });
+      global.fetch = fetchReal2;
+      return JSON.parse(r.body || '{}');
+    }
+
+    // 🔒 REVERSIBLE: los tres estados son el mismo movimiento. Un dedazo en el
+    // teléfono no puede sacar a nadie del concurso.
+    for (const est of ['invalidada', 'aprobada', 'pendiente']) {
+      const r = await admin({ accion: 'revisar_foto', id: 'r1', estado: est });
+      af(r.ok === true && r.estado === est, 'no se pudo poner el estado ' + est + ': ' + JSON.stringify(r));
+    }
+    console.log('    los tres estados se pueden poner: ' + patches.map((p2) => p2.cuerpo.foto_estado).join(' → '));
+    af(patches.length === 3, 'no se hicieron los tres PATCH: ' + patches.length);
+    af(patches.every((p2) => Object.keys(p2.cuerpo).length === 1 && 'foto_estado' in p2.cuerpo),
+       'un PATCH de revisión tocó algo más que el estado: ' + JSON.stringify(patches.map((p2) => Object.keys(p2.cuerpo))));
+    af(patches.every((p2) => /slug=eq\./.test(p2.url)),
+       'el PATCH de revisión no filtra por slug: podría tocar a alguien de OTRO giveaway');
+    // Un estado inventado se rehúsa: el typo «invalidado» dejaría a alguien
+    // DENTRO del sorteo creyendo que quedó fuera.
+    const malEstado = await admin({ accion: 'revisar_foto', id: 'r1', estado: 'invalidado' });
+    af(malEstado.ok === false, 'aceptó el estado «invalidado» (typo): el giro excluye por el valor EXACTO');
+
+    // La URL de la foto caduca.
+    const firma = await admin({ accion: 'foto_url', foto_path: 'karolg-bbva-2026/abcdef012345/uno.jpg' });
+    console.log('    la firma pedida: ' + JSON.stringify(firmaPedida) + ' → ' + (firma.url || '').slice(0, 40));
+    af(firma.ok === true && !!firma.url, 'no se pudo firmar la foto: ' + JSON.stringify(firma));
+    af(firmaPedida && firmaPedida.expiresIn > 0 && firmaPedida.expiresIn <= 900,
+       'la URL de la foto no caduca pronto (' + JSON.stringify(firmaPedida) + '): una que no caduca es una foto pública con pasos extra');
+    // Y una ruta inventada no se firma.
+    const mala = await admin({ accion: 'foto_url', foto_path: '../../otra-cosa.jpg' });
+    af(mala.ok === false, 'firmó una ruta con «../»');
   }
 
   // ── [5] LA PÁGINA, ABIERTA EN UN NAVEGADOR ──────────────────────────────

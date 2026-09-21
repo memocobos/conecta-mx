@@ -13,7 +13,7 @@ const IG_RE = /^[A-Za-z0-9._]{1,30}$/;
 // Y la forma del path que devuelve `giveaway-foto`: `<slug>/<uuid>.<ext>`.
 // Se valida la FORMA antes de preguntarle al bucket, para que una cadena con
 // `../` ni siquiera llegue a convertirse en una consulta.
-const FOTO_PATH_RE = /^[a-z0-9-]+\/[A-Za-z0-9-]+\.(jpg|png)$/;
+const FOTO_PATH_RE = /^[a-z0-9-]+\/[a-f0-9]{12}\/[A-Za-z0-9-]+\.(jpg|png)$/;
 const BUCKET_FOTOS = 'giveaway-fotos';
 
 // Máximo de altas por IP en una hora. No es antifraude —una IP compartida son
@@ -168,7 +168,15 @@ exports.handler = async (event) => {
 
   if (!r.ok) {
     const detalle = await r.text().catch(() => '');
+    // 🔒 DOS ÍNDICES ÚNICOS, DOS MENSAJES. Antes había uno solo y su texto
+    // decía «ese WhatsApp ya está registrado»: con el de `foto_path` encima,
+    // ese mismo texto habría mandado a la persona a revisar un WhatsApp que
+    // estaba bien. El 23505 se lee por el NOMBRE de la restricción.
     if (r.status === 409 || /23505/.test(detalle)) {
+      if (/foto_path/.test(detalle)) {
+        return G.json(409, headers, { ok: false,
+          error: 'Esa foto ya está usada en otro registro. Elige otra foto e inténtalo.' });
+      }
       return G.json(409, headers, { ok: false, error: 'Ese WhatsApp ya está registrado' });
     }
     // 🔒 LA MIGRACIÓN QUE FALTA, DICHA POR SU NOMBRE. 42703 es «la columna no

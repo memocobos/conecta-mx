@@ -30,6 +30,20 @@ begin
   end if;
 end $$;
 
+-- 🔒 UNA RUTA DE FOTO NO PUEDE QUEDAR EN DOS REGISTROS. Sin esto, dos personas
+-- podrían acabar apuntando al mismo archivo —por un reintento mal encadenado o
+-- por alguien mandando a mano el `foto_path` de otra— y la cuadrícula de
+-- revisión mostraría la misma cara dos veces sin poder distinguirlas.
+--
+-- ⚠️ EL `where foto_path is not null` NO ES ADORNO: en Postgres `NULL != NULL`,
+-- así que un único sobre una columna nullable deja pasar TODOS los nulos sin
+-- decir nada… pero también los CUENTA para el índice. Las ~600 filas viejas de
+-- melanie y Natanael tienen la columna en NULL, y el índice parcial las deja
+-- fuera en vez de apilarlas.
+create unique index if not exists giveaway_registros_foto_path_uniq
+  on public.giveaway_registros (foto_path)
+  where foto_path is not null;
+
 -- El índice que usa la cuadrícula de revisión y la consulta del giro.
 create index if not exists giveaway_registros_slug_foto_estado_idx
   on public.giveaway_registros (slug, foto_estado);

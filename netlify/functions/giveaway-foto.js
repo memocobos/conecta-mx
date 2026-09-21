@@ -55,6 +55,46 @@ function tipoPorBytes(b) {
   return null;
 }
 
+// ── EL FRENO AL ABUSO ───────────────────────────────────────────────────────
+// Esta función es PÚBLICA y va ANTES del registro, así que no la protege el
+// índice único del WhatsApp: sin freno, cualquiera llena el bucket.
+//
+// 🔒 NO HAY TABLA NUEVA PARA CONTAR. La cuenta sale de LISTAR el propio bucket
+// bajo el prefijo de quien sube — que es la misma operación que necesita el
+// barrido de huérfanos, así que no se inventa un mecanismo para cada cosa.
+//
+// El número: un registro legítimo sube UNA foto. Con reintentos por mala señal
+// y con cambiar de foto un par de veces, seis o siete. DOCE en una hora deja
+// pasar a la persona más indecisa con la peor señal, y frena al que quiere
+// llenar el bucket. Y es POR IP: en una casa o un salón comparten IP, así que
+// apretar más castigaría a gente real.
+const MAX_POR_IP_HORA = 12;
+
+// La IP no se escribe en la ruta: se HASHEA. El bucket es privado y solo lo
+// lee el service_role, pero un identificador de red en un nombre de archivo es
+// un dato personal que no hace falta guardar para contar.
+function prefijoDe(ip) {
+  const h = require('crypto').createHash('sha256').update(String(ip) + '|' + SLUG_SAL).digest('hex');
+  return h.slice(0, 12);
+}
+const SLUG_SAL = 'giveaway-foto';
+
+// Lista lo que hay bajo un prefijo. Devuelve [] ante cualquier tropiezo: el
+// límite es un FRENO, no un candado — perder una subida real por una consulta
+// caída sería peor que el abuso que evita.
+async function listar(prefijo, limite) {
+  try {
+    const r = await fetch(`${G.SB_URL}/storage/v1/object/list/${BUCKET}`, {
+      method: 'POST',
+      headers: { apikey: G.SB_KEY, Authorization: 'Bearer ' + G.SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: prefijo, limit: limite || 100, sortBy: { column: 'created_at', order: 'desc' } }),
+    });
+    if (!r.ok) return [];
+    const j = await r.json().catch(() => []);
+    return Array.isArray(j) ? j : [];
+  } catch (_) { return []; }
+}
+
 function uuid() {
   try { return require('crypto').randomUUID(); }
   catch (_) { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
@@ -102,10 +142,26 @@ exports.handler = async (event) => {
     return G.json(415, headers, { ok: false, error: 'Ese archivo no es una foto. Sube una imagen JPG o PNG.' });
   }
 
+  // ── El freno por IP, antes de escribir nada ──────────────────────────────
+  const ip = G.ipDe(event);
+  const pref = prefijoDe(ip);
+  const yaSubidas = await listar(`${G.SLUG}/${pref}/`, 100);
+  const haceUnaHora = Date.now() - 60 * 60 * 1000;
+  const recientes = yaSubidas.filter((o) => {
+    const t = Date.parse(o && (o.created_at || o.updated_at) || '');
+    return !Number.isFinite(t) || t >= haceUnaHora;   // sin fecha, cuenta: el lado seguro
+  }).length;
+  if (recientes >= MAX_POR_IP_HORA) {
+    return G.json(429, headers, { ok: false,
+      error: 'Demasiadas fotos desde aquí. Espera un rato e inténtalo otra vez.' });
+  }
+
   // 🔒 EL NOMBRE LO PONE EL SERVIDOR, SIEMPRE. Si lo pusiera el cliente podría
   // mandar `../` y escribir fuera de su carpeta, o pisar la foto de otra
   // persona escribiendo su path. Aquí no hay nada del cliente en la ruta.
-  const path = `${G.SLUG}/${uuid()}.${tipo.ext}`;
+  // El prefijo de la IP va en la ruta para poder CONTAR sin tabla aparte; es
+  // un hash, no la IP.
+  const path = `${G.SLUG}/${pref}/${uuid()}.${tipo.ext}`;
 
   let r;
   try {
@@ -144,3 +200,5 @@ exports.handler = async (event) => {
 module.exports.BUCKET = BUCKET;
 module.exports.MAX_BYTES = MAX_BYTES;
 module.exports.tipoPorBytes = tipoPorBytes;
+module.exports.MAX_POR_IP_HORA = MAX_POR_IP_HORA;
+module.exports.prefijoDe = prefijoDe;

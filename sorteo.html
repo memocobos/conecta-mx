@@ -135,6 +135,107 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 /* El golpe al frenar: un tirón corto, no un rebote de juguete. */
 @keyframes golpe{0%{transform:translateY(0)}35%{transform:translateY(5px)}100%{transform:translateY(0)}}
 .rod.golpe{animation:golpe .17s ease-out}
+/* ═══ EL MOSAICO DE LA ESCALERA ═════════════════════════════════════════
+   [SORTEO-RONDAS-1] Vive DENTRO del mueble, en un segundo pozo hundido —el
+   mismo negro con sombra interior que `.rodillos`— y no como una rejilla de
+   tarjetas pegada debajo. La razón no es estética: esta página no es una
+   pantalla con contenido, es una MÁQUINA, y una tarjeta flotando encima la
+   convierte en un sitio web con una tragamonedas de adorno.
+
+   🔒 Y ELIMINAR ES QUE SE APAGUE EL FOCO. El mueble ya tiene ese vocabulario
+   —`@keyframes latir` en las luces perimetrales—, así que una ronda no
+   «desvanece» tarjetas: les corta la corriente. El que sigue se ve MÁS
+   brillante porque quedan menos focos repartiéndose la luz, y eso sale del
+   mismo `--viva` sin una regla aparte.
+
+   El tamaño lo da la rejilla (`--cols`), no cada tarjeta: bajar de 4 a 3 a 2
+   columnas ES el «crecen» del encargo, sin tocar un ancho. */
+.mosaico-caja{margin-top:10px;background:#000;border-radius:12px;padding:8px;
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:inset 0 3px 14px rgba(0,0,0,.9)}
+.mosaico-caja[hidden]{display:none}
+.mos-cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  padding:1px 3px 7px;font-family:var(--font-display);font-size:10px;
+  letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.mos-quedan{color:var(--c-amarillo);font-size:13px;letter-spacing:.12em}
+/* `minmax(0,1fr)` y no `1fr`: con `1fr` el contenido puede empujar la columna
+   y a 390px eso es desbordamiento horizontal de la página entera. */
+.mosaico{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));
+  gap:clamp(4px,1.4vw,8px)}
+.mos{position:relative;display:flex;flex-direction:column;
+  background:#0e0e11;border-radius:7px;overflow:hidden;
+  box-shadow:0 2px 6px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
+  transition:box-shadow .5s cubic-bezier(.16,1,.3,1),
+             background-color .5s cubic-bezier(.16,1,.3,1),
+             opacity .5s cubic-bezier(.16,1,.3,1)}
+/* `container-type` para que las iniciales midan un PORCENTAJE DE LA TARJETA:
+   la tarjeta va de ~75px (390px, 4 columnas) a ~166px (560px, 3 columnas), y
+   un tamaño fijo se ve enano en un extremo y desbordado en el otro. */
+.mos-foto{position:relative;aspect-ratio:1;width:100%;overflow:hidden;background:#15151a;
+  container-type:inline-size}
+.mos-foto img{width:100%;height:100%;object-fit:cover;display:block;
+  transition:filter .55s cubic-bezier(.16,1,.3,1)}
+/* Sin foto aprobada NUNCA hay hueco: van las iniciales. El amarillo sobre el
+   negro del mueble pasa contraste de sobra, y es el mismo par que la placa. */
+.mos-ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:900;color:var(--c-amarillo);
+  /* RESPALDO primero, y de verdad: si `cqw` no se entiende, esta línea queda y
+     el bloque @supports de abajo nunca se aplica. Un respaldo que no funciona
+     es peor que no tenerlo, porque nadie lo prueba. */
+  font-size:clamp(15px,8.5vw,34px);letter-spacing:.02em;
+  background:radial-gradient(circle at 50% 38%,#1e1e24,#0c0c0f 78%)}
+@supports (container-type: inline-size){
+  .mos-ini{font-size:40cqw}
+}
+.mos-nom{padding:4px 3px 5px;text-align:center;font-family:var(--font-display);
+  font-weight:900;line-height:1.02;font-size:clamp(8.5px,2.6vw,13px);
+  letter-spacing:.01em;color:rgba(255,255,255,.88);
+  /* Dos renglones caben: «María de los Angeles I.» no se recorta, se acomoda.
+     Truncar con puntos suspensivos en la tarjeta de una persona se lee como
+     un error, no como un límite. */
+  min-height:2.1em;display:flex;align-items:center;justify-content:center;
+  overflow-wrap:anywhere}
+.mos-folio{position:absolute;top:3px;left:4px;z-index:2;
+  font-family:var(--font-display);font-size:9px;font-weight:900;
+  color:rgba(255,255,255,.5);text-shadow:0 1px 3px rgba(0,0,0,.9)}
+
+/* EL FOCO ENCENDIDO. `--viva` sube conforme quedan menos: la misma corriente
+   repartida entre menos tarjetas. */
+.mos.vive{background:#14141a;
+  box-shadow:0 2px 6px rgba(0,0,0,.65),
+             0 0 calc(var(--viva,0) * 14px) rgba(232,255,76,calc(var(--viva,0) * .5)),
+             inset 0 0 0 1px rgba(232,255,76,calc(var(--viva,0) * .55))}
+.mos.vive .mos-nom{color:#fff}
+
+/* EL FOCO APAGADO. Es el color del foco muerto del marco (#5a4a12 sin brillo),
+   no un gris: la máquina no tiene grises. */
+.mos.fuera{background:#08080a;opacity:.34;box-shadow:inset 0 2px 8px rgba(0,0,0,.9)}
+.mos.fuera .mos-foto img{filter:grayscale(1) brightness(.45)}
+.mos.fuera .mos-ini{color:#5a4a12;background:#0a0a0c}
+.mos.fuera .mos-nom{color:rgba(255,255,255,.3)}
+
+/* LOS FINALISTAS, con la corriente entera. */
+.mos.finalista{--viva:1}
+.mos.finalista .mos-nom{color:var(--c-amarillo);font-size:clamp(11px,3.4vw,19px);
+  min-height:1.5em;padding:6px 4px 7px}
+
+/* La entrada: caen escalonadas, desde un estado YA VISIBLE (sin esto, un JS
+   caído deja el mosaico en blanco). */
+.mos{animation:mosCae .5s cubic-bezier(.16,1,.3,1) backwards;
+  animation-delay:calc(var(--n,0) * 45ms)}
+@keyframes mosCae{from{opacity:0;transform:translateY(-9px)}to{opacity:1;transform:none}}
+
+/* El redoble SOSTENIDO: la máquina vibra y el encabezado late, para que
+   esperar un dato no se vea como algo roto. */
+.mosaico-caja.redoble .mos-quedan{animation:mosLate .9s ease-in-out infinite}
+@keyframes mosLate{0%,100%{opacity:1}50%{opacity:.35}}
+
+@media (prefers-reduced-motion: reduce){
+  .mos{animation:none}
+  .mosaico-caja.redoble .mos-quedan{animation:none}
+  .mos,.mos-foto img{transition:none}
+}
+
 .rod-lbl{text-align:center;font-size:9px;letter-spacing:.2em;text-transform:uppercase;
   color:rgba(255,255,255,.34);margin-top:7px}
 
@@ -551,6 +652,22 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       <div class="rod-lbl">Folio</div>
     </div>
 
+    <!-- [SORTEO-RONDAS-1] EL MOSAICO. Nace `hidden` y lo enciende la máquina de
+         rondas: quien llegue con el JS caído no debe ver una rejilla vacía
+         prometiendo un show que no va a correr.
+         🔒 Va aquí, DENTRO de `.maquina`, en el hueco que quedaba entre los
+         rodillos y la placa del ganador — que es justo el espacio grande que
+         Memo pidió usar. -->
+    <div class="mosaico-caja" id="mosaico-caja" hidden>
+      <div class="mos-cab">
+        <span class="mos-quedan" id="mos-quedan">—</span>
+        <!-- VACÍO A PROPÓSITO: lo escribe `pintarMosaico()` desde los
+             escalones. Tecleado («24 de 66») miente en cuanto N cambia. -->
+        <span id="mos-de"></span>
+      </div>
+      <div class="mosaico" id="mosaico" style="--cols:4"></div>
+    </div>
+
     <div class="placa-ganador" id="placa-ganador">
       <div class="pg-l" id="pg-l">Ganador</div>
       <div class="pg-n" id="pg-n">—</div>
@@ -781,10 +898,19 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   </div>
 </footer>
 
+<!-- [SORTEO-RONDAS-1] 🔒 LOS TIEMPOS VIENEN DEL MISMO ARCHIVO QUE LEE EL
+     SERVIDOR (`giveaway-estado` lo requiere). Si vivieran copiados, un cambio
+     en uno dejaría al otro publicando de más o animando de menos — y en ESTE
+     módulo ya pasó: las cuatro constantes de fecha se quedaron en el 13-sep de
+     Natanael mientras el lib decía 1-oct. -->
+<script src="/sorteo-tiempos.js"></script>
 <script>
 (function(){
   'use strict';
   var $ = function(id){ return document.getElementById(id); };
+  // 🔒 El MISMO objeto que requiere giveaway-estado. El careo los compara campo
+  // por campo sobre la página SERVIDA: no hay forma de mover uno solo.
+  var TIEMPOS = window.SORTEO_TIEMPOS || null;
 
   // ═══════════════════════════════════════════════════════════════════════
   // La página es PÚBLICA y de solo lectura. Pregunta el estado cada 4s y, en
@@ -927,7 +1053,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // igual: son.tic/golpe/fanfarria no hacen nada y no truenan.
   // ═══════════════════════════════════════════════════════════════════════
   var son = (function(){
-    var ctx = null, encendido = false, ultimoTic = 0;
+    var ctx = null, encendido = false, ultimoTic = 0, redob = null, redobVivo = false;
     function nota(freq, dur, tipo, vol, cuando){
       if (!ctx) return;
       var o = ctx.createOscillator(), g = ctx.createGain();
@@ -971,12 +1097,45 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
           nota(p[0], .30, 'square', .11, p[1]);
         });
       },
+      // [SORTEO-RONDAS-1] EL REDOBLE DE RONDA. No es un tono sostenido: son
+      // golpes que se ACELERAN, que es lo que el oído lee como «va a pasar
+      // algo». Se construye sobre el mismo `nota()` y respeta el interruptor:
+      // si nadie activó el sonido no suena y no truena, igual que tic/golpe.
+      //
+      // ⚠️ Va con setTimeout que SE RE-AGENDA, no con setInterval: un interval
+      // tiene un solo periodo, y acelerar obligaba a matarlo y recrearlo — mi
+      // primera versión lo mataba y no lo recreaba, así que el redoble se
+      // apagaba solo al primer cambio de ritmo.
+      redoble: function(on){
+        if (!on){ redobVivo = false; if (redob){ clearTimeout(redob); redob = null; } return; }
+        if (!encendido || redobVivo) return;
+        redobVivo = true;
+        var t0 = Date.now();
+        (function golpear(){
+          if (!redobVivo) return;
+          nota(96, .07, 'triangle', .11);
+          nota(150, .05, 'sine', .07);
+          // Acelera de 190 ms a 95 ms a lo largo de ~14 s y ahí se queda: más
+          // rápido se vuelve zumbido y deja de contar nada.
+          var k = Math.min(1, (Date.now() - t0) / 14000);
+          redob = setTimeout(golpear, Math.round(190 - 95 * k));
+        })();
+      },
+      remate: function(){
+        if (!encendido) return;
+        nota(74, .30, 'sine', .18);
+        [[659,0],[880,.12],[1175,.24],[1568,.38]].forEach(function(p){
+          nota(p[0], .38, 'square', .12, p[1]);
+        });
+      },
     };
   })();
 
   // ═══ LA REVELACIÓN ═════════════════════════════════════════════════════
   function revelar(){
-    son.fanfarria();
+    // Con escalera va el REMATE (trae el golpe de bajo que cierra las rondas);
+    // sin escalera, la fanfarria de siempre — el camino viejo no se toca.
+    if (SHOW) son.remate(); else son.fanfarria();
     if (navigator.vibrate) { try { navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
     if (reducido) return;
     var d = $('destello');
@@ -1293,6 +1452,259 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     girarUno(2, folios,      folioGanador,     true,  unoMenos);
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // LA MÁQUINA DE RONDAS — GUIADA POR DATO, NO POR TEMPORIZADOR
+  //
+  // 🔴 POR QUÉ NO ES UNA CADENA DE setTimeout: una cadena avanza A CIEGAS. Si
+  // el latido que traía la ronda de 6 se cayó, un setTimeout la habría SALTADO
+  // —apagando tarjetas sin saber cuáles— y el show habría mentido en cámara.
+  //
+  // Para pasar de la fase k a la k+1 hacen falta LAS DOS cosas:
+  //   · el RELOJ:  t >= momentos[k]        (del servidor, vía desfaseMs)
+  //   · el DATO:   ya llegó rondas[k]      (del servidor, gateado)
+  // Si falta el dato, el redoble SE SOSTIENE y se vuelve a latir. Nunca se
+  // traba (el latido sigue) y NUNCA se salta una ronda.
+  //
+  // ── DENTRO DEL SHOW SE SINCRONIZA; FUERA, SE REPITE ───────────────────
+  // «Todos ven lo mismo al mismo tiempo» y «el que entra tarde ve la animación
+  // completa» chocan para quien llega en el segundo 90 de un show de 2:12. La
+  // lectura, firmada por Memo el 21-sep: DENTRO de la ventana del show se
+  // sincroniza con `creado_at` (alcanza la ronda que va y sigue en vivo, para
+  // que «quedan 6» dicho en cámara sea cierto para todos); FUERA, repetición
+  // completa desde el principio. `SHOW.t0` es el único interruptor.
+  //
+  // ⚠️ El umbral es `duracionTotal`, NO `RECIENTE_MS`. Son dos preguntas
+  // distintas: los 60 s de RECIENTE_MS siguen gobernando SOLO el rótulo
+  // «Repetición», que es lo que hacían antes.
+  // ═══════════════════════════════════════════════════════════════════════
+  var SHOW = null;
+
+  function showDe(u){
+    if (!u || !TIEMPOS || !u.escalones || !u.escalones.length) return null;
+    var creado = Date.parse(u.creado_at);
+    if (!isFinite(creado)) return null;
+    var esc = u.escalones;
+    var dentro = (ahora() - creado) < TIEMPOS.duracionTotal(esc);
+    return {
+      id: u.id, escalones: esc, momentos: TIEMPOS.momentos(esc),
+      // En REPETICIÓN el 3·2·1 no corre (ya se sabe qué pasó), así que el t0
+      // se adelanta esa cuenta: el mosaico entra de inmediato y los momentos
+      // siguientes conservan su separación. Sin esto la repetición regalaba
+      // 2.7 s de máquina quieta al principio.
+      t0: dentro ? creado : (ahora() - TIEMPOS.T.CUENTA_321_MS),
+      sincronizado: dentro,
+      rondas: [], pintadas: 0, corriendo: false, sostenido: false,
+    };
+  }
+
+  // Lo que llega del servidor se VUELCA sobre lo que ya teníamos. Nunca se
+  // reemplaza a ciegas: una respuesta sin `?fotos=1` OMITE la clave `foto`, y
+  // sustituir dejaría las tarjetas en blanco a media transmisión.
+  function absorberRondas(u){
+    if (!SHOW || !u || !u.rondas) return;
+    u.rondas.forEach(function(r){
+      var previa = SHOW.rondas[r.i];
+      if (previa && previa.miembros){
+        r.miembros.forEach(function(m, i){
+          var p = previa.miembros[i] || {};
+          if (!('foto' in m) && ('foto' in p)) m.foto = p.foto;
+        });
+      }
+      SHOW.rondas[r.i] = r;
+    });
+  }
+
+  var COLS = { 24: 4, 12: 4, 6: 3, 3: 3, 1: 1 };
+  function pintarMosaico(ronda, fuera){
+    var caja = $('mosaico-caja'), rej = $('mosaico');
+    if (!caja || !rej || !SHOW) return;
+    caja.hidden = false;
+    var tam = ronda.tam;
+    var ultima = tam === SHOW.escalones[SHOW.escalones.length - 1];
+    var finalistas = tam <= 3 && !ultima;
+    rej.style.setProperty('--cols', COLS[tam] || 4);
+    // La corriente se reparte entre menos focos conforme baja la escalera.
+    var viva = Math.min(1, 0.18 + (1 - tam / (SHOW.escalones[0] || 24)) * 0.9);
+
+    $('mos-quedan').textContent = tam === 1 ? 'Ganador' : ('Quedan ' + tam);
+    // 🔒 DERIVADO de los escalones y del total: tecleado («24 de 66») miente en
+    // cuanto N cambia, y con 11 participantes ni existe la ronda de 24.
+    $('mos-de').textContent = (ronda.i === 0 && estado && estado.ultimo)
+      ? (SHOW.escalones[0] + ' de ' + (estado.ultimo.de_cuantos || 0) + ' · al azar')
+      : ('ronda ' + (ronda.i + 1) + ' de ' + SHOW.escalones.length);
+
+    var vivos = ronda.miembros.map(function(m){ return m.folio; });
+    // Los que YA estaban y no siguen: se quedan en la rejilla, apagados. Sacar
+    // una tarjeta del DOM haría que el mosaico brincara y nadie vería QUIÉN
+    // salió — que es justo lo que la ronda tiene que contar.
+    var lista = (fuera || []).concat(ronda.miembros);
+    lista.sort(function(a, b){ return (a.folio || 0) - (b.folio || 0); });
+    rej.innerHTML = lista.map(function(m, i){
+      var dentro = vivos.indexOf(m.folio) !== -1;
+      var cls = 'mos ' + (dentro ? 'vive' : 'fuera') + (dentro && finalistas ? ' finalista' : '');
+      return '<div class="' + cls + '" data-folio="' + esc(String(m.folio)) + '"'
+        + ' style="--n:' + i + ';--viva:' + (dentro ? viva.toFixed(2) : 0) + '">'
+        + '<div class="mos-folio">#' + esc(String(m.folio)) + '</div>'
+        + '<div class="mos-foto">'
+        +   (m.foto ? '<img alt="" src="' + esc(m.foto) + '" data-folio="' + esc(String(m.folio)) + '">'
+                    : '<div class="mos-ini">' + esc(m.ini || '·') + '</div>')
+        + '</div>'
+        + '<div class="mos-nom">' + esc(m.corto || '') + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Qué folios están en la rejilla pero ya no en la ronda que sigue.
+  function fueraDe(kAnterior, ronda){
+    if (kAnterior == null || !SHOW.rondas[kAnterior]) return [];
+    var siguen = ronda.miembros.map(function(m){ return m.folio; });
+    return SHOW.rondas[kAnterior].miembros.filter(function(m){
+      return siguen.indexOf(m.folio) === -1;
+    });
+  }
+
+  // 🔴 CADA PASO SE ANCLA AL RELOJ DEL SHOW, no a «ahora + 18 s».
+  //
+  // Con temporizadores relativos, quien entra en el segundo 90 de un show de
+  // 2:12 tardaba DOS MINUTOS en alcanzarlo: cada ronda volvía a contar sus 18 s
+  // desde cero. O sea que «dentro de la ventana se sincroniza» no se cumplía —
+  // se veía sincronizado al arrancar y se iba desfasando ronda por ronda.
+  //
+  // Anclado al reloj, un paso cuyo momento YA PASÓ ocurre de inmediato: el que
+  // llega tarde alcanza al instante y de ahí sigue en vivo, y un dato que
+  // llegó tarde se pinta en cuanto debía haberse pintado, sin arrastrar el
+  // retraso al resto del show.
+  function enElMomento(offset, fn){
+    if (reducido || offset == null){ fn(); return; }
+    var falta = (SHOW.t0 + offset) - ahora();
+    if (falta <= 0){ fn(); return; }
+    setTimeout(fn, falta);
+  }
+
+  function animarRonda(k, ronda, alTerminar){
+    var T = TIEMPOS.T;
+    var n = SHOW.escalones.length;
+    var ultima = (k === n - 1);
+    var finDeEsta = ultima ? null : SHOW.momentos[k + 1];
+
+    if (k === 0){
+      pintarMosaico(ronda, []);
+      son.arranque();
+      enElMomento(finDeEsta, alTerminar);
+      return;
+    }
+    if (!ultima){
+      // Redoble → se apagan los que no siguen → los que quedan se reacomodan.
+      var caja = $('mosaico-caja');
+      if (caja) caja.classList.add('redoble');
+      son.redoble(true);
+      // 🔴 SON DOS MOVIMIENTOS, NO UNO. El encargo dice «se apagan la mitad.
+      // Los que siguen se reacomodan y crecen» — y sin el segundo paso nadie
+      // crece nunca: la rejilla se queda con los apagados dentro para siempre.
+      //
+      //   APAGADO   · se ven QUIÉNES salieron, en su sitio, con el foco muerto
+      //   REACOMODO · los apagados se van, la rejilla baja de columnas y los
+      //               que quedan crecen solos (el tamaño lo da `--cols`)
+      enElMomento(SHOW.momentos[k] + T.RONDA_REDOBLE_MS, function(){
+        if (caja) caja.classList.remove('redoble');
+        son.redoble(false);
+        son.golpe();
+        pintarMosaico(ronda, fueraDe(k - 1, ronda));
+        enElMomento(SHOW.momentos[k] + T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS, function(){
+          pintarMosaico(ronda, []);
+          enElMomento(finDeEsta, alTerminar);
+        });
+      });
+      return;
+    }
+    // La última: los finalistas quedan en grande y la tragamonedas gira una
+    // vez más. `animarHacia` ya trae su propio perfil de 11 s y su revelación.
+    pintarMosaico(ronda, fueraDe(k - 1, ronda));
+    animarHacia(estado.ultimo, alTerminar);
+  }
+
+  // El redoble sostenido: la máquina no avanza, pero el ojo no ve nada roto.
+  //
+  // 🔴 Y MIENTRAS SOSTIENE, SE PREGUNTA MÁS SEGUIDO. Con el latido normal de
+  // 4 s, un dato que llegaba tarde dejaba la máquina congelada hasta CUATRO
+  // SEGUNDOS después de estar disponible — medido: el careo pedía que soltara
+  // en 1.5 s y no soltaba. Cuatro segundos de máquina quieta en cámara es
+  // justo lo que este estado existe para evitar.
+  //
+  // 800 ms solo DURANTE la espera, y se apaga al soltar: no es martillar el
+  // servidor durante todo el show, es preguntar rápido cuando de verdad falta
+  // algo y se sabe QUÉ falta.
+  var latidoRapido = null;
+  function sostenerRedoble(k){
+    $('maquina').classList.add('girando');
+    var caja = $('mosaico-caja');
+    if (caja) caja.classList.add('redoble');
+    var q = $('mos-quedan');
+    if (q) q.textContent = 'Ronda ' + (k + 1) + '…';
+    son.redoble(true);
+    if (!latidoRapido) latidoRapido = setInterval(refrescar, 800);
+  }
+  function soltarRedoble(){
+    $('maquina').classList.remove('girando');
+    var caja = $('mosaico-caja');
+    if (caja) caja.classList.remove('redoble');
+    son.redoble(false);
+    if (latidoRapido){ clearInterval(latidoRapido); latidoRapido = null; }
+  }
+
+  function avanzarShow(){
+    if (!SHOW || SHOW.corriendo) return;
+    var k = SHOW.pintadas;
+    if (k >= SHOW.escalones.length) return;
+    var t = ahora() - SHOW.t0;
+    if (t < SHOW.momentos[k]) return;              // todavía no le toca: manda el reloj
+    if (!SHOW.rondas[k]){                          // le toca y NO llegó el dato
+      if (!SHOW.sostenido){ SHOW.sostenido = true; sostenerRedoble(k); }
+      return;                                      // 🔒 SE SOSTIENE, no se salta
+    }
+    if (SHOW.sostenido){ SHOW.sostenido = false; soltarRedoble(); }
+    SHOW.corriendo = true;
+    var ronda = SHOW.rondas[k];
+    animarRonda(k, ronda, function(){
+      SHOW.corriendo = false;
+      SHOW.pintadas = k + 1;
+      if (SHOW.pintadas >= SHOW.escalones.length){
+        animado = SHOW.id;
+        pintarPanel(estado.ultimo);
+        return;
+      }
+      avanzarShow();                               // por si ya le toca la siguiente
+    });
+  }
+
+  // El latido DIRIGIDO: en vez de martillar cada segundo durante el show, se
+  // pide justo después de que el servidor libere la ronda que sigue. El latido
+  // de 4 s queda como PISO, no como único camino.
+  var latidoDirigido = null;
+  function programarLatido(ms){
+    if (latidoDirigido){ clearTimeout(latidoDirigido); latidoDirigido = null; }
+    if (ms == null || !(ms >= 0)) return;
+    latidoDirigido = setTimeout(function(){ latidoDirigido = null; refrescar(); },
+                                Math.max(300, ms + 300));
+  }
+
+  // El que hace que el redoble sostenido suelte EN CUANTO llega el dato, sin
+  // esperar los 4 s del latido.
+  setInterval(avanzarShow, 200);
+
+  // 🔒 SONDA DE SOLO LECTURA. La máquina de rondas es el punto de riesgo de
+  // esta tuerca y su estado vive en una cerradura (IIFE): sin esto, un careo
+  // solo puede mirar el DOM y adivinar. No cambia una coma del comportamiento
+  // —devuelve una copia— y es lo que permite afirmar «sostuvo» y «soltó» en vez
+  // de inferirlos de una clase de CSS que el redoble de ronda también pone.
+  window.__sorteoShow = function(){
+    if (!SHOW) return null;
+    return { id: SHOW.id, escalones: SHOW.escalones.slice(), pintadas: SHOW.pintadas,
+             corriendo: SHOW.corriendo, sostenido: SHOW.sostenido,
+             sincronizado: SHOW.sincronizado, t: ahora() - SHOW.t0,
+             tengo: SHOW.rondas.map(function(r){ return r ? r.tam : null; }) };
+  };
+
   var tickReloj = null;
   function arrancarReloj(desdeISO, resultado){
     if (tickReloj){ clearInterval(tickReloj); tickReloj = null; }
@@ -1442,16 +1854,47 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       pintarCuenta();
 
       var u = res.j.ultimo;
-      if (!u){ $('espera').style.display = ''; $('panel').style.display = 'none'; reposo(); return; }
+      if (!u){
+        $('espera').style.display = ''; $('panel').style.display = 'none';
+        var cm = $('mosaico-caja'); if (cm) cm.hidden = true;
+        SHOW = null; reposo(); return;
+      }
       pintarHistorial(res.j.giros || []);
+
+      // ── [SORTEO-RONDAS-1] EL CAMINO DE LA ESCALERA ──────────────────────
+      if (TIEMPOS && u.escalones && u.escalones.length){
+        if (!SHOW || SHOW.id !== u.id){
+          SHOW = showDe(u);
+          animado = null;
+          $('espera').style.display = 'none';
+          $('cuenta').style.display = 'none';
+          absorberRondas(u);
+          // El 3·2·1 SOLO cuando el show va sincronizado y todavía no empezó.
+          // En una repetición no va: ya se sabe qué pasó, y volver a contar
+          // sería mentir sobre que está por ocurrir (regla de hoy, conservada).
+          var arranca = SHOW && SHOW.sincronizado
+            && (ahora() - SHOW.t0) < TIEMPOS.T.CUENTA_321_MS;
+          if (arranca) tresDosUno(function(){ avanzarShow(); });
+          else avanzarShow();
+        } else {
+          absorberRondas(u);
+          avanzarShow();
+        }
+        programarLatido(u.siguiente_ronda_en_ms);
+        // Con el show ya terminado (una repetición vista entera, o el que llega
+        // tarde y ya la corrió) el panel se mantiene al día.
+        if (animado === u.id) pintarPanel(u);
+        return;
+      }
+
+      // ── EL CAMINO DE ANTES: un giro SIN escalera (los dos de Natanael) ──
+      // 🔒 No se rompe. Su `rondas` es NULL, el ganador viene revelado y el
+      // show es el de siempre.
       if (animado === u.id){ pintarPanel(u); return; }
       if (girando) return;
       girando = true;
       $('espera').style.display = 'none';
       $('cuenta').style.display = 'none';
-      // El 3·2·1 solo la PRIMERA vez que se descubre un giro nuevo. En una
-      // repetición no va: ya se sabe qué pasó y volver a contar sería mentir
-      // sobre que está por ocurrir.
       tresDosUno(function(){
         animarHacia(u, function(){ girando = false; animado = u.id; pintarPanel(u); });
       });

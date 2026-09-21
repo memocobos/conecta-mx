@@ -21,11 +21,22 @@ let ok = 0, mal = 0; const fallos = [];
 
 // 🔒 Una aserción que TRUENA se cuenta como rojo CON NOMBRE. Un arnés que se
 // cae deja las secciones de abajo sin ejercitar y esconde qué candado falló.
+// 🔴 EL MENSAJE TAMBIÉN PUEDE TRONAR, y si truena se cae el arnés entero — lo
+// que el try/catch de aquí NO alcanza a atrapar, porque un mensaje armado con
+// `+` se evalúa ANTES de entrar a esta función. Pasó: `'...' +
+// res.d.ultimo.rondas.length` con `rondas` en undefined tumbó la corrida en el
+// bloque [9] y el marcador dijo «0 en rojo» sobre una caída.
+// Se admite el mensaje como FUNCIÓN para poder diferirlo; y el que llegue ya
+// armado se protege igual con su propio try.
 const af = (fn, e) => {
+  const texto = () => {
+    try { return (typeof e === 'function') ? e() : e; }
+    catch (x) { return '(el mensaje del careo tronó: ' + x.message + ')'; }
+  };
   let c = false;
   try { c = (typeof fn === 'function') ? fn() : fn; }
-  catch (x) { fallos.push(e + '  → TRONÓ: ' + x.message); mal++; return; }
-  if (c) ok++; else { mal++; fallos.push(e); }
+  catch (x) { fallos.push(texto() + '  → TRONÓ: ' + x.message); mal++; return; }
+  if (c) ok++; else { mal++; fallos.push(texto()); }
 };
 
 // 🔒 UN ARNÉS QUE SE CAE NO REPORTA. `af()` atrapa lo que truena DENTRO de una
@@ -34,8 +45,12 @@ const af = (fn, e) => {
 // enseñando solo un stack. Este guardián imprime el marcador SIEMPRE y dice en
 // voz alta que la corrida quedó incompleta — así una caída no se puede leer
 // como «no había nada más que medir».
-let completo = false;
+let completo = false, reportado = false;
 function marcador() {
+  // Se llama desde el final feliz, desde el .catch de la IIFE y desde el
+  // handler de `exit`. Imprimirlo tres veces no aclara nada.
+  if (reportado) return;
+  reportado = true;
   console.log('\n──────────────────────────────────────────────');
   if (!completo) {
     console.log('❌ ARNÉS CAÍDO · la corrida NO llegó al final: lo de abajo NO se midió');
@@ -905,6 +920,136 @@ af(() => JSON.stringify(SOR[0].rondas) === JSON.stringify(RF), 'la escalera no s
 af(() => PATCHES.filter((x) => x.tabla === 'sorteos').length > 0
       && PATCHES.filter((x) => x.tabla === 'sorteos').every((x) => /slug=eq\./.test(x.u)),
    '🔴 un PATCH de sorteos sin `slug=eq.` — el ensayo podría tocar lo real');
+
+
+// ═══ [9] LA PUERTA PÚBLICA: EL GATEO DE VERDAD, POR EL CAMINO DE VERDAD ═════
+console.log('\n── [9] la puerta pública: el gateo por el camino real ──');
+const estado = require(path.join(RAIZ, 'netlify/functions/giveaway-estado.js')).handler;
+const evG = (q, tok) => ({ httpMethod: 'GET',
+  headers: Object.assign({ origin: 'https://conectareynosa.mx' }, tok ? { 'x-admin-token': tok } : {}),
+  queryStringParameters: q || {} });
+const pedir = async (q, tok) => {
+  URLS = [];
+  const r = await estado(evG(q, tok));
+  let d = {}; try { d = JSON.parse(r.body || '{}'); } catch (_) {}
+  return { code: r.statusCode, d, crudo: r.body || '' };
+};
+
+// 🔒 EL RELOJ SE CONGELA MOVIENDO `creado_at` HACIA ATRÁS, no parcheando
+// Date.now(): así se mide el camino real (el handler hace su propia resta) y el
+// careo no depende de la hora a la que se corra.
+async function girarYFijar(atrasMs) {
+  sembrarPadron(); SOR = [];
+  await llamar({ accion: 'girar' });
+  SOR[0].creado_at = new Date(Date.now() - atrasMs).toISOString();
+  return SOR[0];
+}
+
+for (const [atras, esperadas, revelado] of
+     [[0, 1, false], [13000, 1, false], [30000, 2, false],
+      [60000, 3, false], [95000, 4, false], [200000, 5, true]]) {
+  const fila = await girarYFijar(atras);
+  const res = await pedir({ fotos: '1' });
+  af(() => res.code === 200 && res.d.ok === true, 'estado 200 con t=' + atras + ', dio ' + res.code);
+  af(() => res.d.ultimo && res.d.ultimo.rondas.length === esperadas,
+     '🔴 t=' + atras + ': ' + (res.d.ultimo && res.d.ultimo.rondas && res.d.ultimo.rondas.length)
+     + ' rondas publicadas, se esperaban ' + esperadas);
+  af(() => !!(res.d.ultimo) && (res.d.ultimo.nombre != null) === revelado,
+     '🔴 t=' + atras + ': ultimo.nombre ' + (revelado ? 'debía' : 'NO debía')
+     + ' venir, vino ' + JSON.stringify(res.d.ultimo.nombre));
+  af(() => !!(res.d.ultimo) && (res.d.ultimo.folio != null) === revelado,
+     '🔴 t=' + atras + ': el folio del ganador ' + (revelado ? 'debía' : 'NO debía') + ' venir');
+  // 🔴 EL NOMBRE COMPLETO DEL GANADOR NO PUEDE ESTAR EN NINGUNA PARTE del
+  // cuerpo servido. Se busca la cadena en el JSON entero, no un campo.
+  if (!revelado) {
+    af(() => res.crudo.indexOf('"nombre":"' + fila.ganador_nombre + '"') === -1,
+       '🔴 t=' + atras + ': el nombre del ganador salió como valor de "nombre"');
+    af(() => !!(res.d.ultimo && res.d.ultimo.rondas) && res.d.ultimo.rondas.every((x) => x.tam >= 3),
+       '🔴 t=' + atras + ': salió una ronda de menos de 3 — eso SEÑALA al ganador');
+  }
+  // 🔒 Lo privado, en TODOS los instantes, sobre el cuerpo COMPLETO.
+  af(() => !/8990000|@x\.mx|"instagram"|foto_path|descarte_motivo|no_cumple|no_sigue/.test(res.crudo),
+     '🔴 t=' + atras + ': dato privado en la puerta pública');
+  af(() => res.crudo.indexOf('"orden"') === -1,
+     '🔴 t=' + atras + ': se filtró `orden` EN CRUDO — ese arreglo EMPIEZA por el ganador');
+  af(() => res.crudo.indexOf('"id":"r') === -1,
+     '🔒 t=' + atras + ': se filtró un id de registro');
+}
+
+// ── El resultado DERIVADO, por el camino real ─────────────────────────────
+let fila9 = await girarYFijar(200000);
+await llamar({ accion: 'resolver', sorteo_id: fila9.id, resultado: 'no_cumple', motivo: 'no_sigue' });
+SOR[0].creado_at = new Date(Date.now() - 200000).toISOString();
+let res9 = await pedir({});
+af(() => res9.d.ultimo.resultado === 'se_regira',
+   '🔴 `no_cumple` debe salir como se_regira, dio ' + res9.d.ultimo.resultado);
+af(() => !/no_cumple|no_sigue|cumple/.test(res9.crudo), '🔒 ni la palabra `no_cumple` puede salir');
+// Y el mismo giro, resuelto pero A MEDIA ANIMACIÓN: sigue diciendo pendiente.
+SOR[0].creado_at = new Date(Date.now() - 30000).toISOString();
+res9 = await pedir({});
+af(() => res9.d.ultimo.resultado === 'pendiente',
+   '🔴 resuelto a media animación, el público debe seguir viendo `pendiente`, vio '
+   + res9.d.ultimo.resultado);
+af(() => res9.d.ultimo.nombre === null, 'y el nombre sigue oculto');
+
+// ── Las fotos: solo aprobadas, solo con ?fotos=1, NUNCA antes del giro ────
+sembrarPadron(); SOR = [];
+res9 = await pedir({ fotos: '1' });
+af(() => !res9.d.ultimo, 'sin giro no hay `ultimo`');
+af(() => !/object\/sign/.test(res9.crudo) && !URLS.some((x) => /object\/sign/.test(x.u)),
+   '🔴 SIN GIRO NO SE FIRMA NI UNA FOTO — medido sobre las peticiones que salieron');
+await girarYFijar(200000);
+res9 = await pedir({ fotos: '1' });
+const miembros9 = ((res9.d.ultimo || {}).rondas || [{}])[0].miembros || [];
+af(() => miembros9.some((m) => m.foto), 'con ?fotos=1 salen las firmadas');
+// En el padrón de prueba los folios IMPARES están aprobados.
+af(() => miembros9.every((m) => !m.foto || m.folio % 2 === 1),
+   '🔴 salió la foto de alguien SIN aprobar');
+af(() => miembros9.every((m) => m.foto || m.ini), '🔒 sin foto SIEMPRE hay iniciales');
+// Y la consulta de fotos llevaba el filtro de aprobada EN LA CONSULTA.
+af(() => URLS.some((x) => /foto_estado=eq\.aprobada/.test(x.u)),
+   '🔒 la consulta de fotos perdió el filtro `foto_estado=eq.aprobada`');
+const sinFotos = await pedir({});
+af(() => (((sinFotos.d.ultimo || {}).rondas || [{}])[0].miembros || []).every((m) => !('foto' in m)),
+   '🔒 sin ?fotos=1 la clave `foto` se OMITE (no null): así la página distingue «no me lo dijeron» de «no tiene»');
+af(() => !URLS.some((x) => /object\/sign/.test(x.u)), 'sin ?fotos=1 no se firma nada');
+
+// ── El ensayo NO sale por la puerta pública ───────────────────────────────
+const ens = await pedir({ modo: 'ensayo' });
+af(() => ens.code === 401, '🔴 ?modo=ensayo sin token → 401, dio ' + ens.code);
+const ensTok = await pedir({ modo: 'ensayo' }, 'tok');
+af(() => ensTok.code === 200, 'con token el ensayo sí se sirve, dio ' + ensTok.code);
+af(() => !ensTok.d.ultimo, 'y el ensayo está vacío (no hereda el giro real)');
+const modoMal = await pedir({ modo: 'inventado' });
+af(() => modoMal.code === 400, 'un modo inventado → 400, dio ' + modoMal.code);
+
+// ── Los rodillos y los campos derivados ───────────────────────────────────
+await girarYFijar(200000);
+res9 = await pedir({ rodillos: '1' });
+af(() => res9.d.rodillos && res9.d.rodillos.nombres.length > 0 && res9.d.rodillos.apellidos.length > 0,
+   'los rodillos siguen dando las dos listas separadas (orden de Memo: se conservan)');
+af(() => res9.d.ultimo.de_cuantos === 28 && res9.d.ultimo.escalones[0] === 24,
+   'el renglón «24 de N» sale DERIVADO: ' + res9.d.ultimo.escalones[0] + ' de ' + res9.d.ultimo.de_cuantos);
+af(() => res9.d.ultimo.rondas_totales === 5, 'rondas_totales dio ' + res9.d.ultimo.rondas_totales);
+af(() => res9.d.ultimo.revelacion_en_ms === TI.momentos([24, 12, 6, 3, 1])[4],
+   '🔒 `revelacion_en_ms` viene del SERVIDOR: el reloj de 10 min y el gateo tienen que arrancar del MISMO número; dio '
+   + res9.d.ultimo.revelacion_en_ms);
+af(() => res9.d.ultimo.es_regiro === false && res9.d.ultimo.escalon === null,
+   'el primer giro no es re-giro y no tiene escalón');
+
+// ── Un giro VIEJO, sin escalera (los dos de Natanael) ─────────────────────
+// 🔒 No se puede romper el camino de un giro anterior a esta tuerca: su
+// `rondas` es NULL y el show tiene que ser el de siempre, con el ganador
+// revelado de inmediato.
+sembrarPadron();
+SOR = [sembrarGiro('pendiente', 1)];   // sin `rondas`
+res9 = await pedir({});
+af(() => res9.d.ultimo && res9.d.ultimo.rondas.length === 0,
+   'un giro sin escalera no publica rondas');
+af(() => res9.d.ultimo.nombre != null,
+   '🔒 un giro sin escalera revela al ganador de inmediato: es el camino de antes');
+af(() => res9.d.ultimo.rondas_totales === 0 && res9.d.ultimo.revelacion_en_ms === 0,
+   'y sus campos derivados van en cero');
 
 // <<<SIGUIENTES-BLOQUES>>>
 

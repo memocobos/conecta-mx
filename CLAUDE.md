@@ -167,6 +167,49 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **GIVEAWAY-KG-1 FASE 1 EN PROD (21-sep-2026, #747): el giveaway de Karol G
+  abre registro.** `/giveaway` y `/sorteo` repuntados de Natanael a **Karol G**
+  (7-nov-2026, Estadio BBVA), slug `karolg-bbva-2026`. Candado de las tres redes
+  (buena fe: el follow NO se verifica por API), campo de Instagram, **foto del
+  participante en bucket PRIVADO** `giveaway-fotos` (sube por function, jamás
+  llaves en el cliente), cuadrícula de revisión para celular, aviso de fotos
+  pendientes antes del giro (avisa, **no bloquea**), botón de huérfanas (6 h) y
+  premio doble por ciudad. `npm run mide:giveaway-karolg`, **177 aserciones**.
+  🔒 **La mecánica del giro NO se tocó: es Fase 2.**
+  **CIERRE `2026-10-01T20:00-05:00` · SORTEO `2026-10-01T21:00-05:00`.**
+  🔴 **Lo que se cazó midiendo, y ninguna lectura habría visto:**
+  - **El cron estaba FUERA de su propia ventana** (`55 16 * * *`, heredado de
+    melanie): el recordatorio **no habría salido nunca**, sin error ni log. Hoy
+    el careo carea el `schedule` contra la ventana y truena si se separan.
+  - **Las fechas vivían en TRES runtimes y solo se movió uno.** Las CUATRO
+    copias del navegador se quedaron en el 13-sep de Natanael, así que
+    `ahora >= CIERRE` era cierto y la página anunciaba **«EL REGISTRO CERRÓ» el
+    día que abría el registro**.
+  - **El correo del recordatorio venía de MELANIE**: anunciaba «las 12:00 PM»
+    para un sorteo de las 9 PM. **Sobrevivió DOS giveaways** mintiendo, porque
+    solo se renderiza el día del sorteo dentro de una ventana de 40 minutos.
+  - **/sorteo seguía entero en la época anterior**: título, dos fechas, el
+    bloque de rescate completo (artista, venue y el `?text=` del WhatsApp) y el
+    link del nav.
+  🔒 **LOS LETREROS SE DERIVAN, NO SE SUSTITUYEN** — sustituir es lo que se
+  pudrió dos veces (melanie → Natanael → Karol G). Hoy salen de `SORTEO_TS`, de
+  `G.SORTEO` y del catálogo, y **si no se pueden derivar NO SE MANDA NADA**. Lo
+  único tecleado que queda es el nombre del artista en el rescate de /sorteo.
+  🔒 **SON DOS CORREOS, NO TRES: no existe correo al ganador.** Se le habla por
+  WhatsApp y el reloj de 10 minutos de /sorteo es la puerta. Medido contando
+  llamadas a Resend en las 7 functions del giveaway, y el careo lo fija.
+  🔒 **El barrido de restos va sobre lo SERVIDO, no por grep** (careo `[9]`):
+  el texto que la gente VE + title/og/href, **incluidos los bloques ocultos**
+  —el rescate está oculto en 4 de los 5 estados y era justo el sucio—, con
+  control positivo en los dos caminos de lectura. Y al `<script>` se le quitan
+  los **comentarios**, no el script entero: un `var x = 'Natanael'` sí debe caer.
+  ⏳ **`CODIGO = 'KAROL'` del consuelo espera su fila**: tiene que existir en
+  `promos_codigos` **y publicarse desde Baba**. Mientras no esté, el handler se
+  rehúsa con 409 — no puede mandar nada roto.
+  ⚠️ **`mide:tira-agotados` trae 1 rojo PRE-EXISTENTE** (`[12a]`, premisa
+  caducada de LAND-2) y su `HEAD` sigue **sin anclar**: no se tocó aquí a
+  propósito, es tuerca propia.
+
 - ✅ **SERIE LAND-2 CERRADA (19-sep-2026, #737/#738/#739): la portada dejó de
   mentir.** Tres tuercas, `npm run mide:tira-agotados` (**150 aserciones, el
   primer careo VERSIONADO del hero**), cero SQL. Ninguna tocó `heroALaVenta` ni

@@ -10,18 +10,29 @@
 // media transmisión — no se puede girar hasta que salga alguien conveniente.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const crypto = require('crypto');
 const G = require('./_lib/giveaway');
+const ESC = require('./_lib/sorteo-escalera');
 
-// Azar de crypto, no Math.random(): en un sorteo con premio, el generador
-// tiene que ser el bueno aunque nadie lo vaya a auditar.
-function alAzar(n) {
-  if (n <= 0) return -1;
-  const limite = Math.floor(0xFFFFFFFF / n) * n;   // sin sesgo por módulo
-  let x;
-  do { x = crypto.randomBytes(4).readUInt32BE(0); } while (x >= limite);
-  return x % n;
-}
+// 🔒 EL REQUIRE QUE PUEDE FALLAR, Y FALLA RUIDOSO.
+//
+// `sorteo-tiempos.js` vive en la RAÍZ (es el publish dir de Netlify) y NINGUNA
+// function de este repo requería nada de fuera de su carpeta, así que el
+// empaquetado no estaba medido. Va declarado con `included_files` en
+// netlify.toml, pero si aun así no llega, esta function contesta 500 NOMBRANDO
+// el archivo.
+//
+// ⚠️ JAMÁS un respaldo silencioso a números tecleados. Un respaldo así es
+// exactamente cómo dos runtimes se separan sin que nadie lo note: las cuatro
+// constantes de fecha de este mismo módulo se quedaron en el 13-sep de
+// Natanael mientras el lib decía 1-oct, y el formulario salía OCULTO el día
+// que abría.
+let TI = null, ERR_TIEMPOS = null;
+try { TI = require('../../sorteo-tiempos.js'); }
+catch (e) { ERR_TIEMPOS = (e && e.message) || String(e); }
+
+// El azar y la escalera viven en `_lib/sorteo-escalera`. `alAzar` estaba AQUÍ
+// como función local y ningún arnés podía tocarlo; mudarlo no cambió una línea
+// de su implementación.
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -46,74 +57,159 @@ exports.handler = async (event) => {
 
   const regBase = `${G.SB_URL}/rest/v1/giveaway_registros`;
   const sorBase = `${G.SB_URL}/rest/v1/giveaway_sorteos`;
-  const slugQ = encodeURIComponent(G.SLUG);
+  // 🔒 Sin los tiempos NO se gira: el gateo por tiempo de la puerta pública
+  // sale de aquí, y girar sin ellos dejaría una escalera que nadie sabe cuándo
+  // revelar.
+  if (!TI) return G.json(500, headers, { ok: false,
+    error: 'No se pudo cargar sorteo-tiempos.js (revisa included_files en netlify.toml): ' + ERR_TIEMPOS });
+
+  // 🔒 DOS VALORES, NUNCA UN SLUG DEL CUERPO (ver `slugDe` en el lib).
+  const slug = G.slugDe(body.modo);
+  if (slug === null) return G.json(400, headers, { ok: false, error: "modo debe ser 'real' o 'ensayo'" });
+  const slugQ = encodeURIComponent(slug);
+  const esEnsayo = slug === G.SLUG_ENSAYO;
 
   // ── GIRAR ────────────────────────────────────────────────────────────────
   if (body.accion === 'girar') {
-    let registros = [], sorteos = [];
+    let todos = [], elegibles = [], sorteos = [];
     try {
-      const [rr, rs] = await Promise.all([
-        // [SORTEO-ADMIN-1] `eliminado_at=is.null` va EN LA CONSULTA, no en un filtro
-        // de después: así un eliminado no puede entrar a la tómbola por ningún
-        // camino, ni aunque alguien toque la lógica de abajo. El candado más
-        // barato es el que no deja llegar el dato.
-        // [GIVEAWAY-KG-1] Y `foto_estado=neq.invalidada`, por la MISMA razón:
-        // una foto declinada por el equipo queda FUERA del sorteo, y el
-        // candado más barato sigue siendo el que no deja llegar el dato.
+      const [rt, re, rs] = await Promise.all([
+        // (1) TODOS los del slug, SOLO ids: de aquí sale el FOLIO, que es la
+        // posición en el orden de registro y CUENTA A LOS ELIMINADOS. Es el
+        // mismo folio que publica `giveaway-estado` (misma función,
+        // `ESC.folios`); contados distinto, el número del mosaico y el del
+        // tercer rodillo dirían cosas diferentes EN CÁMARA.
+        fetch(`${regBase}?slug=eq.${slugQ}&select=id&order=creado_at.asc`, { headers: G.sbHeaders() }),
+        // (2) LOS ELEGIBLES.
+        // [SORTEO-ADMIN-1] `eliminado_at=is.null` va EN LA CONSULTA, no en un
+        // filtro de después: así un eliminado no puede entrar a la tómbola por
+        // ningún camino, ni aunque alguien toque la lógica de abajo. El candado
+        // más barato es el que no deja llegar el dato.
+        // [GIVEAWAY-KG-1] Y `foto_estado=neq.invalidada`, por la MISMA razón.
         // ⚠️ `neq` y no `in.(pendiente,aprobada)`: con `neq` una fila cuyo
-        // estado sea NULL —las ~600 de melanie y Natanael, que nacieron antes
-        // de la columna— se quedaría FUERA sin que nadie lo decidiera, porque
-        // en Postgres `NULL <> 'x'` es NULL y no pasa el filtro. Como esas
-        // filas son de OTRO slug, aquí no llegan nunca; pero se dice, porque
-        // el día que alguien reuse esta consulta sin el `slug` va a morder.
+        // estado sea NULL —las ~600 de melanie y Natanael, nacidas antes de la
+        // columna— quedaría FUERA sin que nadie lo decidiera, porque en
+        // Postgres `NULL <> 'x'` es NULL y no pasa el filtro. Como esas filas
+        // son de OTRO slug aquí no llegan nunca; pero se dice, porque el día
+        // que alguien reuse esta consulta sin el `slug` va a morder.
         fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&foto_estado=neq.invalidada`
-              + `&select=id,nombre,whatsapp`, { headers: G.sbHeaders() }),
-        fetch(`${sorBase}?slug=eq.${slugQ}&select=registro_id,resultado,intento`, { headers: G.sbHeaders() }),
+              + `&select=id,nombre,whatsapp&order=creado_at.asc`, { headers: G.sbHeaders() }),
+        fetch(`${sorBase}?slug=eq.${slugQ}&select=id,registro_id,resultado,intento,rondas`,
+              { headers: G.sbHeaders() }),
       ]);
-      if (!rr.ok) throw new Error('registros ' + rr.status);
-      registros = await rr.json().catch(() => []);
+      if (!rt.ok || !re.ok) throw new Error('registros ' + rt.status + '/' + re.status);
+      todos = await rt.json().catch(() => []);
+      elegibles = await re.json().catch(() => []);
       sorteos = rs.ok ? (await rs.json().catch(() => [])) : [];
     } catch (e) {
       console.error('[giveaway-sortear] lectura:', e.message);
       return G.json(502, headers, { ok: false, error: 'No se pudo leer el padrón' });
     }
 
-    const total = Array.isArray(registros) ? registros.length : 0;
-    if (!total) return G.json(409, headers, { ok: false, error: 'Todavía no hay participantes' });
-
-    // Quedan fuera SOLO los que ya salieron y NO contestaron. Los 'pendiente'
-    // también se excluyen: hay un giro vivo sin resolver, y volver a sacar a la
-    // misma persona mientras se le marca sería absurdo.
-    const quemados = new Set(
-      (Array.isArray(sorteos) ? sorteos : [])
-        .filter(s => s && (s.resultado === 'no_contesto' || s.resultado === 'pendiente'))
-        .map(s => s.registro_id)
-    );
-    const elegibles = registros.filter(r => r && !quemados.has(r.id));
-    if (!elegibles.length) {
-      return G.json(409, headers, { ok: false, error: 'Ya se giró a todos los participantes' });
+    // ═══ 🔒 UN SORTEO CON GANADOR CONFIRMADO ESTÁ CERRADO ═══════════════════
+    //
+    // Orden de Memo (21-sep), y va más lejos de meter al ganador a `quemados`:
+    // se REHÚSA por completo, cero filas nuevas.
+    //
+    // 🔴 Y ES UN DEFECTO DE LA VERSIÓN ANTERIOR, no una precaución: `quemados`
+    // solo excluía 'no_contesto' y 'pendiente', así que un ganador que YA HABÍA
+    // ACEPTADO seguía elegible, y volver a picarle a «Girar» abría un segundo
+    // giro que podía sacar a la MISMA persona. Sin esto, «ganador confirmado de
+    // forma permanente» no es permanente.
+    if ((Array.isArray(sorteos) ? sorteos : []).some(s => s && s.resultado === 'acepto')) {
+      return G.json(409, headers, { ok: false,
+        error: 'Este sorteo ya tiene ganador confirmado: está cerrado.' });
     }
 
-    const ganador = elegibles[alAzar(elegibles.length)];
-    const intento = (Array.isArray(sorteos) ? sorteos.length : 0) + 1;
+    const folioPorId = ESC.folios(todos);
+    const conFolio = (Array.isArray(elegibles) ? elegibles : []).map(r => ({
+      id: r.id, nombre: r.nombre, whatsapp: r.whatsapp, folio: folioPorId[String(r.id)] || null,
+    }));
+    const total = conFolio.length;
+    if (!total) return G.json(409, headers, { ok: false, error: 'Todavía no hay participantes' });
 
-    // Insert directo (sin on_conflict: aquí no hay índice único que provocarlo).
+    // ── QUEMADO = dos clases de id, y las DOS tienen que estar ──────────────
+    //   (a) quien ya salió y no se resolvió a favor — incluido 'pendiente',
+    //       porque hay un giro vivo sin resolver y volver a sacar a la misma
+    //       persona mientras se le marca sería absurdo;
+    //   (b) 🔒 quien DEJÓ DE SER ELEGIBLE (eliminado o foto invalidada) después
+    //       del giro. Sin esto el pozo podría devolver a alguien que ya no
+    //       concursa: el insert reventaría por `ganador_whatsapp` nulo — o
+    //       peor, saldría EN CÁMARA alguien que el padrón ya dio de baja.
+    const vivos = new Set(conFolio.map(r => String(r.id)));
+    const quemados = new Set();
+    (Array.isArray(sorteos) ? sorteos : []).forEach(s => {
+      if (s && s.registro_id
+          && (s.resultado === 'no_contesto' || s.resultado === 'no_cumple' || s.resultado === 'pendiente')) {
+        quemados.add(String(s.registro_id));
+      }
+    });
+    (Array.isArray(todos) ? todos : []).forEach(r => {
+      if (r && r.id && !vivos.has(String(r.id))) quemados.add(String(r.id));
+    });
+
+    // 🔒 LA ESCALERA SE SORTEA UNA VEZ POR SLUG. Si ya hay un giro con
+    // `rondas`, esto es un RE-GIRO que la HEREDA — nunca una escalera nueva,
+    // que sería volver a sortear a media cadena y romper la promesa de que las
+    // rondas son inmutables.
+    const conEscalera = (Array.isArray(sorteos) ? sorteos : [])
+      .filter(s => s && s.rondas)
+      .sort((a, b) => Number(b.intento) - Number(a.intento))[0] || null;
+
+    let nueva;
+    if (!conEscalera) {
+      const escalones = TI.escalonesPara(total);
+      const rondas = ESC.construirEscalera(conFolio, escalones);
+      if (!rondas) return G.json(409, headers, { ok: false, error: 'Todavía no hay participantes' });
+      const g = conFolio.find(r => String(r.id) === String(rondas.orden[0].id));
+      nueva = {
+        slug, registro_id: g.id, ganador_nombre: g.nombre, ganador_whatsapp: g.whatsapp,
+        intento: 1, resultado: 'pendiente', total_participantes: total,
+        // 🔒 EN EL MISMO INSERT QUE CREA EL GIRO. Dos escrituras podrían dejar
+        // un giro SIN escalera si la segunda falla, y entonces la inmutabilidad
+        // saldría de una promesa en vez de salir de que nadie la toca nunca.
+        rondas,
+      };
+    } else {
+      const p = ESC.pozoDeReGiro(conEscalera.rondas, quemados, conFolio);
+      if (!p.pozo.length) {
+        return G.json(409, headers, { ok: false, error: 'Ya se giró a todos los participantes' });
+      }
+      const pick = p.pozo[ESC.alAzar(p.pozo.length)];
+      const g = conFolio.find(r => String(r.id) === String(pick.id));
+      // No debería poder pasar (el pozo ya filtra por `quemados`, que incluye a
+      // los no elegibles), pero si pasa se DICE en vez de insertar una fila con
+      // el teléfono en nulo.
+      if (!g) return G.json(502, headers, { ok: false,
+        error: 'El pozo devolvió a alguien que ya no es elegible' });
+      nueva = {
+        slug, registro_id: g.id, ganador_nombre: g.nombre, ganador_whatsapp: g.whatsapp,
+        intento: (Array.isArray(sorteos) ? sorteos.length : 0) + 1,
+        resultado: 'pendiente', total_participantes: total,
+        origen_sorteo_id: conEscalera.id, escalon: p.escalon,
+      };
+    }
+
+    // Insert directo, SIN on_conflict (revienta 42P10 con índices únicos).
     let creado = null;
     try {
       const r = await fetch(sorBase, {
         method: 'POST',
         headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
-        body: JSON.stringify({
-          slug: G.SLUG,
-          registro_id: ganador.id,
-          ganador_nombre: ganador.nombre,
-          ganador_whatsapp: ganador.whatsapp,
-          intento,
-          resultado: 'pendiente',
-          total_participantes: total,
-        }),
+        body: JSON.stringify(nueva),
       });
-      if (!r.ok) throw new Error('insert ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 200));
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        // 🔒 EL 23505 ES EL CASO ESPERADO, y se CONFIRMA por su código —no se
+        // adivina por el status—: es el único de (slug, intento) cazando dos
+        // clics casi juntos. Sin ese índice las dos filas entrarían y la cadena
+        // quedaría ambigua, y de la cadena se deriva quién hereda la escalera.
+        if (/23505/.test(txt)) {
+          return G.json(409, headers, { ok: false,
+            error: 'Ya se está girando en este momento: espera un segundo e intenta de nuevo' });
+        }
+        throw new Error('insert ' + r.status + ' ' + txt.slice(0, 200));
+      }
       const filas = await r.json().catch(() => []);
       creado = Array.isArray(filas) ? filas[0] : null;
     } catch (e) {
@@ -124,10 +220,17 @@ exports.handler = async (event) => {
     return G.json(200, headers, {
       ok: true,
       sorteo_id: creado && creado.id,
-      nombre: ganador.nombre,
-      whatsapp: ganador.whatsapp,
-      intento,
+      intento: nueva.intento,
       total_participantes: total,
+      escalon: nueva.escalon != null ? nueva.escalon : null,
+      es_regiro: !!conEscalera,
+      ensayo: esEnsayo,
+      // Esta puerta EXIGE token y Memo necesita prepararse para contactar al
+      // ganador. La página los guarda en memoria y NO los pinta hasta la
+      // revelación; lo que el gateo cierra es la puerta PÚBLICA
+      // (`giveaway-estado`), no la vista del admin con su propia llave.
+      nombre: nueva.ganador_nombre,
+      whatsapp: nueva.ganador_whatsapp,
     });
   }
 
@@ -316,19 +419,19 @@ exports.handler = async (event) => {
       // El listado es por carpeta, y las fotos viven en <slug>/<prefijo-ip>/.
       const rr = await fetch(`${G.SB_URL}/storage/v1/object/list/${BUCKET}`, {
         method: 'POST', headers: G.sbHeaders(),
-        body: JSON.stringify({ prefix: `${G.SLUG}/`, limit: 1000 }),
+        body: JSON.stringify({ prefix: `${slug}/`, limit: 1000 }),
       });
       const carpetas = rr.ok ? (await rr.json().catch(() => [])) : [];
       for (const c of (Array.isArray(carpetas) ? carpetas : [])) {
         if (!c || !c.name) continue;
         const r2 = await fetch(`${G.SB_URL}/storage/v1/object/list/${BUCKET}`, {
           method: 'POST', headers: G.sbHeaders(),
-          body: JSON.stringify({ prefix: `${G.SLUG}/${c.name}/`, limit: 1000 }),
+          body: JSON.stringify({ prefix: `${slug}/${c.name}/`, limit: 1000 }),
         });
         const objs = r2.ok ? (await r2.json().catch(() => [])) : [];
         for (const o of (Array.isArray(objs) ? objs : [])) {
           if (!o || !o.name) continue;
-          enBucket.push({ path: `${G.SLUG}/${c.name}/${o.name}`, creado: Date.parse(o.created_at || o.updated_at || '') });
+          enBucket.push({ path: `${slug}/${c.name}/${o.name}`, creado: Date.parse(o.created_at || o.updated_at || '') });
         }
       }
     } catch (e) {

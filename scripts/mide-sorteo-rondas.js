@@ -45,6 +45,17 @@ function marcador() {
 }
 process.on('exit', function (codigo) { if (!completo) marcador(); });
 
+// ⚠️ ANTES DE REQUERIR CUALQUIER LIB: `_lib/giveaway` lee las env vars AL
+// CARGARSE. Puestas después, `faltaEnv()` detiene al handler ANTES de las
+// guardas que este careo quiere medir, y el rojo sería del entorno y no del
+// código — seis aserciones en rojo diciendo «no llevó la escalera» cuando lo
+// que faltaba era una variable. Ya mordió aquí mismo.
+// `tokenAdminValido` rehúsa TODO si el token está vacío (sin token configurado
+// nada es válido, que es la postura correcta), así que también va arriba.
+process.env.PORTAL_SUPABASE_URL = 'https://careo.sb';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = 'k';
+process.env.GIVEAWAY_ADMIN_TOKEN = 'tok';
+
 const TI = require(path.join(RAIZ, 'sorteo-tiempos.js'));
 
 // ═══ [1] LOS TIEMPOS Y LA ESCALERA POR N ════════════════════════════════════
@@ -495,6 +506,321 @@ af(() => G.slugDe('ensayo') === G.SLUG_ENSAYO, '"ensayo" da el slug de ensayo');
 af(() => G.esEnsayo('ensayo') === true && G.esEnsayo() === false
       && G.esEnsayo('real') === false && G.esEnsayo('otro') === false, 'esEnsayo');
 
-completo = true;
-marcador();
-process.exit(mal ? 1 : 0);
+// ═══════════════════════════════════════════════════════════════════════════
+// EL ARNÉS DE HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔒 HANDLER REAL, con el salto simulado UN NIVEL MÁS ADENTRO (global.fetch).
+// Un mock por ruta salta al portero: tres tuercas llegaron ROTAS a producción
+// con el careo en verde por eso mismo (RAD-FIX-CAMINO, #625).
+//
+// 🔒 Y EL MOCK HONRA LOS FILTROS DE POSTGREST — incluido el `select`. Uno que
+// ignore `eliminado_at=is.null` devolvería al eliminado y el careo diría «la
+// tómbola lo excluye» sobre un código que no excluye nada: falsifica hacia el
+// lado cómodo.
+let REG = [], SOR = [], PATCHES = [], INSERTS = [], URLS = [], BORRADOS = [];
+
+function proyectar(u, filas) {
+  const mSel = /select=([^&]+)/.exec(u);
+  if (!mSel) return filas.map((r) => Object.assign({}, r));
+  const cols = decodeURIComponent(mSel[1]).split(',').map((x) => x.trim());
+  return filas.map((r) => {
+    const o = {};
+    cols.forEach((c) => { if (c in r) o[c] = r[c]; });
+    return o;
+  });
+}
+function filtrarReg(u, filas) {
+  let out = filas.slice();
+  const mSlug = /slug=eq\.([^&]+)/.exec(u);
+  if (mSlug) out = out.filter((r) => r.slug === decodeURIComponent(mSlug[1]));
+  if (/eliminado_at=is\.null/.test(u))       out = out.filter((r) => !r.eliminado_at);
+  if (/foto_estado=neq\.invalidada/.test(u)) out = out.filter((r) => r.foto_estado !== 'invalidada');
+  const mEst = /foto_estado=eq\.([^&]+)/.exec(u);
+  if (mEst) out = out.filter((r) => (r.foto_estado || 'pendiente') === decodeURIComponent(mEst[1]));
+  const mId = /[?&]id=eq\.([^&]+)/.exec(u);
+  if (mId) out = out.filter((r) => r.id === decodeURIComponent(mId[1]));
+  const mIn = /[?&]id=in\.\(([^)]*)\)/.exec(u);
+  if (mIn) { const set = new Set(decodeURIComponent(mIn[1]).split(',')); out = out.filter((r) => set.has(String(r.id))); }
+  if (/consuelo_at=is\.null/.test(u))        out = out.filter((r) => !r.consuelo_at);
+  if (/order=creado_at\.asc/.test(u))        out.sort((a, b) => String(a.creado_at).localeCompare(String(b.creado_at)));
+  return out;
+}
+function filtrarSor(u, filas) {
+  let out = filas.slice();
+  const mSlug = /slug=eq\.([^&]+)/.exec(u);
+  if (mSlug) out = out.filter((r) => r.slug === decodeURIComponent(mSlug[1]));
+  const mRes = /resultado=eq\.([^&]+)/.exec(u);
+  if (mRes) out = out.filter((r) => r.resultado === decodeURIComponent(mRes[1]));
+  if (/registro_id=not\.is\.null/.test(u)) out = out.filter((r) => r.registro_id != null);
+  const mId = /[?&]id=eq\.([^&]+)/.exec(u);
+  if (mId) out = out.filter((r) => String(r.id) === decodeURIComponent(mId[1]));
+  if (/order=intento\.desc/.test(u)) out.sort((a, b) => Number(b.intento) - Number(a.intento));
+  else if (/order=intento\.asc/.test(u)) out.sort((a, b) => Number(a.intento) - Number(b.intento));
+  const mLim = /limit=(\d+)/.exec(u);
+  if (mLim) out = out.slice(0, Number(mLim[1]));
+  return out;
+}
+
+global.fetch = async (url, opts) => {
+  const u = String(url), m = (opts && opts.method) || 'GET';
+  URLS.push({ m, u, body: (opts && opts.body) || '' });
+  const J = (v, st) => ({ ok: (st || 200) < 300, status: st || 200,
+                          json: async () => v, text: async () => JSON.stringify(v),
+                          arrayBuffer: async () => Buffer.from('fotofalsa') });
+  if (/giveaway_registros/.test(u)) {
+    if (m === 'PATCH') {
+      const cambios = JSON.parse(opts.body || '{}');
+      const tocadas = filtrarReg(u, REG);
+      PATCHES.push({ tabla: 'registros', u, cambios, n: tocadas.length });
+      tocadas.forEach((r) => Object.assign(r, cambios));
+      return J(tocadas.map((r) => ({ id: r.id, eliminado_motivo: r.eliminado_motivo, foto_estado: r.foto_estado })));
+    }
+    if (m === 'POST') {
+      const f = JSON.parse(opts.body || '{}');
+      const arr = Array.isArray(f) ? f : [f];
+      arr.forEach((x, i) => { const fila = Object.assign({ id: 'nuevo' + (REG.length + i + 1) }, x); REG.push(fila); INSERTS.push(fila); });
+      return J(arr, 201);
+    }
+    if (m === 'DELETE') {
+      const fuera = filtrarReg(u, REG);
+      BORRADOS.push({ tabla: 'registros', u, n: fuera.length });
+      const ids = new Set(fuera.map((r) => r.id));
+      REG = REG.filter((r) => !ids.has(r.id));
+      return J([]);
+    }
+    return J(proyectar(u, filtrarReg(u, REG)));
+  }
+  if (/giveaway_sorteos/.test(u)) {
+    if (m === 'POST') {
+      const f = JSON.parse(opts.body || '{}');
+      // 🔒 EL ÚNICO DE (slug, intento) SE SIMULA: es el candado de la carrera, y
+      // un mock que lo ignore dejaría pasar dos filas con el mismo intento —
+      // exactamente lo que el índice existe para impedir.
+      if (SOR.some((x) => x.slug === f.slug && Number(x.intento) === Number(f.intento))) {
+        return J({ code: '23505', message: 'duplicate key value violates unique constraint "giveaway_sorteos_slug_intento_uniq"' }, 409);
+      }
+      // 🔒 EL ID TIENE FORMA DE UUID, y no es cosmética: `resolver` valida
+      // `^[0-9a-f-]{36}$` y con ids tipo 's1' RECHAZABA con 400 todas las
+      // llamadas de preparación del careo — en silencio, dejando seis
+      // aserciones en rojo por la razón equivocada. Un mock que no respeta la
+      // forma del dato real mide otra cosa.
+      const nId = String(SOR.length + 1).padStart(12, '0');
+      const fila = Object.assign({ id: '00000000-0000-4000-8000-' + nId,
+                                   creado_at: new Date().toISOString() }, f);
+      SOR.push(fila); INSERTS.push(fila);
+      return J([fila], 201);
+    }
+    if (m === 'PATCH') {
+      const cambios = JSON.parse(opts.body || '{}');
+      const tocadas = filtrarSor(u, SOR);
+      PATCHES.push({ tabla: 'sorteos', u, cambios, n: tocadas.length });
+      tocadas.forEach((x) => Object.assign(x, cambios));
+      return J(tocadas.map((x) => Object.assign({}, x)));
+    }
+    if (m === 'DELETE') {
+      const fuera = filtrarSor(u, SOR);
+      BORRADOS.push({ tabla: 'sorteos', u, n: fuera.length });
+      const ids = new Set(fuera.map((x) => x.id));
+      SOR = SOR.filter((x) => !ids.has(x.id));
+      return J([]);
+    }
+    return J(proyectar(u, filtrarSor(u, SOR)));
+  }
+  if (/storage\/v1\/object\/sign/.test(u)) {
+    const cuerpo = JSON.parse((opts && opts.body) || '{}');
+    if (Array.isArray(cuerpo.paths)) {
+      return J(cuerpo.paths.map((x) => ({ path: x, signedURL: '/object/sign/' + x + '?token=x' })));
+    }
+    return J({ signedURL: '/object/sign/x?token=x' });
+  }
+  if (/storage\/v1\/object\/list/.test(u)) return J([]);
+  if (/storage\/v1\/object\//.test(u)) return J({}, m === 'DELETE' ? 200 : 200);
+  return J([]);
+};
+
+const sortear = require(path.join(RAIZ, 'netlify/functions/giveaway-sortear.js')).handler;
+const evP = (body, tok) => ({ httpMethod: 'POST',
+  headers: Object.assign({ origin: 'https://conectareynosa.mx' },
+                         tok === false ? {} : { 'x-admin-token': tok || 'tok' }),
+  body: JSON.stringify(body) });
+const llamar = async (body, tok) => {
+  PATCHES = []; INSERTS = []; URLS = []; BORRADOS = [];
+  const r = await sortear(evP(body, tok));
+  let d = {}; try { d = JSON.parse(r.body || '{}'); } catch (_) {}
+  return { code: r.statusCode, d, crudo: r.body || '' };
+};
+
+// Un padrón de prueba con las FORMAS duras dentro, y dos fuera de la tómbola.
+const NOMBRES_DUROS = ['Juan Pérez', 'Juan Del Ángel Pérez', 'Jorge Monserrath Lopez de Leon',
+                       'María de los Angeles Izaguirre Cruz', 'Ana'];
+function sembrarPadron() {
+  REG = []; SOR = [];
+  for (let i = 1; i <= 30; i++) {
+    REG.push({ id: 'r' + i, slug: G.SLUG, nombre: NOMBRES_DUROS[i % 5],
+               ciudad: (i % 3) ? 'Reynosa' : 'Monterrey',
+               whatsapp: '89900000' + (i < 10 ? '0' + i : i), correo: 'x' + i + '@x.mx',
+               instagram: 'ig' + i, foto_path: G.SLUG + '/aaaaaaaaaaaa/f' + i + '.jpg',
+               foto_estado: (i % 2) ? 'aprobada' : 'pendiente',
+               creado_at: '2026-09-' + (i < 10 ? '0' + i : i) + 'T10:00:00Z',
+               eliminado_at: null, consuelo_at: null });
+  }
+  REG[28].eliminado_at = '2026-09-29T10:00:00Z';   // r29 eliminado
+  REG[29].foto_estado = 'invalidada';              // r30 con foto invalidada
+}
+function sembrarGiro(res, intento, extra) {
+  return Object.assign({ id: '00000000-0000-4000-8000-00000000000' + intento,
+    slug: G.SLUG, intento, resultado: res, registro_id: 'r' + intento,
+    ganador_nombre: NOMBRES_DUROS[intento % 5], ganador_whatsapp: '8990000001',
+    total_participantes: 28, creado_at: '2026-10-01T21:00:0' + intento + 'Z' }, extra || {});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// De aquí abajo todo toca handlers, o sea `await`. En CommonJS el await de
+// nivel superior no existe, así que va en una IIFE asíncrona — igual que los
+// otros careos de la casa. El `.catch` del final cuenta una caída como ROJO
+// con nombre, no como silencio.
+// ═══════════════════════════════════════════════════════════════════════════
+(async () => {
+
+// ═══ [7] GIRAR: LA ESCALERA, EL RE-GIRO Y EL SORTEO CERRADO ═════════════════
+console.log('\n── [7] girar: la escalera, el re-giro y el sorteo cerrado ──');
+sembrarPadron();
+
+let g1 = await llamar({ accion: 'girar' });
+af(() => g1.code === 200 && g1.d.ok,
+   'el primer giro debe salir 200, dio ' + g1.code + ' ' + JSON.stringify(g1.d).slice(0, 140));
+// 🔒 LOS DOS FILTROS SIGUEN EN LA CONSULTA: 30 registros, 28 elegibles.
+af(() => g1.d.total_participantes === 28,
+   '🔒 elegibles debe ser 28 (fuera el eliminado y la foto invalidada), dio ' + g1.d.total_participantes);
+af(() => g1.d.intento === 1 && g1.d.es_regiro === false, 'el primer giro es intento 1 y no es re-giro');
+af(() => g1.d.escalon === null, 'el primer giro no sale de ningún escalón, dio ' + g1.d.escalon);
+// Y la consulta de elegibles llevaba los dos candados, medido sobre la URL real.
+af(() => URLS.some((x) => /eliminado_at=is\.null/.test(x.u) && /foto_estado=neq\.invalidada/.test(x.u)),
+   '🔒 la consulta de elegibles perdió uno de los dos filtros');
+
+// La escalera se GUARDÓ en el MISMO insert, y con la forma buena.
+const fila1 = SOR[0];
+af(() => !!fila1.rondas, '🔴 el insert del giro NO llevó la escalera');
+af(() => JSON.stringify(fila1.rondas.escalones) === JSON.stringify([24, 12, 6, 3, 1]),
+   'con 28 elegibles la escalera es la completa, dio ' + JSON.stringify(fila1.rondas.escalones));
+af(() => fila1.rondas.orden.length === 24, '`orden` debe traer 24, dio ' + fila1.rondas.orden.length);
+af(() => String(fila1.rondas.orden[0].id) === String(fila1.registro_id),
+   '🔒 orden[0] TIENE que ser el ganador de la fila: si no, el show anima hacia otro');
+af(() => fila1.rondas.orden.every((r) => r.folio >= 1 && r.folio <= 30),
+   'los folios salen del orden de registro de TODOS (incluidos los eliminados)');
+af(() => fila1.rondas.orden.every((r) => Object.keys(r).length === 3),
+   '🔒 la escalera guardada no lleva un dato de más');
+af(() => fila1.rondas.orden.every((r) => r.id !== 'r29' && r.id !== 'r30'),
+   '🔴 un NO-elegible entró a la escalera');
+// 🔒 Y el insert fue UNO: la escalera no se escribe aparte.
+af(() => INSERTS.length === 1, 'el giro debe ser UN solo insert, hubo ' + INSERTS.length);
+
+// ── LA CADENA DE RE-GIROS ───────────────────────────────────────────────────
+await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_contesto' });
+let g2 = await llamar({ accion: 'girar' });
+af(() => g2.code === 200 && g2.d.intento === 2 && g2.d.es_regiro === true,
+   'el re-giro es intento 2 y se declara re-giro, dio ' + g2.code + '/' + g2.d.intento);
+af(() => g2.d.escalon === 3, '🔴 el primer re-giro sale del escalón 3, dio ' + g2.d.escalon);
+af(() => !SOR[1].rondas, '🔒 un re-giro NO tiene escalera propia: la hereda');
+af(() => SOR[1].origen_sorteo_id === SOR[0].id, 'el re-giro apunta al giro que tiene la escalera');
+const tres = SOR[0].rondas.orden.slice(0, 3).map((r) => String(r.id));
+af(() => tres.indexOf(String(SOR[1].registro_id)) !== -1 && SOR[1].registro_id !== SOR[0].registro_id,
+   '🔴 el re-giro tiene que salir de los OTROS DOS de la ronda de 3');
+
+// 🔒 UN ELIMINADO DESPUÉS DEL GIRO TAMBIÉN ESTÁ QUEMADO. Si no, el pozo podría
+// devolver a alguien que ya no está en el padrón: el insert reventaría por
+// `ganador_whatsapp` nulo — o peor, saldría EN CÁMARA alguien ya eliminado.
+await llamar({ accion: 'resolver', sorteo_id: SOR[1].id, resultado: 'no_cumple', motivo: 'no_sigue' });
+const sobra = tres.filter((x) => x !== String(SOR[0].registro_id) && x !== String(SOR[1].registro_id))[0];
+REG.find((r) => r.id === sobra).eliminado_at = '2026-09-30T10:00:00Z';
+let g3 = await llamar({ accion: 'girar' });
+af(() => g3.code === 200, 'el tercer giro sale 200 aunque el que quedaba fue eliminado, dio ' + g3.code + ' ' + g3.d.error);
+af(() => g3.d.escalon === 6,
+   '🔴 con el último de los 3 eliminado debe SUBIR al escalón 6, dio ' + g3.d.escalon);
+af(() => String(SOR[2].registro_id) !== sobra, '🔴 el pozo devolvió al eliminado');
+
+// ── 🔴 EL SORTEO CERRADO ────────────────────────────────────────────────────
+// CONTROL POSITIVO PRIMERO: con un pendiente vivo, girar SÍ inserta.
+await llamar({ accion: 'resolver', sorteo_id: SOR[2].id, resultado: 'no_contesto' });
+const nCtrl = SOR.length;
+const gCtrl = await llamar({ accion: 'girar' });
+af(() => gCtrl.code === 200 && SOR.length === nCtrl + 1 && INSERTS.length === 1,
+   '🔒 CONTROL POSITIVO: antes del acepto, girar SÍ inserta (dio ' + gCtrl.code + ', ' + INSERTS.length + ' inserts)');
+// Ahora sí: el acepto CIERRA el sorteo.
+await llamar({ accion: 'resolver', sorteo_id: SOR[SOR.length - 1].id, resultado: 'acepto' });
+const nAntes = SOR.length;
+const gCerrado = await llamar({ accion: 'girar' });
+af(() => gCerrado.code === 409, '🔴 con un `acepto` vivo girar debe dar 409, dio ' + gCerrado.code);
+af(() => /ganador confirmado|cerrado/i.test(String(gCerrado.d.error || '')),
+   'el mensaje debe decir que el sorteo está cerrado, dijo: ' + gCerrado.d.error);
+af(() => INSERTS.length === 0, '🔴 CERO FILAS NUEVAS: el mock registró ' + INSERTS.length + ' inserts');
+af(() => SOR.length === nAntes, '🔴 la tabla creció tras un giro rehusado');
+// Y no se molestó ni en revolver: no firmó, no escribió nada.
+af(() => PATCHES.length === 0, 'un giro rehusado no puede haber hecho un PATCH');
+
+// ── LA CARRERA DEL `intento` ────────────────────────────────────────────────
+// 🔒 SE SIMULA LA CARRERA DE VERDAD: `girar` calcula `intento = filas + 1`, así
+// que para que choque, la tabla tiene que traer YA una fila con ESE intento.
+// Con UNA fila que dice intento 2, girar calcula 2 y el único muerde.
+//
+// ⚠️ Mi primera versión dejaba DOS filas (intentos 1 y 2), girar calculaba 3 y
+// no colisionaba nada: el careo pasaba en verde sin ejercitar el candado. Un
+// escenario que no alcanza la condición no mide, aunque se vea razonable.
+sembrarPadron();
+await llamar({ accion: 'girar' });
+const escaleraCar = SOR[0].rondas;
+SOR = [{ id: '00000000-0000-4000-8000-0000000000ff', slug: G.SLUG, intento: 2,
+         resultado: 'no_contesto', registro_id: String(escaleraCar.orden[0].id),
+         ganador_nombre: 'X', ganador_whatsapp: '1', rondas: escaleraCar,
+         total_participantes: 28, creado_at: '2026-10-01T21:00:00Z' }];
+const gCar = await llamar({ accion: 'girar' });
+af(() => gCar.code === 409 && /girando|intenta/i.test(String(gCar.d.error || '')),
+   '🔒 un 23505 del único (slug,intento) se contesta «ya se está girando», dio '
+   + gCar.code + ' ' + gCar.d.error);
+af(() => INSERTS.length === 0, 'tras el 23505 no puede quedar una fila nueva');
+
+// ── SIN PARTICIPANTES, Y CON LA ESCALERA AGOTADA ───────────────────────────
+REG = []; SOR = [];
+const gVacio = await llamar({ accion: 'girar' });
+af(() => gVacio.code === 409, 'sin participantes → 409, dio ' + gVacio.code);
+sembrarPadron();
+await llamar({ accion: 'girar' });
+// Se queman TODOS los elegibles, EL GANADOR DE LA ESCALERA INCLUIDO.
+//
+// ⚠️ Mi primera versión saltaba el índice 0 de REG, que NO es el ganador de la
+// escalera —ése lo eligió la revoltura—, así que quedaba uno vivo y el giro
+// salía en 200: el careo afirmaba lo contrario de lo que su nombre decía.
+await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_contesto' });
+const yaQuemado = String(SOR[0].registro_id);
+REG.filter((r) => !r.eliminado_at && r.foto_estado !== 'invalidada').forEach((r, i) => {
+  if (String(r.id) === yaQuemado) return;
+  SOR.push({ id: '00000000-0000-4000-9000-' + String(i).padStart(12, '0'), slug: G.SLUG,
+             intento: 100 + i, resultado: 'no_contesto', registro_id: r.id,
+             ganador_nombre: 'q', ganador_whatsapp: '1', creado_at: '2026-10-01T21:00:00Z' });
+});
+const gFin = await llamar({ accion: 'girar' });
+af(() => gFin.code === 409 && /todos/i.test(String(gFin.d.error || '')),
+   'con todos quemados → 409 «ya se giró a todos», dio ' + gFin.code + ' ' + gFin.d.error);
+
+// ── LA PUERTA ───────────────────────────────────────────────────────────────
+sembrarPadron();
+const sinTok = await llamar({ accion: 'girar' }, false);
+af(() => sinTok.code === 401, 'sin token → 401, dio ' + sinTok.code);
+af(() => !/8990000|@x\.mx|ig\d/.test(sinTok.crudo), '🔒 el 401 no filtra un solo dato personal');
+af(() => INSERTS.length === 0, 'un 401 no puede haber insertado nada');
+// Un modo inventado NO se interpreta: se rehúsa.
+const gModo = await llamar({ accion: 'girar', modo: 'inventado' });
+af(() => gModo.code === 400, '🔒 un modo inventado → 400, dio ' + gModo.code);
+
+// <<<SIGUIENTES-BLOQUES>>>
+
+  completo = true;
+  marcador();
+  process.exit(mal ? 1 : 0);
+})().catch((e) => {
+  // 🔒 Una caída del arnés es un ROJO CON NOMBRE, no un stack suelto: el
+  // marcador ya dice que la corrida quedó incompleta.
+  console.error('\nARNÉS CAÍDO:', e.message, '\n', e.stack);
+  marcador();
+  process.exit(1);
+});

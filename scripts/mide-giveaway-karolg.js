@@ -25,6 +25,11 @@ const { chromium } = require('playwright');
 // esta prueba quiere medir, y el rojo sería del entorno, no del código.
 process.env.PORTAL_SUPABASE_URL = process.env.PORTAL_SUPABASE_URL || 'https://pt.test';
 process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || 'k';
+// El token del admin, para poder tocar las puertas privadas en la prueba.
+// `tokenAdminValido` rehúsa TODO si la var está vacía — sin token configurado
+// nada es válido, que es la postura correcta y por eso hay que ponerlo.
+const TOKEN_PRUEBA = 'token-de-prueba-del-careo';
+process.env.GIVEAWAY_ADMIN_TOKEN = TOKEN_PRUEBA;
 const G = require(path.join(RAIZ, 'netlify/functions/_lib/giveaway.js'));
 
 // Sirve el árbol de trabajo para abrir la página como la abre la gente.
@@ -272,6 +277,56 @@ function servir() {
     af(!/ana_secreta/.test(cuerpo), f + ' FILTRÓ el Instagram: ' + cuerpo.slice(0, 200));
     af(!/foto_path|abc\.jpg/.test(cuerpo), f + ' FILTRÓ la ruta de la foto: ' + cuerpo.slice(0, 200));
     af(!/8112345678/.test(cuerpo), f + ' filtró el WhatsApp');
+  }
+
+  // ── [4d] 🔒 UNA FOTO INVALIDADA QUEDA FUERA DEL SORTEO ──────────────────
+  // Y la exclusión va EN LA CONSULTA que alimenta el giro, no en un filtro del
+  // navegador: es la misma razón por la que `eliminado_at=is.null` vive ahí
+  // desde SORTEO-ADMIN-1. Un filtro de pantalla se salta con recargar.
+  console.log('\n[4d] la exclusión del giro');
+  {
+    const PADRON = [
+      { id: 'r-ok',   nombre: 'Aprobada Ana',  whatsapp: '8110000001', foto_estado: 'aprobada',   eliminado_at: null },
+      { id: 'r-pend', nombre: 'Pendiente Beto', whatsapp: '8110000002', foto_estado: 'pendiente',  eliminado_at: null },
+      { id: 'r-inv',  nombre: 'Invalidada Cris', whatsapp: '8110000003', foto_estado: 'invalidada', eliminado_at: null },
+    ];
+    let urlPadron = null;
+    global.fetch = async (url) => {
+      const u = String(url);
+      if (u.includes('/giveaway_registros?')) {
+        urlPadron = u;
+        // La red falsa RESPETA el filtro: si la consulta no excluye, la fila
+        // invalidada entra — que es justo lo que hay que poder ver.
+        let filas = PADRON;
+        const m = /foto_estado=neq\.([a-z]+)/.exec(u);
+        if (m) filas = filas.filter((f) => f.foto_estado !== m[1]);
+        if (/eliminado_at=is\.null/.test(u)) filas = filas.filter((f) => f.eliminado_at == null);
+        return { ok: true, status: 200, json: async () => filas, text: async () => JSON.stringify(filas) };
+      }
+      return { ok: true, status: 200, json: async () => [], text: async () => '[]' };
+    };
+    delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/giveaway-sortear.js'))];
+    const sortear = require(path.join(RAIZ, 'netlify/functions/giveaway-sortear.js'));
+    const r = await sortear.handler({ httpMethod: 'POST',
+      headers: { origin: 'https://conectareynosa.mx', 'x-admin-token': TOKEN_PRUEBA },
+      body: JSON.stringify({ accion: 'girar' }) });
+    global.fetch = fetchReal2;
+    console.log('    la consulta del giro: ' + String(urlPadron || '').replace(/^.*giveaway_registros/, 'giveaway_registros').slice(0, 130));
+    af(!!urlPadron, 'el giro no consultó el padrón: ' + r.statusCode + ' ' + String(r.body).slice(0, 120));
+    // 🔒 Y SIN TOKEN NO SE GIRA. Se comprueba aquí porque la sección acaba de
+    // usar el token bueno: si el portero no mordiera, todo lo de arriba se
+    // estaría midiendo por una puerta abierta.
+    global.fetch = async () => ({ ok: true, status: 200, json: async () => [], text: async () => '[]' });
+    const sinTok = await sortear.handler({ httpMethod: 'POST',
+      headers: { origin: 'https://conectareynosa.mx' }, body: JSON.stringify({ accion: 'girar' }) });
+    global.fetch = fetchReal2;
+    af(sinTok.statusCode === 401, 'se puede GIRAR sin token: ' + sinTok.statusCode);
+    af(/foto_estado=neq\.invalidada/.test(urlPadron || ''),
+       'LA CONSULTA DEL GIRO NO EXCLUYE LAS INVALIDADAS: una foto declinada seguiría pudiendo ganar. '
+       + 'Consulta: ' + String(urlPadron).slice(-120));
+    af(/eliminado_at=is\.null/.test(urlPadron || ''),
+       'se perdió el `eliminado_at=is.null` de SORTEO-ADMIN-1 al meter el filtro nuevo');
+    void r;
   }
 
   // ── [5] LA PÁGINA, ABIERTA EN UN NAVEGADOR ──────────────────────────────

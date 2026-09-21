@@ -57,7 +57,17 @@ exports.handler = async (event) => {
         // de después: así un eliminado no puede entrar a la tómbola por ningún
         // camino, ni aunque alguien toque la lógica de abajo. El candado más
         // barato es el que no deja llegar el dato.
-        fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&select=id,nombre,whatsapp`, { headers: G.sbHeaders() }),
+        // [GIVEAWAY-KG-1] Y `foto_estado=neq.invalidada`, por la MISMA razón:
+        // una foto declinada por el equipo queda FUERA del sorteo, y el
+        // candado más barato sigue siendo el que no deja llegar el dato.
+        // ⚠️ `neq` y no `in.(pendiente,aprobada)`: con `neq` una fila cuyo
+        // estado sea NULL —las ~600 de melanie y Natanael, que nacieron antes
+        // de la columna— se quedaría FUERA sin que nadie lo decidiera, porque
+        // en Postgres `NULL <> 'x'` es NULL y no pasa el filtro. Como esas
+        // filas son de OTRO slug, aquí no llegan nunca; pero se dice, porque
+        // el día que alguien reuse esta consulta sin el `slug` va a morder.
+        fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&foto_estado=neq.invalidada`
+              + `&select=id,nombre,whatsapp`, { headers: G.sbHeaders() }),
         fetch(`${sorBase}?slug=eq.${slugQ}&select=registro_id,resultado,intento`, { headers: G.sbHeaders() }),
       ]);
       if (!rr.ok) throw new Error('registros ' + rr.status);

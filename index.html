@@ -468,6 +468,16 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .pc-notify-btn:hover{background:#1fba57;}
 .vuelo-btn{display:block;background:rgba(0,0,205,.18);border:2px solid rgba(0,0,205,.5);color:#8888ff;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:14px 20px;text-align:center;text-decoration:none;font-family:Montserrat,sans-serif;transition:all .15s;}
 .vuelo-btn:hover{background:rgba(0,0,205,.3);border-color:#0000cd;color:#aaaaff;}
+/* [STOCK-VIVO-1] El chip de escasez DENTRO del botón de zona. Reusa
+   `pulse-red`/`pulse-yellow` —SELLADAS por SCROLL-2, medidas y sin costo— en
+   vez de inventarles hermanas. Rojo con 1-2, amarillo con 3-5. */
+.z-pocas{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:9px;font-weight:900;
+  text-transform:uppercase;letter-spacing:.06em;padding:3px 7px;font-family:Montserrat,sans-serif}
+.z-pocas::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.z-pocas.zp-rojo{background:rgba(255,40,59,.16);color:#ff283b;border:1px solid rgba(255,40,59,.4)}
+.z-pocas.zp-rojo::before{background:#ff283b;animation:pulse-red 1.2s ease-in-out infinite}
+.z-pocas.zp-amar{background:rgba(232,255,76,.16);color:#e8ff4c;border:1px solid rgba(232,255,76,.4)}
+.z-pocas.zp-amar::before{background:#e8ff4c;animation:pulse-yellow 1.5s ease-in-out infinite}
 .tpoca{background:rgba(232,255,76,.18);color:#e8ff4c;border:1px solid rgba(232,255,76,.4);font-weight:900;}
 .tpoca::before{background:#e8ff4c;animation:pulse-yellow 1.2s ease-in-out infinite}
 
@@ -4900,7 +4910,7 @@ function showDetail(id, _skipHistory){
   if(cur.multifecha) cur._fechaIdx=0;
   // Capa 2 (Tuerca 2c-ii): pregunta al inventario real qué zonas apagar/encender.
   // Async y fail-closed: si falla o el evento no se gestiona, el render no cambia.
-  loadDisponibilidad(cur.id);
+  loadDisponibilidad(dispKey());
 
   $$('d-fecha').textContent=cur.f;
   $$('d-artist').textContent=cur.a;
@@ -5511,6 +5521,7 @@ function buildDiaButtons(){
 
 function selDia(btn,idx){
   selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;selPkg=null;selBoleto=null;
+  loadDisponibilidad(dispKey());   // [STOCK-VIVO-1] el stock es POR FECHA: otra fecha, otro inventario
   var btns=$$('d-dias').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
@@ -5541,6 +5552,27 @@ function selDia(btn,idx){
 // el ajuste del .ag vive solo aquí y aplica únicamente al render del detalle abierto.
 var dispOverlay=null;
 
+// 🔴 [STOCK-VIVO-1] LA LLAVE DEL INVENTARIO LLEVA LA FECHA.
+//
+// Esto NO funcionaba y nadie lo sabía: el overlay pedía `cur.id` —la base,
+// `straykids`— y el stock de KameHouse se llavea POR FECHA (`straykids#0`).
+// El endpoint contestaba `gestionado:false` y los QUINCE eventos multifecha se
+// quedaban SIN OVERLAY NINGUNO: ni el chip nuevo, ni el apagado por inventario
+// que llevan meses creyendo tener.
+//
+// Medido el 20-sep antes de tocarlo: 9 de los 15 tienen stock por fecha; al
+// arreglar la llave, 37 zonas pasan a enseñar «¡Últimos N!» y 11 pasan a
+// AGOTADO. Esas 11 hoy se pueden comprar — es una decisión comercial, y la
+// firmó Memo con el número delante.
+//
+// 🔒 La dirección sigue siendo la de OVERLAY-DIR-1: el overlay SOLO APAGA. Así
+// que el arreglo no puede sobrevender; a lo más deja de vender lo que el
+// inventario dice que ya no está.
+function dispKey(){
+  if(!cur)return '';
+  return cur.multifecha ? (cur.id+'#'+(selFechaIdx||0)) : cur.id;
+}
+
 function loadDisponibilidad(evId){
   dispOverlay=null;  // limpia el del evento anterior de inmediato
   fetch('/.netlify/functions/disponibilidad-evento',{
@@ -5550,7 +5582,7 @@ function loadDisponibilidad(evId){
   }).then(function(r){return r.ok?r.json():null;}).then(function(d){
     // Fallback estricto: cualquier cosa que no sea ok+gestionado → no tocar nada.
     if(!d||!d.ok||d.gestionado!==true)return;
-    if(!cur||cur.id!==evId)return;  // el detalle cambió o se cerró mientras esperábamos
+    if(!cur||dispKey()!==evId)return;  // el detalle (o la fecha) cambió mientras esperábamos
     var map={};
     var gest=Array.isArray(d.zonas_gestionadas)?d.zonas_gestionadas:[];
     var ago=Array.isArray(d.zonas_agotadas)?d.zonas_agotadas:[];
@@ -5558,7 +5590,20 @@ function loadDisponibilidad(evId){
     for(var i=0;i<gest.length;i++){map[String(gest[i]).trim()]=false;}
     // Agotada → apagar (true). Override sobre lo anterior; zonas_agotadas ⊆ zonas_gestionadas.
     for(var j=0;j<ago.length;j++){map[String(ago[j]).trim()]=true;}
-    dispOverlay={evId:evId,map:map};
+    // [STOCK-VIVO-1] `zonas_pocas` ya venía del servidor con su conteo y su
+    // tope de 5 — se estaba TIRANDO. 🔒 El umbral vive allá a propósito: un
+    // cliente curioso del DevTools no puede ver más de lo que el chip dice,
+    // porque el número grande nunca sale del servidor.
+    var pocas={};
+    var pv=(d.zonas_pocas&&typeof d.zonas_pocas==='object')?d.zonas_pocas:{};
+    for(var k in pv){ if(Object.prototype.hasOwnProperty.call(pv,k)){
+      var nn=parseInt(pv[k],10);
+      // Solo números creíbles, y solo de zonas GESTIONADAS: un chip sobre una
+      // zona que el Palacio no maneja sería escasez INVENTADA, y eso no se
+      // hace ni por marketing.
+      if(nn>0&&nn<=5&&map[String(k).trim()]===false)pocas[String(k).trim()]=nn;
+    }}
+    dispOverlay={evId:evId,map:map,pocas:pocas};
     rerenderZonasDisp();  // si las zonas ya están pintadas, vuelve a pintarlas
   }).catch(function(){});  // red/timeout → fallback: no tocar nada
 }
@@ -5616,7 +5661,7 @@ function buildZonaButtons(zonas){
     // esta dirección —encender una zona sin precio— y sin la dirección no tiene
     // a quién atajar.
     var effAg=z.ag;
-    if(dispOverlay&&cur&&dispOverlay.evId===cur.id){
+    if(dispOverlay&&cur&&dispOverlay.evId===dispKey()){
       var ov=dispOverlay.map[(z.n||'').trim()];
       if(ov===true)effAg=1;        // agotada según inventario real: ésta SÍ manda
     }
@@ -5648,7 +5693,29 @@ function buildZonaButtons(zonas){
       var reqV=z.requiereViajeros||0;
       var reqAttr=reqV?' data-reqviaj="'+reqV+'"':'';
       var notaH=reqV?'<div class="z-nota">Solo grupos de '+reqV+' · '+fmt(z.p*reqV)+' total</div>':'';
-      h+='<button class="z-btn'+(z.vip?' vip':'')+'"'+reqAttr+' data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(showP)+'</div>'+notaH+'</button>';
+      // ── [STOCK-VIVO-1] EL CHIP DE ESCASEZ ──────────────────────────────
+      // Solo con 5 o menos, y solo de zonas GESTIONADAS con disponible: el
+      // conteo viene del overlay, que a su vez lo tomó del servidor. Con 6 o
+      // más el número ni siquiera viaja — enseñar abundancia mata la urgencia
+      // y publica el inventario.
+      //
+      // 🔒 Y va en ESTE constructor porque es el ÚNICO que existe:
+      // `buildZonaButtons`, con cuatro llamadores. El libro avisaba de un
+      // gemelo muerto (`renderZonas`) donde un arnés ya midió la función que
+      // nadie llama; medido hoy, ese gemelo ya fue podado. El careo lo vuelve
+      // a comprobar en cada corrida.
+      var pocasN=0;
+      if(dispOverlay&&cur&&dispOverlay.evId===dispKey()&&dispOverlay.pocas){
+        pocasN=dispOverlay.pocas[(z.n||'').trim()]||0;
+      }
+      var pocasH='';
+      if(pocasN>0){
+        // Con 1 se dice distinto: «¡Últimos 1!» no lo escribe nadie.
+        var txt=(pocasN===1)?'¡Último lugar!':('¡Últimos '+pocasN+'!');
+        pocasH='<div class="z-pocas '+(pocasN<=2?'zp-rojo':'zp-amar')+'" data-pocas="'+pocasN+'">'+txt+'</div>';
+      }
+      var pocasAttr=pocasN>0?' data-libres="'+pocasN+'"':'';
+      h+='<button class="z-btn'+(z.vip?' vip':'')+'"'+reqAttr+pocasAttr+' data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(showP)+'</div>'+notaH+pocasH+'</button>';
     }
   }
   $$('d-zonas').innerHTML=h;
@@ -5721,6 +5788,7 @@ function buildHotelButtons(){
 function selFecha(btn,idx){
   // Normal flow only (non-diaFirst events with multifecha)
   selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;
+  loadDisponibilidad(dispKey());   // [STOCK-VIVO-1] el stock es POR FECHA
   var btns=$$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
@@ -5755,6 +5823,22 @@ function selFecha(btn,idx){
 }
 
 function selZona(btn,p,n){
+  // ── [STOCK-VIVO-1] NO SE ARMA LA COTIZACIÓN IMPOSIBLE ────────────────────
+  // Si el cliente trae más viajeros de los que quedan, se le dice AQUÍ en vez
+  // de dejar que lo descubra en WhatsApp después de ilusionarse con un total.
+  //
+  // 🔒 SOLO CUANDO EL CONTEO SE CONOCE. Una zona con más de 5 libres no manda
+  // número —el servidor no lo expone— y ahí no se bloquea NADA: la guarda de
+  // verdad sigue siendo el servidor al solicitar, y un bloqueo del navegador
+  // sobre un dato que no tiene sería inventarse una escasez.
+  var libres=parseInt(btn.getAttribute('data-libres'),10)||0;
+  if(libres>0&&selViaj>libres){
+    showToast('De esta zona solo queda'+(libres===1?' 1 lugar':'n '+libres+' lugares')
+      +'; apárta'+(libres===1?'lo':'los')+' y el resto te lo resolvemos por WhatsApp.','error');
+    var waB=$$('d-wa-fallback')||document.querySelector('#d-modal .wa-btn,#d-modal a[href*="wa.me"]');
+    if(waB&&waB.scrollIntoView)waB.scrollIntoView({behavior:'smooth',block:'center'});
+    return;                       // ni se marca la zona ni se calcula nada
+  }
   // Zonas con requiereViajeros (ej. Mesas Rockstar = grupos de 4): si el nº de
   // viajeros actual no coincide, lo forzamos al requerido, reconstruimos el
   // hotel para ese nº y avisamos. Genérico: aplica a cualquier zona/evento.

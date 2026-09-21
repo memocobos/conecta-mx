@@ -20,6 +20,37 @@ const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || process.env.PORTAL_SUP
 // enteras, y simplemente dejan de ser las del giveaway activo.
 const SLUG = 'karolg-bbva-2026';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [SORTEO-RONDAS-1] EL SLUG DE ENSAYO — para ensayar el show sin tocar lo real
+//
+// 🔒 EN MINÚSCULAS, Y NO ES ESTÉTICA: el regex de `foto_url` en
+// giveaway-sortear es `^[a-z0-9-]+\/[a-f0-9]{12}\/…`. Un slug con mayúsculas no
+// pasaría y las fotos del ensayo saldrían EN BLANCO sin un solo mensaje de
+// error — el peor modo de falla que hay: el que se ve como «ya quedó».
+//
+// 🔒 Y LA MITAD DEL BLINDAJE YA EXISTÍA: las SEIS functions del módulo filtran
+// duro por el slug (ver el comentario de SLUG, arriba), así que
+// giveaway-registro, giveaway-recordatorio, giveaway-consuelo y giveaway-foto
+// NO PUEDEN VER una fila de ensayo. O sea que un slug de ensayo es
+// ESTRUCTURALMENTE INCAPAZ de mandar un correo. Eso no lo agrega esta tuerca:
+// es el candado que ya estaba, y el careo lo AFIRMA — porque un candado que
+// nadie carea es una nota.
+const SLUG_ENSAYO = 'karolg-bbva-2026-ensayo';
+
+// 🔒 DOS VALORES, NUNCA UN SLUG DEL CUERPO. Aceptar `body.slug` convertiría
+// estas functions en el «buzón abierto a cualquier slug inventado» contra el
+// que advierte el comentario de SLUG veinte líneas más arriba.
+//
+// Devuelve null para lo desconocido: el llamador contesta 400, no adivina. Y
+// ausente/vacío/null cuentan como REAL, porque un `body.modo` que no vino es
+// el caso normal —el sorteo de verdad— y no un error que haya que rechazar.
+function slugDe(modo) {
+  if (modo == null || modo === '' || modo === 'real') return SLUG;
+  if (modo === 'ensayo') return SLUG_ENSAYO;
+  return null;
+}
+function esEnsayo(modo) { return slugDe(modo) === SLUG_ENSAYO; }
+
 // ⚠️ REYNOSA NO ES MONTERREY. Reynosa vive en America/Matamoros, que SÍ trae
 // horario de verano (es zona fronteriza, se alinea con Texas); Monterrey vive
 // en America/Monterrey, que dejó el horario de verano en 2022. En agosto de
@@ -191,7 +222,7 @@ const PREMIOS = {
 };
 
 module.exports = {
-  SB_URL, SB_KEY, SLUG, CIERRE, SORTEO, RECORDATORIO_VENTANA_MIN,
+  SB_URL, SB_KEY, SLUG, SLUG_ENSAYO, slugDe, esEnsayo, CIERRE, SORTEO, RECORDATORIO_VENTANA_MIN,
   normalizarCiudad, esDeReynosa, premioPorCiudad, PREMIOS,
   corsCheck, cabeceras, json, faltaEnv, sbHeaders,
   registroCerrado, tokenAdminValido, ipDe,

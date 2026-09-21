@@ -470,6 +470,31 @@ af(() => ['pendiente', 'acepto', 'no_contesto', 'no_cumple']
       .every((rr) => ESC.resultadoPublico(rr, true).indexOf('cumple') === -1),
    '🔒 la cadena "cumple" se filtró al valor público');
 
+// ═══ [5] EL SLUG DE ENSAYO: DOS VALORES, JAMÁS UN SLUG DEL CUERPO ═══════════
+console.log('\n── [5] el slug de ensayo ──');
+const G = require(path.join(RAIZ, 'netlify/functions/_lib/giveaway.js'));
+af(() => G.SLUG_ENSAYO === 'karolg-bbva-2026-ensayo', 'el slug de ensayo dio ' + G.SLUG_ENSAYO);
+// 🔴 MINÚSCULAS: el regex de `foto_url` es ^[a-z0-9-]+\/… — con mayúsculas las
+// fotos del ensayo saldrían EN BLANCO sin decir por qué, que es el peor modo
+// de falla: el que se ve como «ya quedó».
+af(() => /^[a-z0-9-]+$/.test(G.SLUG_ENSAYO),
+   '🔴 el slug de ensayo no pasa ^[a-z0-9-]+$ — las fotos saldrían en blanco');
+af(() => G.SLUG_ENSAYO !== G.SLUG, 'el slug de ensayo no puede ser el real');
+// Ausente, vacío, null y 'real' son todos «el sorteo real»: un `body.modo` que
+// no vino es el caso normal, no un error.
+af(() => G.slugDe() === G.SLUG && G.slugDe('') === G.SLUG
+      && G.slugDe(null) === G.SLUG && G.slugDe('real') === G.SLUG,
+   'ausente, vacío, null y "real" dan el slug real');
+af(() => G.slugDe('ensayo') === G.SLUG_ENSAYO, '"ensayo" da el slug de ensayo');
+// 🔒 CUALQUIER OTRA COSA SE REHÚSA. Éste es el candado del «buzón abierto a
+// cualquier slug inventado» que el propio lib advierte en su cabecera.
+[G.SLUG, 'otro', 'ENSAYO', 'ensayo ', ' ensayo', '../x', 0, 1, {}, [], true].forEach((m) => {
+  af(() => G.slugDe(m) === null,
+     '🔒 slugDe(' + JSON.stringify(m) + ') debió ser null, dio ' + G.slugDe(m));
+});
+af(() => G.esEnsayo('ensayo') === true && G.esEnsayo() === false
+      && G.esEnsayo('real') === false && G.esEnsayo('otro') === false, 'esEnsayo');
+
 completo = true;
 marcador();
 process.exit(mal ? 1 : 0);

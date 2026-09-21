@@ -57,7 +57,17 @@ exports.handler = async (event) => {
         // de después: así un eliminado no puede entrar a la tómbola por ningún
         // camino, ni aunque alguien toque la lógica de abajo. El candado más
         // barato es el que no deja llegar el dato.
-        fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&select=id,nombre,whatsapp`, { headers: G.sbHeaders() }),
+        // [GIVEAWAY-KG-1] Y `foto_estado=neq.invalidada`, por la MISMA razón:
+        // una foto declinada por el equipo queda FUERA del sorteo, y el
+        // candado más barato sigue siendo el que no deja llegar el dato.
+        // ⚠️ `neq` y no `in.(pendiente,aprobada)`: con `neq` una fila cuyo
+        // estado sea NULL —las ~600 de melanie y Natanael, que nacieron antes
+        // de la columna— se quedaría FUERA sin que nadie lo decidiera, porque
+        // en Postgres `NULL <> 'x'` es NULL y no pasa el filtro. Como esas
+        // filas son de OTRO slug, aquí no llegan nunca; pero se dice, porque
+        // el día que alguien reuse esta consulta sin el `slug` va a morder.
+        fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&foto_estado=neq.invalidada`
+              + `&select=id,nombre,whatsapp`, { headers: G.sbHeaders() }),
         fetch(`${sorBase}?slug=eq.${slugQ}&select=registro_id,resultado,intento`, { headers: G.sbHeaders() }),
       ]);
       if (!rr.ok) throw new Error('registros ' + rr.status);
@@ -154,6 +164,16 @@ exports.handler = async (event) => {
   // es público: al recargar con token, el admin tiene que recuperar el
   // teléfono del ganador vivo, y ese dato no puede salir por la puerta
   // pública. Aquí sí, porque aquí se exige token.
+  // [GIVEAWAY-KG-1] Cuántas fotos siguen SIN revisar. No bloquea el giro
+  // —orden de Memo— pero /sorteo lo pregunta antes y avisa: girar con fotos
+  // pendientes es una decisión, y una decisión hay que poder tomarla sabiendo.
+  if (body.accion === 'pendientes_foto') {
+    const r = await fetch(`${regBase}?slug=eq.${slugQ}&eliminado_at=is.null&foto_estado=eq.pendiente&select=id`,
+      { headers: Object.assign({}, G.sbHeaders(), { Prefer: 'count=exact' }) });
+    const filas = r.ok ? (await r.json().catch(() => [])) : [];
+    return G.json(200, headers, { ok: true, pendientes: Array.isArray(filas) ? filas.length : 0 });
+  }
+
   if (body.accion === 'estado_admin') {
     try {
       const r = await fetch(
@@ -188,7 +208,11 @@ exports.handler = async (event) => {
   if (body.accion === 'padron') {
     try {
       const r = await fetch(
+        // [GIVEAWAY-KG-1] `instagram`, `foto_path` y `foto_estado` viajan SOLO
+        // por aquí: ésta es la puerta CON token. Las públicas no los piden ni
+        // los pueden pedir — su `select` es de dos columnas.
         `${regBase}?slug=eq.${slugQ}&select=id,nombre,ciudad,whatsapp,correo,creado_at,` +
+        'instagram,foto_path,foto_estado,' +
         'eliminado_at,eliminado_motivo,eliminado_por&order=creado_at.asc',
         { headers: G.sbHeaders() }
       );
@@ -222,6 +246,121 @@ exports.handler = async (event) => {
   //   3. SOLO ANTES DE QUE EL SORTEO SE RESUELVA. Con un ganador que ya aceptó,
   //      eliminar sería reescribir el resultado.
   const MOTIVOS = ['duplicado', 'no_cumple', 'solicitud_participante', 'otro'];
+  // La foto se ve con URL FIRMADA de corta duración: el bucket es privado y
+  // una URL que no caduca es una foto pública con pasos extra.
+  if (body.accion === 'foto_url') {
+    const p = String(body.foto_path || '').trim();
+    if (!/^[a-z0-9-]+\/[a-f0-9]{12}\/[A-Za-z0-9-]+\.(jpg|png)$/.test(p)) {
+      return G.json(400, headers, { ok: false, error: 'Ruta inválida' });
+    }
+    try {
+      const r = await fetch(`${G.SB_URL}/storage/v1/object/sign/giveaway-fotos/${encodeURI(p)}`, {
+        method: 'POST', headers: G.sbHeaders(), body: JSON.stringify({ expiresIn: 600 }),   // 10 min
+      });
+      if (!r.ok) return G.json(502, headers, { ok: false, error: 'No se pudo firmar' });
+      const j = await r.json().catch(() => ({}));
+      return G.json(200, headers, { ok: true, url: j && j.signedURL ? `${G.SB_URL}/storage/v1${j.signedURL}` : null });
+    } catch (e) {
+      return G.json(502, headers, { ok: false, error: 'No se pudo firmar' });
+    }
+  }
+
+  // ═══ [GIVEAWAY-KG-1] LA REVISIÓN DE FOTOS ═════════════════════════════════
+  //
+  // 🔒 ES REVERSIBLE, Y ESO NO ES UN LUJO: un dedazo en un teléfono no puede
+  // sacar a nadie del concurso. Aprobar, invalidar y volver a pendiente son el
+  // mismo movimiento —se escribe el estado que se pida— y por eso no hay
+  // «invalidar» de una sola dirección. Lo irreversible es `eliminar`, que ya
+  // existía y pide motivo.
+  if (body.accion === 'revisar_foto') {
+    const id = String(body.id || '').trim();
+    const estado = String(body.estado || '').trim();
+    if (!id) return G.json(400, headers, { ok: false, error: 'Falta el id' });
+    // La lista blanca vive aquí Y en el CHECK de la base: un typo
+    // («invalidado» por «invalidada») dejaría a alguien DENTRO del sorteo
+    // creyendo que quedó fuera, porque el giro excluye por el valor exacto.
+    if (!['pendiente', 'aprobada', 'invalidada'].includes(estado)) {
+      return G.json(400, headers, { ok: false, error: 'Estado inválido' });
+    }
+    const r = await fetch(`${regBase}?id=eq.${encodeURIComponent(id)}&slug=eq.${slugQ}`, {
+      method: 'PATCH',
+      headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
+      body: JSON.stringify({ foto_estado: estado }),
+    });
+    if (!r.ok) return G.json(502, headers, { ok: false, error: 'No se pudo guardar', detalle: (await r.text()).slice(0, 200) });
+    const filas = await r.json().catch(() => []);
+    // Cuántas tocó: si el filtro se aflojara algún día, el número lo grita.
+    return G.json(200, headers, { ok: true, tocadas: filas.length, estado });
+  }
+
+  // ── EL BARRIDO DE HUÉRFANAS ───────────────────────────────────────────────
+  // Una foto es HUÉRFANA cuando está en el bucket y NINGÚN registro la nombra.
+  //
+  // ⚠️ Y SOLO SI LLEVA MÁS DE SEIS HORAS. Entre que se sube y que se guarda el
+  // registro pasan segundos, pero una persona puede dejar el formulario a
+  // medias y volver un rato después — barrerla a los diez minutos le borraría
+  // la foto en la cara. Seis horas es de sobra para cualquier registro real y
+  // corto para que no se acumule.
+  //
+  // 🔒 NO CORRE SOLO. Es un botón del admin que primero ENSEÑA cuántas son y
+  // solo borra cuando se le confirma: un barrido automático sobre el bucket de
+  // la gente es justo lo que no se hace sin mirar.
+  if (body.accion === 'fotos_huerfanas' || body.accion === 'fotos_huerfanas_borrar') {
+    const BUCKET = 'giveaway-fotos';
+    const HORAS = 6;
+    const corte = Date.now() - HORAS * 60 * 60 * 1000;
+
+    // Lo que el bucket tiene, bajo el prefijo de ESTE giveaway.
+    const enBucket = [];
+    try {
+      // El listado es por carpeta, y las fotos viven en <slug>/<prefijo-ip>/.
+      const rr = await fetch(`${G.SB_URL}/storage/v1/object/list/${BUCKET}`, {
+        method: 'POST', headers: G.sbHeaders(),
+        body: JSON.stringify({ prefix: `${G.SLUG}/`, limit: 1000 }),
+      });
+      const carpetas = rr.ok ? (await rr.json().catch(() => [])) : [];
+      for (const c of (Array.isArray(carpetas) ? carpetas : [])) {
+        if (!c || !c.name) continue;
+        const r2 = await fetch(`${G.SB_URL}/storage/v1/object/list/${BUCKET}`, {
+          method: 'POST', headers: G.sbHeaders(),
+          body: JSON.stringify({ prefix: `${G.SLUG}/${c.name}/`, limit: 1000 }),
+        });
+        const objs = r2.ok ? (await r2.json().catch(() => [])) : [];
+        for (const o of (Array.isArray(objs) ? objs : [])) {
+          if (!o || !o.name) continue;
+          enBucket.push({ path: `${G.SLUG}/${c.name}/${o.name}`, creado: Date.parse(o.created_at || o.updated_at || '') });
+        }
+      }
+    } catch (e) {
+      return G.json(502, headers, { ok: false, error: 'No se pudo leer el bucket: ' + e.message });
+    }
+
+    // Lo que los registros nombran.
+    const rp = await fetch(`${regBase}?slug=eq.${slugQ}&select=foto_path&limit=20000`, { headers: G.sbHeaders() });
+    const usados = new Set(((rp.ok ? await rp.json().catch(() => []) : []) || [])
+      .map((f) => f && f.foto_path).filter(Boolean));
+
+    const huerfanas = enBucket.filter((o) => !usados.has(o.path))
+      // Sin fecha legible NO se borra: ante la duda, se queda. Borrar de más
+      // es irreversible y borrar de menos solo cuesta unos KB.
+      .filter((o) => Number.isFinite(o.creado) && o.creado < corte);
+
+    if (body.accion === 'fotos_huerfanas') {
+      return G.json(200, headers, { ok: true, en_bucket: enBucket.length, usadas: usados.size,
+        huerfanas: huerfanas.length, horas: HORAS, muestra: huerfanas.slice(0, 5).map((o) => o.path) });
+    }
+    // Borrar, ya confirmado.
+    let borradas = 0;
+    for (let i = 0; i < huerfanas.length; i += 50) {
+      const lote = huerfanas.slice(i, i + 50).map((o) => o.path);
+      const rd = await fetch(`${G.SB_URL}/storage/v1/object/${BUCKET}`, {
+        method: 'DELETE', headers: G.sbHeaders(), body: JSON.stringify({ prefixes: lote }),
+      });
+      if (rd.ok) borradas += lote.length;
+    }
+    return G.json(200, headers, { ok: true, borradas, de: huerfanas.length });
+  }
+
   if (body.accion === 'eliminar') {
     const id = String(body.registro_id || '').trim();
     if (!id) return G.json(400, headers, { ok: false, error: 'Falta el participante' });

@@ -64,7 +64,14 @@
 # con horario de verano en agosto). Corre DIARIO porque Netlify no agenda "solo
 # el 5 de agosto"; la función se sale sola cualquier otro día y lo dice en el log.
 [functions."giveaway-recordatorio"]
-  schedule = "55 16 * * *"
+  # ⏰ EN UTC, Y SE MUEVE CON `SORTEO` DE netlify/functions/_lib/giveaway.js.
+  # La función solo manda si el disparo cae dentro de su ventana (40 min antes
+  # del sorteo); si este número y esa constante dejan de cruzarse, el
+  # recordatorio NO SALE y nadie se entera. `npm run mide:giveaway-karolg`
+  # truena si eso pasa.
+  # ⚠️ Las 9 PM de Reynosa son las 02:00 UTC del DÍA SIGUIENTE: 01:30 UTC es
+  # 8:30 PM de Reynosa del día del sorteo, 30 min dentro de la ventana.
+  schedule = "30 1 * * *"
 
 [functions."check-strikes-diario"]
   schedule = "0 0 * * *"

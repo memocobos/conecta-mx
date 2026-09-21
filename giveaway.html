@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Gánate tu lugar para Natanael Cano · Conecta Reynosa</title>
-<meta name="description" content="Gánate tu lugar para Natanael Cano el 2 de octubre en el Estadio Walmart Park. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta). Si eres de fuera: boleto en Zona Tumbada + Kit Conecta. Registro hasta el 13 de septiembre 7:00 PM · sorteo en vivo ese día a las 8:00 PM, hora de Reynosa.">
+<title>Gánate tu lugar para Karol G · Conecta Reynosa</title>
+<meta name="description" content="Gánate tu lugar para Karol G el 7 de noviembre en el Estadio BBVA, Monterrey. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto Club Seat y Kit Conecta). Si eres de fuera: boleto Club Seat + Kit Conecta. Registro hasta el 1 de octubre 8:00 PM · sorteo en vivo ese día a las 9:00 PM, hora de Reynosa.">
 <meta name="robots" content="index,follow">
-<meta property="og:title" content="Gánate tu lugar para Natanael Cano">
-<meta property="og:description" content="Gánate tu lugar para Natanael Cano el 2 de octubre en el Estadio Walmart Park. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta). Si eres de fuera: boleto en Zona Tumbada + Kit Conecta. Registro hasta el 13 de septiembre 7:00 PM · sorteo en vivo ese día a las 8:00 PM, hora de Reynosa.">
-<meta property="og:image" content="https://conectareynosa.mx/imgs/giveaways/natanael-tumbada.jpg">
+<meta property="og:title" content="Gánate tu lugar para Karol G">
+<meta property="og:description" content="Gánate tu lugar para Karol G el 7 de noviembre en el Estadio BBVA, Monterrey. Si eres de Reynosa: paquete PLUS (transporte, traslados, hospedaje, boleto Club Seat y Kit Conecta). Si eres de fuera: boleto Club Seat + Kit Conecta. Registro hasta el 1 de octubre 8:00 PM · sorteo en vivo ese día a las 9:00 PM, hora de Reynosa.">
+<meta property="og:image" content="https://conectareynosa.mx/imgs/giveaways/karol-g.jpg">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
@@ -138,6 +138,25 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 /* text-transform:none — es un <label> y heredaba las MAYÚSCULAS de los
    rótulos de campo. Una frase entera en caja alta se lee a tropezones, y ésta
    es justo la que hay que leer antes de aceptar. */
+.foto-prev{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.foto-prev img{width:72px;height:72px;object-fit:cover;border:1px solid rgba(255,255,255,.2)}
+.foto-meta{font-size:11px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace}
+.foto-otra,.foto-reint{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;
+  font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;cursor:pointer;
+  font-family:Montserrat,sans-serif}
+.foto-error{margin-top:8px;font-size:12px;color:#ff283b;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.redes-gate{margin:0 0 18px}
+.redes-copy{font-size:13px;color:rgba(255,255,255,.72);margin:0 0 10px;line-height:1.5}
+.redes-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.red-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 6px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);color:#fff;
+  text-decoration:none;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;
+  font-family:Montserrat,sans-serif;transition:all .15s}
+.red-btn:hover{background:rgba(255,255,255,.12)}
+.red-btn .red-ok{opacity:0;font-size:13px;transition:opacity .15s}
+.red-btn.ok{border-color:#88ea4e;color:#88ea4e;background:rgba(136,234,78,.10)}
+.red-btn.ok .red-ok{opacity:1}
+@media(max-width:420px){.red-btn{font-size:10px;padding:10px 4px}}
 .bases-ck{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.55;
   color:rgba(255,255,255,.82);cursor:pointer;margin:18px 0 20px;text-transform:none;letter-spacing:0}
 .bases-ck input{width:20px;height:20px;flex:none;margin:1px 0 0;accent-color:var(--c-amarillo)}
@@ -385,18 +404,18 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
 <div class="pagina">
   <div class="foto-col">
-    <img class="hero-foto" src="imgs/giveaways/natanael-tumbada.jpg" alt="Natanael Cano en el Estadio Walmart Park" width="1200" height="1200">
+    <img class="hero-foto" src="imgs/giveaways/karol-g.jpg" alt="Karol G en el Estadio BBVA" width="2048" height="2048">
     <div class="hero-velo" aria-hidden="true"></div>
   </div>
 
   <div class="hero-txt">
     <div class="kicker"><svg class="ic"><use href="#ic-regalo"/></svg> Giveaway</div>
-    <h1>Gánate tu lugar<br>para <em>Natanael Cano</em></h1>
+    <h1>Gánate tu lugar<br>para <em>Karol G</em></h1>
     <ul class="incluye">
       <li><svg class="ic"><use href="#ic-bus"/></svg>Transporte ida y vuelta</li>
       <li><svg class="ic"><use href="#ic-auto"/></svg>Traslados</li>
       <li><svg class="ic"><use href="#ic-cama"/></svg>Hospedaje</li>
-      <li><svg class="ic"><use href="#ic-boleto"/></svg>Boleto en <b>Zona Tumbada</b></li>
+      <li><svg class="ic"><use href="#ic-boleto"/></svg>Boleto <b>Club Seat</b></li>
       <li><svg class="ic"><use href="#ic-regalo"/></svg>Kit Conecta</li>
     </ul>
   </div>
@@ -410,11 +429,29 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <div class="cd-c"><div class="cd-n" id="cd-m">--</div><div class="cd-l">min</div></div>
     <div class="cd-c"><div class="cd-n" id="cd-s">--</div><div class="cd-l">seg</div></div>
   </div>
-  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Sorteo en vivo · <b>13 sep, 8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey)</p>
+  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Sorteo en vivo · <b>1 oct, 9:00 PM hora de Reynosa</b> (8:00 PM en Monterrey)</p>
   </div>
 
   <form id="form" novalidate>
-    <div class="campo">
+      <!-- ═══ [GIVEAWAY-KG-1] LAS TRES REDES ═══════════════════════════════════
+       Participar se desbloquea al picarle a las tres. Es de BUENA FE: no hay
+       API que verifique un follow, y prometer que se verifica en automático
+       sería mentir. Lo que sí se hace es verificar AL GANADOR a mano, y eso
+       se dice aquí y en las bases.
+       Las URLs son las MISMAS del header de esta página; no se inventan. -->
+  <div class="redes-gate" id="redes-gate">
+    <p class="redes-copy">Síguenos en las tres redes para participar. Al ganador se le verifica que nos siga.</p>
+    <div class="redes-btns">
+      <a class="red-btn" data-red="instagram" href="https://www.instagram.com/conectarey" target="_blank" rel="noopener">
+        <span class="red-nom">Instagram</span><span class="red-ok" aria-hidden="true">✓</span></a>
+      <a class="red-btn" data-red="tiktok" href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener">
+        <span class="red-nom">TikTok</span><span class="red-ok" aria-hidden="true">✓</span></a>
+      <a class="red-btn" data-red="facebook" href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener">
+        <span class="red-nom">Facebook</span><span class="red-ok" aria-hidden="true">✓</span></a>
+    </div>
+  </div>
+
+<div class="campo">
       <label for="f-nombre">Tu nombre completo</label>
       <input type="text" id="f-nombre" autocomplete="name" placeholder="Ana Pérez" required>
     </div>
@@ -434,9 +471,33 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       <input type="text" id="f-ciudad" autocomplete="address-level2" placeholder="Reynosa" required>
       <small class="campo-ayuda">De tu ciudad depende tu premio — mira las bases.</small>
     </div>
+    <div class="campo">
+      <label for="f-instagram">Tu Instagram</label>
+      <input type="text" id="f-instagram" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tu_usuario" required>
+      <small class="campo-ayuda">Solo el usuario, sin el @. Es para uso interno de Conecta; solo el del ganador se menciona en redes.</small>
+    </div>
+
+    <!-- [GIVEAWAY-KG-1] LA FOTO. `capture` NO se pone a propósito: con él,
+         Android abre SOLO la cámara y quita la galería, y mucha gente quiere
+         subir una que ya tiene. Sin él, el sistema ofrece las dos. -->
+    <div class="campo">
+      <label for="f-foto">Tu foto</label>
+      <input type="file" id="f-foto" accept="image/*" required>
+      <small class="campo-ayuda">Sube una foto tuya, clara y de frente. Todas las fotos son revisadas por el equipo de Conecta.</small>
+      <div class="foto-prev" id="foto-prev" hidden>
+        <img id="foto-img" alt="Tu foto">
+        <div class="foto-meta" id="foto-meta"></div>
+        <button type="button" class="foto-otra" id="foto-otra">Elegir otra</button>
+      </div>
+      <div class="foto-error" id="foto-error" hidden>
+        <span id="foto-error-txt"></span>
+        <button type="button" class="foto-reint" id="foto-reint">Reintentar</button>
+      </div>
+    </div>
+
     <label class="bases-ck">
       <input type="checkbox" id="f-acepto">
-      <span>Acepto las bases del sorteo y que me contacten por WhatsApp si gano.</span>
+      <span>Acepto las bases, el uso de mi foto y nombre en el sorteo, y que me contacten por WhatsApp.</span>
     </label>
     <button class="btn" id="btn" type="submit">Participar</button>
     <div class="aviso" id="aviso" role="alert"></div>
@@ -446,8 +507,8 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <h2>¡Ya estás dentro!</h2>
     <div class="ok-num" id="ok-num">—</div>
     <div class="ok-num-l" id="ok-num-l">tu número de participante</div>
-    <p class="ok-premio">El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si eres de <b>fuera</b>, boleto en Zona Tumbada + Kit Conecta.</p>
-    <p>Sorteo en vivo el <b>domingo 13 de septiembre</b> · <b>8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey). Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
+    <p class="ok-premio">El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto Club Seat y Kit Conecta. Si eres de <b>fuera</b>, boleto Club Seat + Kit Conecta. El boleto es para el <b>7 de noviembre</b>.</p>
+    <p>Sorteo en vivo el <b>jueves 1 de octubre</b> · <b>9:00 PM hora de Reynosa</b> (8:00 PM en Monterrey). Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
     <a class="btn btn-wa" id="ok-share" href="#" target="_blank" rel="noopener">
       <svg class="ic" style="width:20px;height:20px"><use href="#ic-wa"/></svg> Invitar a alguien
     </a>
@@ -460,7 +521,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
   <div class="cerrado" id="cerrado">
     <h2>El registro cerró</h2>
-    <p>El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si eres de <b>fuera</b>, boleto en Zona Tumbada + Kit Conecta.<br><br>Sorteo en vivo el <b>domingo 13 de septiembre</b> · <b>8:00 PM hora de Reynosa</b> (7:00 PM en Monterrey). Síguenos para verlo.</p>
+    <p>El premio depende de dónde vivas: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto Club Seat y Kit Conecta. Si eres de <b>fuera</b>, boleto Club Seat + Kit Conecta. El boleto es para el <b>7 de noviembre</b>.<br><br>Sorteo en vivo el <b>jueves 1 de octubre</b> · <b>9:00 PM hora de Reynosa</b> (8:00 PM en Monterrey). Síguenos para verlo.</p>
   </div>
 
   </div><!-- /cuerpo -->
@@ -472,12 +533,20 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   <div class="pie">
   <div class="bases">
     <h3>Bases</h3>
+    <!-- [GIVEAWAY-KG-1] LAS BASES DE KAROL G, firmadas por Memo el 21-sep.
+         Sustituyen enteras a las de Natanael: cambiaron el premio, las fechas,
+         y entraron tres reglas nuevas (redes, revisión de fotos y uso de
+         imagen) que antes no existían. -->
     <ol>
-      <li>El premio es DUAL y lo decide tu ciudad: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto en Zona Tumbada y Kit Conecta. Si NO eres de Reynosa, boleto en Zona Tumbada + Kit Conecta (el viaje y el hospedaje corren por tu cuenta).</li>
+      <li>El premio es DUAL y lo decide tu ciudad: si eres de <b>Reynosa</b>, Paquete PLUS: transporte ida y vuelta, traslados, hospedaje, boleto <b>Club Seat</b> y Kit Conecta. Si NO eres de Reynosa, boleto <b>Club Seat</b> + Kit Conecta (el viaje y el hospedaje corren por tu cuenta). El boleto es para la fecha del <b>7 de noviembre</b>. La zona (Club Seat Oriente o Poniente) la asigna Conecta según disponibilidad.</li>
       <li>Mayores de 18 años.</li>
       <li>Un registro por persona; WhatsApp repetido se anula.</li>
-      <li>El registro cierra el domingo 13 de septiembre a las 7:00 PM hora de Reynosa, y el sorteo es en vivo ese mismo día a las 8:00 PM (6:00 y 7:00 PM en Monterrey).</li>
-      <li>El ganador tiene 10 minutos para contestar su WhatsApp durante la transmisión. Si no contesta, se vuelve a girar.</li>
+      <li>Para participar debes seguir a Conecta en Instagram, TikTok y Facebook. Al ganador se le verifica; si no nos sigue, se vuelve a girar.</li>
+      <li>Todas las fotos son revisadas por el equipo de Conecta antes del sorteo. Si tu foto no es tuya, no se te distingue bien, o incluye contenido ofensivo, sexual, violento, marcas o a terceras personas, tu registro se declina y tu participación queda invalidada, sin derecho a volver a registrarte.</li>
+      <li>Al participar aceptas que tu foto y tu nombre aparezcan en la página del sorteo y en las redes sociales de Conecta si resultas finalista o ganador. Tu Instagram es solo para uso interno de Conecta; únicamente el del ganador podrá mencionarse en redes.</li>
+      <li>El registro cierra el jueves 1 de octubre a las 8:00 PM hora de Reynosa (7:00 PM en Monterrey) y el sorteo es ese mismo día a las 9:00 PM hora de Reynosa (8:00 PM en Monterrey), en conectareynosa.mx/sorteo.</li>
+      <li>El sorteo es al azar y por rondas eliminatorias; la mecánica se publica en la página del sorteo antes del giro.</li>
+      <li>El ganador tiene 10 minutos para contestar su WhatsApp. Si no contesta, se vuelve a girar.</li>
       <li>El ganador firma contrato antes de recibir el premio.</li>
     </ol>
   </div>
@@ -487,21 +556,21 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
        apartar de una vez en lugar de jugársela. Número, formato de liga y
        ?text= codificado son los del index. -->
   <div class="rescate">
-    <h3>¿No ganaste? Todavía hay lugares para Natanael Cano</h3>
+    <h3>¿No ganaste? Todavía hay lugares para Karol G</h3>
     <!-- [RESCATE-FECHA-1] Este párrafo anunciaba «el 6 de agosto en Arena
          Monterrey» — el evento de melanie, sobrevivió a GIVEAWAY-NATA-1. El h3
          de arriba y el ?text= del botón de abajo ya decían Natanael Cano: era
          la ÚNICA línea del bloque que seguía en la época anterior. -->
-    <p>Todavía quedan lugares para el <b>2 de octubre</b> en el <b>Estadio Walmart Park</b>, Monterrey. Escríbenos y te armamos tu paquete.</p>
+    <p>Todavía quedan lugares para el <b>7 de noviembre</b> en el <b>Estadio BBVA</b>, Monterrey. Escríbenos y te armamos tu paquete.</p>
     <a class="btn-rescate" target="_blank" rel="noopener"
-       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Natanael%20Cano%20el%202%20de%20octubre">
+       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Karol%20G%20el%207%20de%20noviembre">
       <svg class="ic"><use href="#ic-wa"/></svg> Apartar mi lugar
     </a>
   </div>
 
   <nav class="navegar" aria-label="Ir a otras páginas">
     <a class="nav-btn fuerte" href="/sorteo"><svg class="ic"><use href="#ic-vivo"/></svg> Ver el sorteo en vivo</a>
-    <a class="nav-btn" href="/?evento=natanael"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
+    <a class="nav-btn" href="/?evento=karolg"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
     <a class="nav-btn" href="/"><svg class="ic"><use href="#ic-casa"/></svg> Volver al inicio</a>
   </nav>
 
@@ -587,8 +656,8 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   // [GIVEAWAY-NATA-1] Gemelos de `_lib/giveaway.js` — el navegador no puede
   // importar la function, así que son copia con nombre y el arnés los carea
   // contra el lib. En SEPTIEMBRE Reynosa está en -05:00.
-  var CIERRE = new Date('2026-09-13T19:00:00-05:00').getTime();
-  var SORTEO = new Date('2026-09-13T20:00:00-05:00').getTime();
+  var CIERRE = new Date('2026-10-01T20:00:00-05:00').getTime();
+  var SORTEO = new Date('2026-10-01T21:00:00-05:00').getTime();
 
   var $ = function(id){ return document.getElementById(id); };
   var form = $('form'), aviso = $('aviso'), btn = $('btn');
@@ -638,6 +707,169 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     io.observe(form);
   }
 
+  // ═══ [GIVEAWAY-KG-1] EL CANDADO DE LAS TRES REDES, Y LA MEMORIA ═════════
+  //
+  // 🔒 POR QUÉ ESTO VIVE EN `sessionStorage` Y NO EN UNA VARIABLE: en celular,
+  // picarle a Instagram abre LA APP, y al volver el navegador puede RECARGAR
+  // la página. Con el estado en memoria, la persona vuelve y se encuentra los
+  // tres botones apagados y el formulario en blanco — y no se vuelve a
+  // registrar. Se guarda lo picado Y lo escrito.
+  //
+  // `sessionStorage` y no `localStorage` a propósito: esto es de ESTA visita.
+  // Y todo entre try/catch: en navegación privada el acceso TRUENA, y si eso
+  // tumbara el script el formulario entero dejaría de funcionar — la página
+  // tiene que servir igual, solo sin memoria.
+  var LLAVE_REDES = 'kg-redes', LLAVE_FORM = 'kg-form';
+  var REDES = ['instagram', 'tiktok', 'facebook'];
+  var CAMPOS = ['f-nombre', 'f-wa', 'f-correo', 'f-ciudad', 'f-instagram'];
+
+  function leer(llave){
+    try { return JSON.parse(sessionStorage.getItem(llave) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function guardar(llave, obj){
+    try { sessionStorage.setItem(llave, JSON.stringify(obj)); } catch (e) {}
+  }
+
+  function pintarRedes(){
+    var st = leer(LLAVE_REDES), listas = 0;
+    REDES.forEach(function(r){
+      var b = document.querySelector('[data-red="' + r + '"]');
+      if (!b) return;
+      if (st[r]) { b.classList.add('ok'); listas++; } else { b.classList.remove('ok'); }
+    });
+    // El botón se habilita SOLO con las tres. Se cuenta, no se lleva una
+    // bandera: una bandera se queda encendida si mañana entra una cuarta red.
+    if (btn) btn.disabled = (listas < REDES.length);
+    return listas;
+  }
+
+  REDES.forEach(function(r){
+    var b = document.querySelector('[data-red="' + r + '"]');
+    if (!b) return;
+    b.addEventListener('click', function(){
+      var st = leer(LLAVE_REDES); st[r] = true; guardar(LLAVE_REDES, st);
+      pintarRedes();
+      // El enlace sigue su curso (target=_blank): no se hace preventDefault.
+    });
+  });
+
+  // Lo escrito también sobrevive al regreso.
+  CAMPOS.forEach(function(id){
+    var el = $(id); if (!el) return;
+    el.addEventListener('input', function(){
+      var f = leer(LLAVE_FORM); f[id] = el.value; guardar(LLAVE_FORM, f);
+    });
+  });
+  (function restaurar(){
+    var f = leer(LLAVE_FORM);
+    CAMPOS.forEach(function(id){ var el = $(id); if (el && f[id]) el.value = f[id]; });
+    pintarRedes();
+  })();
+
+  // ═══ [GIVEAWAY-KG-1] LA FOTO: comprimir aquí, subir aparte ══════════════
+  //
+  // Se comprime EN EL NAVEGADOR antes de subir porque una foto de iPhone pesa
+  // 3-5 MB y con señal de celular eso es medio minuto de espera y un fallo
+  // probable. Meta: lado mayor 1080, JPEG, ~300 KB.
+  //
+  // 🔒 LA ORIENTACIÓN. Las fotos de teléfono traen su giro en el EXIF, no en
+  // los píxeles: dibujarlas en un canvas «tal cual» las saca ACOSTADAS, que es
+  // el clásico de las fotos de iPhone. `createImageBitmap(blob, {imageOrientation:
+  // 'from-image'})` aplica ese giro; es la vía que respetan Safari y Chrome.
+  // Si el navegador no la trae, se cae a `<img>`, que en los navegadores de hoy
+  // también honra el EXIF al pintar.
+  //
+  // 🔒 Y EL HEIC. iPhone guarda en HEIC; Safari lo DECODIFICA, así que al pasar
+  // por el canvas sale JPEG y el servidor ya no ve HEIC nunca. En un navegador
+  // que no lo decodifica, la decodificación falla y se dice con su nombre en
+  // vez de dejar a la persona mirando un botón muerto.
+  var LADO_MAX = 1080, META_BYTES = 300 * 1024, TOPE_BYTES = 1024 * 1024;
+  var fotoPath = null;        // lo que devuelve la subida; viaja al registro
+  var fotoDataUri = null;     // por si hay que REINTENTAR sin volver a comprimir
+
+  function $$(id){ return document.getElementById(id); }
+  function fotoError(msg){
+    $$('foto-error-txt').textContent = msg;
+    $$('foto-error').hidden = false;
+  }
+  function fotoErrorFuera(){ $$('foto-error').hidden = true; }
+
+  async function aBitmap(file){
+    if (window.createImageBitmap){
+      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+      catch (e) { /* cae al <img> */ }
+    }
+    return await new Promise(function(res, rej){
+      var img = new Image();
+      img.onload = function(){ res(img); };
+      img.onerror = function(){ rej(new Error('no se pudo abrir')); };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function comprimir(file){
+    var bmp = await aBitmap(file);
+    var w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
+    if (!w || !h) throw new Error('no se pudo abrir');
+    var esc = Math.min(1, LADO_MAX / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * esc)), ch = Math.max(1, Math.round(h * esc));
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    c.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
+    // Se baja la calidad hasta acercarse a la meta. Nunca por debajo de .5:
+    // más abajo la cara deja de distinguirse, y la foto existe justo para eso.
+    var q = 0.82, uri = c.toDataURL('image/jpeg', q);
+    while (uri.length * 0.75 > META_BYTES && q > 0.5){
+      q -= 0.1; uri = c.toDataURL('image/jpeg', q);
+    }
+    return { uri: uri, bytes: Math.round(uri.length * 0.75), w: cw, h: ch };
+  }
+
+  async function subirFoto(){
+    fotoErrorFuera();
+    if (!fotoDataUri) return false;
+    try {
+      var r = await fetch('/.netlify/functions/giveaway-foto', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foto: fotoDataUri })
+      });
+      var j = await r.json().catch(function(){ return {}; });
+      if (!r.ok || !j.ok){
+        // 🔒 Y NO SE PIERDE NADA. Lo escrito sigue en sessionStorage y la foto
+        // comprimida sigue en memoria: el botón de reintentar vuelve a subir
+        // ESA misma, sin volver a elegirla ni a comprimirla.
+        fotoError((j && j.error) || 'No se pudo subir tu foto.');
+        return false;
+      }
+      fotoPath = j.foto_path;
+      return true;
+    } catch (e) {
+      fotoError('Se cortó la subida. Revisa tu señal.');
+      return false;
+    }
+  }
+
+  var inpFoto = $$('f-foto');
+  if (inpFoto) inpFoto.addEventListener('change', async function(){
+    fotoPath = null; fotoDataUri = null; fotoErrorFuera();
+    var file = inpFoto.files && inpFoto.files[0];
+    if (!file) { $$('foto-prev').hidden = true; return; }
+    try {
+      var out = await comprimir(file);
+      fotoDataUri = out.uri;
+      if (out.bytes > TOPE_BYTES){ fotoError('Esa foto pesa demasiado aunque la comprimamos. Prueba con otra.'); return; }
+      $$('foto-img').src = out.uri;
+      $$('foto-meta').textContent = out.w + '×' + out.h + ' · ' + Math.round(out.bytes / 1024) + ' KB';
+      $$('foto-prev').hidden = false;
+      await subirFoto();
+    } catch (e) {
+      $$('foto-prev').hidden = true;
+      fotoError('No pudimos abrir esa foto. Si es de iPhone, elígela otra vez desde la galería.');
+    }
+  });
+  if ($$('foto-reint')) $$('foto-reint').addEventListener('click', function(){ subirFoto(); });
+  if ($$('foto-otra')) $$('foto-otra').addEventListener('click', function(){ inpFoto.click(); });
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
     aviso.className = 'aviso'; aviso.textContent = '';
@@ -655,12 +887,24 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     if (whatsapp.length !== 10) return mal('El WhatsApp va a 10 dígitos, sin lada de país');
     if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(correo)) return mal('Revisa tu correo, algo no cuadra');
     if (ciudad.length < 3) return mal('Escribe tu ciudad — de ella depende tu premio');
+    var ig = (($('f-instagram') || {}).value || '').trim().replace(/^@+/, '');
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(ig)) return mal('Revisa tu Instagram: solo el usuario, sin el @ y sin la liga');
+    // 🔒 SIN FOTO NO SE MANDA. Y el mensaje distingue los dos casos: no haberla
+    // elegido y haberla elegido pero que no subiera — se arreglan distinto, y
+    // confundirlos manda a la persona a hacer lo que no es.
+    if (!fotoPath) {
+      return mal(fotoDataUri
+        ? 'Tu foto no terminó de subir. Dale a «Reintentar» ahí arriba.'
+        : 'Sube tu foto para participar');
+    }
 
     btn.disabled = true; btn.textContent = 'Registrando…';
     fetch('/.netlify/functions/giveaway-registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, ciudad: ciudad, acepto: true })
+      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, ciudad: ciudad,
+        instagram: (($('f-instagram') || {}).value || '').trim().replace(/^@+/, ''),
+        foto_path: fotoPath, acepto: true })
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
     }).then(function(res){
@@ -668,6 +912,10 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       if (res.status === 410) return cerrar();
       if (!res.j || res.j.ok !== true) return mal((res.j && res.j.error) || 'No pudimos registrarte, vuelve a intentar');
 
+      // La memoria del regreso se borra AL REGISTRARSE: si no, la siguiente
+      // persona que abra la página en ese teléfono se encuentra los datos de
+      // la anterior ya escritos — y los manda sin darse cuenta.
+      try { sessionStorage.removeItem(LLAVE_FORM); sessionStorage.removeItem(LLAVE_REDES); } catch (e) {}
       form.style.display = 'none';
       $('ok').style.display = 'block';
       // Si el conteo no vino (la consulta de posición es best-effort), se
@@ -680,13 +928,13 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
         $('ok-num-l').style.display = 'none';
       }
       $('ok-share').href = 'https://wa.me/?text=' + encodeURIComponent(
-        'Me registré para ganarme mi lugar para Natanael Cano con Conecta Reynosa ' +
-        '(o boleto + Kit si eres de fuera). El sorteo es en vivo el 13 de septiembre a las 8 PM. Participa: ' +
+        'Me registré para ganarme mi lugar para Karol G con Conecta Reynosa ' +
+        '(o boleto + Kit si eres de fuera). El sorteo es en vivo el 1 de octubre a las 9 PM. Participa: ' +
         'https://conectareynosa.mx/giveaway'
       );
       // Pixel: Lead al CONFIRMARSE el registro, no al enviar el formulario.
       // trackLead ya dispara fbq + CAPI con el mismo event_id (meta-events.js).
-      try { if (typeof window.trackLead === 'function') window.trackLead('giveaway-natanael'); } catch (e) {}
+      try { if (typeof window.trackLead === 'function') window.trackLead('giveaway-karolg'); } catch (e) {}
       $('ok').scrollIntoView({ block: 'center', behavior: 'smooth' });
     }).catch(function(){
       btn.disabled = false; btn.textContent = 'Participar';

@@ -289,6 +289,20 @@ exports.handler = async (event) => {
   try {
     const r = await fetch(
       `${G.SB_URL}/rest/v1/giveaway_sorteos?slug=eq.${encodeURIComponent(G.SLUG)}`
+      // 🔴 [SORTEO-RONDAS-1] `resultado=eq.acepto` — EL RENGLÓN QUE FALTABA.
+      //
+      // Antes esto tomaba «el último giro», fuera el que fuera. Con Natanael
+      // funcionó de casualidad porque el último fue el que aceptó. Con una
+      // cadena de cuatro o cinco eslabones —que es lo que la eliminatoria por
+      // rondas vuelve NORMAL—, si el último quedó en `no_contesto` o
+      // `no_cumple`, el consuelo excluiría a quien NO ganó y le mandaría «no
+      // ganaste» a alguien que sigue en juego, dejando además al ganador real
+      // sin excluir.
+      //
+      // Medido en el careo: con la cadena [no_contesto, acepto, no_cumple],
+      // sin este filtro se tomaba el intento 3. Autorizado por Memo el
+      // 21-sep-2026: es lo ÚNICO que se le toca a esta function.
+      + `&resultado=eq.acepto`
       + `&registro_id=not.is.null&select=registro_id,intento&order=intento.desc&limit=1`,
       { headers: G.sbHeaders() }
     );
@@ -301,7 +315,13 @@ exports.handler = async (event) => {
   }
   if (!ganadorId) {
     // Nunca "por si acaso mandamos a todos": mejor no mandar nada.
-    return G.json(409, headers, { ok: false, error: 'sin ganador identificado; no se manda nada' });
+    //
+    // 🔒 Y EL MOTIVO SE DICE CON PRECISIÓN. «No se pudo identificar» suena a
+    // error del sistema; esto es un ESTADO LEGÍTIMO del sorteo —la cadena
+    // sigue abierta, nadie ha aceptado todavía— y confundir los dos manda a
+    // buscar un fallo donde no hay ninguno.
+    return G.json(409, headers, { ok: false,
+      error: 'no hay ganador CONFIRMADO (ningún giro con «aceptó»): no se manda nada' });
   }
 
   // ── El padrón pendiente. ───────────────────────────────────────────────────

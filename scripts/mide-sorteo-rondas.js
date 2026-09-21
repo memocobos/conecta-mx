@@ -70,6 +70,13 @@ process.on('exit', function (codigo) { if (!completo) marcador(); });
 process.env.PORTAL_SUPABASE_URL = 'https://careo.sb';
 process.env.PORTAL_SUPABASE_SERVICE_KEY = 'k';
 process.env.GIVEAWAY_ADMIN_TOKEN = 'tok';
+process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.careo';
+process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'k';
+// 🔒 `giveaway-consuelo` carea el código contra el `var PROMOS` del index
+// SERVIDO — la lección de CONSUELO-VERDAD-1: la fila viva NO es lo que el
+// cliente ve, y la copia del index solo se refresca publicando desde Baba. Se
+// apunta a un sitio de mentira para que el careo no salga a la red.
+process.env.URL = 'https://sitio.careo';
 
 const TI = require(path.join(RAIZ, 'sorteo-tiempos.js'));
 
@@ -648,6 +655,29 @@ global.fetch = async (url, opts) => {
     }
     return J({ signedURL: '/object/sign/x?token=x' });
   }
+  // La fila del código de consolación, en KameHouse. Va con ventana VIVA: sin
+  // ella `promoViva` aborta ANTES de la consulta del ganador, y el careo del
+  // consuelo mediría la nada — es lo que me pasó.
+  // El index SERVIDO, con su `var PROMOS`. Es la SEGUNDA fuente que el consuelo
+  // carea antes de anunciar un código.
+  // ⚠️ Los DOS vencimientos cuadran al milisegundo a propósito: el candado de
+  // CONSUELO-VERDAD-1 compara el `expiresTs` del sitio contra el `expires_at`
+  // de la fila y se rehúsa si difieren. Desalinearlos aquí dejaría el careo
+  // midiendo ese candado en vez del filtro del ganador — y de paso confirma
+  // que el candado SIGUE VIVO, porque con mi primer valor mordió.
+  if (/sitio\.careo\/index\.html/.test(u)) {
+    return { ok: true, status: 200, json: async () => ({}), arrayBuffer: async () => Buffer.from(''),
+      text: async () => "var PROMOS = { 'KAROL': {amount:400, startTs:1788220800000, "
+        + "expiresTs:1798761599000, maxUsos:9999, usos:0, desc:'$400 de descuento con código KAROL', "
+        + "onlyEvent:'karolg'}, };\nvar EV=[{id:'karolg',a:'Karol G',f:'7 nov 2026',ds:'2026-11-07'}];" };
+  }
+  if (/promos_codigos/.test(u)) {
+    return J([{ codigo: 'KAROL', desc_texto: '$400 de descuento con código KAROL',
+                monto: 400, pct: null, archivado: false,
+                starts_at: '2026-09-01T00:00:00Z', expires_at: '2026-12-31T23:59:59Z' }]);
+  }
+  // El catálogo de KameHouse, lo justo para que el correo se pueda armar.
+  if (/kh\.careo/.test(u) && /catalogo|eventos|index/.test(u)) return J([]);
   if (/storage\/v1\/object\/list/.test(u)) return J([]);
   if (/storage\/v1\/object\//.test(u)) return J({}, m === 'DELETE' ? 200 : 200);
   return J([]);
@@ -1050,6 +1080,58 @@ af(() => res9.d.ultimo.nombre != null,
    '🔒 un giro sin escalera revela al ganador de inmediato: es el camino de antes');
 af(() => res9.d.ultimo.rondas_totales === 0 && res9.d.ultimo.revelacion_en_ms === 0,
    'y sus campos derivados van en cero');
+
+
+// ═══ [10] EL CONSUELO: EL **GANADOR CONFIRMADO**, NO «EL ÚLTIMO GIRO» ═══════
+console.log('\n── [10] el consuelo: el ganador CONFIRMADO ──');
+const consuelo = require(path.join(RAIZ, 'netlify/functions/giveaway-consuelo.js')).handler;
+// `seco:true` es el ensayo que la propia function ya trae: mide a quién le
+// tocaría y NO manda ni marca nada. Un careo no manda un correo.
+const llamarCons = async () => {
+  URLS = [];
+  const r = await consuelo(evP({ seco: true }, 'tok'));
+  let d = {}; try { d = JSON.parse(r.body || '{}'); } catch (_) {}
+  return { code: r.statusCode, d, urls: URLS.slice() };
+};
+
+// 🔴 EL DEFECTO, en su forma exacta: una cadena que TERMINA en un descarte.
+// Antes, `order=intento.desc&limit=1` tomaba ESE último giro y excluía del
+// consuelo a quien NO ganó — mandándole «no ganaste» a alguien que seguía en
+// juego, y dejando al ganador real sin excluir.
+sembrarPadron();
+SOR = [sembrarGiro('no_contesto', 1), sembrarGiro('no_cumple', 2, { descarte_motivo: 'no_sigue' })];
+let c10 = await llamarCons();
+af(() => c10.code === 409,
+   '🔴 sin ningún `acepto` el consuelo se REHÚSA, dio ' + c10.code);
+af(() => /confirmado/i.test(String(c10.d.error || '')),
+   '🔒 y lo dice con precisión: «sin ganador CONFIRMADO» no es «no se pudo identificar» '
+   + '(lo segundo suena a error y esto es un estado legítimo del sorteo). Dijo: ' + c10.d.error);
+// 🔒 Y EL FILTRO VA EN LA CONSULTA, medido sobre la URL que salió de verdad.
+af(() => c10.urls.some((x) => /giveaway_sorteos/.test(x.u) && /resultado=eq\.acepto/.test(x.u)),
+   '🔴 la consulta del ganador NO lleva `resultado=eq.acepto`');
+af(() => !c10.urls.some((x) => /resend\.com/.test(x.u)), '🔒 un rehúse no manda un solo correo');
+
+// Con un `acepto` EN MEDIO de la cadena, toma a ÉSE y no al último.
+SOR = [sembrarGiro('no_contesto', 1),
+       sembrarGiro('acepto', 2),
+       sembrarGiro('no_cumple', 3, { descarte_motivo: 'no_sigue' })];
+c10 = await llamarCons();
+af(() => !(c10.code === 409 && /confirmado/i.test(String(c10.d.error || ''))),
+   '🔴 con un `acepto` en la cadena el consuelo PROCEDE, dio ' + c10.code + ' ' + c10.d.error);
+af(() => !c10.urls.some((x) => /resend\.com/.test(x.u)), '🔒 y en seco tampoco manda correos');
+
+// 🔒 EL CONTROL POSITIVO: sin el filtro, la cadena de arriba habría tomado el
+// intento 3 (un descarte). Se comprueba que la consulta pide el intento más
+// alto **entre los acepto**, no el más alto a secas.
+af(() => c10.urls.some((x) => /giveaway_sorteos/.test(x.u)
+      && /resultado=eq\.acepto/.test(x.u) && /order=intento\.desc/.test(x.u) && /limit=1/.test(x.u)),
+   'la consulta sigue pidiendo el intento más alto, pero ENTRE los acepto');
+
+// Sin ningún giro: también se rehúsa, y por lo mismo.
+SOR = [];
+c10 = await llamarCons();
+af(() => c10.code === 409 && /confirmado/i.test(String(c10.d.error || '')),
+   'sin ningún giro → 409 por el mismo motivo, dio ' + c10.code);
 
 // <<<SIGUIENTES-BLOQUES>>>
 

@@ -128,13 +128,42 @@ function parsearPestana(filas, encabezado, reglaZona) {
   const mapa = mapearColumnas(cabecera);
   const out = new Map();
   const descartes = { chatarra: 0, sinNombre: 0, otraZona: 0 };
+  // [BOLETOS-1 adenda] LA CHATARRA TAMBIÉN CONSUME BOLETO.
+  //
+  // «Vendido Alex», una creadora, un coordinador: NO son viajeros —por eso se
+  // descartan del careo de DINERO, y eso no cambia— pero ocupan un lugar, y su
+  // casa en el sistema ya existe: `stock_ajustes.vendidos_fuera`.
+  //
+  // Medido sobre la pestaña real de Soy Luna: 8 boletos de chatarra (VIP 2,
+  // Platino 1, Balcón 2, Megacable 2, Plata 1) que el sistema no veía —
+  // `stock_ajustes` de soyluna estaba VACÍO—. La cuenta completa del Excel es
+  // `restan = pedido − boletos de clientes − chatarra de esa zona`.
+  //
+  // 🔒 VIAJA APARTE, JAMÁS FUNDIDA CON LAS PERSONAS. Si entrara al montón de
+  // gente, «Vendido Alex» se daría de alta como viajero.
+  const chatarraPorZona = {};
   const desde = (encabezado ? encabezado.fila : 0) + 1;
 
   for (let i = desde; i < (filas || []).length; i++) {
     const f = filas[i] || [];
     const nombreCrudo = mapa.nombre >= 0 ? String(f[mapa.nombre] == null ? '' : f[mapa.nombre]).trim() : '';
     if (!nombreCrudo) { descartes.sinNombre++; continue; }
-    if (esChatarra(nombreCrudo)) { descartes.chatarra++; continue; }
+    if (esChatarra(nombreCrudo)) {
+      descartes.chatarra++;
+      // Se cuenta por zona. Sin zona no se le puede descontar a ninguna, y
+      // repartirla sería inventar: se descarta y ya.
+      //
+      // ⚠️ Y RESPETA LA REGLA DE ZONA. La guarda de chatarra corre ANTES que el
+      // filtro de `reglaZona` —porque un nombre de chatarra no es nadie, venga
+      // de donde venga—, así que aquí hay que volver a preguntarlo: en una
+      // pestaña repartida entre varios eventos (Corona Capital) la chatarra de
+      // OTRA zona no es de este evento, y contarla le restaría stock ajeno.
+      const zc = mapa.boleto >= 0 ? String(f[mapa.boleto] == null ? '' : f[mapa.boleto]).trim() : '';
+      if (zc && (!reglaZona || normalizarNombre(zc) === normalizarNombre(reglaZona))) {
+        chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + 1;
+      }
+      continue;
+    }
 
     const zona = mapa.boleto >= 0 ? String(f[mapa.boleto] == null ? '' : f[mapa.boleto]).trim() : '';
     if (reglaZona && normalizarNombre(zona) !== normalizarNombre(reglaZona)) { descartes.otraZona++; continue; }
@@ -158,6 +187,13 @@ function parsearPestana(filas, encabezado, reglaZona) {
       // MISMA PERSONA, otra compra: se suma el dinero y se cuentan las filas.
       ya.abonado += abonado;
       ya.filas += 1;
+      // [BOLETOS-1] CUÁNTOS BOLETOS Y EN QUÉ ZONAS. La pestaña lleva UNA FILA
+      // POR BOLETO, así que `filas` ya era el conteo — lo que faltaba era saber
+      // DÓNDE, porque la persona solo guardaba la PRIMERA zona. Sin este mapa
+      // no se puede distinguir «4 boletos de la misma zona» —que se sincroniza
+      // solo— de «boletos repartidos», que hay que preguntar: repartirlos entre
+      // zonas sin fila sería inventar, y ya mordió con Angel.
+      if (zona) ya.zonas[zona] = (ya.zonas[zona] || 0) + 1;
       // Dos boletos de la misma persona: los totales se SUMAN, igual que el
       // abonado. Pero si a UNA de las filas le falta el total, la suma de las
       // otras es un número que MIENTE por defecto — se marca incompleta y la
@@ -169,6 +205,9 @@ function parsearPestana(filas, encabezado, reglaZona) {
     } else {
       out.set(clave, {
         nombre: nombreCrudo, clave, abonado, filas: 1, zona,
+        // ⚠️ `zona` (la primera) SE QUEDA: hay consumidores que la leen y
+        // cambiarla sería otra tuerca. `zonas` se AÑADE al lado.
+        zonas: zona ? { [zona]: 1 } : {},
         total: totalFila, totalIncompleto: !totalLegible,
         paquete: mapa.paquete >= 0 ? String(f[mapa.paquete] == null ? '' : f[mapa.paquete]).trim() : '',
         // [EXCEL-CAREO-FIX-1] La talla no se usa para decidir nada: viaja como
@@ -184,7 +223,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
     const { totalIncompleto, ...resto } = p;
     return { ...resto, total: totalIncompleto ? null : p.total };
   });
-  return { personas, mapa, descartes };
+  return { personas, mapa, descartes, chatarraPorZona };
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────

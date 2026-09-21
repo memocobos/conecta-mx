@@ -36,7 +36,9 @@ async function leerBase(eventoId, sb) {
   // [CUADRE-1a] `total_contrato` para el séptimo montón. `notas` YA venía —la
   // usa el filtro de «ya no aparece»— y además dice si el total es un DERIVADO
   // de TOTAL-1 o un exacto de la libreta.
-  sp.set('select', 'id,nombre,notas,tipo_viajero,zona_boleto,tipo_paquete,abonado_previo,total_contrato');
+  // [BOLETOS-1] `boletos` para poder carear la CARDINALIDAD: la pestaña lleva
+  // una fila por boleto y el sistema una por persona.
+  sp.set('select', 'id,nombre,notas,tipo_viajero,zona_boleto,tipo_paquete,abonado_previo,total_contrato,boletos');
   sp.append('evento_id', 'eq.' + eventoId);
   sp.set('limit', '5000');
   // Un solo `or=` en la URL. DOS `or=` en la misma consulta se combinan de una
@@ -76,6 +78,9 @@ async function leerBase(eventoId, sb) {
     // de «todavía no se sabe cuánto».
     total_contrato: v.total_contrato == null ? null : Number(v.total_contrato),
     notas: v.notas || '',
+    // NOT NULL DEFAULT 1 en la base; el respaldo se escribe igual porque un
+    // null aquí haría que la sincronía «corrigiera» filas que ya estaban bien.
+    boletos: (parseInt(v.boletos, 10) > 0) ? parseInt(v.boletos, 10) : 1,
   })) };
 }
 
@@ -99,6 +104,9 @@ async function correrCareo(eventoId) {
   // 2. Cosechar cada pestaña y leerla con el protocolo.
   const personas = new Map();
   const detallePestanas = [];
+  // [BOLETOS-1 adenda] La chatarra por zona, fundida entre pestañas del mismo
+  // evento igual que la gente. Viaja APARTE: no es nadie, pero ocupa boleto.
+  const chatarraPorZona = {};
   for (const m of mapeos) {
     const c = await cosechar({ pestana: m.pestana });
     if (!c.ok) {
@@ -109,6 +117,9 @@ async function correrCareo(eventoId) {
         mensaje: `No pude cosechar la pestaña "${m.pestana}": ${c.mensaje}` } };
     }
     const p = parsearPestana(c.filas, c.encabezado, m.regla_zona);
+    for (const zc in (p.chatarraPorZona || {})) {
+      chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + p.chatarraPorZona[zc];
+    }
     detallePestanas.push({ pestana: m.pestana, regla_zona: m.regla_zona || null,
                            personas: p.personas.length, descartes: p.descartes,
                            mapa: p.mapa, notas: m.notas || null });
@@ -127,6 +138,10 @@ async function correrCareo(eventoId) {
         // null — una suma a la que le falta un sumando es un número que miente.
         ya.total = (ya.total == null || per.total == null) ? null : ya.total + per.total;
         if (!ya.zona && per.zona) ya.zona = per.zona;
+        // [BOLETOS-1] El mapa de zonas también se funde: Pa'l Norte reparte a
+        // la misma persona entre dos pestañas del mismo evento.
+        ya.zonas = ya.zonas || {};
+        for (const zz in (per.zonas || {})) ya.zonas[zz] = (ya.zonas[zz] || 0) + per.zonas[zz];
         if (!ya.paquete && per.paquete) ya.paquete = per.paquete;
         if (!ya.talla && per.talla) ya.talla = per.talla;
         ya.pestanas.push(m.pestana);
@@ -151,6 +166,15 @@ async function correrCareo(eventoId) {
     personasLado = personasLado.map((p) => ({ ...p, fuentes: ['pestana'] }));
   }
 
+  // [BOLETOS-1 adenda] Lo que el sistema cree que se vendió FUERA. Es la casa
+  // que la chatarra ya tenía —`stock_ajustes.vendidos_fuera`— y hasta hoy la
+  // llenaba una persona a mano. Medido el 20-sep: solo 4 filas en toda la
+  // tabla, y las 2 de un evento vivo (calle24) coinciden AL BOLETO con la
+  // chatarra de su pestaña. Las dos fuentes decían lo mismo; ahora una sola lo
+  // dice sola.
+  const ar = await fetch(`${SB_URL}/rest/v1/stock_ajustes?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,zona,vendidos_fuera&limit=2000`, { headers: sb });
+  const ajustes = ar.ok ? (await ar.json().catch(() => [])) : [];
+
   // 3. El lado del sistema.
   const base = await leerBase(eventoId, sb);
   if (base.error) return { error: { status: 502, mensaje: base.error } };
@@ -158,7 +182,8 @@ async function correrCareo(eventoId) {
   // 4. Los montones.
   const montones = carear(personasLado, base.viajeros);
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
-           viajeros: base.viajeros, montones, numerologia };
+           viajeros: base.viajeros, montones, numerologia,
+           chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };
 }
 
 // ── traerNumerologia ────────────────────────────────────────────────────────

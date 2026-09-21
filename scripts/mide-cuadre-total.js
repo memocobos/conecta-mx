@@ -271,6 +271,79 @@ const CASO = () => ({
   af(!!cris, 'Cris (dos filas, 5,950 + 5,950) NO entró al montón');
   if (cris) af(cris.excel_total === 11900, 'Cris: excel_total = ' + cris.excel_total + ', se esperaba 11900 (los totales se SUMAN, como el abonado)');
 
+  // ── [3b] [BOLETOS-1] LA CARDINALIDAD: cuántos boletos y EN QUÉ ZONAS ─────
+  // La pestaña lleva UNA FILA POR BOLETO. `filas` ya se contaba; lo que faltaba
+  // es SABER EN QUÉ ZONAS, porque la persona solo guardaba la PRIMERA — y sin
+  // eso no se puede distinguir «4 boletos de la misma zona» (se sincroniza
+  // solo) de «boletos repartidos» (hay que preguntar).
+  console.log('\n[3b] boletos por zona');
+  {
+    const { parsearPestana } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-careo.js'));
+    const filas3b = conPreludio(CAB_YOUNGMIKO, [
+      ...Array.from({ length: 4 }, () => filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Sergio Cuatro', 'Paquete': 'PLUS', 'Boleto': 'VIP', 'Separo': '$500', 'Total': '$4,000' })),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Angel Dos Zonas', 'Paquete': 'PLUS', 'Boleto': 'Perfiles', 'Separo': '$500', 'Total': '$5,000' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Angel Dos Zonas', 'Paquete': 'PLUS', 'Boleto': 'Platino', 'Separo': '$500', 'Total': '$5,000' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Sola Una', 'Paquete': 'PLUS', 'Boleto': 'VIP', 'Separo': '$500', 'Total': '$1,000' }),
+    ]);
+    const r3b = parsearPestana(filas3b, { fila: 10 }, null);
+    const por3b = (n) => r3b.personas.find((p) => new RegExp(n).test(p.nombre));
+    r3b.personas.forEach((p) => console.log(`    ${p.nombre.padEnd(18)} filas=${p.filas} zonas=${JSON.stringify(p.zonas)}`));
+    const serg = por3b('Sergio');
+    af(serg && serg.filas === 4, 'Sergio: filas ' + (serg && serg.filas) + ', se esperaban 4');
+    af(serg && serg.zonas && serg.zonas['VIP'] === 4,
+       'Sergio no trae su conteo POR ZONA: ' + JSON.stringify(serg && serg.zonas)
+       + ' — sin él no se puede distinguir «4 de la misma zona» de «boletos repartidos»');
+    af(serg && Object.keys(serg.zonas || {}).length === 1, 'Sergio tiene UNA zona y salieron ' + Object.keys((serg && serg.zonas) || {}).length);
+    const ang = por3b('Angel');
+    af(ang && ang.zonas && Object.keys(ang.zonas).length === 2,
+       'Angel tiene boletos en DOS zonas y el parser reportó ' + JSON.stringify(ang && ang.zonas));
+    af(ang && ang.zonas && ang.zonas['Perfiles'] === 1 && ang.zonas['Platino'] === 1, 'el reparto de Angel no es 1 y 1: ' + JSON.stringify(ang && ang.zonas));
+    const sola = por3b('Sola');
+    af(sola && sola.zonas && sola.zonas['VIP'] === 1, 'la de un solo boleto: ' + JSON.stringify(sola && sola.zonas));
+    // ── [BOLETOS-1 adenda] LA CHATARRA TAMBIÉN CONSUME BOLETO ──────────────
+    // «Vendido X», una creadora, un coordinador: NO son viajeros —bien
+    // descartados del careo de DINERO— pero ocupan un lugar. Su casa en el
+    // sistema ya existe: `stock_ajustes.vendidos_fuera`.
+    // Medido en Soy Luna: 8 boletos de chatarra (VIP 2, Platino 1, Balcón 2,
+    // Megacable 2, Plata 1) que el sistema no veía — soyluna tiene CERO filas
+    // en stock_ajustes.
+    // 🔒 VIAJA APARTE, jamás fundida con las personas: si entrara al montón de
+    // gente, «Vendido Alex» se daría de alta como viajero.
+    const filasCh = conPreludio(CAB_YOUNGMIKO, [
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Persona Real', 'Paquete': 'PLUS', 'Boleto': 'VIP', 'Total': '$1,000' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Marietta Barrera creadora', 'Boleto': 'VIP' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Marietta Barrera creadora', 'Boleto': 'VIP' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Vendido Alex', 'Boleto': 'Balcón' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Coordinador', 'Boleto': 'Plata' }),
+      filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Vendido Sin Zona', 'Boleto': '' }),
+    ]);
+    const rCh = parsearPestana(filasCh, { fila: 10 }, null);
+    console.log('    chatarra por zona: ' + JSON.stringify(rCh.chatarraPorZona) + ' · personas: ' + rCh.personas.length);
+    af(rCh.chatarraPorZona && rCh.chatarraPorZona['VIP'] === 2,
+       'la chatarra de VIP no se contó: ' + JSON.stringify(rCh.chatarraPorZona)
+       + ' — «Vendido X» no es viajero pero SÍ ocupa un boleto');
+    af(rCh.chatarraPorZona && rCh.chatarraPorZona['Balcón'] === 1 && rCh.chatarraPorZona['Plata'] === 1,
+       'falta chatarra de alguna zona: ' + JSON.stringify(rCh.chatarraPorZona));
+    // Sin zona no se le puede descontar a ninguna: se cuenta aparte, no se inventa.
+    af(!(rCh.chatarraPorZona || {})[''] && !(rCh.chatarraPorZona || {})['(sin zona)'],
+       'la chatarra SIN zona se le asignó a alguna: ' + JSON.stringify(rCh.chatarraPorZona));
+    // 🔒 Y NO SE FUNDE CON LA GENTE.
+    af(rCh.personas.length === 1, 'la chatarra se coló a las personas: ' + JSON.stringify(rCh.personas.map((p) => p.nombre)));
+    af(rCh.descartes.chatarra === 5, 'descartes.chatarra = ' + rCh.descartes.chatarra + ', se esperaban 5');
+    // 🔒 Y RESPETA LA REGLA DE ZONA. En una pestaña repartida entre eventos
+    // (Corona Capital), la chatarra de OTRA zona no es de este evento: contarla
+    // le restaría stock ajeno. La guarda de chatarra corre ANTES del filtro de
+    // zona, así que este caso NO es teórico.
+    const rZona = parsearPestana(filasCh, { fila: 10 }, 'VIP');
+    console.log('    con regla_zona «VIP»: ' + JSON.stringify(rZona.chatarraPorZona));
+    af(rZona.chatarraPorZona['VIP'] === 2 && !rZona.chatarraPorZona['Balcón'] && !rZona.chatarraPorZona['Plata'],
+       'con regla de zona se contó chatarra de OTRAS zonas: ' + JSON.stringify(rZona.chatarraPorZona)
+       + ' — eso le resta stock a un evento que no es');
+
+    // 🔒 La llave `zona` de siempre NO se toca: hay consumidores que la leen.
+    af(serg && serg.zona === 'VIP', 'se perdió la llave `zona` de siempre: ' + JSON.stringify(serg && serg.zona));
+  }
+
   // ── [4] LA COLUMNA AUSENTE ────────────────────────────────────────────────
   console.log('\n[4] la pestaña SIN columna Total');
   const sinCol = CASO();

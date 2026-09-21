@@ -38,7 +38,7 @@ const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
 
 // 🔒 LISTA BLANCA. Lo que no está aquí NO TIENE PUERTA, y por eso `bajas` y
 // `ambiguos` no aparecen: un `solo:'bajas'` se rehúsa antes de tocar nada.
-const MONTONES_APLICABLES = ['abonos', 'totales', 'altas'];
+const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera'];
 
 // 🔒 UN GUION NO ES UNA ZONA. En la pestaña, «-» es como las chicas escriben
 // «nada» —no un valor—, y la diferencia importa justo aquí: `viajero_migrar`
@@ -107,7 +107,7 @@ function planear(careo, opciones) {
   const M = careo.montones;
   const porClave = new Map((careo.personas || []).map((p) => [p.clave, p]));
   const vPorId = new Map((careo.viajeros || []).map((v) => [v.id, v]));
-  const abonos = [], totales = [], altas = [], negativas = [], saltados = [];
+  const abonos = [], totales = [], altas = [], negativas = [], saltados = [], boletos = [];
 
   // ── 1. PAGOS ──────────────────────────────────────────────────────────────
   for (const g of (M.pagos || [])) {
@@ -150,6 +150,97 @@ function planear(careo, opciones) {
     totales.push({ clave, nombre: x.nombre, viajero_id: x.viajero_id,
       excel_total: x.excel_total, sistema_total: x.sistema_total, derivado: x.derivado,
       notas_previas: (v && v.notas) || '' });
+  }
+
+  // ── 2.5 [BOLETOS-1] LA SINCRONÍA DE BOLETOS ───────────────────────────────
+  // 🔒 ES CONTEO, NO DINERO, y por eso SÍ entra al clic global: la fuente de
+  // verdad es la pestaña, que lleva UNA FILA POR BOLETO. Que el sistema tenga
+  // una fila por PERSONA no es un desacuerdo de criterio —como sí lo es un
+  // total derivado contra uno de libreta—: es que le falta el número.
+  //
+  // Lo que costó no tenerlo, medido sobre Soy Luna el 20-sep: VIP con 17
+  // boletos vendidos contra 12 filas, y el sitio publicando «8 libres»
+  // quedando 3. La clase muerde en cada evento con multi-boleto.
+  //
+  // 🔒 SOLO EN AUTOMÁTICO CUANDO NO HAY NADA QUE ADIVINAR: una sola zona en la
+  // pestaña Y que coincida con la de su fila. Si los boletos vienen repartidos
+  // entre zonas, la fila del sistema es UNA y no se sabe cuántos van a cada
+  // una: repartirlos sería inventar, y ya mordió con Angel. Eso sale como
+  // AVISO, con nombre.
+  // El emparejamiento por nombre, con la MISMA llave normalizada que usa
+  // `carear` — no una propia: dos criterios de emparejamiento serían dos
+  // listas que todavía no divergen.
+  const porNombreBase = new Map();
+  for (const v of (careo.viajeros || [])) {
+    const k = normalizarNombre(v.nombre);
+    if (!porNombreBase.has(k)) porNombreBase.set(k, []);
+    porNombreBase.get(k).push(v);
+  }
+  const avisosBoletos = [];
+  for (const p of (careo.personas || [])) {
+    const mismos = porNombreBase.get(p.clave) || [];
+    if (mismos.length !== 1) continue;          // los ambiguos ya salen en su montón
+    const v = mismos[0];
+    // 🔴 LOS BOLETOS SE CUENTAN DE `zonas`, NO DE `filas`. Y la diferencia NO es
+    // cosmética: `filas` lo incrementan las DOS fuentes del lado-Excel, y
+    // medido contra producción el 20-sep, 15 personas de Soy Luna están en las
+    // dos — con el libro de Memo repitiendo EXACTAMENTE los mismos boletos que
+    // la pestaña (Camila: 2 renglones en la pestaña y 2 filas en el libro, los
+    // mismos 2 boletos anotados dos veces). Con `filas` se le habrían escrito
+    // 4, y el stock habría cerrado zonas que sí tienen lugar.
+    //
+    // `zonas` solo lo llena `parsearPestana`, que es la fuente de verdad que la
+    // tuerca nombra: un renglón de pestaña = un boleto.
+    const enPestana = Object.values(p.zonas || {}).reduce((a, b) => a + b, 0);
+    if (!enPestana) continue;
+    const actual = Number(v.boletos || 1);
+    if (enPestana === actual) continue;         // ya cuadra
+    const zonas = Object.keys(p.zonas || {});
+    const zonaFila = String(v.zona || '').trim();
+    if (zonas.length > 1) {
+      avisosBoletos.push({ nombre: p.nombre, viajero_id: v.id, de: actual, a: enPestana,
+        zonas: p.zonas,
+        motivo: `sus ${enPestana} boletos están repartidos entre ${zonas.length} zonas (${zonas.join(', ')}) `
+              + `y en el sistema tiene UNA fila en «${zonaFila || 'sin zona'}»: repartirlos sería inventar en cuál va cada uno.` });
+      continue;
+    }
+    if (zonas.length === 1 && normalizarNombre(zonas[0]) !== normalizarNombre(zonaFila)) {
+      avisosBoletos.push({ nombre: p.nombre, viajero_id: v.id, de: actual, a: enPestana,
+        zonas: p.zonas,
+        motivo: `la pestaña lo pone en la zona «${zonas[0]}» y su fila dice «${zonaFila || 'sin zona'}»: `
+              + 'primero hay que saber en cuál está.' });
+      continue;
+    }
+    if (!quiere('boletos') || !elegida(p.clave)) continue;
+    boletos.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
+      de: actual, a: enPestana, zona: zonaFila });
+  }
+
+  // ── 2.6 [BOLETOS-1 adenda] LA CHATARRA → `vendidos_fuera` ─────────────────
+  // La cuenta completa del Excel es `restan = pedido − boletos de clientes −
+  // chatarra`. Los dos primeros ya los sabe el sistema; el tercero vivía solo
+  // en la pestaña. Medido en Soy Luna: 8 boletos de chatarra que el sistema no
+  // veía, con `stock_ajustes` VACÍO.
+  //
+  // 🔒 LA ESCRITURA ES **SET**, JAMÁS SUMA — eso se obra en `ejecutarPlan`,
+  // pero la razón se dice aquí porque es la que ordena todo: `stock_ajustes`
+  // SUMA por diseño y tiene UNIQUE en (evento_id, zona). Un sync que sumara
+  // convertiría cada clic en boletos de más: es la mordida de CREA-1.
+  const fuera = [];
+  if (quiere('fuera')) {
+    const actualPorZona = new Map();
+    for (const a of (careo.ajustes || [])) actualPorZona.set(String(a.zona || '').trim(), a);
+    const zonasCh = new Set([...Object.keys(careo.chatarraPorZona || {}),
+                             ...[...actualPorZona.keys()].filter(Boolean)]);
+    for (const z of zonasCh) {
+      if (!z) continue;
+      const contado = Number((careo.chatarraPorZona || {})[z] || 0);
+      const fila = actualPorZona.get(z);
+      const actual = Number((fila && fila.vendidos_fuera) || 0);
+      if (contado === actual) continue;
+      if (claves && !claves.has(normalizarNombre(z))) continue;
+      fuera.push({ zona: z, de: actual, a: contado, ajuste_id: (fila && fila.id) || null });
+    }
   }
 
   // ── 3. ALTAS ──────────────────────────────────────────────────────────────
@@ -206,10 +297,16 @@ function planear(careo, opciones) {
       // 🔒 SEMÁNTICA DE `abonado_previo` (VJ-3): dinero que vino del Excel y
       // queda CONGELADO. Para un apartado es 0 por definición.
       abonado_previo: c.origen === 'apartado' ? 0 : p.abonado,
+      // [BOLETOS-1] El alta NACE con su número: las de pestaña con sus filas,
+      // las del libro con su `boletos` (el parser ya lo trae). El caso Danna
+      // —2 lugares en una fila— queda cubierto por aquí y por la sincronía.
+      // Misma razón que arriba: los renglones de la PESTAÑA (`zonas`), y si la
+      // persona vive solo en el libro, el `boletos` que trae el parser.
+      boletos: Math.max(1, Object.values(p.zonas || {}).reduce((a, b) => a + b, 0) || Number(p.boletos || 1)),
       pestanas: p.pestanas || [] });
   }
 
-  return { abonos, totales, altas, negativas, saltados };
+  return { abonos, totales, altas, negativas, saltados, boletos, fuera, avisos_boletos: avisosBoletos };
 }
 
 
@@ -243,7 +340,7 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
   // ⚠️ `quien` llega POR PARÁMETRO y sale del TOKEN en el handler — nunca del
   // cliente. El anti-spoofing no se relajó al mudarse: se movió el sitio donde
   // se lee, no de dónde.
-  const resultado = { abonos: [], totales: [], altas: [], errores: [] };
+  const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [], errores: [] };
 
   // ── 1. LOS ABONOS, EN UN SOLO INSERT ──────────────────────────────────────
   // Un arreglo en un POST: una sola ida y vuelta para todos. Sin `on_conflict`
@@ -288,6 +385,45 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
     }));
   }
 
+  // ── 2.5 [BOLETOS-1] LOS BOLETOS ───────────────────────────────────────────
+  // Un PATCH por fila, en tandas, igual que los totales. 🔒 SOLO la columna
+  // `boletos`: `abonado_previo` está congelado (VJ-3) y el total es otra
+  // cuenta — lo que no se nombra no se puede pisar.
+  for (let i = 0; i < plan.boletos.length; i += TANDA) {
+    const tanda = plan.boletos.slice(i, i + TANDA);
+    await Promise.all(tanda.map(async (x) => {
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify({ boletos: x.a }),
+      });
+      if (!r.ok) { resultado.errores.push({ paso: 'boletos', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
+      resultado.boletos.push({ nombre: x.nombre, viajero_id: x.viajero_id, de: x.de, a: x.a });
+    }));
+  }
+
+  // ── 2.6 [BOLETOS-1 adenda] `vendidos_fuera`: SET, JAMÁS SUMA ──────────────
+  // 🔒 `stock_ajustes` SUMA por diseño y tiene UNIQUE en (evento_id, zona). Si
+  // esto insertara cada vez, el segundo clic duplicaría boletos —la mordida de
+  // CREA-1— y si usara `on_conflict` rompería la regla de la casa. Así que:
+  // la fila YA VIENE LEÍDA del careo (con su `id`), y se decide con eso.
+  //   · hay fila  → PATCH por `id` al valor ABSOLUTO;
+  //   · no hay    → INSERT directo, sin `on_conflict`.
+  for (const x of plan.fuera) {
+    const cuerpo = { vendidos_fuera: x.a };
+    let r;
+    if (x.ajuste_id) {
+      r = await fetch(`${SB_URL}/rest/v1/stock_ajustes?id=eq.${encodeURIComponent(x.ajuste_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' }, body: JSON.stringify(cuerpo) });
+    } else {
+      r = await fetch(`${SB_URL}/rest/v1/stock_ajustes`, {
+        method: 'POST', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify({ evento_id: eventoId, zona: x.zona, ...cuerpo,
+          nota: `Chatarra contada del careo Excel ${hoy}` }) });
+    }
+    if (!r.ok) { resultado.errores.push({ paso: 'fuera', zona: x.zona, detalle: (await r.text()).slice(0, 200) }); continue; }
+    resultado.fuera.push({ zona: x.zona, de: x.de, a: x.a });
+  }
+
   // ── 3. LAS ALTAS, POR LA PUERTA DE SIEMPRE ────────────────────────────────
   // 🔒 NO HAY INSERT NUEVO AQUÍ. Se invoca el handler REAL de
   // `admin-coordi-asignaciones` con la acción `viajero_migrar` —la misma que
@@ -307,6 +443,7 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
           tipo_paquete: x.tipo_paquete, zona_boleto: x.zona_boleto,
           total_contrato: x.total_contrato, abonado_previo: x.abonado_previo,
           talla_playera: x.talla_playera || '',
+          boletos: x.boletos || 1,
           notas: `Alta por careo Excel ${(x.pestanas && x.pestanas[0]) || pestanaNombre} ${hoy}`
                + (x.origen === 'apartado' ? ' · apartado sin abonar (si está en el Excel, va)' : '')
                // La marca que hace que el careo de mañana la vuelva a levantar:

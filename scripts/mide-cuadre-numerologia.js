@@ -482,6 +482,42 @@ const MAPEOS = () => ([
        'sin contrato en NINGUNA de las dos fuentes, el alta tiene que seguir saltándose con motivo');
   } catch (e) { af(false, 'la sección del solo-libro se CAYÓ: ' + e.message); }
 
+  // ── [4e] 🔴 EL LIBRO REPITE LOS BOLETOS DE LA PESTAÑA ────────────────────
+  // MEDIDO CONTRA PRODUCCIÓN el 20-sep: en Soy Luna hay 15 personas en LAS DOS
+  // fuentes, y para ellas el libro de Memo anota EXACTAMENTE los mismos
+  // boletos que la pestaña — Camila: 2 renglones en la pestaña y 2 filas en el
+  // libro, los MISMOS 2 boletos escritos dos veces.
+  //
+  // Por eso el conteo de boletos sale de `zonas` (que solo llena la pestaña) y
+  // NO de `filas`, que lo incrementan las dos fuentes. Con `filas` se le
+  // habrían escrito 4 a Camila y el stock habría cerrado zonas con lugar.
+  // Sin este caso, el careo pasaba VERDE con el defecto dentro.
+  console.log('\n[4e] una persona en LAS DOS fuentes');
+  try {
+    const { planear } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-aplicar.js'));
+    const dePestana = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 2000, total: 4000,
+      filas: 2, zonas: { 'Balcón': 2 }, zona: 'Balcón', paquete: 'PLUS', talla: '', pestanas: ['P'] }];
+    const delLibro = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 },
+                      { nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 }];
+    const fundidas = N.fundirNumerologia(dePestana, delLibro);
+    const cam = fundidas[0];
+    console.log('    tras fundir: filas=' + cam.filas + ' · zonas=' + JSON.stringify(cam.zonas));
+    af(cam.filas > 2, 'el fixture no reproduce el caso: `filas` tiene que inflarse (' + cam.filas + ') o el candado de abajo no prueba nada');
+    const careoFalso = {
+      personas: fundidas,
+      viajeros: [{ id: 'v1', nombre: 'Camila Dos', zona: 'Balcón', paquete: 'plus', abonado: 2000,
+        abonado_previo: 2000, total_contrato: 4000, notas: '', boletos: 1 }],
+      montones: { pagos: [], totales_contrato: [], nuevos: [], apartados: [], bajas: [], ambiguos: [], iguales: [] },
+      ajustes: [], chatarraPorZona: {},
+    };
+    const plan = planear(careoFalso, {});
+    const pb = (plan.boletos || [])[0];
+    console.log('    el plan escribiría: ' + JSON.stringify(pb));
+    af(pb && pb.a === 2,
+       'el plan le escribiría ' + (pb && pb.a) + ' boletos y la PESTAÑA le cuenta 2: '
+       + 'el libro repite los mismos boletos, contarlos dos veces cierra zonas que sí tienen lugar');
+  } catch (e) { af(false, 'la sección de las dos fuentes se CAYÓ: ' + e.message); }
+
   // ── [4c] EL RELOJ: no se trae el libro si no hay nada que mapear ──────────
   // ⏱ MEDIDO CONTRA PRODUCCIÓN: la cosecha del libro cuesta ~2.1 s en CADA
   // careo, y es EL MISMO libro para los 107 eventos. Con él, natanael pasó de

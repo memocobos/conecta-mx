@@ -142,6 +142,9 @@ const SEMILLA = () => ({
       filaExcel({ 'Nombre': 'Tino Gil', 'Paquete': 'PLUS', 'Boleto': 'Zona GNP', 'Separo': '$500', '1': '$900', 'Total': '$0', 'TALLA': 'L' }),
       // [E] TOTAL EXACTO de la libreta (notas sin «derivado») → FUERA del global.
       filaExcel({ 'Nombre': 'Rosa Vela', 'Paquete': 'PLUS', 'Boleto': 'Zona GNP', 'Separo': '$500', '1': '$1,500', 'Total': '$6,000', 'TALLA': 'M' }),
+      // [P] [BOLETOS-1] ALTA con DOS renglones: nace con boletos 2 (caso Danna).
+      filaExcel({ 'Nombre': 'Danna Dos', 'Paquete': 'PLUS', 'Boleto': 'Zona GNP', 'Separo': '$1,000', 'Total': '$5,950', 'TALLA': 'M' }),
+      filaExcel({ 'Nombre': 'Danna Dos', 'Paquete': 'PLUS', 'Boleto': 'Zona GNP', 'Separo': '$1,000', 'Total': '$5,950', 'TALLA': 'M' }),
       // [F] NUEVO con dinero → alta por el camino de `viajero_migrar`.
       filaExcel({ 'Nombre': 'Nadia Soto', 'Paquete': 'CHEAP', 'Boleto': 'Poniente Baja', 'Separo': '$1,000', '1': '$500', 'Total': '$3,200', 'TALLA': 'S' }),
       // [G] APARTADO sin un peso y sin fila en el sistema → alta con $0.
@@ -155,6 +158,19 @@ const SEMILLA = () => ({
       filaExcel({ 'Nombre': 'matamoros', 'Paquete': 'RIDE', 'Boleto': '-', 'Costo': '0', 'Pago Hab': '$0', 'Total': '$0', 'TALLA': '-' }),
       // [M] APARTADO de verdad, con zona buena, pero la pestaña dice $0 de total.
       filaExcel({ 'Nombre': 'Ervin Huerta', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Total': '$0', 'TALLA': 'M' }),
+      // [N] [BOLETOS-1] SERGIO: CUATRO renglones de la MISMA zona. El sistema
+      //     tiene UNA fila con boletos 1 → hay que sincronizar a 4.
+      ...Array.from({ length: 4 }, () => filaExcel({ 'Nombre': 'Sergio Cuatro', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$1,000', 'Total': '$5,950', 'TALLA': 'M' })),
+      // [O] ANGEL: dos boletos en zonas DISTINTAS. NO se sincroniza solo —
+      //     repartirlos entre zonas sin fila sería inventar.
+      filaExcel({ 'Nombre': 'Angel Reparto', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$1,500', 'Total': '$5,950' }),
+      filaExcel({ 'Nombre': 'Angel Reparto', 'Paquete': 'PLUS', 'Boleto': 'Zona GNP', 'Separo': '$1,500', 'Total': '$5,950' }),
+      // [Q] [BOLETOS-1 adenda] CHATARRA: no son viajeros, pero ocupan boleto.
+      //     Cancha General tiene 2 (y `stock_ajustes` ya trae una fila en 1 →
+      //     PATCH al valor absoluto). Zona GNP tiene 1 y NO tiene fila → INSERT.
+      filaExcel({ 'Nombre': 'Vendido Alex', 'Boleto': 'Cancha General' }),
+      filaExcel({ 'Nombre': 'Marietta Barrera creadora', 'Boleto': 'Cancha General' }),
+      filaExcel({ 'Nombre': 'Coordinadora Renata', 'Boleto': 'Zona GNP' }),
       // [K] CUADRA en todo → no genera nada.
       filaExcel({ 'Nombre': 'Cris Mora', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$5,450', 'Total': '$5,950', 'TALLA': 'M' }),
       // [I] AMBIGUO: dos viajeros con ese nombre en el sistema → JAMÁS.
@@ -163,7 +179,8 @@ const SEMILLA = () => ({
   },
   excel_pestanas: [{ evento_id: EVENTO, pestana: PESTANA, regla_zona: null, activa: true, notas: null }],
   eventos_meta: [{ slug: EVENTO }],
-  stock_ajustes: [],
+  // Una fila que YA existe, en 1: el sync tiene que PATCHearla a 2, no sumarle.
+  stock_ajustes: [{ id: 'aj-1', evento_id: EVENTO, zona: 'Cancha General', vendidos_fuera: 1, nota: null }],
   abonos_viajero: [],
   viajeros_evento: [
     { id: 'v-a', evento_id: EVENTO, nombre: 'David Lara',   tipo_viajero: 'cliente', abonado_previo: 5980, total_contrato: 5950, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'plus' },
@@ -171,6 +188,8 @@ const SEMILLA = () => ({
     { id: 'v-c', evento_id: EVENTO, nombre: 'Ana Ruiz',     tipo_viajero: 'cliente', abonado_previo: 7000, total_contrato: 7200, notas: 'TOTAL-1: contrato derivado del catálogo (se afina contra la pestaña)', zona_boleto: 'Zona GNP', tipo_paquete: 'plus' },
     { id: 'v-d', evento_id: EVENTO, nombre: 'Tino Gil',     tipo_viajero: 'cliente', abonado_previo: 1400, total_contrato: 3900, notas: 'TOTAL-1: contrato derivado del catálogo (se afina contra la pestaña)', zona_boleto: 'Zona GNP', tipo_paquete: 'plus' },
     { id: 'v-e', evento_id: EVENTO, nombre: 'Rosa Vela',    tipo_viajero: 'cliente', abonado_previo: 2000, total_contrato: 4200, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Zona GNP', tipo_paquete: 'plus' },
+    { id: 'v-n', evento_id: EVENTO, nombre: 'Sergio Cuatro',  tipo_viajero: 'cliente', abonado_previo: 4000, total_contrato: 23800, notas: 'Migrado Excel', zona_boleto: 'Cancha General', tipo_paquete: 'plus', boletos: 1 },
+    { id: 'v-o', evento_id: EVENTO, nombre: 'Angel Reparto',  tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: 11900, notas: 'Migrado Excel', zona_boleto: 'Cancha General', tipo_paquete: 'plus', boletos: 1 },
     { id: 'v-k', evento_id: EVENTO, nombre: 'Cris Mora',    tipo_viajero: 'cliente', abonado_previo: 5950, total_contrato: 5950, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'plus' },
     // [H] BAJA: está en el sistema y ya no en el Excel. JAMÁS se toca.
     { id: 'v-h', evento_id: EVENTO, nombre: 'Zulema Fría',  tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: 5950, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'plus' },
@@ -234,7 +253,7 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     (v.saltados || []).forEach((x) => console.log('      salta · ' + x.nombre + ' — ' + x.motivo));
     af((v.abonos || []).length === 1, 'la vista previa promete ' + (v.abonos || []).length + ' abono(s), se esperaba 1 (solo David)');
     af((v.totales || []).length === 1, 'promete ' + (v.totales || []).length + ' total(es), se esperaba 1 (solo Ana: derivada y > 0)');
-    af((v.altas || []).length === 3, 'promete ' + (v.altas || []).length + ' alta(s), se esperaban 3 (Nadia nueva + Hugo y Ervin apartados; «matamoros» NO es persona)');
+    af((v.altas || []).length === 4, 'promete ' + (v.altas || []).length + ' alta(s), se esperaban 4 (Danna, Nadia, Hugo y Ervin; «matamoros» NO es persona)');
     af((v.abonos || []).every((x) => x.nombre && x.monto > 0), 'la vista previa trae montos sin nombre: un número pelón no se confirma');
     af((v.saltados || []).some((x) => /Ines/.test(x.nombre) && /zona/i.test(x.motivo)),
        'Ines no trae zona y `viajero_migrar` la exige: tiene que saltarse CON MOTIVO, no desaparecer');
@@ -270,7 +289,7 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     const t = a.tablas;
     console.log('    abonos_viajero: 0 → ' + cuenta(t, 'abonos_viajero') + '   viajeros_evento: 9 → ' + cuenta(t, 'viajeros_evento'));
     af(cuenta(t, 'abonos_viajero') === 1, 'se escribieron ' + cuenta(t, 'abonos_viajero') + ' abono(s), se esperaba 1');
-    af(cuenta(t, 'viajeros_evento') === 12, 'viajeros_evento quedó en ' + cuenta(t, 'viajeros_evento') + ', se esperaban 12 (9 + 3 altas)');
+    af(cuenta(t, 'viajeros_evento') === 15, 'viajeros_evento quedó en ' + cuenta(t, 'viajeros_evento') + ', se esperaban 15 (11 + 4 altas)');
     // CARDINALIDAD: si la corrida buena no escribe, los Δ 0 de abajo no dicen nada.
     af(a.escrituras.length > 0, 'la corrida buena no escribió NADA: los Δ 0 de los candados no valdrían nada');
     const ab = (t.abonos_viajero || [])[0] || {};
@@ -289,7 +308,16 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     af(!('on_conflict' in ab), 'llegó on_conflict a la fila');
     const patches = a.escrituras.filter((e) => e.op === 'PATCH');
     console.log('    PATCHes: ' + patches.length + ' → ' + patches.map((x) => x.fila.nombre + ':' + x.fila.total_contrato).join(', '));
-    af(patches.length === 1, 'se hicieron ' + patches.length + ' PATCH(es), se esperaba 1 (solo Ana)');
+    // Se cuentan POR LO QUE TOCAN, no en bulto: desde BOLETOS-1 hay dos clases
+    // de PATCH y un total suelto diría lo mismo que un total de boletos.
+    const pTot = patches.filter((x) => x.parche && 'total_contrato' in x.parche);
+    const pBol = patches.filter((x) => x.parche && 'boletos' in x.parche);
+    console.log('    PATCH de total: ' + pTot.length + ' · de boletos: ' + pBol.length);
+    af(pTot.length === 1, 'se hicieron ' + pTot.length + ' PATCH(es) de total, se esperaba 1 (solo Ana)');
+    af(pBol.length === 1, 'se hicieron ' + pBol.length + ' PATCH(es) de boletos, se esperaba 1 (solo Sergio)');
+    // 🔒 Y NO SE MEZCLAN: un PATCH de boletos no puede llevar dinero encima.
+    af(pBol.every((x) => Object.keys(x.parche).length === 1 && 'boletos' in x.parche),
+       'un PATCH de boletos llevó algo más: ' + JSON.stringify(pBol.map((x) => Object.keys(x.parche))));
     af(patches.every((x) => /id=eq\./.test(x.filtro)), 'un PATCH salió sin filtrar por id: escribiría de más');
   }
 
@@ -300,6 +328,63 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     console.log('    con `capturado_por` mandado por el cliente → quedó ' + JSON.stringify(abSup.capturado_por));
     af(abSup.capturado_por === 'Bulma',
        'EL CLIENTE SUPLANTÓ a quien captura: quedó ' + JSON.stringify(abSup.capturado_por));
+  }
+
+  // ── [2b] [BOLETOS-1] LA SINCRONÍA DE BOLETOS ─────────────────────────────
+  // Es CONTEO, no dinero: la fuente de verdad es la pestaña, así que entra al
+  // clic global. Pero solo cuando NO hay nada que adivinar.
+  console.log('\n[2b] la sincronía de boletos');
+  if (!a.falta) {
+    const t = a.tablas;
+    const serg = (t.viajeros_evento || []).find((v) => v.id === 'v-n');
+    const ang = (t.viajeros_evento || []).find((v) => v.id === 'v-o');
+    console.log('    Sergio (4 renglones, 1 zona): boletos ' + serg.boletos
+      + ' · Angel (2 zonas): boletos ' + ang.boletos);
+    // 🔒 UNA SOLA ZONA Y COINCIDE → se sincroniza en automático.
+    af(serg.boletos === 4, 'Sergio quedó en ' + serg.boletos + ' boletos y la pestaña le cuenta 4');
+    // 🔒 BOLETOS REPARTIDOS → AVISO, y Δ0 sobre esa fila. Repartirlos entre
+    // zonas sin fila sería inventar, y ya mordió con Angel.
+    af(ang.boletos === 1, 'a Angel le sincronizaron los boletos teniéndolos en DOS zonas: quedó en ' + ang.boletos
+       + ' — eso es repartir sin saber en cuál');
+    const aviso = ((a.d.plan || {}).saltados || []).find((x) => /Angel/.test(x.nombre))
+      || ((a.d.plan || {}).avisos_boletos || []).find((x) => /Angel/.test(x.nombre));
+    af(!!aviso, 'Angel no sale con AVISO: callarlo lo vuelve invisible justo donde hay que preguntar');
+    af(aviso && /zona/i.test(aviso.motivo || aviso.detalle || ''),
+       'el aviso de Angel no dice que el problema son las zonas: ' + JSON.stringify(aviso));
+    // 🔒 REGRESIÓN: la fila que ya cuadra no se toca.
+    const cris = (t.viajeros_evento || []).find((v) => v.id === 'v-e');
+    af(cris.boletos === undefined || cris.boletos === 1, 'a una fila que cuadra le movieron los boletos: ' + cris.boletos);
+    // Y el PATCH de boletos es su propio renglón del plan.
+    const plan = a.d.plan || {};
+    af(Array.isArray(plan.boletos), 'el plan no trae el renglón de `boletos`: ' + Object.keys(plan).join(','));
+    af((plan.boletos || []).length === 1, 'el plan sincroniza ' + (plan.boletos || []).length + ' fila(s), se esperaba 1 (solo Sergio)');
+    const pb = (plan.boletos || [])[0];
+    af(pb && pb.de === 1 && pb.a === 4, 'el renglón dice ' + JSON.stringify(pb) + ' y debe ir de 1 a 4');
+  }
+
+  // ── [2c] [BOLETOS-1 adenda] LA CHATARRA → `vendidos_fuera` ───────────────
+  // 🔒 LA ESCRITURA ES **SET**, JAMÁS SUMA. `stock_ajustes` SUMA por diseño y
+  // tiene UNIQUE en (evento_id, zona): un segundo clic que sumara duplicaría
+  // boletos —es la mordida de CREA-1—. Así que: leer-si-existe → PATCH al
+  // valor ABSOLUTO; si no existe → INSERT. Jamás `on_conflict`.
+  console.log('\n[2c] la chatarra a vendidos_fuera');
+  if (!a.falta) {
+    const aj = a.tablas.stock_ajustes || [];
+    console.log('    ' + JSON.stringify(aj.map((x) => [x.zona, x.vendidos_fuera])));
+    const cg = aj.find((x) => x.zona === 'Cancha General');
+    const gnp = aj.find((x) => x.zona === 'Zona GNP');
+    af(cg && cg.vendidos_fuera === 2,
+       'Cancha General quedó en ' + (cg && cg.vendidos_fuera) + ' y la pestaña cuenta 2 de chatarra');
+    af(cg && cg.id === 'aj-1', 'se creó una fila NUEVA para Cancha General en vez de PATCHear la que había: '
+       + JSON.stringify(cg) + ' — con UNIQUE en (evento_id,zona) eso truena, y sin él duplica');
+    af(!!gnp && gnp.vendidos_fuera === 1, 'Zona GNP no se insertó con su 1: ' + JSON.stringify(gnp));
+    af(aj.length === 2, 'quedaron ' + aj.length + ' fila(s) de ajuste, se esperaban 2');
+    // Y sale en el plan, para poder verlo antes de confirmar.
+    const plan = a.d.plan || {};
+    af(Array.isArray(plan.fuera), 'el plan no trae el renglón de `fuera`: ' + Object.keys(plan).join(','));
+    af((plan.fuera || []).length === 2, 'el plan sincroniza ' + (plan.fuera || []).length + ' zona(s), se esperaban 2');
+    const pf = (plan.fuera || []).find((x) => x.zona === 'Cancha General');
+    af(pf && pf.de === 1 && pf.a === 2, 'el renglón dice ' + JSON.stringify(pf) + ' y debe ir de 1 a 2');
   }
 
   // ── [3] 🔒 LAS DIFERENCIAS NEGATIVAS: JAMÁS ───────────────────────────────
@@ -360,6 +445,16 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
       af(nadia.tipo_viajero === 'cliente', 'el alta no marcó tipo_viajero=cliente: consumeBoleto no la contaría');
       af(/careo/i.test(String(nadia.notas || '')), 'el alta no dejó nota de origen');
     }
+    // [BOLETOS-1] EL ALTA NACE CON SU NÚMERO. El caso Danna: dos lugares, una
+    // fila. Si naciera en 1, el stock la contaría de menos desde el día uno y
+    // habría que esperar al careo del día siguiente para corregirla.
+    const nadiaB = (a.tablas.viajeros_evento || []).find((v) => v.nombre === 'Nadia Soto');
+    af(nadiaB && nadiaB.boletos === 1, 'Nadia trae 1 renglón y nació con boletos ' + (nadiaB && nadiaB.boletos));
+    const danna = (a.tablas.viajeros_evento || []).find((v) => v.nombre === 'Danna Dos');
+    af(!!danna, 'Danna (dos renglones, nueva) no se dio de alta');
+    af(danna && danna.boletos === 2,
+       'Danna trae DOS renglones y nació con boletos ' + (danna && danna.boletos)
+       + ': si nace en 1, el stock la cuenta de menos desde el día uno');
     if (hugo) {
       console.log('    Hugo:  abonado_previo=' + hugo.abonado_previo + ' total=' + hugo.total_contrato);
       af(hugo.abonado_previo === 0, 'Hugo es un apartado: abonado_previo debe ser 0 y es ' + hugo.abonado_previo);
@@ -387,9 +482,9 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     // `eventos_meta` para comprobar que el evento existe. Si las altas
     // hubieran salido por un INSERT propio, esa lectura no aparecería.
     const vecesMeta = a.lecturas.filter((t) => t === 'eventos_meta').length;
-    console.log('    lecturas de `eventos_meta` (el candado de viajero_migrar): ' + vecesMeta + ' · altas: 3');
-    af(vecesMeta === 3, 'las altas NO pasaron por `viajero_migrar`: su candado de «el evento existe» se consultó '
-       + vecesMeta + ' vez(ces) y hubo 3 altas. Un INSERT propio aquí sería una segunda puerta que envejece sola.');
+    console.log('    lecturas de `eventos_meta` (el candado de viajero_migrar): ' + vecesMeta + ' · altas: 4');
+    af(vecesMeta === 4, 'las altas NO pasaron por `viajero_migrar`: su candado de «el evento existe» se consultó '
+       + vecesMeta + ' vez(ces) y hubo 4 altas. Un INSERT propio aquí sería una segunda puerta que envejece sola.');
     // Y el aviso del doble descuento de MIG-1b tiene que viajar: es lo que
     // impide que el mismo boleto se reste dos veces.
     af((a.d.resultado.altas || []).every((x) => 'aviso_doble_descuento' in x),
@@ -414,6 +509,12 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     console.log('    escrituras del 1er clic: ' + a.escrituras.length + ' · del 2º: ' + red2.escrituras.length);
     af(red2.escrituras.length === 0, 'el SEGUNDO clic escribió ' + red2.escrituras.length + ' vez(ces): '
        + JSON.stringify(red2.escrituras.map((e) => e.tabla + ':' + e.op)));
+    // 🔒 Y `vendidos_fuera` QUEDA IDÉNTICO, no duplicado. `stock_ajustes` SUMA
+    // por diseño: un sync que sumara convertiría cada clic en boletos de más.
+    const ajDesp = (a.tablas.stock_ajustes || []).map((x) => [x.zona, x.vendidos_fuera]).sort();
+    console.log('    vendidos_fuera tras el 2º clic: ' + JSON.stringify(ajDesp));
+    af(JSON.stringify(ajDesp) === JSON.stringify([['Cancha General', 2], ['Zona GNP', 1]]),
+       'el segundo clic movió `vendidos_fuera`: ' + JSON.stringify(ajDesp) + ' — eso es sumar, no SET');
   }
 
   // ── [8] EL BOTÓN DE RENGLÓN: el exacto y el $0, uno por uno ───────────────

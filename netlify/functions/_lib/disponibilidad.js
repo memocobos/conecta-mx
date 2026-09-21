@@ -191,7 +191,10 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   // no una fuente nueva—. Con él, el tablero puede decir el dinero REAL de un
   // migrado en vez del estimado "vendidas × precio de hoy" que la propia nota
   // al pie confiesa que es una estimación.
-  mp.set('select', 'zona_boleto,tipo_paquete,tipo_viajero,total_contrato');
+  // [BOLETOS-1] `boletos` entra al select. Sin él, el contador lo leería como
+  // undefined y caería a 1 — que es EXACTAMENTE el defecto que se arregla, así
+  // que el fallo se vería como «ya estaba bien».
+  mp.set('select', 'zona_boleto,tipo_paquete,tipo_viajero,total_contrato,boletos');
   mp.append('evento_id', `eq.${evento_id}`);
   mp.set('limit', '10000');
 
@@ -256,8 +259,20 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
     else segurasPorZona[z] = (segurasPorZona[z] || 0) + n;
   });
 
-  // [MIG-1b] Migrados por zona. UNA FILA = UNA PERSONA = UN BOLETO: aquí no hay
-  // `num_personas` que multiplicar, y suponerlo contaría de más.
+  // [MIG-1b] Migrados por zona.
+  //
+  // 🔴 [BOLETOS-1] AQUÍ DECÍA «UNA FILA = UNA PERSONA = UN BOLETO», y esa
+  // segunda igualdad era FALSA. La pestaña de las chicas lleva UNA FILA POR
+  // BOLETO y el careo las funde por nombre, así que una persona con 4 boletos
+  // entraba como UNA fila y descontaba UNO.
+  //
+  // Medido sobre Soy Luna el 20-sep, destapado por Memo usando el sitio: 56
+  // renglones de pestaña = 38 personas; VIP tenía 17 boletos vendidos contra 12
+  // filas, y el sitio publicaba «8 libres» quedando 3. La clase muerde en CADA
+  // evento con multi-boleto.
+  //
+  // Lo que NO cambia: `consumeBoleto` sigue siendo el único dueño de QUIÉN
+  // consume. Lo que cambia es CUÁNTO.
   const migradosPorZona = {};
   // [CAP-MIG-FIX] Dinero REAL de los migrados por zona, y CUÁNTOS lo traen.
   // Las dos cifras van juntas por lo mismo que el costo unitario de MER-1: un
@@ -270,7 +285,11 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
     if (!consumeBoleto(m.tipo_paquete, m.tipo_viajero)) return;
     const z = (m.zona_boleto != null) ? String(m.zona_boleto).trim() : '';
     if (!z) return;   // sin zona no se le puede descontar a ninguna
-    migradosPorZona[z] = (migradosPorZona[z] || 0) + 1;
+    // `boletos` es NOT NULL DEFAULT 1 en la base, pero el respaldo se escribe
+    // igual: si algún día llega null por un select viejo, contar 0 SOBREVENDE,
+    // y contar de más solo deja de vender. Ante la duda, el lado seguro.
+    const nb = parseInt(m.boletos, 10);
+    migradosPorZona[z] = (migradosPorZona[z] || 0) + (Number.isInteger(nb) && nb > 0 ? nb : 1);
     const tc = Number(m.total_contrato);
     if (Number.isFinite(tc) && tc > 0) {
       dineroMigradoPorZona[z] = (dineroMigradoPorZona[z] || 0) + tc;

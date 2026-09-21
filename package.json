@@ -19,6 +19,7 @@
     "mide:cuadre-aplicar": "node scripts/mide-cuadre-aplicar.js",
     "mide:cuadre-numerologia": "node scripts/mide-cuadre-numerologia.js",
     "mide:cuadre-todo": "node scripts/mide-cuadre-todo.js",
-    "mide:stock-vivo": "node scripts/mide-stock-vivo.js"
+    "mide:stock-vivo": "node scripts/mide-stock-vivo.js",
+    "mide:boletos": "node scripts/mide-boletos.js"
   }
 }

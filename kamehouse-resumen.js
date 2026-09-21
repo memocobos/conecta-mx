@@ -1337,7 +1337,7 @@ function _radCalMasDias(fecha, n) {
 // bonito de SU evento para que la lista cruzada siga diciendo de dónde es cada
 // quien sin tener que agrupar por evento.
 function _resumenActualizarAgrupar(eventos) {
-  const g = { lugares: [], abonos: [], bajas: [], negativas: [], saltados: [], errores: [], monto: 0 };
+  const g = { lugares: [], abonos: [], boletos: [], fuera: [], bajas: [], negativas: [], saltados: [], errores: [], monto: 0 };
   for (const e of (eventos || [])) {
     // ⚠️ El nombre bonito puede faltar (fails-soft del servidor). Se cae al
     // slug antes que dejar el renglón sin decir de qué evento es: una lista
@@ -1357,6 +1357,14 @@ function _resumenActualizarAgrupar(eventos) {
       g.negativas.push({ tour, evento_id: e.evento_id, nombre: b.nombre, diferencia: b.diferencia, numerologia: b.numerologia });
     }
     for (const s of (p.saltados || [])) g.saltados.push({ tour, evento_id: e.evento_id, nombre: s.nombre, motivo: s.motivo });
+    // [BOLETOS-1] Es CONTEO, no dinero: entra al clic global y se reporta.
+    for (const b of (p.boletos || [])) g.boletos.push({ tour, evento_id: e.evento_id, nombre: b.nombre, de: b.de, a: b.a });
+    // [adenda] La chatarra («Vendido X», coordinadoras, creadoras) no es gente
+    // pero ocupa boleto: va a `vendidos_fuera` y se reporta como boletos de la
+    // casa, no como personas — mezclarlas las daría de alta como viajeros.
+    for (const f of (p.fuera || [])) g.fuera.push({ tour, evento_id: e.evento_id, zona: f.zona, de: f.de, a: f.a });
+    // Y los que NO se pudieron sincronizar solos van a Avisos, con su motivo.
+    for (const b of (p.avisos_boletos || [])) g.saltados.push({ tour, evento_id: e.evento_id, nombre: b.nombre, motivo: b.motivo });
     // Las bajas NO vienen en el plan y no pueden venir: jamás se aplican. El
     // servidor las manda aparte, como aviso, para poder NOMBRARLAS aquí.
     for (const b of (e.bajas || [])) g.bajas.push({ tour, evento_id: e.evento_id, nombre: b.nombre, abonado: b.abonado });
@@ -1382,7 +1390,8 @@ function _resumenActualizarHtml(g, totalEventos, hecho) {
     </div>
     <div style="font-size:15px;margin:8px 0 12px">
       <b style="color:var(--tp)">${g.lugares.length}</b> lugar${g.lugares.length === 1 ? '' : 'es'} nuevo${g.lugares.length === 1 ? '' : 's'} ·
-      <b style="color:var(--tp)">${g.abonos.length}</b> abono${g.abonos.length === 1 ? '' : 's'} por <b style="color:var(--green)">${mxn(g.monto)}</b>
+      <b style="color:var(--tp)">${g.abonos.length}</b> abono${g.abonos.length === 1 ? '' : 's'} por <b style="color:var(--green)">${mxn(g.monto)}</b>${g.boletos.length ? ` ·
+      <b style="color:var(--tp)">${g.boletos.length}</b> boleto${g.boletos.length === 1 ? '' : 's'} corregido${g.boletos.length === 1 ? '' : 's'}` : ''}
     </div>
 
     ${g.lugares.length ? `
@@ -1397,7 +1406,17 @@ function _resumenActualizarHtml(g, totalEventos, hecho) {
       `<b>${esc(x.nombre)}</b>${tour(x)}${chip(x.paquete)}`,
       `<b style="color:var(--green)">+${mxn(x.monto)}</b>`)).join('')}` : ''}
 
-    ${(!g.lugares.length && !g.abonos.length) ? `<div style="font-size:13px;color:var(--ts);padding:6px 0">No hay nada nuevo que entrar. Todo cuadra.</div>` : ''}
+    ${g.boletos.length ? `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue,#0000cd);margin-top:14px">Boletos corregidos</div>
+    <div style="font-size:11px;color:var(--ts);padding:2px 0 4px">La pestaña lleva UN RENGLÓN POR BOLETO; el sistema tenía uno por persona. Esto es lo que hacía que el sitio publicara lugares de más.</div>
+    ${g.boletos.map((x) => fila(`<b>${esc(x.nombre)}</b>${tour(x)}`, `${x.de} → <b>${x.a}</b> boleto${x.a === 1 ? '' : 's'}`)).join('')}` : ''}
+
+    ${g.fuera.length ? `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--orange);margin-top:14px">Boletos de la casa</div>
+    <div style="font-size:11px;color:var(--ts);padding:2px 0 4px">Cortesías, coordinadoras y vendidos sin registro: no son viajeros, pero ocupan lugar. La pestaña los tenía y el sistema no.</div>
+    ${g.fuera.map((x) => fila(`<b>${esc(x.zona)}</b>${tour(x)}`, `${x.de} → <b>${x.a}</b> boleto${x.a === 1 ? '' : 's'}`)).join('')}` : ''}
+
+    ${(!g.lugares.length && !g.abonos.length && !g.boletos.length && !g.fuera.length) ? `<div style="font-size:13px;color:var(--ts);padding:6px 0">No hay nada nuevo que entrar. Todo cuadra.</div>` : ''}
 
     ${avisos ? `
     <details style="margin-top:14px">
@@ -1413,7 +1432,7 @@ function _resumenActualizarHtml(g, totalEventos, hecho) {
     </details>` : ''}
 
     ${hecho ? '' : `<button class="btn btn-primary" id="resumen-actualizar-ok" style="margin-top:12px" onclick="resumenActualizarConfirmar()">
-      Sí, guardar${g.lugares.length ? ` los ${g.lugares.length} lugar${g.lugares.length === 1 ? '' : 'es'}` : ''}${g.abonos.length ? ` y los ${g.abonos.length} abono${g.abonos.length === 1 ? '' : 's'}` : ''}
+      Sí, guardar${g.lugares.length ? ` los ${g.lugares.length} lugar${g.lugares.length === 1 ? '' : 'es'}` : ''}${g.abonos.length ? ` y los ${g.abonos.length} abono${g.abonos.length === 1 ? '' : 's'}` : ''}${g.boletos.length ? ` · ${g.boletos.length} boleto${g.boletos.length === 1 ? '' : 's'}` : ''}
     </button>`}
   </div>`;
 }

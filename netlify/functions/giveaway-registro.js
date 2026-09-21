@@ -6,6 +6,16 @@
 
 const G = require('./_lib/giveaway');
 
+// [GIVEAWAY-KG-1] El formato de un usuario de Instagram: letras, números,
+// punto y guion bajo, hasta 30. Anclado a inicio y fin — sin las anclas,
+// «https://instagram.com/fulano» pasaría por traer un tramo válido dentro.
+const IG_RE = /^[A-Za-z0-9._]{1,30}$/;
+// Y la forma del path que devuelve `giveaway-foto`: `<slug>/<uuid>.<ext>`.
+// Se valida la FORMA antes de preguntarle al bucket, para que una cadena con
+// `../` ni siquiera llegue a convertirse en una consulta.
+const FOTO_PATH_RE = /^[a-z0-9-]+\/[A-Za-z0-9-]+\.(jpg|png)$/;
+const BUCKET_FOTOS = 'giveaway-fotos';
+
 // Máximo de altas por IP en una hora. No es antifraude —una IP compartida son
 // muchas personas— es un freno al script que llena la tabla en un minuto.
 const MAX_POR_IP_HORA = 5;
@@ -69,10 +79,50 @@ exports.handler = async (event) => {
     return G.json(400, headers, { ok: false, error: 'Escribe tu ciudad — de ella depende tu premio' });
   }
 
+  // ── [GIVEAWAY-KG-1] INSTAGRAM. Obligatorio, y PRIVADO: no sale por ninguna
+  // puerta pública. Se acepta con o sin @ porque la gente lo copia de las dos
+  // formas, y se guarda SIN @ para que la llave sea una sola.
+  // El formato es el de Instagram: letras, números, punto y guion bajo, hasta
+  // 30. Validarlo evita que entre una URL completa o un «@ mi cuenta».
+  const igCrudo = String(body.instagram || '').trim().replace(/^@+/, '');
+  if (!IG_RE.test(igCrudo)) {
+    return G.json(400, headers, { ok: false,
+      error: 'Revisa tu Instagram: solo el usuario, sin el @ y sin la liga' });
+  }
+  const instagram = igCrudo;
+
+  // ── [GIVEAWAY-KG-1] LA FOTO. Llega ya subida: el navegador la manda primero
+  // a `giveaway-foto` y trae de vuelta su `foto_path`. El orden es a propósito
+  // (ver el encabezado de esa función): un archivo huérfano es barato, un
+  // registro sin foto es caro.
+  //
+  // 🔒 SE COMPRUEBA QUE EL PATH EXISTA DE VERDAD. Sin esto, un cliente podría
+  // mandar cualquier cadena y quedar registrado sin foto — con su WhatsApp
+  // ocupando el índice único, o sea sin poder corregirlo después.
+  const fotoPath = String(body.foto_path || '').trim();
+  if (!fotoPath || !FOTO_PATH_RE.test(fotoPath)) {
+    return G.json(400, headers, { ok: false, error: 'Falta tu foto — súbela antes de participar' });
+  }
+
   // Cierre por fecha. Va DESPUÉS de las validaciones de forma para que quien
   // llegue tarde con datos malos sepa que llegó tarde, no que su correo falla.
   if (G.registroCerrado()) {
     return G.json(410, headers, { ok: false, error: 'El registro ya cerró' });
+  }
+
+  // El objeto tiene que estar en el bucket. Se pregunta por HEAD: barato, y no
+  // baja la foto.
+  try {
+    const h = await fetch(`${G.SB_URL}/storage/v1/object/${BUCKET_FOTOS}/${encodeURI(fotoPath)}`, {
+      method: 'HEAD', headers: { apikey: G.SB_KEY, Authorization: 'Bearer ' + G.SB_KEY },
+    });
+    if (!h.ok) {
+      return G.json(400, headers, { ok: false,
+        error: 'Tu foto no llegó completa. Vuelve a subirla e inténtalo otra vez.' });
+    }
+  } catch (e) {
+    console.warn('[giveaway-registro] no se pudo comprobar la foto:', e.message);
+    return G.json(502, headers, { ok: false, error: 'No pudimos verificar tu foto, vuelve a intentar' });
   }
 
   const ip = G.ipDe(event);
@@ -108,6 +158,7 @@ exports.handler = async (event) => {
       headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
       body: JSON.stringify({
         slug: G.SLUG, nombre, whatsapp, correo, ciudad, ip, user_agent: ua,
+        instagram, foto_path: fotoPath,   // [GIVEAWAY-KG-1] `foto_estado` lo pone la base en 'pendiente'
       }),
     });
   } catch (e) {
@@ -119,6 +170,16 @@ exports.handler = async (event) => {
     const detalle = await r.text().catch(() => '');
     if (r.status === 409 || /23505/.test(detalle)) {
       return G.json(409, headers, { ok: false, error: 'Ese WhatsApp ya está registrado' });
+    }
+    // 🔒 LA MIGRACIÓN QUE FALTA, DICHA POR SU NOMBRE. 42703 es «la columna no
+    // existe»: pasa si esto se despliega antes de correr
+    // `migraciones/GIVEAWAY-KG-1-fotos.sql`. Sin este caso, el día del estreno
+    // el síntoma sería un 502 mudo y se buscaría el problema en la red.
+    if (/42703/.test(detalle) || /column .* does not exist/i.test(detalle)) {
+      console.error('[giveaway-registro] FALTA LA MIGRACIÓN GIVEAWAY-KG-1-fotos.sql');
+      return G.json(500, headers, { ok: false,
+        error: 'El registro todavía no está listo. Avísale a Conecta.',
+        codigo: 'FALTA_MIGRACION' });
     }
     console.error('[giveaway-registro] Supabase', r.status, detalle.slice(0, 300));
     return G.json(502, headers, { ok: false, error: 'No pudimos guardar tu registro, vuelve a intentar' });

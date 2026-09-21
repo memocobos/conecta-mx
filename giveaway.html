@@ -138,6 +138,13 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 /* text-transform:none — es un <label> y heredaba las MAYÚSCULAS de los
    rótulos de campo. Una frase entera en caja alta se lee a tropezones, y ésta
    es justo la que hay que leer antes de aceptar. */
+.foto-prev{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.foto-prev img{width:72px;height:72px;object-fit:cover;border:1px solid rgba(255,255,255,.2)}
+.foto-meta{font-size:11px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace}
+.foto-otra,.foto-reint{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;
+  font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;cursor:pointer;
+  font-family:Montserrat,sans-serif}
+.foto-error{margin-top:8px;font-size:12px;color:#ff283b;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .redes-gate{margin:0 0 18px}
 .redes-copy{font-size:13px;color:rgba(255,255,255,.72);margin:0 0 10px;line-height:1.5}
 .redes-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -464,6 +471,30 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       <input type="text" id="f-ciudad" autocomplete="address-level2" placeholder="Reynosa" required>
       <small class="campo-ayuda">De tu ciudad depende tu premio — mira las bases.</small>
     </div>
+    <div class="campo">
+      <label for="f-instagram">Tu Instagram</label>
+      <input type="text" id="f-instagram" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tu_usuario" required>
+      <small class="campo-ayuda">Solo el usuario, sin el @. Es para uso interno de Conecta; solo el del ganador se menciona en redes.</small>
+    </div>
+
+    <!-- [GIVEAWAY-KG-1] LA FOTO. `capture` NO se pone a propósito: con él,
+         Android abre SOLO la cámara y quita la galería, y mucha gente quiere
+         subir una que ya tiene. Sin él, el sistema ofrece las dos. -->
+    <div class="campo">
+      <label for="f-foto">Tu foto</label>
+      <input type="file" id="f-foto" accept="image/*" required>
+      <small class="campo-ayuda">Sube una foto tuya, clara y de frente. Todas las fotos son revisadas por el equipo de Conecta.</small>
+      <div class="foto-prev" id="foto-prev" hidden>
+        <img id="foto-img" alt="Tu foto">
+        <div class="foto-meta" id="foto-meta"></div>
+        <button type="button" class="foto-otra" id="foto-otra">Elegir otra</button>
+      </div>
+      <div class="foto-error" id="foto-error" hidden>
+        <span id="foto-error-txt"></span>
+        <button type="button" class="foto-reint" id="foto-reint">Reintentar</button>
+      </div>
+    </div>
+
     <label class="bases-ck">
       <input type="checkbox" id="f-acepto">
       <span>Acepto las bases, el uso de mi foto y nombre en el sorteo, y que me contacten por WhatsApp.</span>
@@ -736,6 +767,109 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     pintarRedes();
   })();
 
+  // ═══ [GIVEAWAY-KG-1] LA FOTO: comprimir aquí, subir aparte ══════════════
+  //
+  // Se comprime EN EL NAVEGADOR antes de subir porque una foto de iPhone pesa
+  // 3-5 MB y con señal de celular eso es medio minuto de espera y un fallo
+  // probable. Meta: lado mayor 1080, JPEG, ~300 KB.
+  //
+  // 🔒 LA ORIENTACIÓN. Las fotos de teléfono traen su giro en el EXIF, no en
+  // los píxeles: dibujarlas en un canvas «tal cual» las saca ACOSTADAS, que es
+  // el clásico de las fotos de iPhone. `createImageBitmap(blob, {imageOrientation:
+  // 'from-image'})` aplica ese giro; es la vía que respetan Safari y Chrome.
+  // Si el navegador no la trae, se cae a `<img>`, que en los navegadores de hoy
+  // también honra el EXIF al pintar.
+  //
+  // 🔒 Y EL HEIC. iPhone guarda en HEIC; Safari lo DECODIFICA, así que al pasar
+  // por el canvas sale JPEG y el servidor ya no ve HEIC nunca. En un navegador
+  // que no lo decodifica, la decodificación falla y se dice con su nombre en
+  // vez de dejar a la persona mirando un botón muerto.
+  var LADO_MAX = 1080, META_BYTES = 300 * 1024, TOPE_BYTES = 1024 * 1024;
+  var fotoPath = null;        // lo que devuelve la subida; viaja al registro
+  var fotoDataUri = null;     // por si hay que REINTENTAR sin volver a comprimir
+
+  function $$(id){ return document.getElementById(id); }
+  function fotoError(msg){
+    $$('foto-error-txt').textContent = msg;
+    $$('foto-error').hidden = false;
+  }
+  function fotoErrorFuera(){ $$('foto-error').hidden = true; }
+
+  async function aBitmap(file){
+    if (window.createImageBitmap){
+      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+      catch (e) { /* cae al <img> */ }
+    }
+    return await new Promise(function(res, rej){
+      var img = new Image();
+      img.onload = function(){ res(img); };
+      img.onerror = function(){ rej(new Error('no se pudo abrir')); };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function comprimir(file){
+    var bmp = await aBitmap(file);
+    var w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
+    if (!w || !h) throw new Error('no se pudo abrir');
+    var esc = Math.min(1, LADO_MAX / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * esc)), ch = Math.max(1, Math.round(h * esc));
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    c.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
+    // Se baja la calidad hasta acercarse a la meta. Nunca por debajo de .5:
+    // más abajo la cara deja de distinguirse, y la foto existe justo para eso.
+    var q = 0.82, uri = c.toDataURL('image/jpeg', q);
+    while (uri.length * 0.75 > META_BYTES && q > 0.5){
+      q -= 0.1; uri = c.toDataURL('image/jpeg', q);
+    }
+    return { uri: uri, bytes: Math.round(uri.length * 0.75), w: cw, h: ch };
+  }
+
+  async function subirFoto(){
+    fotoErrorFuera();
+    if (!fotoDataUri) return false;
+    try {
+      var r = await fetch('/.netlify/functions/giveaway-foto', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foto: fotoDataUri })
+      });
+      var j = await r.json().catch(function(){ return {}; });
+      if (!r.ok || !j.ok){
+        // 🔒 Y NO SE PIERDE NADA. Lo escrito sigue en sessionStorage y la foto
+        // comprimida sigue en memoria: el botón de reintentar vuelve a subir
+        // ESA misma, sin volver a elegirla ni a comprimirla.
+        fotoError((j && j.error) || 'No se pudo subir tu foto.');
+        return false;
+      }
+      fotoPath = j.foto_path;
+      return true;
+    } catch (e) {
+      fotoError('Se cortó la subida. Revisa tu señal.');
+      return false;
+    }
+  }
+
+  var inpFoto = $$('f-foto');
+  if (inpFoto) inpFoto.addEventListener('change', async function(){
+    fotoPath = null; fotoDataUri = null; fotoErrorFuera();
+    var file = inpFoto.files && inpFoto.files[0];
+    if (!file) { $$('foto-prev').hidden = true; return; }
+    try {
+      var out = await comprimir(file);
+      fotoDataUri = out.uri;
+      if (out.bytes > TOPE_BYTES){ fotoError('Esa foto pesa demasiado aunque la comprimamos. Prueba con otra.'); return; }
+      $$('foto-img').src = out.uri;
+      $$('foto-meta').textContent = out.w + '×' + out.h + ' · ' + Math.round(out.bytes / 1024) + ' KB';
+      $$('foto-prev').hidden = false;
+      await subirFoto();
+    } catch (e) {
+      $$('foto-prev').hidden = true;
+      fotoError('No pudimos abrir esa foto. Si es de iPhone, elígela otra vez desde la galería.');
+    }
+  });
+  if ($$('foto-reint')) $$('foto-reint').addEventListener('click', function(){ subirFoto(); });
+  if ($$('foto-otra')) $$('foto-otra').addEventListener('click', function(){ inpFoto.click(); });
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
     aviso.className = 'aviso'; aviso.textContent = '';
@@ -753,12 +887,24 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     if (whatsapp.length !== 10) return mal('El WhatsApp va a 10 dígitos, sin lada de país');
     if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(correo)) return mal('Revisa tu correo, algo no cuadra');
     if (ciudad.length < 3) return mal('Escribe tu ciudad — de ella depende tu premio');
+    var ig = (($('f-instagram') || {}).value || '').trim().replace(/^@+/, '');
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(ig)) return mal('Revisa tu Instagram: solo el usuario, sin el @ y sin la liga');
+    // 🔒 SIN FOTO NO SE MANDA. Y el mensaje distingue los dos casos: no haberla
+    // elegido y haberla elegido pero que no subiera — se arreglan distinto, y
+    // confundirlos manda a la persona a hacer lo que no es.
+    if (!fotoPath) {
+      return mal(fotoDataUri
+        ? 'Tu foto no terminó de subir. Dale a «Reintentar» ahí arriba.'
+        : 'Sube tu foto para participar');
+    }
 
     btn.disabled = true; btn.textContent = 'Registrando…';
     fetch('/.netlify/functions/giveaway-registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, ciudad: ciudad, acepto: true })
+      body: JSON.stringify({ nombre: nombre, whatsapp: whatsapp, correo: correo, ciudad: ciudad,
+        instagram: (($('f-instagram') || {}).value || '').trim().replace(/^@+/, ''),
+        foto_path: fotoPath, acepto: true })
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
     }).then(function(res){
@@ -766,6 +912,10 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       if (res.status === 410) return cerrar();
       if (!res.j || res.j.ok !== true) return mal((res.j && res.j.error) || 'No pudimos registrarte, vuelve a intentar');
 
+      // La memoria del regreso se borra AL REGISTRARSE: si no, la siguiente
+      // persona que abra la página en ese teléfono se encuentra los datos de
+      // la anterior ya escritos — y los manda sin darse cuenta.
+      try { sessionStorage.removeItem(LLAVE_FORM); sessionStorage.removeItem(LLAVE_REDES); } catch (e) {}
       form.style.display = 'none';
       $('ok').style.display = 'block';
       // Si el conteo no vino (la consulta de posición es best-effort), se

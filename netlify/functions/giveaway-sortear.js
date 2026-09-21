@@ -235,27 +235,104 @@ exports.handler = async (event) => {
   }
 
   // ── RESOLVER ─────────────────────────────────────────────────────────────
+  // La lista blanca del motivo vive AQUÍ **y** en el CHECK de la base: un typo
+  // que no truena es un dato que nadie puede leer después ('no_sige' se vería
+  // igual de verde, y el día que alguien filtre por 'no_sigue' esa fila no
+  // aparecería). Es la misma razón por la que `foto_estado` tiene su CHECK.
+  const MOTIVOS_DESCARTE = ['no_sigue', 'otro'];
+
   if (body.accion === 'resolver') {
     const id = String(body.sorteo_id || '').trim();
     const resultado = String(body.resultado || '').trim();
     if (!/^[0-9a-f-]{36}$/i.test(id)) {
       return G.json(400, headers, { ok: false, error: 'sorteo_id inválido' });
     }
-    if (resultado !== 'acepto' && resultado !== 'no_contesto') {
-      return G.json(400, headers, { ok: false, error: "resultado debe ser 'acepto' o 'no_contesto'" });
+    // Cuatro valores. `pendiente` es el DESHACER, no un estado que la pantalla
+    // pida por su cuenta.
+    if (!['pendiente', 'acepto', 'no_contesto', 'no_cumple'].includes(resultado)) {
+      return G.json(400, headers, { ok: false,
+        error: "resultado debe ser 'pendiente', 'acepto', 'no_contesto' o 'no_cumple'" });
     }
+
+    // 🔒 EL MOTIVO NACE VACÍO y es obligatorio para `no_cumple`. Un default
+    // escribiría en el acta un motivo que NADIE eligió — el defecto de
+    // `kmt-prov`, que mandó tres compras a «Hotel» por un selector que elegía
+    // solo. Aquí quedaría por escrito para siempre en `descarte_motivo`.
+    let descarte = null;
+    if (resultado === 'no_cumple') {
+      const m = String(body.motivo || '').trim();
+      if (!MOTIVOS_DESCARTE.includes(m)) {
+        return G.json(400, headers, { ok: false,
+          error: 'Elige un motivo: ' + MOTIVOS_DESCARTE.join(', ') });
+      }
+      const det = String(body.motivo_detalle || '').trim().slice(0, 200);
+      if (m === 'otro' && det.length < 3) {
+        return G.json(400, headers, { ok: false, error: 'Con «otro» hace falta escribir el motivo' });
+      }
+      descarte = (m === 'otro') ? ('otro: ' + det) : m;
+    }
+
+    // LA CADENA COMPLETA: de ella salen las dos reglas de abajo. Se lee del
+    // slug resuelto, así que un token en modo ensayo ve la cadena del ensayo.
+    let cadena = [];
     try {
-      const r = await fetch(`${sorBase}?id=eq.${encodeURIComponent(id)}`, {
+      const rs = await fetch(`${sorBase}?slug=eq.${slugQ}&select=id,intento,resultado,descarte_motivo`,
+        { headers: G.sbHeaders() });
+      if (!rs.ok) throw new Error('lectura ' + rs.status);
+      cadena = await rs.json().catch(() => []);
+    } catch (e) {
+      console.error('[giveaway-sortear] resolver/cadena:', e.message);
+      return G.json(502, headers, { ok: false, error: 'No se pudo leer el estado del sorteo' });
+    }
+    const lista = Array.isArray(cadena) ? cadena : [];
+    const fila = lista.find(x => x && String(x.id) === id);
+    // 🔒 El éxito vacío también habla: si no está en ESTE slug, no existe para
+    // esta petición — y decirlo es mejor que un ok sobre cero filas.
+    if (!fila) return G.json(404, headers, { ok: false, error: 'Ese giro no existe' });
+
+    // La IDEMPOTENCIA va ANTES de los candados: volver a picarle al mismo botón
+    // es un dedazo inofensivo, no un error que merezca un rojo en pantalla
+    // —y con `acepto` el candado de abajo lo trataría como intento de cambio.
+    if (fila.resultado === resultado && (fila.descarte_motivo || null) === descarte) {
+      return G.json(200, headers, { ok: true, resultado, sin_cambio: true });
+    }
+
+    // 🔒 `acepto` ES PERMANENTE. Antes de esto un PATCH podía regresarlo a
+    // `no_contesto`: un sorteo con ganador confirmado dejaba de estar cerrado,
+    // y «de forma permanente» era una promesa de la pantalla, no del servidor.
+    if (fila.resultado === 'acepto') {
+      return G.json(409, headers, { ok: false,
+        error: 'Ese giro se cerró con ganador confirmado: no se puede cambiar.' });
+    }
+
+    // 🔒 UN DESCARTE SE DESHACE MIENTRAS NO HAYA GIRO POSTERIOR. Orden de Memo:
+    // un dedazo no puede quemar al ganador legítimo. En cuanto hay re-giro queda
+    // fijo, porque deshacerlo entonces dejaría DOS ganadores vivos en la cadena.
+    if (fila.resultado !== 'pendiente') {
+      const hayPosterior = lista.some(x => x && Number(x.intento) > Number(fila.intento));
+      if (hayPosterior) {
+        return G.json(409, headers, { ok: false,
+          error: 'Ya se volvió a girar después de este: su resultado queda fijo.' });
+      }
+    }
+
+    try {
+      // 🔒 `descarte_motivo` se BORRA cuando la fila deja de ser un descarte: un
+      // motivo colgando de algo que ya no lo es es un dato que miente.
+      // 🔒 Y el filtro lleva `slug`: sin él, un token en modo ensayo podría
+      // resolver un giro REAL pasándole su id.
+      const r = await fetch(`${sorBase}?id=eq.${encodeURIComponent(id)}&slug=eq.${slugQ}`, {
         method: 'PATCH',
         headers: Object.assign({}, G.sbHeaders(), { Prefer: 'return=representation' }),
-        body: JSON.stringify({ resultado }),
+        body: JSON.stringify({ resultado, descarte_motivo: resultado === 'no_cumple' ? descarte : null }),
       });
       if (!r.ok) throw new Error('patch ' + r.status);
       const filas = await r.json().catch(() => []);
       if (!Array.isArray(filas) || !filas.length) {
-        return G.json(404, headers, { ok: false, error: 'Ese giro no existe' });
+        return G.json(409, headers, { ok: false, error: 'Ese giro no se pudo actualizar (¿es de este sorteo?)' });
       }
-      return G.json(200, headers, { ok: true, resultado });
+      return G.json(200, headers, { ok: true, resultado,
+        descarte_motivo: resultado === 'no_cumple' ? descarte : null });
     } catch (e) {
       console.error('[giveaway-sortear] resolver:', e.message);
       return G.json(502, headers, { ok: false, error: 'No se pudo guardar el resultado' });

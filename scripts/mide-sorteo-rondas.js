@@ -812,6 +812,100 @@ af(() => INSERTS.length === 0, 'un 401 no puede haber insertado nada');
 const gModo = await llamar({ accion: 'girar', modo: 'inventado' });
 af(() => gModo.code === 400, '🔒 un modo inventado → 400, dio ' + gModo.code);
 
+
+// ═══ [8] RESOLVER: CUATRO VALORES Y LAS REGLAS DE DESHACER ══════════════════
+console.log('\n── [8] resolver: cuatro valores y las reglas de deshacer ──');
+
+// ── El tercer botón EXIGE motivo, de lista cerrada ─────────────────────────
+sembrarPadron(); SOR = [sembrarGiro('pendiente', 1)];
+let rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple' });
+af(() => rr.code === 400 && /motivo/i.test(String(rr.d.error)),
+   '🔴 `no_cumple` sin motivo → 400, dio ' + rr.code + ' ' + rr.d.error);
+af(() => SOR[0].resultado === 'pendiente', 'y no se movió');
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple', motivo: 'no_sige' });
+af(() => rr.code === 400, '🔒 un motivo fuera de la lista → 400 (el typo NO puede pasar), dio ' + rr.code);
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple', motivo: 'otro', motivo_detalle: 'ab' });
+af(() => rr.code === 400 && /otro/i.test(String(rr.d.error)), '«otro» sin texto → 400, dio ' + rr.code);
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple', motivo: 'no_sigue' });
+af(() => rr.code === 200 && SOR[0].resultado === 'no_cumple' && SOR[0].descarte_motivo === 'no_sigue',
+   '🔴 `no_cumple` + no_sigue se guarda, quedó ' + SOR[0].resultado + '/' + SOR[0].descarte_motivo);
+SOR = [sembrarGiro('pendiente', 1)];
+await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple',
+               motivo: 'otro', motivo_detalle: 'cuenta privada' });
+af(() => SOR[0].descarte_motivo === 'otro: cuenta privada',
+   'el «otro» guarda «otro: <texto>», igual que `eliminado_motivo`; quedó ' + SOR[0].descarte_motivo);
+
+// ── Deshacer: SOLO mientras no haya giro posterior ────────────────────────
+SOR = [sembrarGiro('no_contesto', 1)];
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'pendiente' });
+af(() => rr.code === 200 && SOR[0].resultado === 'pendiente',
+   'sin giro posterior, no_contesto vuelve a pendiente; dio ' + rr.code);
+SOR = [sembrarGiro('no_contesto', 1)];
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'acepto' });
+af(() => rr.code === 200 && SOR[0].resultado === 'acepto',
+   'sin giro posterior, no_contesto puede pasar a acepto (el dedazo útil)');
+SOR = [sembrarGiro('no_cumple', 1, { descarte_motivo: 'no_sigue' })];
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_contesto' });
+af(() => rr.code === 200 && SOR[0].resultado === 'no_contesto' && SOR[0].descarte_motivo === null,
+   'entre los dos descartes se puede corregir la etiqueta, y el motivo se limpia');
+// 🔴 Con un giro POSTERIOR queda FIJO: deshacerlo crearía dos ganadores vivos.
+SOR = [sembrarGiro('no_cumple', 1, { descarte_motivo: 'no_sigue' }), sembrarGiro('pendiente', 2)];
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'pendiente' });
+af(() => rr.code === 409 && /volvió a girar|fijo/i.test(String(rr.d.error)),
+   '🔴 con un giro posterior el descarte queda FIJO, dio ' + rr.code + ' ' + rr.d.error);
+af(() => SOR[0].resultado === 'no_cumple', 'y no se movió');
+// Pero el giro VIVO (el último) sí se resuelve.
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[1].id, resultado: 'acepto' });
+af(() => rr.code === 200 && SOR[1].resultado === 'acepto', 'el giro vivo sí se resuelve');
+
+// 🔒 EL MOTIVO SE BORRA AL DEJAR DE SER DESCARTE ───────────────────────────
+SOR = [sembrarGiro('no_cumple', 1, { descarte_motivo: 'no_sigue' })];
+await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'acepto' });
+af(() => SOR[0].descarte_motivo === null,
+   '🔒 un motivo colgando de una fila que ya no es descarte es un dato que MIENTE; quedó ' + SOR[0].descarte_motivo);
+
+// ── `acepto` es IRREVERSIBLE ───────────────────────────────────────────────
+SOR = [sembrarGiro('acepto', 1)];
+for (const dest of ['pendiente', 'no_contesto']) {
+  const r2 = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: dest });
+  af(() => r2.code === 409 && /confirmado|no se puede/i.test(String(r2.d.error)),
+     '🔴 `acepto` NO se deshace hacia ' + dest + ', dio ' + r2.code);
+}
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'no_cumple', motivo: 'no_sigue' });
+af(() => rr.code === 409, '`acepto` tampoco se vuelve no_cumple');
+af(() => SOR[0].resultado === 'acepto', 'y sigue en acepto tras los tres intentos');
+// Volver a picarle a ACEPTÓ es IDEMPOTENTE, no un error: es un dedazo inofensivo.
+rr = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'acepto' });
+af(() => rr.code === 200 && rr.d.sin_cambio === true,
+   'acepto → acepto es idempotente, dio ' + rr.code + ' ' + JSON.stringify(rr.d));
+
+// ── La forma y el éxito vacío ──────────────────────────────────────────────
+SOR = [sembrarGiro('pendiente', 1)];
+const rMal = await llamar({ accion: 'resolver', sorteo_id: 'abc', resultado: 'acepto' });
+af(() => rMal.code === 400 && /inválido/i.test(String(rMal.d.error)), 'un sorteo_id que no es uuid → 400');
+const rVal = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'inventado' });
+af(() => rVal.code === 400, 'un resultado inventado → 400');
+const rNo = await llamar({ accion: 'resolver', sorteo_id: '11111111-1111-4111-8111-111111111111', resultado: 'acepto' });
+af(() => rNo.code === 404 && /no existe/i.test(String(rNo.d.error)),
+   '🔒 el éxito vacío habla: un giro que no existe → 404, dio ' + rNo.code);
+const rSin = await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'acepto' }, false);
+af(() => rSin.code === 401, 'resolver sin token → 401, dio ' + rSin.code);
+af(() => PATCHES.length === 0, 'un 401 no puede haber hecho un PATCH');
+
+// ── 🔒 NINGÚN PATCH TOCA `rondas` ──────────────────────────────────────────
+// Medido por HECHO: el mock guarda todos los PATCH. No por grep del fuente —
+// el comentario que explica por qué `rondas` no está CONTIENE la palabra.
+SOR = [sembrarGiro('pendiente', 1, { rondas: RF })];
+await llamar({ accion: 'resolver', sorteo_id: SOR[0].id, resultado: 'acepto' });
+af(() => PATCHES.every((x) => !('rondas' in x.cambios)),
+   '🔴 un PATCH llevó `rondas` en el cuerpo: la escalera tiene que ser inmutable');
+af(() => JSON.stringify(SOR[0].rondas) === JSON.stringify(RF), 'la escalera no se movió al resolver');
+// 🔒 EL PATCH VA ACOTADO POR SLUG: sin eso, un token en modo ensayo podría
+// resolver un giro REAL pasándole su id.
+af(() => PATCHES.filter((x) => x.tabla === 'sorteos').length > 0
+      && PATCHES.filter((x) => x.tabla === 'sorteos').every((x) => /slug=eq\./.test(x.u)),
+   '🔴 un PATCH de sorteos sin `slug=eq.` — el ensayo podría tocar lo real');
+
 // <<<SIGUIENTES-BLOQUES>>>
 
   completo = true;

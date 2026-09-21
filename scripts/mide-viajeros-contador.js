@@ -287,6 +287,18 @@ function servir() {
         // escritorio la pieza caía al fondo, debajo de los CTA y medio fuera
         // del pliegue: sin área en la rejilla se iba a una fila implícita.
         // El hecho que importa es el ORDEN VISUAL, no la existencia.
+        // El ORDEN DE LA PIEZA, leído de los hijos que de verdad pintan texto.
+        // Tiene que ser exactamente: número → rótulo → chips de año.
+        piezas: [...c.children].filter((e) => (e.textContent || '').trim())
+          .map((e) => (e.className || e.tagName)),
+        // Lo que se lee ARRIBA del número dentro del bloque, si algo hay.
+        antesDelNumero: (() => {
+          const n = document.getElementById('hh-vc-num');
+          if (!n) return null;
+          const t = (c.innerText || '').trim();
+          const i = t.indexOf(n.textContent.trim());
+          return i <= 0 ? '' : t.slice(0, i).trim();
+        })(),
         yTop: Math.round(r.top),
         yProof: (() => { const e = document.querySelector('.hh-proof');
           return e ? Math.round(e.getBoundingClientRect().top) : null; })(),
@@ -317,6 +329,20 @@ function servir() {
        `[4/${rotulo}] el contador quedó DEBAJO de los CTA (y=${v.yTop} contra ${v.yCtas}): se fue al fondo de la rejilla`);
     af(v.yTop < v.alto,
        `[4/${rotulo}] el contador nace fuera del pliegue (y=${v.yTop}, pantalla ${v.alto}): nadie lo ve sin bajar`);
+
+    // ── 🔒 LA PIEZA ARRANCA EN EL NÚMERO ─────────────────────────────────
+    // Decisión de Memo con la palabra de Jane (21-sep-2026): se quitó el
+    // renglón «Nos han acompañado» porque HABLA EN PASADO y la pieza dice
+    // justo lo contrario — «y contando».
+    //
+    // ⚠️ Esto NO retira una aserción: NINGUNA exigía ese renglón, así que no
+    // había nada que jubilar. Lo que se agrega es el candado que faltaba — sin
+    // él, la decisión vive solo en un comentario, y esta casa ya pagó esta
+    // semana lo que cuesta un candado prometido en un comentario.
+    af(v.antesDelNumero === '',
+       `[4/${rotulo}] hay texto ANTES del número dentro de la pieza: «${v.antesDelNumero}»`);
+    af(JSON.stringify(v.piezas) === JSON.stringify(['hh-vc-n', 'hh-vc-anios']),
+       `[4/${rotulo}] el orden de la pieza es ${JSON.stringify(v.piezas)}, se esperaba número+rótulo y luego los años`);
     await pg.close();
   }
 

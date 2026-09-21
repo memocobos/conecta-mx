@@ -28,6 +28,11 @@ let ok = 0, mal = 0; const fallos = [];
 // bloque [9] y el marcador dijo «0 en rojo» sobre una caída.
 // Se admite el mensaje como FUNCIÓN para poder diferirlo; y el que llegue ya
 // armado se protege igual con su propio try.
+// ⚠️ NUNCA `await` DENTRO de la flecha que recibe `af()`: la flecha no es
+// asíncrona y el archivo deja de PARSEAR — o sea que no se cae una aserción,
+// se cae el careo entero antes de correr una línea. Me mordió TRES veces en
+// esta tuerca. La forma buena: `const r = await llamar(...)` y luego
+// `af(() => r.code === 200, ...)`.
 const af = (fn, e) => {
   const texto = () => {
     try { return (typeof e === 'function') ? e() : e; }
@@ -1132,6 +1137,71 @@ SOR = [];
 c10 = await llamarCons();
 af(() => c10.code === 409 && /confirmado/i.test(String(c10.d.error || '')),
    'sin ningún giro → 409 por el mismo motivo, dio ' + c10.code);
+
+
+// ═══ [11] ESTADO_ADMIN: EL MOTIVO SE **DERIVA** DE LA CADENA ════════════════
+console.log('\n── [11] estado_admin: el motivo se DERIVA de la cadena ──');
+sembrarPadron();
+SOR = [sembrarGiro('no_contesto', 1),
+       sembrarGiro('no_cumple', 2, { descarte_motivo: 'no_sigue', origen_sorteo_id: 'o1', escalon: 3 }),
+       sembrarGiro('pendiente', 3, { origen_sorteo_id: 'o1', escalon: 6 })];
+let a11 = await llamar({ accion: 'estado_admin' });
+af(() => a11.code === 200 && a11.d.ok === true, 'estado_admin sale 200, dio ' + a11.code);
+af(() => a11.d.ultimo && a11.d.ultimo.resultado === 'pendiente',
+   'estado_admin da el resultado VERDADERO (no el derivado del público)');
+af(() => Array.isArray(a11.d.cadena) && a11.d.cadena.length === 3,
+   'la cadena trae los 3 intentos, dio ' + ((a11.d.cadena || []).length));
+
+// 🔒 EL MOTIVO DE UN RE-GIRO SE DERIVA del resultado del intento ANTERIOR. No
+// se guarda: un dato derivable guardado dos veces es cómo los letreros se
+// quedan viejos (`flash_promo`, el chip de PROMO-DERIVA-1, las tres fechas).
+af(() => ((a11.d.cadena||[])[0]||{}).motivo_derivado === null, 'el primer giro no tiene motivo');
+af(() => ((a11.d.cadena||[])[1]||{}).motivo_derivado === 'no_contesto',
+   '🔴 el intento 2 existe porque el 1 NO CONTESTÓ; dio ' + ((a11.d.cadena||[])[1]||{}).motivo_derivado);
+af(() => ((a11.d.cadena||[])[2]||{}).motivo_derivado === 'no_cumple',
+   '🔴 el intento 3 existe porque el 2 NO CUMPLIÓ; dio ' + ((a11.d.cadena||[])[2]||{}).motivo_derivado);
+// Y con la cadena al revés el motivo cambia solo: eso es lo que prueba que se
+// DERIVA y no que se copió de algún lado.
+SOR = [sembrarGiro('no_cumple', 1, { descarte_motivo: 'otro: cuenta privada' }),
+       sembrarGiro('no_contesto', 2), sembrarGiro('pendiente', 3)];
+let b11 = await llamar({ accion: 'estado_admin' });
+af(() => ((b11.d.cadena||[])[1]||{}).motivo_derivado === 'no_cumple'
+      && ((b11.d.cadena||[])[2]||{}).motivo_derivado === 'no_contesto',
+   '🔴 invirtiendo la cadena, los motivos se invierten: se DERIVAN. Dio '
+   + JSON.stringify((b11.d.cadena||[]).map(function(x){ return x.motivo_derivado; })));
+
+// El detalle PRIVADO sí sale por aquí (esta puerta exige token) y nunca allá.
+af(() => ((b11.d.cadena||[])[0]||{}).descarte_motivo === 'otro: cuenta privada',
+   'el detalle del motivo sale con token, dio ' + ((b11.d.cadena||[])[0]||{}).descarte_motivo);
+af(() => (b11.d.ultimo||{}).whatsapp && (b11.d.ultimo||{}).instagram,
+   'el contacto del ganador (WhatsApp e Instagram) sale con token');
+af(() => (b11.d.ultimo||{}).premio === 'PLUS' || (b11.d.ultimo||{}).premio === 'CHEAP',
+   '🔒 el premio se DERIVA de la ciudad con la regla de la casa, dio ' + (b11.d.ultimo||{}).premio);
+af(() => typeof (b11.d.ultimo||{}).premio_texto === 'string' && (b11.d.ultimo||{}).premio_texto.length > 20,
+   '🔒 y el TEXTO del premio sale de PREMIOS del lib, no tecleado en la pantalla');
+af(() => (b11.d.ultimo||{}).escalon === null || typeof (b11.d.ultimo||{}).escalon === 'number', 'el escalón viaja');
+const sinT11 = await llamar({ accion: 'estado_admin' }, false);
+af(() => sinT11.code === 401, 'sin token → 401, dio ' + sinT11.code);
+af(() => !/8990000|ig\d|cuenta privada/.test(sinT11.crudo), '🔒 el 401 no filtra un dato');
+
+// ── `foto_datauri`: la foto lista para el canvas, sin ensuciar ────────────
+// 🔒 POR QUÉ NO UNA URL FIRMADA: una imagen de otro dominio ENSUCIA el canvas y
+// `toBlob` truena. Un `data:` URI no depende de un header ajeno.
+const fd = await llamar({ accion: 'foto_datauri', registro_id: 'r1' });
+af(() => fd.code === 200 && /^data:image\/(jpeg|png);base64,/.test(String(fd.d.datauri || '')),
+   '🔴 foto_datauri devuelve un data: URI, dio ' + fd.code + ' ' + String(fd.d.datauri || '').slice(0, 40));
+af(() => fd.d.foto_estado === 'aprobada', 'y dice en qué estado está la foto, dio ' + fd.d.foto_estado);
+const fdSin = await llamar({ accion: 'foto_datauri', registro_id: 'r1' }, false);
+af(() => fdSin.code === 401, '🔒 foto_datauri sin token → 401, dio ' + fdSin.code);
+const fdNo = await llamar({ accion: 'foto_datauri', registro_id: 'nadie' });
+af(() => fdNo.code === 404, 'un registro que no existe → 404, dio ' + fdNo.code);
+const fdVacio = await llamar({ accion: 'foto_datauri' });
+af(() => fdVacio.code === 400, 'sin registro_id → 400, dio ' + fdVacio.code);
+// 🔒 Y ACOTADO POR SLUG: un token en modo ensayo no puede sacar la foto de
+// alguien del sorteo REAL.
+af(() => URLS.filter(function(x){ return /giveaway_registros/.test(x.u); })
+        .every(function(x){ return /slug=eq\./.test(x.u); }),
+   '🔴 foto_datauri leyó registros sin acotar por slug');
 
 // <<<SIGUIENTES-BLOQUES>>>
 

@@ -356,24 +356,108 @@ exports.handler = async (event) => {
 
   if (body.accion === 'estado_admin') {
     try {
-      const r = await fetch(
-        `${sorBase}?slug=eq.${slugQ}&select=id,intento,resultado,ganador_nombre,ganador_whatsapp,creado_at&order=intento.desc&limit=1`,
-        { headers: G.sbHeaders() }
-      );
-      if (!r.ok) throw new Error('lectura ' + r.status);
-      const filas = await r.json().catch(() => []);
-      const u = Array.isArray(filas) ? filas[0] : null;
+      const rs = await fetch(
+        `${sorBase}?slug=eq.${slugQ}&select=id,intento,resultado,descarte_motivo,ganador_nombre,`
+        + 'ganador_whatsapp,registro_id,creado_at,escalon,origen_sorteo_id&order=intento.asc',
+        { headers: G.sbHeaders() });
+      if (!rs.ok) throw new Error('lectura ' + rs.status);
+      const filas = await rs.json().catch(() => []);
+      const lista = Array.isArray(filas) ? filas : [];
+
+      // ═══ 🔒 EL MOTIVO DE UN RE-GIRO NO SE GUARDA: SE DERIVA ═════════════
+      //
+      // Un re-giro existe porque el intento ANTERIOR se descartó, así que su
+      // motivo es un HECHO DE ESA OTRA FILA. Guardarlo sería una copia, y una
+      // copia es cómo los letreros se quedan viejos: `flash_promo` era una
+      // copia escrita al encenderla que nunca se re-sincronizaba, el chip de
+      // PROMO-DERIVA-1 igual, y las cuatro constantes de fecha de este módulo
+      // se quedaron en el 13-sep de Natanael.
+      //
+      // Lo que vuelve inequívoco «el anterior» es el único de (slug, intento):
+      // sin él, dos clics juntos darían dos filas con el mismo intento y la
+      // cadena no tendría un orden que leer.
+      const cadena = lista.map((s, i) => ({
+        sorteo_id: s.id,
+        intento: s.intento,
+        resultado: s.resultado,
+        descarte_motivo: s.descarte_motivo || null,
+        motivo_derivado: i > 0 ? lista[i - 1].resultado : null,
+        escalon: s.escalon != null ? s.escalon : null,
+        nombre: s.ganador_nombre,
+        creado_at: s.creado_at,
+      }));
+
+      const u = lista.length ? lista[lista.length - 1] : null;
+      let extra = {};
+      if (u && u.registro_id) {
+        // 🔒 `instagram` y `ciudad` viajan SOLO por aquí: ésta es la puerta CON
+        // token. Las públicas no los piden ni los pueden pedir — su whitelist
+        // no los nombra.
+        const rr = await fetch(`${regBase}?id=eq.${encodeURIComponent(u.registro_id)}&slug=eq.${slugQ}`
+          + '&select=id,ciudad,instagram,foto_path,foto_estado', { headers: G.sbHeaders() });
+        const filasR = rr.ok ? (await rr.json().catch(() => [])) : [];
+        const rf = Array.isArray(filasR) ? filasR[0] : null;
+        if (rf) extra = {
+          registro_id: rf.id,
+          ciudad: rf.ciudad || null,
+          instagram: rf.instagram || null,
+          foto_estado: rf.foto_estado || 'pendiente',
+          tiene_foto: !!rf.foto_path,
+          // 🔒 El premio y su TEXTO se DERIVAN con la regla de la casa: la
+          // pantalla no vuelve a decidirlo (sería la segunda definición de
+          // quién gana qué) ni lo teclea (sería el letrero que se queda viejo).
+          premio: G.premioPorCiudad(rf.ciudad),
+          premio_texto: G.PREMIOS[G.premioPorCiudad(rf.ciudad)],
+        };
+      }
+
       return G.json(200, headers, {
-        ok: true,
-        ultimo: u ? {
+        ok: true, ensayo: esEnsayo, cadena,
+        ultimo: u ? Object.assign({
           sorteo_id: u.id, intento: u.intento, resultado: u.resultado,
+          descarte_motivo: u.descarte_motivo || null,
           nombre: u.ganador_nombre, whatsapp: u.ganador_whatsapp, creado_at: u.creado_at,
-        } : null,
+          escalon: u.escalon != null ? u.escalon : null,
+          es_regiro: !!u.origen_sorteo_id,
+        }, extra) : null,
       });
     } catch (e) {
       console.error('[giveaway-sortear] estado_admin:', e.message);
       return G.json(502, headers, { ok: false, error: 'No se pudo leer el estado' });
     }
+  }
+
+  // ── LA FOTO COMO data: URI — para el canvas de la story (PR B) ────────────
+  //
+  // 🔒 POR QUÉ NO UNA URL FIRMADA: una imagen de otro dominio ENSUCIA el canvas
+  // y `toBlob` truena con SecurityError. Medí que el Storage del Portal manda
+  // `access-control-allow-origin: *`, así que `crossOrigin="anonymous"`
+  // probablemente funcionaría — pero el día que ese header no venga la imagen
+  // NO CARGA EN ABSOLUTO y la story sale sin cara. Un `data:` URI no depende
+  // de un header ajeno y nunca ensucia el canvas; el CSP ya permite `data:` en
+  // `img-src`. Es admin: el peso no importa.
+  if (body.accion === 'foto_datauri') {
+    const rid = String(body.registro_id || '').trim();
+    if (!rid) return G.json(400, headers, { ok: false, error: 'Falta el participante' });
+    // 🔒 Acotado por SLUG: un token en modo ensayo no puede sacar la foto de
+    // alguien del sorteo REAL.
+    const rr = await fetch(`${regBase}?id=eq.${encodeURIComponent(rid)}&slug=eq.${slugQ}`
+      + '&select=foto_path,foto_estado', { headers: G.sbHeaders() });
+    const filasR = rr.ok ? (await rr.json().catch(() => [])) : [];
+    const f = Array.isArray(filasR) ? filasR[0] : null;
+    if (!f || !f.foto_path) return G.json(404, headers, { ok: false, error: 'Ese registro no tiene foto' });
+    let buf;
+    try {
+      const r = await fetch(`${G.SB_URL}/storage/v1/object/giveaway-fotos/${encodeURI(f.foto_path)}`,
+        { headers: G.sbHeaders() });
+      if (!r.ok) throw new Error('storage ' + r.status);
+      buf = Buffer.from(await r.arrayBuffer());
+    } catch (e) {
+      return G.json(502, headers, { ok: false, error: 'No se pudo leer la foto' });
+    }
+    const tipo = /\.png$/i.test(f.foto_path) ? 'image/png' : 'image/jpeg';
+    return G.json(200, headers, { ok: true, foto_estado: f.foto_estado || 'pendiente',
+      datauri: 'data:' + tipo + ';base64,' + buf.toString('base64') });
   }
 
   // ═════════════════════════════════════════════════════════════════════════

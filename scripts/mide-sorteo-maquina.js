@@ -120,6 +120,27 @@ const foto = (pg) => pg.evaluate(() => ({
   show: window.__sorteoShow ? window.__sorteoShow() : null,
 }));
 
+// 🔴 NO SE ADIVINA EL INSTANTE: SE CAZA LA FASE.
+//
+// Con el show en 40 s las fases miden 5 s y el apagado 1.4 s, mientras que
+// cargar la pagina mete 1-3 s de variacion. Esperar por reloj de pared se
+// pasaba la ventana y los rojos eran del arnes, no del codigo — seis de una
+// sentada. Esto sondea cada 120 ms hasta ver la fase o hasta el plazo: mide LO
+// MISMO y es inmune a la variacion.
+//
+// 🔒 Y con PLAZO: una fase que NUNCA ocurre sigue siendo un rojo, no un verde
+// silencioso. Devuelve `visto:false` y la asercion lo dice por su nombre.
+async function cazar(pg, foto, pred, msMax, nombre) {
+  const t0 = Date.now();
+  let ultima = null;
+  while (Date.now() - t0 < msMax) {
+    ultima = await foto(pg);
+    if (pred(ultima)) return { visto: true, f: ultima, ms: Date.now() - t0 };
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  return { visto: false, f: ultima, ms: Date.now() - t0, nombre };
+}
+
 (async () => {
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const p = srv.address().port, nav = await chromium.launch();
@@ -132,17 +153,45 @@ const foto = (pg) => pg.evaluate(() => ({
   let pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(6000);
-  let f = await foto(pg);
-  console.log('   t≈6s  ', JSON.stringify(f));
-  af(f.vivas === 24 && f.fuera === 0, 'en t≈6s deben estar las 24 vivas, hubo ' + f.vivas + '/' + f.fuera);
-  // la ronda de 12 se anima en momentos[1]=18700 + redoble 18000 => ~36.7s
-  await pg.waitForTimeout(32000);
-  f = await foto(pg);
-  console.log('   t≈38s ', JSON.stringify(f));
-  af(f.vivas === 12 && f.fuera === 12, '🔴 en t≈38s deben quedar 12 vivas y 12 apagadas, hubo ' + f.vivas + '/' + f.fuera);
-  af(f.total === 24, 'las 24 siguen en la rejilla (no se saca a nadie del DOM), hubo ' + f.total);
-  af(/Quedan 12/.test(f.quedan || ''), 'el encabezado dice «Quedan 12», dijo ' + f.quedan);
+  const T = TI.T;
+  // 1 · PRESENTACION: las 24 vivas.
+  let c = await cazar(pg, foto, (x) => x.total === 24 && x.vivas === 24 && x.fuera === 0,
+                      T.CUENTA_321_MS + T.PRESENTAR_MS + 4000, 'presentacion');
+  console.log('   presentacion @' + c.ms + 'ms ', JSON.stringify(c.f));
+  af(c.visto, '🔴 nunca se vio la presentacion con las 24 vivas: ' + JSON.stringify(c.f));
+
+  // 2 · APAGADO: las MISMAS 24 en la rejilla, 12 con el foco muerto.
+  c = await cazar(pg, foto, (x) => x.total === 24 && x.fuera === 12 && x.vivas === 12,
+                  momentos[1] + T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS + 5000, 'apagado');
+  console.log('   apagado     @' + c.ms + 'ms ', JSON.stringify(c.f));
+  af(c.visto, '🔴 nunca se vio el APAGADO (24 en la rejilla, 12 apagadas): ' + JSON.stringify(c.f));
+  af(c.visto && c.f.total === 24,
+     '🔒 durante el apagado las 24 SIGUEN en la rejilla: es lo que hace que se vea QUIEN salio');
+
+  // 🔴 Y EL APAGADO TIENE QUE ANIMAR, no re-dibujar. Si `pintarMosaico`
+  // reconstruyera el DOM, las eliminadas APARECERIAN ya apagadas y el foco
+  // muriendose —el unico momento autoral de esta pantalla— no ocurriria nunca.
+  if (c.visto) {
+    const anim = await pg.evaluate(() => {
+      const rej = document.getElementById('mosaico');
+      const ap = [...document.querySelectorAll('.mos.fuera')];
+      return { muere: rej ? rej.style.getPropertyValue('--muere') : null,
+               conTransicion: ap.filter((e) => getComputedStyle(e).transitionDuration !== '0s').length,
+               total: ap.length };
+    });
+    console.log('   --muere=' + anim.muere + ' · con transicion ' + anim.conTransicion + '/' + anim.total);
+    af(!!anim.muere, '🔴 el apagado no fijo `--muere`: no hay transicion que animar');
+    af(anim.conTransicion === anim.total,
+       'las ' + anim.total + ' apagadas tienen transicion viva, no aparecieron ya muertas');
+  }
+
+  // 3 · REACOMODO: los apagados se van y quedan 12, en 4 columnas.
+  c = await cazar(pg, foto, (x) => x.total === 12 && x.vivas === 12,
+                  T.RONDA_REACOMODO_MS + 5000, 'reacomodo');
+  console.log('   reacomodo   @' + c.ms + 'ms ', JSON.stringify(c.f));
+  af(c.visto, '🔴 nunca se vio el REACOMODO (solo los 12): ' + JSON.stringify(c.f));
+  af(c.visto && /Quedan 12/.test(c.f.quedan || ''),
+     'el encabezado dice «Quedan 12», dijo ' + (c.f || {}).quedan);
   af(errs.length === 0, 'errores de pagina: ' + JSON.stringify(errs.slice(0,3)));
   await pg.close();
 
@@ -152,15 +201,15 @@ const foto = (pg) => pg.evaluate(() => ({
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs2 = []; pg.on('pageerror', (e) => errs2.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(24000);          // ya paso momentos[1]=18.7s
+  await pg.waitForTimeout(momentos[1] + 2500);   // ya paso el momento de la ronda 2
   f = await foto(pg);
   console.log('   t≈24s, servidor recortado ', JSON.stringify(f));
   af(f.redoble === true, '🔴 pasado el momento sin dato, el redoble tiene que estar SOSTENIDO');
   af(f.vivas === 24 && f.fuera === 0, '🔴 y NO se salto la ronda: siguen las 24, hubo ' + f.vivas + '/' + f.fuera);
   af(/Ronda 2/.test(f.quedan || ''), 'el encabezado avisa que espera la ronda 2, dijo ' + f.quedan);
   const antesPed = pedidos;
-  await pg.waitForTimeout(5000);
-  af(pedidos > antesPed, '🔴 la pagina NO se trabo: siguio latiendo (' + (pedidos - antesPed) + ' peticiones en 5s)');
+  await pg.waitForTimeout(3000);
+  af(pedidos > antesPed, '🔴 la pagina NO se trabo: siguio latiendo (' + (pedidos - antesPed) + ' peticiones en 3s)');
   af(f.show && f.show.sostenido === true, '🔴 la sonda tiene que decir sostenido:true, dijo ' + JSON.stringify(f.show));
   // Se restablece: SOLTAR se mide en la SONDA, no en la clase de CSS —el
   // redoble de la ronda pone la MISMA clase, asi que mirar el DOM no distingue
@@ -172,7 +221,14 @@ const foto = (pg) => pg.evaluate(() => ({
   af(f.show && f.show.sostenido === false,
      '🔴 al llegar el dato tiene que SOLTAR (sonda); quedo ' + JSON.stringify(f.show));
   af(f.show && f.show.tengo[1] === 12, 'y ya tiene la ronda de 12 en mano');
-  af(f.vivas === 24, 'pero todavia NO la pinta: le toca en su momento del reloj, no al recibirla');
+  // ⚠️ Antes aqui se afirmaba «pero todavia NO la pinta». Con el show en 40 s
+  // eso dejo de ser cierto Y ESTA BIEN: el dato llego con su momento ya
+  // PASADO, y la animacion esta anclada al reloj, asi que la pinta de
+  // inmediato — que es justo lo que evita que el retraso se arrastre al resto
+  // del show. La asercion vieja habria condenado el comportamiento correcto.
+  c = await cazar(pg, foto, (x) => x.fuera === 12 || x.total === 12,
+                  T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS + 4000, 'recuperacion');
+  af(c.visto, '🔴 tras soltar, la ronda de 12 tiene que pintarse: ' + JSON.stringify(c.f));
   af(errs2.length === 0, 'errores de pagina en B: ' + JSON.stringify(errs2.slice(0,3)));
   await pg.close();
 
@@ -183,43 +239,45 @@ const foto = (pg) => pg.evaluate(() => ({
   console.log('\n── C · dentro de la ventana SE SINCRONIZA ──');
   const total = TI.duracionTotal(escalones);
   console.log('   el show dura ' + (total / 1000).toFixed(1) + ' s');
-  ARRANQUE = Date.now() - 90000; TOPE = Infinity;
+  // Dentro de la ventana y en la fase de APAGADO de la ronda de 3.
+  // Se entra JUSTO ANTES de la ronda de 3 y se caza su apagado: asi la carga
+  // de la pagina cabe dentro de la ventana en vez de comersela.
+  const tDentro = momentos[3] - 800;
+  ARRANQUE = Date.now() - tDentro; TOPE = Infinity;
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs3 = []; pg.on('pageerror', (e) => errs3.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(3000);
+  await pg.waitForTimeout(1500);
   f = await foto(pg);
-  console.log('   entra en t=90s            ', JSON.stringify(f.show), '· vivas', f.vivas);
-  af(f.show && f.show.sincronizado === true, '🔴 en t=90s (dentro del show) tiene que ir SINCRONIZADO');
+  console.log('   entra en t=' + (tDentro / 1000).toFixed(1) + 's        ', JSON.stringify(f.show), '· vivas', f.vivas);
+  af(f.show && f.show.sincronizado === true, '🔴 dentro del show tiene que ir SINCRONIZADO');
   af(f.show && f.show.pintadas >= 3,
      '🔴 y ALCANZAR al instante: pintadas=' + (f.show && f.show.pintadas) + ', se esperaban >=3');
-  // En t=90s el reloj va en la fase de APAGADO de la ronda de 3 (momentos[3]
-  // =74.7s + redoble 18s = 92.7s), asi que se ven los SEIS de la ronda
-  // anterior: 3 vivos y 3 con el foco muerto. Asertar 21 apagados era mi error
-  // — esos 21 ya se fueron en los reacomodos de las rondas previas.
-  af(f.vivas === 3 && f.total === 6,
-     '🔴 en t=90s deben verse 6 tarjetas (3 vivas, 3 apagadas), hubo ' + f.vivas + ' vivas de ' + f.total);
-  // Y pasado el apagado, el REACOMODO deja solo a los tres, mas grandes.
-  await pg.waitForTimeout(7000);
-  const fr = await foto(pg);
-  console.log('   tras el reacomodo         ', JSON.stringify(fr.show), '· total', fr.total, '· cols', fr.cols);
-  af(fr.total === 3 && fr.vivas === 3,
-     '🔴 tras el reacomodo deben quedar SOLO los 3 finalistas, hubo ' + fr.total);
-  af(fr.cols === '3', 'y la rejilla baja a 3 columnas (asi es como CRECEN), dio ' + fr.cols);
-  af(f.show && Math.abs(f.show.t - 93000) < 4000,
+  af(f.show && Math.abs(f.show.t - (tDentro + 1500)) < 2500,
      'el reloj del show va pegado al del servidor, t=' + (f.show && f.show.t));
+  // El apagado de la ronda de 3: se ven los SEIS de la anterior, 3 con el foco
+  // muerto. Y despues el reacomodo deja solo a los tres, mas grandes.
+  let c3 = await cazar(pg, foto, (x) => x.total === 6 && x.vivas === 3 && x.fuera === 3,
+                       TI.T.RONDA_REDOBLE_MS + TI.T.RONDA_APAGADO_MS + 5000, 'apagado de la de 3');
+  console.log('   apagado de la de 3 @' + c3.ms + 'ms ', JSON.stringify(c3.f));
+  af(c3.visto, '🔴 nunca se vio el apagado de la ronda de 3 (6 tarjetas, 3 muertas): ' + JSON.stringify(c3.f));
+  c3 = await cazar(pg, foto, (x) => x.total === 3 && x.vivas === 3 && x.cols === '3',
+                   TI.T.RONDA_REACOMODO_MS + 5000, 'reacomodo de la de 3');
+  console.log('   reacomodo          @' + c3.ms + 'ms ', JSON.stringify(c3.f));
+  af(c3.visto, '🔴 tras el reacomodo deben quedar SOLO los 3, en 3 columnas (asi CRECEN): '
+     + JSON.stringify(c3.f));
   af(errs3.length === 0, 'errores en C: ' + JSON.stringify(errs3.slice(0, 3)));
   await pg.close();
 
   // ── D · FUERA DE LA VENTANA SE REPITE COMPLETO ──────────────────────────
   console.log('\n── D · fuera de la ventana SE REPITE desde el inicio ──');
-  ARRANQUE = Date.now() - 600000;   // diez minutos: el show ya acabo
+  ARRANQUE = Date.now() - (TI.duracionTotal(escalones) * 5);   // el show ya acabo hace rato
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs4 = []; pg.on('pageerror', (e) => errs4.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
   await pg.waitForTimeout(3000);
   f = await foto(pg);
-  console.log('   entra en t=600s           ', JSON.stringify(f.show), '· vivas', f.vivas);
+  console.log('   entra pasado el show      ', JSON.stringify(f.show), '· vivas', f.vivas);
   af(f.show && f.show.sincronizado === false, '🔴 fuera de la ventana NO se sincroniza: se repite');
   af(f.show && f.show.pintadas === 0,
      '🔴 y arranca DESDE LA RONDA 0: pintadas=' + (f.show && f.show.pintadas));
@@ -273,8 +331,11 @@ const foto = (pg) => pg.evaluate(() => ({
   // con t=200 s el show es una REPETICION de 2:12, asi que `pintarPanel` aun no
   // habia corrido y el reloj seguia mostrando el «10:00» del HTML. Mi primera
   // version media la pagina antes de que existiera lo que queria medir.
-  const ESPERA_F = 20000;
-  ARRANQUE = Date.now() - 125000; TOPE = Infinity; RES = 'pendiente'; RESUELTOS = [];
+  // Entra pasada la revelacion y se espera a que el show ACABE, para que el
+  // panel exista: medir el reloj antes es medir el HTML, no el codigo.
+  const tTrasRevelacion = momentos[momentos.length - 1] + 500;
+  const ESPERA_F = TI.T.GIRO_FINAL_MS + TI.T.REVELACION_MS + 3500;
+  ARRANQUE = Date.now() - tTrasRevelacion; TOPE = Infinity; RES = 'pendiente'; RESUELTOS = [];
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errsF = []; pg.on('pageerror', (e) => errsF.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
@@ -346,7 +407,7 @@ const foto = (pg) => pg.evaluate(() => ({
 
   // ── G · LA BANDA DE ENSAYO Y SUS TRES CONTROLES ────────────────────────
   console.log('\n── G · la banda de ENSAYO y sus controles ──');
-  ARRANQUE = Date.now() - 125000; TOPE = Infinity; RES = 'pendiente'; RESUELTOS = [];
+  ARRANQUE = Date.now() - tTrasRevelacion; TOPE = Infinity; RES = 'pendiente'; RESUELTOS = [];
   CUERPOS = []; QUERIES = [];
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errsG = []; pg.on('pageerror', (e) => errsG.push(e.message));

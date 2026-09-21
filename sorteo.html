@@ -165,16 +165,16 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .mos{position:relative;display:flex;flex-direction:column;
   background:#0e0e11;border-radius:7px;overflow:hidden;
   box-shadow:0 2px 6px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
-  transition:box-shadow .5s cubic-bezier(.16,1,.3,1),
-             background-color .5s cubic-bezier(.16,1,.3,1),
-             opacity .5s cubic-bezier(.16,1,.3,1)}
+  transition:box-shadow var(--muere,.5s) cubic-bezier(.16,1,.3,1),
+             background-color var(--muere,.5s) cubic-bezier(.16,1,.3,1),
+             opacity var(--muere,.5s) cubic-bezier(.16,1,.3,1)}
 /* `container-type` para que las iniciales midan un PORCENTAJE DE LA TARJETA:
    la tarjeta va de ~75px (390px, 4 columnas) a ~166px (560px, 3 columnas), y
    un tamaño fijo se ve enano en un extremo y desbordado en el otro. */
 .mos-foto{position:relative;aspect-ratio:1;width:100%;overflow:hidden;background:#15151a;
   container-type:inline-size}
 .mos-foto img{width:100%;height:100%;object-fit:cover;display:block;
-  transition:filter .55s cubic-bezier(.16,1,.3,1)}
+  transition:filter var(--muere,.55s) cubic-bezier(.16,1,.3,1)}
 /* Sin foto aprobada NUNCA hay hueco: van las iniciales. El amarillo sobre el
    negro del mueble pasa contraste de sobra, y es el mismo par que la placa. */
 .mos-ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -221,8 +221,11 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
 /* La entrada: caen escalonadas, desde un estado YA VISIBLE (sin esto, un JS
    caído deja el mosaico en blanco). */
-.mos{animation:mosCae .5s cubic-bezier(.16,1,.3,1) backwards;
-  animation-delay:calc(var(--n,0) * 45ms)}
+/* El escalonado sale de `--paso`, que lo calcula el JS desde la duración de la
+   fase y el número de fichas: con 45 ms tecleados, 24 tarjetas tardaban
+   1 580 ms en entrar y el reacomodo de 1 000 ms se le quedaba corto. */
+.mos{animation:mosCae .42s cubic-bezier(.16,1,.3,1) backwards;
+  animation-delay:calc(var(--n,0) * var(--paso,40ms))}
 @keyframes mosCae{from{opacity:0;transform:translateY(-9px)}to{opacity:1;transform:none}}
 
 /* El redoble SOSTENIDO: la máquina vibra y el encabezado late, para que
@@ -1267,7 +1270,9 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         rot: Math.random() * 6.28, vr: -.14 + Math.random() * .28,
         col: COL[Math.floor(Math.random() * COL.length)] });
     }
-    var fin = Date.now() + 4200;
+    // 🔒 Desde `REVELACION_MS`: si el confeti durara más que la revelación que
+    // el reloj cuenta, seguiría cayendo sobre la fase siguiente.
+    var fin = Date.now() + ((TIEMPOS && TIEMPOS.T.REVELACION_MS) || 4200);
     (function pinta(){
       ctx2.clearRect(0, 0, W, H);
       piezas.forEach(function(p){
@@ -1283,14 +1288,20 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // ═══ 3 · 2 · 1 ═════════════════════════════════════════════════════════
   function tresDosUno(alTerminar){
     if (reducido) { alTerminar(); return; }
+    // 🔒 EL PASO SALE DE `CUENTA_321_MS`, no de 900 tecleados. Con los 900
+    // originales la cuenta duraba 2 700 y `duracionTotal` decía 2 700 por
+    // coincidencia; el día que Memo movió el show a 40 s la coincidencia se
+    // habría roto y el gateo del servidor habría contado un 3·2·1 que la
+    // pantalla no estaba corriendo.
+    var paso = Math.max(150, Math.round(((TIEMPOS && TIEMPOS.T.CUENTA_321_MS) || 2700) / 3));
     var caja = $('tres21'), n = 3;
     caja.classList.add('on');
-    (function paso(){
+    (function uno(){
       caja.innerHTML = '<span>' + n + '</span>';
       son.golpe();
       n--;
-      if (n >= 1) setTimeout(paso, 900);
-      else setTimeout(function(){ caja.classList.remove('on'); alTerminar(); }, 900);
+      if (n >= 1) setTimeout(uno, paso);
+      else setTimeout(function(){ caja.classList.remove('on'); alTerminar(); }, paso);
     })();
   }
 
@@ -1455,12 +1466,23 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
   // Los tres perfiles. El tercero lleva DOS mesetas antes del definitivo: son
   // los frenados falsos, y caen sobre casillas de relleno, no sobre el ganador.
+  // 🔴 LAS TRES DURACIONES SE ESCALAN DE `GIRO_FINAL_MS`, no van tecleadas.
+  //
+  // Estaban en 6400 / 8400 / 11000, y el tercero —el que define cuándo acaba
+  // el giro— coincidía con `GIRO_FINAL_MS: 11000` POR CASUALIDAD. Al bajar el
+  // show a 40 s esa casualidad se rompía: `duracionTotal` habría dicho 40 000
+  // mientras la pantalla tardaba 41 000, y el umbral de «dentro del show»
+  // —que decide si se sincroniza o se repite— habría mentido por un segundo.
+  //
+  // Se conservan las PROPORCIONES medidas (el primero al 58 %, el segundo al
+  // 76 %, el tercero completo): eso es lo que hace que frenen uno por uno.
   function perfil(idx, n){
     var casi1 = (n - 4) / (n - 1);
     var casi2 = (n - 2) / (n - 1);
-    if (idx === 0) return { ms: 6400, pts: [{t:0,p:0},{t:.12,p:.03},{t:.62,p:.80},{t:1,p:1}] };
-    if (idx === 1) return { ms: 8400, pts: [{t:0,p:0},{t:.10,p:.02},{t:.66,p:.82},{t:1,p:1}] };
-    return { ms: 11000, pts: [
+    var GF = (TIEMPOS && TIEMPOS.T.GIRO_FINAL_MS) || 11000;
+    if (idx === 0) return { ms: Math.round(GF * 0.582), pts: [{t:0,p:0},{t:.12,p:.03},{t:.62,p:.80},{t:1,p:1}] };
+    if (idx === 1) return { ms: Math.round(GF * 0.764), pts: [{t:0,p:0},{t:.10,p:.02},{t:.66,p:.82},{t:1,p:1}] };
+    return { ms: GF, pts: [
       {t:0,p:0},{t:.08,p:.02},{t:.52,p:.74},
       {t:.66,p:casi1},{t:.72,p:casi1},        // 1er frenado falso
       {t:.82,p:casi2},{t:.88,p:casi2},        // 2º frenado falso
@@ -1664,6 +1686,12 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var ultima = tam === SHOW.escalones[SHOW.escalones.length - 1];
     var finalistas = tam <= 3 && !ultima;
     rej.style.setProperty('--cols', COLS[tam] || 4);
+    // El escalonado de entrada tiene que CABER en su fase: se reparte la
+    // duración entre las fichas, dejando fuera los .42 s de la animación.
+    var fase = (ronda.i === 0) ? TIEMPOS.T.PRESENTAR_MS : TIEMPOS.T.RONDA_REACOMODO_MS;
+    var nFichas = Math.max(1, (fuera || []).length + ronda.miembros.length);
+    rej.style.setProperty('--paso', Math.max(8, Math.min(40,
+      Math.floor((fase - 430) / nFichas))) + 'ms');
     // La corriente se reparte entre menos focos conforme baja la escalera.
     var viva = Math.min(1, 0.18 + (1 - tam / (SHOW.escalones[0] || 24)) * 0.9);
 
@@ -1693,6 +1721,55 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         + '<div class="mos-nom">' + esc(m.corto || '') + '</div>'
         + '</div>';
     }).join('');
+  }
+
+  // ═══ 🔴 EL APAGADO **NO** RECONSTRUYE EL DOM ════════════════════════════
+  //
+  // `pintarMosaico` hace `innerHTML =`, así que cada ficha es un elemento
+  // NUEVO: la animación de entrada vuelve a correr y las eliminadas APARECEN
+  // YA APAGADAS en vez de apagarse. O sea que el foco muriéndose —que es toda
+  // la premisa del diseño, y el único momento autoral de esta pantalla— no
+  // ocurría nunca. Se veía como un re-dibujado, no como una eliminación.
+  //
+  // Aquí se tocan LAS MISMAS fichas y solo se les cambia la clase, para que la
+  // transición de CSS haga el trabajo. Escalonado a lo largo de la fase: los
+  // focos no se mueren todos en el mismo instante.
+  function apagarEnMosaico(ronda){
+    var rej = $('mosaico'); if (!rej || !SHOW) return;
+    var siguen = ronda.miembros.map(function(m){ return String(m.folio); });
+    var fichas = [].slice.call(rej.querySelectorAll('.mos'));
+    var mueren = fichas.filter(function(el){
+      return siguen.indexOf(el.getAttribute('data-folio')) === -1;
+    });
+    var tam = ronda.tam;
+    var viva = Math.min(1, 0.18 + (1 - tam / (SHOW.escalones[0] || 24)) * 0.9);
+    // La transición dura lo que le quede a la fase después del escalonado.
+    var total = TIEMPOS.T.RONDA_APAGADO_MS;
+    var paso = mueren.length > 1 ? Math.floor((total * 0.55) / mueren.length) : 0;
+    var dur = Math.max(160, total - paso * Math.max(0, mueren.length - 1));
+    rej.style.setProperty('--muere', dur + 'ms');
+
+    $('mos-quedan').textContent = tam === 1 ? 'Ganador' : ('Quedan ' + tam);
+    $('mos-de').textContent = 'ronda ' + (ronda.i + 1) + ' de ' + SHOW.escalones.length;
+
+    // Los que siguen suben de corriente en el mismo movimiento.
+    fichas.forEach(function(el){
+      if (siguen.indexOf(el.getAttribute('data-folio')) !== -1) {
+        el.style.setProperty('--viva', viva.toFixed(2));
+      }
+    });
+    if (reducido){
+      mueren.forEach(function(el){ el.classList.remove('vive'); el.classList.add('fuera');
+        el.style.setProperty('--viva', 0); });
+      return;
+    }
+    mueren.forEach(function(el, i){
+      setTimeout(function(){
+        el.classList.remove('vive');
+        el.classList.add('fuera');
+        el.style.setProperty('--viva', 0);
+      }, i * paso);
+    });
   }
 
   // Qué folios están en la rejilla pero ya no en la ronda que sigue.
@@ -1750,8 +1827,12 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         if (caja) caja.classList.remove('redoble');
         son.redoble(false);
         son.golpe();
-        pintarMosaico(ronda, fueraDe(k - 1, ronda));
+        // APAGADO: se les corta la corriente a los MISMOS elementos, para que
+        // el foco se muera de verdad (ver `apagarEnMosaico`).
+        apagarEnMosaico(ronda);
         enElMomento(SHOW.momentos[k] + T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS, function(){
+          // REACOMODO: aquí sí se reconstruye, porque la rejilla CAMBIA —los
+          // apagados se van y los que quedan crecen solos con `--cols`.
           pintarMosaico(ronda, []);
           enElMomento(finDeEsta, alTerminar);
         });

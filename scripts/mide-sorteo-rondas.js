@@ -112,23 +112,30 @@ af(() => JSON.stringify(TI.escalonesPara(0)) === '[]', 'escalonesPara(0) debe se
 
 // Los momentos: los del acta, al milisegundo.
 const M24 = TI.momentos([24, 12, 6, 3, 1]);
-af(() => JSON.stringify(M24) === JSON.stringify([0, 18700, 46700, 74700, 116700]),
+af(() => JSON.stringify(M24) === JSON.stringify([0, 7000, 12000, 17000, 26000]),
    'momentos([24,12,6,3,1]) dio ' + JSON.stringify(M24));
-af(() => JSON.stringify(TI.momentos([1])) === JSON.stringify([2700]),
+af(() => JSON.stringify(TI.momentos([1])) === JSON.stringify([3000]),
    'momentos([1]) dio ' + JSON.stringify(TI.momentos([1])) + ' — el caso degenerado NO libera en 0');
-af(() => JSON.stringify(TI.momentos([3, 1])) === JSON.stringify([0, 32700]),
+af(() => JSON.stringify(TI.momentos([3, 1])) === JSON.stringify([0, 11000]),
    'momentos([3,1]) dio ' + JSON.stringify(TI.momentos([3, 1])));
-af(() => JSON.stringify(TI.momentos([6, 3, 1])) === JSON.stringify([0, 18700, 60700]),
+af(() => JSON.stringify(TI.momentos([6, 3, 1])) === JSON.stringify([0, 7000, 16000]),
    'momentos([6,3,1]) dio ' + JSON.stringify(TI.momentos([6, 3, 1])));
-af(() => JSON.stringify(TI.momentos([12, 6, 3, 1])) === JSON.stringify([0, 18700, 46700, 88700]),
+af(() => JSON.stringify(TI.momentos([12, 6, 3, 1])) === JSON.stringify([0, 7000, 12000, 21000]),
    'momentos([12,6,3,1]) dio ' + JSON.stringify(TI.momentos([12, 6, 3, 1])));
 af(() => JSON.stringify(TI.momentos([])) === '[]', 'momentos([]) debe ser []');
 
 // El show completo cae entre 2 y 3 minutos: es lo que Memo pidió.
 const dur = TI.duracionTotal([24, 12, 6, 3, 1]);
 console.log('    duración con escalera de 24: ' + (dur / 1000).toFixed(1) + ' s');
-af(() => dur >= 120000 && dur <= 180000, 'la escalera completa dura ' + dur + ' ms, fuera de los 2–3 min');
-af(() => TI.duracionTotal([1]) === 17900, 'duracionTotal([1]) dio ' + TI.duracionTotal([1]));
+// Firmado por Memo el 21-sep: el show completo en ~40 s. La banda es estrecha
+// a propósito —35-45 s— porque salirse de ahí es un cambio de decisión, no un
+// ajuste fino, y tiene que verse.
+af(() => dur >= 35000 && dur <= 45000, 'la escalera completa dura ' + dur + ' ms, fuera de los ~40 s firmados');
+af(() => TI.duracionTotal([1]) === 17000, 'duracionTotal([1]) dio ' + TI.duracionTotal([1]));
+// La progresión por escalera, para que ninguna quede desproporcionada.
+af(() => TI.duracionTotal([3, 1]) === 25000, 'duracionTotal([3,1]) dio ' + TI.duracionTotal([3, 1]));
+af(() => TI.duracionTotal([6, 3, 1]) === 30000, 'duracionTotal([6,3,1]) dio ' + TI.duracionTotal([6, 3, 1]));
+af(() => TI.duracionTotal([12, 6, 3, 1]) === 35000, 'duracionTotal([12,6,3,1]) dio ' + TI.duracionTotal([12, 6, 3, 1]));
 af(() => TI.duracionTotal([]) === 0, 'duracionTotal([]) debe ser 0');
 
 // 🔒 LOS MOMENTOS SON ESTRICTAMENTE CRECIENTES. Dos rondas en el mismo instante
@@ -142,11 +149,17 @@ af(() => TI.duracionTotal([]) === 0, 'duracionTotal([]) debe ser 0');
 // La liberación se adelanta el margen, y nunca es negativa.
 const L24 = TI.liberaciones([24, 12, 6, 3, 1]);
 af(() => L24[0] === 0, 'la primera liberación debe ser 0, dio ' + L24[0]);
-af(() => L24[4] === 116700 - TI.T.MARGEN_ADELANTO_MS,
+af(() => L24[4] === 26000 - TI.T.MARGEN_ADELANTO_MS,
    '🔴 el GANADOR se libera en ' + L24[4] + ', se esperaba ' + (116700 - TI.T.MARGEN_ADELANTO_MS));
 af(() => L24.every((x) => x >= 0), 'ninguna liberación puede ser negativa');
 // Y el ganador NO puede salir al principio: es todo el punto del ajuste (b).
-af(() => L24[4] > 100000, '🔴 el ganador se libera en ' + L24[4] + ' ms — eso es un spoiler');
+// 🔒 El ganador se libera pasado el 55 % del show. Un umbral absoluto
+// («> 100 000 ms») se volvió falso el día que el show bajó a 40 s: con los
+// tiempos nuevos habría condenado un código correcto. Se mide en PROPORCIÓN.
+af(() => L24[4] / dur > 0.55,
+   '🔴 el ganador se libera en el ' + Math.round(L24[4] / dur * 100) + '% del show — demasiado pronto');
+af(() => L24[4] >= dur - TI.T.GIRO_FINAL_MS - TI.T.REVELACION_MS - TI.T.MARGEN_ADELANTO_MS,
+   'y no antes de que empiece el suspenso final');
 
 // La forma del objeto: si alguien le quita un campo, el gemelo del navegador
 // dejaría de cuadrar y esto lo dice antes.
@@ -372,8 +385,12 @@ const proj = (t, foto) => ESC.proyectarRondas({
 });
 
 // Los seis instantes del acta.
-[[0, 1, false], [13000, 1, false], [30000, 2, false],
- [60000, 3, false], [95000, 4, false], [200000, 5, true]].forEach((c) => {
+// Los instantes salen de las LIBERACIONES [0,5000,10000,15000,24000], no de
+// números elegidos a mano: cada uno cae justo antes o justo después de una.
+// (Los de antes —13 s, 30 s, 60 s, 95 s— eran del show de 2:12 y con 40 s caen
+//  todos pasada la revelación: habrían condenado código correcto.)
+[[0, 1, false], [4000, 1, false], [7000, 2, false],
+ [12000, 3, false], [20000, 4, false], [60000, 5, true]].forEach((c) => {
   const r = proj(c[0]);
   af(() => r.rondas.length === c[1],
      '🔴 en t=' + c[0] + ' ms se publicaron ' + r.rondas.length + ' rondas, se esperaban ' + c[1]);
@@ -385,7 +402,7 @@ const proj = (t, foto) => ESC.proyectarRondas({
 // 🔴 EL SPOILER, DICHO COMO ASERCIÓN. Se mide sobre el JSON COMPLETO
 // serializado, no campo por campo: un campo nuevo que alguien agregue mañana
 // también cae aquí.
-[0, 13000, 30000, 60000, 95000].forEach((t) => {
+[0, 4000, 7000, 12000, 20000].forEach((t) => {
   const r = proj(t);
   const crudo = JSON.stringify(r);
   af(() => r.rondas.every((x) => x.tam >= 3),
@@ -395,18 +412,18 @@ const proj = (t, foto) => ESC.proyectarRondas({
   af(() => !/whatsapp|correo|instagram|foto_path|descarte|nombre"/i.test(crudo),
      '🔒 dato privado o nombre completo en la proyección (t=' + t + ')');
 });
-const r95 = proj(95000);
+const r95 = proj(20000);
 af(() => r95.rondas.length === 4 && r95.rondas[3].tam === 3,
-   'en t=95 s la última ronda publicada debe ser la de 3');
+   'en t=20 s la última ronda publicada debe ser la de 3');
 af(() => r95.rondas.every((x) => x.tam !== 1),
    '🔴 EL GANADOR VIAJÓ ANTES DEL GIRO FINAL — es el mínimo no negociable');
 
 // `siguiente_ronda_en_ms`: para que la página programe un latido dirigido.
-af(() => proj(0).siguiente_ronda_en_ms === 16700,
-   'en t=0 la siguiente ronda es en 16700, dio ' + proj(0).siguiente_ronda_en_ms);
-af(() => proj(13000).siguiente_ronda_en_ms === 3700,
-   'en t=13000 falta 3700, dio ' + proj(13000).siguiente_ronda_en_ms);
-af(() => proj(200000).siguiente_ronda_en_ms === null,
+af(() => proj(0).siguiente_ronda_en_ms === 5000,
+   'en t=0 la siguiente ronda es en 5000, dio ' + proj(0).siguiente_ronda_en_ms);
+af(() => proj(4000).siguiente_ronda_en_ms === 1000,
+   'en t=4000 falta 1000, dio ' + proj(4000).siguiente_ronda_en_ms);
+af(() => proj(60000).siguiente_ronda_en_ms === null,
    'con todo publicado, siguiente_ronda_en_ms es null');
 
 // ── 🔒 ORDEN POR FOLIO, NUNCA POR REVOLTURA ────────────────────────────────
@@ -477,16 +494,16 @@ const M31 = TI.momentos([3, 1]);
 const P31 = { v: 1, escalones: [3, 1], orden: ordenFijo.slice(0, 3) };
 af(() => ESC.proyectarRondas({ rondas: P31, momentos: M31, margenMs: MAR, transcurridoMs: 0, fotoDeId: () => null }).rondas.length === 1,
    'con [3,1] en t=0 sale solo la ronda de 3');
-af(() => ESC.proyectarRondas({ rondas: P31, momentos: M31, margenMs: MAR, transcurridoMs: 40000, fotoDeId: () => null }).ganador_liberado === true,
-   'con [3,1] en t=40 s el ganador ya salió');
+af(() => ESC.proyectarRondas({ rondas: P31, momentos: M31, margenMs: MAR, transcurridoMs: 20000, fotoDeId: () => null }).ganador_liberado === true,
+   'con [3,1] en t=20 s el ganador ya salió (se libera en 9 s)');
 // 🔴 EL CASO DEGENERADO: con [1] el único escalón ES el ganador, así que en
 // t=0 NO puede salir nada. Es lo que la fórmula de momentos() protege.
 const M1 = TI.momentos([1]);
 const P1 = { v: 1, escalones: [1], orden: ordenFijo.slice(0, 1) };
 af(() => ESC.proyectarRondas({ rondas: P1, momentos: M1, margenMs: MAR, transcurridoMs: 0, fotoDeId: () => null }).rondas.length === 0,
    '🔴 con [1] en t=0 NO puede salir el ganador');
-af(() => ESC.proyectarRondas({ rondas: P1, momentos: M1, margenMs: MAR, transcurridoMs: 1000, fotoDeId: () => null }).ganador_liberado === true,
-   'con [1] en t=1 s (tras CUENTA_321−MARGEN=700) ya salió');
+af(() => ESC.proyectarRondas({ rondas: P1, momentos: M1, margenMs: MAR, transcurridoMs: 1200, fotoDeId: () => null }).ganador_liberado === true,
+   'con [1] en t=1.2 s (tras CUENTA_321−MARGEN=1000) ya salió');
 // Sin escalera: no truena y no inventa.
 af(() => ESC.proyectarRondas({ rondas: null, momentos: [], margenMs: MAR, transcurridoMs: 9e9 }).rondas.length === 0,
    'sin escalera la proyección va vacía');
@@ -985,8 +1002,8 @@ async function girarYFijar(atrasMs) {
 }
 
 for (const [atras, esperadas, revelado] of
-     [[0, 1, false], [13000, 1, false], [30000, 2, false],
-      [60000, 3, false], [95000, 4, false], [200000, 5, true]]) {
+     [[0, 1, false], [4000, 1, false], [7000, 2, false],
+      [12000, 3, false], [20000, 4, false], [60000, 5, true]]) {
   const fila = await girarYFijar(atras);
   const res = await pedir({ fotos: '1' });
   af(() => res.code === 200 && res.d.ok === true, 'estado 200 con t=' + atras + ', dio ' + res.code);
@@ -1016,15 +1033,16 @@ for (const [atras, esperadas, revelado] of
 }
 
 // ── El resultado DERIVADO, por el camino real ─────────────────────────────
-let fila9 = await girarYFijar(200000);
+let fila9 = await girarYFijar(60000);
 await llamar({ accion: 'resolver', sorteo_id: fila9.id, resultado: 'no_cumple', motivo: 'no_sigue' });
-SOR[0].creado_at = new Date(Date.now() - 200000).toISOString();
+SOR[0].creado_at = new Date(Date.now() - 60000).toISOString();
 let res9 = await pedir({});
 af(() => res9.d.ultimo.resultado === 'se_regira',
    '🔴 `no_cumple` debe salir como se_regira, dio ' + res9.d.ultimo.resultado);
 af(() => !/no_cumple|no_sigue|cumple/.test(res9.crudo), '🔒 ni la palabra `no_cumple` puede salir');
 // Y el mismo giro, resuelto pero A MEDIA ANIMACIÓN: sigue diciendo pendiente.
-SOR[0].creado_at = new Date(Date.now() - 30000).toISOString();
+// 12 s: pasada la ronda de 6 y muy antes de la revelación (24 s).
+SOR[0].creado_at = new Date(Date.now() - 12000).toISOString();
 res9 = await pedir({});
 af(() => res9.d.ultimo.resultado === 'pendiente',
    '🔴 resuelto a media animación, el público debe seguir viendo `pendiente`, vio '
@@ -1037,7 +1055,7 @@ res9 = await pedir({ fotos: '1' });
 af(() => !res9.d.ultimo, 'sin giro no hay `ultimo`');
 af(() => !/object\/sign/.test(res9.crudo) && !URLS.some((x) => /object\/sign/.test(x.u)),
    '🔴 SIN GIRO NO SE FIRMA NI UNA FOTO — medido sobre las peticiones que salieron');
-await girarYFijar(200000);
+await girarYFijar(60000);
 res9 = await pedir({ fotos: '1' });
 const miembros9 = ((res9.d.ultimo || {}).rondas || [{}])[0].miembros || [];
 af(() => miembros9.some((m) => m.foto), 'con ?fotos=1 salen las firmadas');
@@ -1063,7 +1081,7 @@ const modoMal = await pedir({ modo: 'inventado' });
 af(() => modoMal.code === 400, 'un modo inventado → 400, dio ' + modoMal.code);
 
 // ── Los rodillos y los campos derivados ───────────────────────────────────
-await girarYFijar(200000);
+await girarYFijar(60000);
 res9 = await pedir({ rodillos: '1' });
 af(() => res9.d.rodillos && res9.d.rodillos.nombres.length > 0 && res9.d.rodillos.apellidos.length > 0,
    'los rodillos siguen dando las dos listas separadas (orden de Memo: se conservan)');

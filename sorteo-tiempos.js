@@ -28,14 +28,22 @@
     // Sube cuando cambie la FORMA del objeto, no cuando cambie un número.
     V: 1,
 
-    CUENTA_321_MS:       2700,   // el 3·2·1 que ya existía
-    PRESENTAR_MS:       16000,   // caen las tarjetas del primer escalón
-    RONDA_REDOBLE_MS:   18000,   // el suspenso de cada eliminación
-    RONDA_APAGADO_MS:    6000,   // se apaga la mitad, escalonado
-    RONDA_REACOMODO_MS:  4000,   // los que siguen se reacomodan y crecen
-    SUSPENSO_MS:        14000,   // los finalistas en grande, antes del último giro
-    GIRO_FINAL_MS:      11000,   // el perfil del tercer rodillo, que ya existía
-    REVELACION_MS:       4200,   // destello + confeti, que ya existían
+    // [SORTEO-RONDAS-1 · 21-sep-2026] Firmado por Memo: el show completo en
+    // ~40 s. Los primeros números daban 2:12 y «se sentía eterno».
+    //
+    // 🔴 LOS TRES DE ABAJO GOBIERNAN DE VERDAD, no solo la cuenta. Antes el
+    // giro final duraba 11 000 ms TECLEADOS en `perfil()` de sorteo.html, el
+    // 3·2·1 iba a 900 ms por paso y el confeti a 4 200: `duracionTotal` decía
+    // una cosa y la pantalla hacía otra. Ahora la pantalla los DERIVA de aquí,
+    // así que mover uno mueve lo que se ve — y lo que el servidor libera.
+    CUENTA_321_MS:       3000,   // el 3·2·1 → 1 000 ms por número
+    PRESENTAR_MS:        4000,   // caen las tarjetas del primer escalón
+    RONDA_REDOBLE_MS:    2600,   // el suspenso de cada eliminación
+    RONDA_APAGADO_MS:    1400,   // se apaga la mitad, escalonado
+    RONDA_REACOMODO_MS:  1000,   // los que siguen se reacomodan y crecen
+    SUSPENSO_MS:         4000,   // los finalistas en grande, antes del último giro
+    GIRO_FINAL_MS:      10000,   // el perfil del tercer rodillo lo escala de aquí
+    REVELACION_MS:       4000,   // destello + confeti, los dos escalados de aquí
 
     // Cuánto ANTES de que le toque se publica una ronda, para que la página no
     // se quede esperando el latido. Corto a propósito: es el único adelanto que

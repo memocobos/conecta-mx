@@ -976,6 +976,17 @@ function servir() {
        'la frase de la cuenta no dice la hora de Reynosa del lib: "' + f.cuenta + '"');
     af(!!f.espera && /8:00 PM en Monterrey/.test(f.espera),
        'la frase de espera no dice la hora de Monterrey (una menos): "' + f.espera + '"');
+    // 🔴 Y LA FRASE COMPLETA, COMO SE LEE. Derivar una parte y dejar la otra
+    // tecleada en el markup produjo «El sorteo es el el jueves 1 de octubre»:
+    // el artículo estaba en los DOS lados. Medir solo el trozo derivado no lo
+    // veía — se lee el renglón ENTERO, que es lo que el cliente lee.
+    const renglon = await pg.evaluate(() =>
+      (document.getElementById('espera') || {}).innerText || '');
+    console.log('    el renglón entero:  "' + renglon.replace(/\s+/g, ' ').trim() + '"');
+    af(!/\b(el|la|los|las|de|a las)\s+\1\b/i.test(renglon.replace(/\s+/g, ' ')),
+       'la frase de espera repite una palabra pegada (artículo duplicado): "' + renglon.replace(/\s+/g, ' ').trim() + '"');
+    af(/El sorteo es el jueves 1 de octubre a las 9:00 PM hora de Reynosa \(8:00 PM en Monterrey\)/.test(renglon.replace(/\s+/g, ' ')),
+       'el renglón de espera no se lee como debe: "' + renglon.replace(/\s+/g, ' ').trim() + '"');
     await pg.close();
   }
 

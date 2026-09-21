@@ -545,6 +545,7 @@ af(() => G.esEnsayo('ensayo') === true && G.esEnsayo() === false
 // tómbola lo excluye» sobre un código que no excluye nada: falsifica hacia el
 // lado cómodo.
 let REG = [], SOR = [], PATCHES = [], INSERTS = [], URLS = [], BORRADOS = [];
+let TIPO_GUARDADO = 'image/jpeg';
 
 function proyectar(u, filas) {
   const mSel = /select=([^&]+)/.exec(u);
@@ -591,8 +592,9 @@ function filtrarSor(u, filas) {
 global.fetch = async (url, opts) => {
   const u = String(url), m = (opts && opts.method) || 'GET';
   URLS.push({ m, u, body: (opts && opts.body) || '' });
-  const J = (v, st) => ({ ok: (st || 200) < 300, status: st || 200,
+  const J = (v, st, ctype) => ({ ok: (st || 200) < 300, status: st || 200,
                           json: async () => v, text: async () => JSON.stringify(v),
+                          headers: { get: (k) => (String(k).toLowerCase() === 'content-type' ? (ctype || null) : null) },
                           arrayBuffer: async () => Buffer.from('fotofalsa') });
   if (/giveaway_registros/.test(u)) {
     if (m === 'PATCH') {
@@ -684,7 +686,9 @@ global.fetch = async (url, opts) => {
   // El catálogo de KameHouse, lo justo para que el correo se pueda armar.
   if (/kh\.careo/.test(u) && /catalogo|eventos|index/.test(u)) return J([]);
   if (/storage\/v1\/object\/list/.test(u)) return J([]);
-  if (/storage\/v1\/object\//.test(u)) return J({}, m === 'DELETE' ? 200 : 200);
+  // El almacén contesta con el tipo con el que se GUARDÓ el objeto, que es lo
+  // que `foto_datauri` tiene que creerle en vez de adivinar por la extensión.
+  if (/storage\/v1\/object\//.test(u)) return J({}, 200, TIPO_GUARDADO);
   return J([]);
 };
 
@@ -1191,6 +1195,29 @@ const fd = await llamar({ accion: 'foto_datauri', registro_id: 'r1' });
 af(() => fd.code === 200 && /^data:image\/(jpeg|png);base64,/.test(String(fd.d.datauri || '')),
    '🔴 foto_datauri devuelve un data: URI, dio ' + fd.code + ' ' + String(fd.d.datauri || '').slice(0, 40));
 af(() => fd.d.foto_estado === 'aprobada', 'y dice en qué estado está la foto, dio ' + fd.d.foto_estado);
+// 🔴 EL TIPO SALE DEL ALMACÉN, NO DE LA EXTENSIÓN. El caso que lo destapó: los
+// avatares del ENSAYO son SVG con nombre `.png` —el regex de `foto_url` solo
+// admite .jpg/.png, así que el nombre NO PUEDE decir la verdad—, y un
+// `data:image/png` con bytes SVG no se pinta: en un canvas es una story con la
+// cara en blanco. Y muerde igual con una foto real cuya extensión mienta.
+TIPO_GUARDADO = 'image/svg+xml';
+const fdSvg = await llamar({ accion: 'foto_datauri', registro_id: 'r1' });
+af(() => /^data:image\/svg\+xml;base64,/.test(String(fdSvg.d.datauri || '')),
+   '🔴 con una ruta .png pero bytes SVG, el tipo tiene que salir del ALMACÉN; dio '
+   + String(fdSvg.d.datauri || '').slice(0, 44));
+// Y si el almacén no dice nada, la extensión es el ÚLTIMO recurso (no el primero).
+TIPO_GUARDADO = null;
+const fdSinTipo = await llamar({ accion: 'foto_datauri', registro_id: 'r1' });
+af(() => /^data:image\/jpeg;base64,/.test(String(fdSinTipo.d.datauri || '')),
+   'sin tipo del almacén cae a la extensión (.jpg → image/jpeg), dio '
+   + String(fdSinTipo.d.datauri || '').slice(0, 30));
+// Y un tipo que NO es imagen no se cree: no se va a poner en un `data:image/`.
+TIPO_GUARDADO = 'text/html';
+const fdMal = await llamar({ accion: 'foto_datauri', registro_id: 'r1' });
+af(() => !/text\/html/.test(String(fdMal.d.datauri || '')),
+   '🔒 un content-type que no es imagen no se copia al data: URI');
+TIPO_GUARDADO = 'image/jpeg';
+
 const fdSin = await llamar({ accion: 'foto_datauri', registro_id: 'r1' }, false);
 af(() => fdSin.code === 401, '🔒 foto_datauri sin token → 401, dio ' + fdSin.code);
 const fdNo = await llamar({ accion: 'foto_datauri', registro_id: 'nadie' });

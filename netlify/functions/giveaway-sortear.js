@@ -579,16 +579,30 @@ exports.handler = async (event) => {
     const filasR = rr.ok ? (await rr.json().catch(() => [])) : [];
     const f = Array.isArray(filasR) ? filasR[0] : null;
     if (!f || !f.foto_path) return G.json(404, headers, { ok: false, error: 'Ese registro no tiene foto' });
-    let buf;
+    let buf, tipoGuardado = null;
     try {
       const r = await fetch(`${G.SB_URL}/storage/v1/object/giveaway-fotos/${encodeURI(f.foto_path)}`,
         { headers: G.sbHeaders() });
       if (!r.ok) throw new Error('storage ' + r.status);
+      // 🔴 EL TIPO SE LE PREGUNTA AL ALMACÉN, NO SE ADIVINA POR LA EXTENSIÓN.
+      //
+      // Adivinarlo es un dato inventado sobre bytes que no se miraron: un
+      // `data:image/png` con bytes que no son PNG no se pinta, y en un canvas
+      // eso es una story con la cara en blanco. Muerde en dos casos reales:
+      //   · los avatares del ENSAYO son SVG con nombre .png (el regex de
+      //     `foto_url` solo admite .jpg/.png, así que el nombre no puede
+      //     decir la verdad);
+      //   · una foto de alguien cuya extensión miente — que es normal, porque
+      //     el nombre lo pone quien sube.
+      tipoGuardado = (r.headers && r.headers.get) ? r.headers.get('content-type') : null;
       buf = Buffer.from(await r.arrayBuffer());
     } catch (e) {
       return G.json(502, headers, { ok: false, error: 'No se pudo leer la foto' });
     }
-    const tipo = /\.png$/i.test(f.foto_path) ? 'image/png' : 'image/jpeg';
+    // La extensión solo es el ÚLTIMO recurso, si el almacén no dijo nada.
+    const tipo = (tipoGuardado && /^image\//.test(tipoGuardado))
+      ? tipoGuardado.split(';')[0].trim()
+      : (/\.png$/i.test(f.foto_path) ? 'image/png' : 'image/jpeg');
     return G.json(200, headers, { ok: true, foto_estado: f.foto_estado || 'pendiente',
       datauri: 'data:' + tipo + ';base64,' + buf.toString('base64') });
   }

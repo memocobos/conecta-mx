@@ -38,7 +38,12 @@ const { chromium } = require('playwright');
 
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
-const BASE = sh(`git rev-parse ${process.env.BASE || 'origin/main'}`);
+// 🔒 BASE ANCLADO A SU SHA, no a `origin/main`. Con la rama flotante, el día
+// que esta tuerca se mergee `origin/main` PASA A SER ella misma: BASE y HEAD
+// serían el mismo árbol, el control positivo de [6] diría «BASE ya pintaba el
+// chip» y el careo se pondría rojo por construcción. Es la caducidad que mordió
+// en LAND-2c — un control positivo caduca cuando su pasado se vuelve presente.
+const BASE = sh(`git rev-parse ${process.env.BASE || 'd84ca9d'}`);   // el merge de #744
 const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
 const ARCHIVOS = 'index.html imgs.js mapas.js lineups.js';
 

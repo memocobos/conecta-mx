@@ -39,7 +39,12 @@ const { chromium } = require('playwright');
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
 const BASE = sh(`git rev-parse ${process.env.BASE || '5215107'}`);   // el merge de #738
-const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
+// 🔒 [ANCLAR-CAREOS-1, 21-sep-2026] HEAD decía `|| 'HEAD'`, o sea el ARBOL
+// VIVO, con BASE si anclado. Es la mitad que el libro nombra: «anclar solo el
+// ANTES no sirve de nada, el DESPUES leido del arbol vivo convierte a cualquier
+// tuerca posterior en culpable». Este arnes mide LAND-2c (#739), que ya esta
+// mergeada, asi que su HEAD es el commit de SU merge.
+const HEAD = sh(`git rev-parse ${process.env.HEAD || 'd39ba61'}`);   // el merge de #739
 
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };

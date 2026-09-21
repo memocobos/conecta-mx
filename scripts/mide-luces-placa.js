@@ -20,10 +20,9 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS. BASE es el main de antes y TIENE QUE FALLAR:
 // sin eso, el verde de HEAD no distingue «lo arreglé» de «no estoy midiendo».
-// ⚠️ HEAD sale del árbol vivo mientras esta tuerca está en revisión. EN CUANTO
-// SE MERGEE hay que anclarlo a su commit de merge, o la siguiente tuerca que
-// toque sorteo.html va a reventar este careo sin tener la culpa — le pasó a
-// `mide:consuelo-verdad` el 21-sep.
+// ✅ Anclado el 21-sep-2026, en cuanto entró #748. Ver el bloque de constantes:
+// los dos lados son commits fijos, así que este verde ya no caduca ni lo puede
+// contaminar una tuerca posterior.
 //
 // Uso: node scripts/mide-luces-placa.js   (BASE=<sha> HEAD=<sha> opcionales)
 // =============================================================================
@@ -37,8 +36,17 @@ const { chromium } = require('playwright');
 
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
-const BASE = sh(`git rev-parse ${process.env.BASE || 'main'}`);
-const HEAD = process.env.HEAD ? sh(`git rev-parse ${process.env.HEAD}`) : null;
+// 🔒 LOS DOS LADOS SON COMMITS FIJOS, y los DOS tuvieron que anclarse.
+// · HEAD estaba en el arbol vivo mientras la tuerca estaba en revision. Ya
+//   entro: `dccf45b`, el merge de #748. Sin esto, la siguiente tuerca que
+//   toque sorteo.html revienta este careo sin tener la culpa.
+// · BASE decia `main`, y AL MERGEARSE main paso a traer el arreglo: el control
+//   positivo se puso en ROJO solo, diciendo «en BASE ningun foco cruza la placa
+//   — este careo no distingue lo arregle de no mido». Es el caso del libro: un
+//   control positivo CADUCA cuando su pasado se vuelve presente. `64bd0aa` es
+//   el main de antes del merge, donde los focos SI pisaban la placa.
+const BASE = sh(`git rev-parse ${process.env.BASE || '64bd0aa'}`);   // el main de antes de #748
+const HEAD = sh(`git rev-parse ${process.env.HEAD || 'dccf45b'}`);   // el merge de #748
 
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };
@@ -112,10 +120,10 @@ const asimetria = (a, centro) => {
 
 (async () => {
   console.log('CAREO LUCES-PLACA-1 · los foquitos de /sorteo\n');
-  console.log('BASE ' + BASE.slice(0, 7) + ' · HEAD ' + (HEAD ? HEAD.slice(0, 7) : 'árbol de trabajo'));
+  console.log('BASE ' + BASE.slice(0, 7) + ' · HEAD ' + HEAD.slice(0, 7));
 
   const dirBase = arbol(BASE);
-  const dirHead = HEAD ? arbol(HEAD) : RAIZ;
+  const dirHead = arbol(HEAD);
   const sBase = await servir(dirBase), sHead = await servir(dirHead);
   const nav = await chromium.launch();
 

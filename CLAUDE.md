@@ -167,6 +167,34 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴 **DOS ROJOS ANOTADOS COMO TUERCAS PROPIAS (21-sep-2026, orden de Memo:
+  «no los toques hoy»).** Los dos están en pie en `main` y **ninguno lo trajo
+  una rama de esta sesión** — se midieron contra `origin/main` antes de decirlo.
+
+  **1 · `mide:tira-agotados` → 142 verdes · 1 ROJO en `[12a]`.**
+  `✗ ningún agotado de la ventana está en el top: no se puede probar que el
+  chip se retire`. 🔒 **Anclar el careo NO lo arregla** — se probó: ANCLAR-CAREOS-1
+  (#749) le fijó el `HEAD` a `d39ba61` y el rojo siguió igual. **El caso no
+  depende del árbol, depende del RELOJ**: `univ` se arma con
+  `!esPasado(e)`, que mira HOY. El que cumplía el caso era **Young Miko
+  (19-sep)** —estaba en `TOP_REAL` *y* en la ventana—; pasado el 19 sale del
+  universo, y la ventana de hoy (neighbourhood 23-sep · straykids 25-sep ·
+  ironmaiden 2-oct) no tiene a nadie del top.
+  ⚠️ **El arnés está haciendo lo correcto**: se niega a pasar en vacío y lo
+  dice (ver *el éxito vacío también habla*). Arreglarlo pide **congelar el
+  reloj** dentro del careo, que es tuerca propia — y entonces habrá que decidir
+  si `TOP_REAL` (hoy una foto tecleada) se congela con él.
+
+  **2 · `npm run vigia:color` → 🔴 «EL COLOR EN LÍNEA CRECIÓ».**
+  `js 959` contra la base `cd251cc` de 888; el HTML **no se movió** (187 = 187).
+  Medido en un worktree aparte sobre `origin/main`: **da exactamente lo mismo**,
+  así que es anterior a esta sesión. Los **+71 en `.js`** vienen de después del
+  4-sep y nadie los ha triado.
+  ⚠️ **No confundir con `vigia:color-literal`**, que está 🟢 y es **el medidor
+  de la serie COLOR** (ver el bloque de COLOR-0/COLOR-1: convertir hex→token no
+  mueve el número de `vigia:color`). Antes de mover la base con `--rebase` hay
+  que **mirar los 71** y ver cuántos son deuda de verdad.
+
 - 🏆 **GIVEAWAY-KG-1 FASE 1 EN PROD (21-sep-2026, #747): el giveaway de Karol G
   abre registro.** `/giveaway` y `/sorteo` repuntados de Natanael a **Karol G**
   (7-nov-2026, Estadio BBVA), slug `karolg-bbva-2026`. Candado de las tres redes

@@ -236,6 +236,30 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   .mos,.mos-foto img{transition:none}
 }
 
+/* ═══ «CÓMO FUNCIONA», LA PLACA DE INSTRUCCIONES ════════════════════════
+   [SORTEO-RONDAS-1] La base 8 promete que la mecánica se publica en esta
+   página ANTES del giro, y no estaba. Se trata como lo que es en un mueble de
+   arcade: la calca de instrucciones, grabada al costado — tipografía
+   condensada, pequeña, y los pasos NUMERADOS porque aquí el orden sí es
+   información (son las rondas, en secuencia). */
+.como-func{max-width:560px;margin:0 auto 22px;padding:14px 16px 15px;
+  background:linear-gradient(170deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+  border-top:1px solid rgba(255,255,255,.12);
+  border-bottom:1px solid rgba(0,0,0,.5);border-radius:4px}
+.como-func[hidden]{display:none}
+.como-func h3{margin:0 0 10px;font-family:var(--font-display);font-size:11px;
+  font-weight:900;letter-spacing:.28em;text-transform:uppercase;
+  color:rgba(255,255,255,.45)}
+.como-func ol{margin:0;padding:0;list-style:none;counter-reset:cf}
+.como-func li{counter-increment:cf;position:relative;padding-left:24px;
+  font-size:13px;line-height:1.5;color:rgba(255,255,255,.76);
+  margin-bottom:7px}
+.como-func li:last-child{margin-bottom:0}
+.como-func li::before{content:counter(cf);position:absolute;left:0;top:0;
+  font-family:var(--font-display);font-weight:900;font-size:13px;
+  color:var(--c-amarillo);opacity:.85}
+.como-func b{color:#fff;font-weight:700}
+
 .rod-lbl{text-align:center;font-size:9px;letter-spacing:.2em;text-transform:uppercase;
   color:rgba(255,255,255,.34);margin-top:7px}
 
@@ -680,6 +704,15 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     Deja esta página abierta: se actualiza sola.
   </div>
 
+  <!-- [SORTEO-RONDAS-1] 🔒 VACÍO A PROPÓSITO: lo escribe `pintarComoFunciona()`
+       desde `escalonesPara(total)`. Tecleado, con 11 participantes diría «24» y
+       no habría ronda de 24 — es la forma de `flash_promo` y de las tres
+       fechas: letrero vivo = código vivo. La BASE 8 promete este bloque. -->
+  <div class="como-func" id="como-func" hidden>
+    <h3>Cómo funciona el sorteo</h3>
+    <ol id="como-pasos"></ol>
+  </div>
+
   <div class="panel" id="panel">
     <div class="panel-l" id="panel-l">Ganador</div>
     <div class="panel-n" id="p-nombre">—</div>
@@ -696,9 +729,16 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
     </div>
 
+    <!-- [SORTEO-RONDAS-1] TRES BOTONES, porque son tres HECHOS distintos.
+         Meter «no cumple» dentro de «no contestó» grabaría la etiqueta
+         equivocada sobre un hecho real —alguien que SÍ contestó marcado como
+         que no— y ése es el defecto de `metodo_separo`.
+         🔒 En PÚBLICO los dos descartes se ven IGUAL («Se vuelve a girar»): el
+         motivo no sale por ninguna puerta pública, solo por `estado_admin`. -->
     <div class="acciones" id="acciones">
-      <button class="btn btn-si" id="si">Sí contestó</button>
+      <button class="btn btn-si" id="si">Aceptó el premio</button>
       <button class="btn btn-no" id="no">No contestó — volver a girar</button>
+      <button class="btn btn-no" id="nocumple">No cumple las bases</button>
     </div>
 
     <div style="margin-top:16px">
@@ -730,6 +770,13 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <div class="admin" id="admin">
     <div class="admin-l">Controles</div>
     <button class="btn" id="girar">Girar</button>
+    <!-- Ocupa el lugar del botón cuando el sorteo ya cerró: un hueco no explica
+         por qué ya no se puede girar. -->
+    <div id="sorteo-cerrado" hidden style="font-size:12px;line-height:1.5;
+         color:var(--c-amarillo);background:rgba(232,255,76,.08);
+         border:1px solid rgba(232,255,76,.3);padding:9px 11px;border-radius:4px">
+      Sorteo <b>cerrado</b>: hay ganador confirmado. Ya no se puede girar.
+    </div>
     <button class="btn btn-ghost btn-sm" id="ver-padron">Ver participantes</button>
     <!-- [SORTEO-ADMIN-1] El padrón vive DENTRO del modo admin, que abre el
          candadito. Sale por `giveaway-sortear` (acción `padron`), no por
@@ -1034,8 +1081,15 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     });
   })();
 
-  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
-    return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
+  // 🔴 HABÍA DOS `function esc()` en este mismo ámbito, y por izado GANABA LA
+  // SEGUNDA: la de aquí era código muerto. Eran equivalentes, así que no rompía
+  // nada — pero quien editara ésta creyendo que cambiaba el escapador no habría
+  // cambiado nada, y ése es el defecto de la plantilla gemela muerta esperando
+  // su turno. Queda UNA, en la posición temprana, con la implementación que
+  // reemplaza `&` PRIMERO (si no, se re-escapan los `&amp;` que ella misma
+  // acaba de meter).
+  function esc(x){ return String(x == null ? '' : x)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   // Siempre con su etiqueta de huso: la ve gente de dos husos y "12:00" a
   // secas no dice cuál de los dos.
@@ -1205,6 +1259,37 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     $('marcador').innerHTML = String(v).split('').map(function(d){
       return '<span>' + d + '</span>';
     }).join('');
+  }
+
+  // ═══ [SORTEO-RONDAS-1] «CÓMO FUNCIONA», DERIVADO ═══════════════════════
+  // 🔒 Los cuatro renglones salen de `escalonesPara(total)` y de
+  // `duracionTotal`. Tecleados, con 11 participantes prometerían una ronda de
+  // 24 que no va a existir — y con menos de 3 prometerían rondas donde hay un
+  // giro directo. Un bloque que explica una mecánica que no va a ocurrir es
+  // peor que no tenerlo.
+  function mmss(ms){
+    var s = Math.round(ms / 1000);
+    return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+  }
+  function pintarComoFunciona(total){
+    var caja = $('como-func');
+    if (!caja || !TIEMPOS) return;
+    // Con un giro ya en pantalla el bloque sobra: la mecánica se está viendo.
+    if (estado && estado.ultimo){ caja.hidden = true; return; }
+    var esc = TIEMPOS.escalonesPara(total);
+    // Con menos de 3 no hay rondas: giro directo, y explicar rondas sería
+    // prometer algo que no pasa.
+    if (esc.length < 2){ caja.hidden = true; return; }
+    caja.hidden = false;
+    var finalistas = esc[esc.length - 2];
+    $('como-pasos').innerHTML = [
+      'El servidor sortea al azar <b>' + esc[0] + '</b> de los <b>' + total
+        + '</b> registrados y los pone en pantalla.',
+      'Cada ronda se apaga la mitad: <b>' + esc.join(' · ') + '</b>.',
+      'Los <b>' + finalistas + '</b> finalistas pasan a la tragamonedas, que gira una última vez.',
+      'Las <b>' + esc.length + ' rondas se sortean completas ANTES de empezar</b>, en el servidor. '
+        + 'El show dura unos <b>' + mmss(TIEMPOS.duracionTotal(esc)) + '</b>.',
+    ].map(function(t){ return '<li>' + t + '</li>'; }).join('');
   }
 
   // ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════
@@ -1706,10 +1791,15 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   };
 
   var tickReloj = null;
-  function arrancarReloj(desdeISO, resultado){
+  function arrancarReloj(desdeISO, resultado, revelacionMs){
     if (tickReloj){ clearInterval(tickReloj); tickReloj = null; }
     if (resultado !== 'pendiente'){ $('reloj').style.display = 'none'; return; }
-    var fin = Date.parse(desdeISO) + MINUTOS_PARA_CONTESTAR * 60000;
+    // 🔒 ARRANCA EN LA REVELACIÓN, no en `creado_at`. Si arrancara en creado_at
+    // el show se comería 2:12 de los diez minutos y Memo tendría 7:43 reales
+    // para contactar al ganador. `revelacion_en_ms` lo manda el SERVIDOR para
+    // que el reloj y el gateo de las rondas salgan del MISMO número.
+    var fin = Date.parse(desdeISO) + (Number(revelacionMs) || 0)
+            + MINUTOS_PARA_CONTESTAR * 60000;
     function pinta(){
       $('reloj').style.display = '';
       var falta = fin - ahora();
@@ -1733,19 +1823,24 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   function pintarPanel(g){
     $('espera').style.display = 'none';
     $('panel').style.display = 'block';
-    $('panel').classList.toggle('no', g.resultado === 'no_contesto');
+    // [SORTEO-RONDAS-1] El resultado PÚBLICO tiene tres valores y `no_contesto`
+    // ya no llega por aquí: los dos descartes salen como `se_regira`, para que
+    // la API no afirme en público que alguien «no contestó» cuando sí contestó.
+    // Se acepta el viejo también, por los dos giros de Natanael.
+    var seRegira = (g.resultado === 'se_regira' || g.resultado === 'no_contesto');
+    $('panel').classList.toggle('no', seRegira);
     // El nombre lo dice la PLACA de la máquina; aquí sería la segunda vez
     // seguida y el ojo lee dos ganadores. El panel se queda con lo que la
     // placa no dice: la hora, el reloj de 10 minutos y los controles.
     $('p-nombre').style.display = 'none';
     $('panel-l').style.display = 'none';
     // La placa cambia de rótulo si no contestó.
-    $('pg-l').textContent = g.resultado === 'no_contesto' ? 'No contestó' : 'Ganador';
-    $('placa-ganador').classList.toggle('no', g.resultado === 'no_contesto');
+    $('pg-l').textContent = seRegira ? 'Se vuelve a girar' : 'Ganador';
+    $('placa-ganador').classList.toggle('no', seRegira);
 
     var linea = 'Girado a las ' + horaReynosa(g.creado_at) + ', hora de Reynosa';
     if (g.total_participantes != null) linea += ' · ' + g.total_participantes + ' participantes';
-    if (g.resultado === 'no_contesto') linea += ' · Se vuelve a girar.';
+    if (seRegira) linea += ' · Se vuelve a girar.';
     $('p-cuando').textContent = linea;
 
     var viejo = (ahora() - Date.parse(g.creado_at)) > RECIENTE_MS;
@@ -1757,10 +1852,28 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     // sorteo, y el bloque diría que ya se acabó.
     $('rescate').style.display = (g.resultado === 'acepto') ? 'block' : 'none';
 
-    arrancarReloj(g.creado_at, g.resultado);
+    arrancarReloj(g.creado_at, g.resultado, g.revelacion_en_ms);
     $('acciones').style.display = (TOKEN && g.resultado === 'pendiente') ? 'flex' : 'none';
+
     $('tel').style.display = (TOKEN && telAdmin) ? 'flex' : 'none';
     if (TOKEN && telAdmin) mostrarTel(telVisible);
+  }
+
+  // ═══ 🔒 CON GANADOR CONFIRMADO, «GIRAR» SE VA ═══════════════════════════
+  // No deshabilitado: FUERA. El servidor ya se rehúsa (409 y cero filas), y un
+  // botón que existe para recibir un 409 es una promesa falsa en pantalla.
+  //
+  // 🔴 Y SE EVALÚA EN CADA LATIDO, no al pintar el panel. Medido: colgado de
+  // `pintarPanel` no corría hasta que el show TERMINABA — o sea que durante los
+  // 2:12 de una repetición, con el sorteo YA CERRADO, el botón seguía ahí
+  // invitando a picarle. El estado del sorteo no depende de en qué parte de la
+  // animación vaya la pantalla.
+  function pintarCierre(){
+    var cerrado = !!(estado && (estado.giros || []).some(function(x){ return x.resultado === 'acepto'; }));
+    var bg = $('girar');
+    if (bg) bg.style.display = cerrado ? 'none' : '';
+    var av = $('sorteo-cerrado');
+    if (av) av.hidden = !cerrado;
   }
 
   function pintarHistorial(giros){
@@ -1770,7 +1883,8 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     $('hist-caja').style.display = '';
     $('hist').innerHTML = previos.map(function(g){
       var r = g.resultado === 'acepto' ? '<span class="r-si">sí contestó</span>'
-            : g.resultado === 'no_contesto' ? '<span class="r-no">no contestó</span>'
+            : (g.resultado === 'se_regira' || g.resultado === 'no_contesto')
+              ? '<span class="r-no">se volvió a girar</span>'
             : '<span class="r-pd">pendiente</span>';
       return '<li><b>' + esc(g.nombre) + '</b> — ' + r +
         ' <span class="hist-hora">· ' + horaReynosa(g.creado_at) + '</span></li>';
@@ -1852,6 +1966,8 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       puertaRegistro();
       contarHasta(res.j.total);
       pintarCuenta();
+      pintarComoFunciona(res.j.total);
+      pintarCierre();
 
       var u = res.j.ultimo;
       if (!u){
@@ -2004,8 +2120,6 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         .catch(function(){});
     });
   }
-  function esc(x){ return String(x == null ? '' : x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
   function cargarFotos(){
     return api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'padron' }) })
       .then(function(res){
@@ -2095,19 +2209,79 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     });
   }
 
-  function resolver(resultado){
-    if (!TOKEN || !estado || !estado.ultimo) return;
-    $('si').disabled = $('no').disabled = true;
-    api('giveaway-sortear', { method: 'POST',
-      body: JSON.stringify({ accion: 'resolver', sorteo_id: estado.ultimo.id, resultado: resultado })
-    }).then(function(res){
-      $('si').disabled = $('no').disabled = false;
-      if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo guardar'; return; }
-      refrescar();
-    });
+  // ═══ [SORTEO-RONDAS-1] LOS TRES BOTONES ════════════════════════════════
+  // Los tres piden CONFIRMACIÓN: son irreversibles o casi, y un dedazo en un
+  // teléfono a media transmisión no puede decidir un premio.
+  //
+  // ⚠️ `confirm`/`prompt` BLOQUEAN la página entera —y con ella el latido y la
+  // animación—, así que solo se usan en la vista de admin y nunca durante el
+  // show. Es la misma razón por la que no se disparan alertas en esta página.
+  var BOTONES = ['si', 'no', 'nocumple'];
+  function bloquear(v){
+    BOTONES.forEach(function(id){ var b = $(id); if (b) b.disabled = v; });
   }
-  $('si').addEventListener('click', function(){ resolver('acepto'); });
-  $('no').addEventListener('click', function(){ resolver('no_contesto'); });
+
+  // 🔒 EL MOTIVO NACE VACÍO. Un default escribiría en el acta un motivo que
+  // NADIE eligió —el defecto de `kmt-prov`, que mandó tres compras a «Hotel»—
+  // y aquí quedaría por escrito para siempre en `descarte_motivo`.
+  // Misma forma que el `pedirMotivo()` de eliminar, que ya existe arriba: no se
+  // inventa un segundo diálogo para el mismo tipo de decisión.
+  var MOTIVOS_BASES = [
+    ['no_sigue', 'No nos sigue en redes'],
+    ['otro', 'Otro (escríbelo)'],
+  ];
+  function pedirMotivoBases(){
+    var op = MOTIVOS_BASES.map(function(m, i){ return (i + 1) + ') ' + m[1]; }).join('\n');
+    var elegido = window.prompt('¿Por qué no cumple las bases?\n\n' + op + '\n\nEscribe el número:');
+    if (elegido === null) return null;                       // canceló
+    var idx = parseInt(String(elegido).trim(), 10) - 1;
+    if (!(idx >= 0 && idx < MOTIVOS_BASES.length)) return { error: 'Elige uno de los motivos de la lista' };
+    var motivo = MOTIVOS_BASES[idx][0];
+    if (motivo !== 'otro') return { motivo: motivo, detalle: '' };
+    var txt = window.prompt('Escribe el motivo:');
+    if (txt === null) return null;
+    if (String(txt).trim().length < 3) return { error: 'Con «otro» hace falta escribir el motivo' };
+    return { motivo: 'otro', detalle: String(txt).trim() };
+  }
+
+  function resolver(resultado, extra){
+    if (!TOKEN || !estado || !estado.ultimo) return;
+    bloquear(true);
+    var cuerpo = Object.assign({ accion: 'resolver', sorteo_id: estado.ultimo.id,
+                                 resultado: resultado }, extra || {});
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify(cuerpo) })
+      .then(function(res){
+        bloquear(false);
+        if (!res.j || res.j.ok !== true){
+          // El servidor manda la voz: «ya se volvió a girar», «ganador
+          // confirmado»… Se enseña TAL CUAL en vez de un mensaje genérico.
+          $('err').textContent = (res.j && res.j.error) || 'No se pudo guardar';
+          return;
+        }
+        $('err').textContent = '';
+        refrescar();
+      })
+      .catch(function(){ bloquear(false); $('err').textContent = 'Se cayó la conexión'; });
+  }
+
+  $('si').addEventListener('click', function(){
+    var n = (estado && estado.ultimo && estado.ultimo.nombre) || 'el ganador';
+    if (!window.confirm('¿Confirmar que ' + n + ' ACEPTÓ el premio?\n\n'
+      + 'Esto CIERRA el sorteo de forma permanente: ya no se podrá girar ni deshacer.')) return;
+    resolver('acepto');
+  });
+  $('no').addEventListener('click', function(){
+    if (!window.confirm('¿Marcar que NO CONTESTÓ y volver a girar?')) return;
+    resolver('no_contesto');
+  });
+  $('nocumple').addEventListener('click', function(){
+    if (!window.confirm('¿Marcar que NO CUMPLE LAS BASES y volver a girar?\n\n'
+      + 'Úsalo cuando SÍ contestó pero no cumple (por ejemplo, no nos sigue).')) return;
+    var m = pedirMotivoBases();
+    if (m === null) return;                                  // canceló: no pasa nada
+    if (m.error){ $('err').textContent = m.error; return; }
+    resolver('no_cumple', { motivo: m.motivo, motivo_detalle: m.detalle });
+  });
 })();
 </script>
 </body>

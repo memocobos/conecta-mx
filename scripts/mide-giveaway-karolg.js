@@ -72,6 +72,56 @@ function servir() {
   console.log('    el sorteo en Monterrey: ' + enMty);
   af(/^8:00/.test(enMty), 'en Monterrey el sorteo cae a las ' + enMty + ' y el copy dice 8:00 PM');
 
+  // ── [1b] 🔴 LOS GEMELOS DEL NAVEGADOR, CAREADOS CONTRA EL LIB ────────────
+  // ESTE CAREO NO EXISTÍA Y COSTÓ LA ENTREGA. Los comentarios de giveaway.html
+  // y sorteo.html llevaban desde GIVEAWAY-NATA-1 diciendo «el arnés los carea
+  // contra el lib»… y ningún arnés los careaba. Las cuatro constantes se
+  // quedaron en el 13-sep de Natanael mientras el lib pasaba al 1-oct, así que
+  // en el preview `ahora >= CIERRE` era cierto: el formulario salía OCULTO y la
+  // página anunciaba «EL REGISTRO CERRÓ» el día que abría el registro.
+  //
+  // 🔒 Es la trampa de la aserción de ausencia en su forma peor: el comentario
+  // que PROMETE un candado se lee igual que el candado. Un candado prometido no
+  // es un candado. Y el bug no lo vieron 120 aserciones verdes porque todas le
+  // preguntaban al lib — la única fuente que sí estaba bien.
+  //
+  // Se carea el INSTANTE, no el texto: `Date.parse` de los dos lados. Así un
+  // gemelo escrito con otro huso pero el mismo momento pasaría (es el mismo
+  // instante) y uno con la misma cara y otro momento NO.
+  const GEMELOS = [
+    { archivo: 'giveaway.html', cual: 'CIERRE',
+      re: /var CIERRE\s*=\s*new Date\('([^']+)'\)/,          esperado: G.CIERRE },
+    { archivo: 'giveaway.html', cual: 'SORTEO',
+      re: /var SORTEO\s*=\s*new Date\('([^']+)'\)/,          esperado: G.SORTEO },
+    { archivo: 'sorteo.html',   cual: 'CIERRE_TS',
+      re: /var CIERRE_TS\s*=\s*Date\.parse\('([^']+)'\)/,    esperado: G.CIERRE },
+    { archivo: 'sorteo.html',   cual: 'SORTEO_TS',
+      re: /var SORTEO_TS\s*=\s*Date\.parse\('([^']+)'\)/,    esperado: G.SORTEO },
+  ];
+  console.log('[1b] los 4 gemelos del navegador contra el lib');
+  let gemelosVistos = 0;
+  for (const g of GEMELOS) {
+    const txt = fs.readFileSync(path.join(RAIZ, g.archivo), 'utf8');
+    const m = txt.match(g.re);
+    // 🔒 Candado de cardinalidad: si el regex deja de encontrar la constante
+    // —porque alguien la renombró o la movió— esta sección pasaría EN VACÍO y
+    // volveríamos exactamente al agujero que la creó.
+    af(!!m, g.archivo + ': no encontré la constante ' + g.cual + '; el careo de gemelos se quedó SIN MEDIR');
+    if (!m) continue;
+    gemelosVistos++;
+    const mismoInstante = Date.parse(m[1]) === Date.parse(g.esperado);
+    console.log('     ' + g.archivo + ' ' + g.cual + ' = ' + m[1] + (mismoInstante ? '  ✓' : '  ✗'));
+    af(mismoInstante, g.archivo + ' ' + g.cual + ' = ' + m[1] + ' y el lib dice ' + g.esperado
+       + ' — son INSTANTES distintos: el navegador decide por su cuenta y miente');
+  }
+  af(gemelosVistos === 4, 'se carearon ' + gemelosVistos + ' gemelos de 4: el barrido está incompleto');
+
+  // 🔒 CONTROL POSITIVO DEL CAREO: si le doy un gemelo con la fecha vieja, TIENE
+  // que declararlo distinto. Sin esto, los 4 ✓ de arriba no distinguen «coinciden»
+  // de «no estoy comparando nada».
+  af(Date.parse('2026-09-13T19:00:00-05:00') !== Date.parse(G.CIERRE),
+     'el control positivo no muerde: la fecha vieja de Natanael se lee igual que el CIERRE nuevo');
+
   // ── [2] EL CRON: la ventana y el schedule, que se mueven JUNTOS ──────────
   // 🔴 EL SCHEDULE NO DERIVA DE `SORTEO`: la FECHA sí (el cron se rehúsa si el
   // día no es el del sorteo) pero LA HORA vive en netlify.toml, en UTC. Son

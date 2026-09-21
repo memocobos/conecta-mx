@@ -764,7 +764,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // cerrada. El -05:00 es Reynosa con horario de verano (America/Matamoros).
   // [GIVEAWAY-NATA-1] Gemelo de `_lib/giveaway.js` (el navegador no importa la
   // function). Septiembre en Reynosa es -05:00, con el offset explícito.
-  var CIERRE_TS = Date.parse('2026-09-13T19:00:00-05:00');
+  var CIERRE_TS = Date.parse('2026-10-01T20:00:00-05:00');
 
   var TOKEN = null;       // SOLO en memoria. Nunca localStorage.
   var estado = null;
@@ -1009,7 +1009,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
 
   // ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════
-  var SORTEO_TS = Date.parse('2026-09-13T20:00:00-05:00');   // gemelo del lib
+  var SORTEO_TS = Date.parse('2026-10-01T21:00:00-05:00');   // gemelo del lib
   function pintarCuenta(){
     var caja = $('cuenta');
     // Con un giro ya en pantalla la cuenta sobra.

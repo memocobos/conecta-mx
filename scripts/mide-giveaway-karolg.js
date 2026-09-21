@@ -1036,6 +1036,37 @@ function servir() {
     // Y que el nombre del artista NO esté tecleado en la plantilla.
     af(!/no haber ganado el boleto para [A-Z]/.test(c),
        'el consuelo volvió a teclear el nombre del artista en la plantilla; se deriva del catálogo');
+
+    // ── EL NOMBRE DERIVADO, RENDERIZADO ─────────────────────────────────────
+    // No basta con que no esté tecleado: hay que ver que el derivado SALGA
+    // IMPRESO. Sin esto la derivación podría leer el campo y tirarlo, y el
+    // careo se quedaría contento con una plantilla sin nombre ninguno.
+    //
+    // 🔒 ESTO VIVE AQUÍ Y NO EN `mide:consuelo-verdad`. Ese arnés mide
+    // CONSUELO-VERDAD-1 (#736) entre DOS COMMITS FIJOS y no debe seguir al
+    // árbol vivo — se cayó acusando a esta tuerca justamente por tener el HEAD
+    // sin anclar. El consuelo DE HOY lo mide su propia tuerca: ésta.
+    const CC = require(path.join(RAIZ, 'netlify/functions/giveaway-consuelo.js'));
+    const PROMO = { codigo: 'KAROL', texto: '$500 de descuento', expira: '2026-11-01T05:59:59+00:00' };
+    // El evento tiene la FORMA que devuelve `fetchCatalogo`: `nombre` sale de
+    // `e.a` del EV. Leído de `_lib/catalogo-index`, no recordado.
+    const mapea = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js'), 'utf8');
+    af(/nombre:\s*\(e\.a != null\)/.test(mapea),
+       'el catálogo ya no mapea `a` → `nombre`: el fixture de este careo dejó de parecerse a producción');
+    const EVT = { ds: '2026-11-06', nombre: 'Karol G en Monterrey' };
+    const htmlC = CC._correoHtml('Ana Pérez', 'https://x/#karolg', PROMO, EVT);
+    af(typeof htmlC === 'string' && htmlC.length > 1000, 'el consuelo no imprimió HTML (cardinalidad)');
+    af(htmlC.includes(EVT.nombre),
+       'el consuelo no imprime el nombre derivado del catálogo («' + EVT.nombre + '»)');
+    af(restos(htmlC.replace(/<[^>]+>/g, ' ')).length === 0,
+       'el consuelo renderizado todavía trae restos de la época anterior');
+    // 🔒 Y LA OTRA MITAD: sin nombre legible NO SE MANDA NADA. Es la regla del
+    // archivo para las otras dos líneas derivadas, y sin este control la guarda
+    // nueva sería letra muerta — declarar un hueco no es taparlo.
+    let sinNombre = null;
+    try { CC._correoHtml('X', 'https://x/#karolg', PROMO, { ds: '2026-11-06' }); } catch (e) { sinNombre = e; }
+    af(!!sinNombre && /nombre/.test(sinNombre.message),
+       'un evento SIN nombre no hace tronar el render: la guarda del artista no muerde');
   }
 
   await nav.close(); srv.close();

@@ -38,7 +38,17 @@ const path = require('path');
 const RAIZ = path.join(__dirname, '..');
 const sh = (c) => execSync(c, { cwd: RAIZ, encoding: 'utf8' }).trim();
 const BASE = sh(`git rev-parse ${process.env.BASE || '81f69c2'}`);
-const HEAD = sh(`git rev-parse ${process.env.HEAD || 'HEAD'}`);
+// 🔴 [GIVEAWAY-KG-1] HEAD SE ANCLA. Estaba en `|| 'HEAD'`, o sea el ÁRBOL VIVO,
+// con BASE sí anclado: la mitad que el libro ya nombra —«anclar solo el ANTES no
+// sirve de nada: el DESPUÉS leído del árbol vivo convierte a cualquier tuerca
+// posterior en culpable»—. Y pasó: el barrido de restos de Natanael repuntó el
+// consuelo a karolg y dejó de teclear el nombre del artista, y este careo se
+// cayó acusando a una tuerca que no tiene nada que ver con lo que mide.
+//
+// 🔒 ESTE ARNÉS MIDE CONSUELO-VERDAD-1 (#736), que YA ESTÁ MERGEADA, así que
+// sus DOS lados son commits fijos y su verde no caduca ni se contamina. Lo que
+// mide el consuelo DE HOY es `mide:giveaway-karolg` [9d].
+const HEAD = sh(`git rev-parse ${process.env.HEAD || '00197ea'}`);
 
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };

@@ -167,6 +167,109 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **GIVEAWAY FASE 2 COMPLETA EN PROD (22-sep-2026, #751 y #752): el sorteo
+  de Karol G se corre por RONDAS y la tarjeta del ganador está vestida.**
+  `npm run mide:sorteo-rondas` (**1 280**) · `mide:sorteo-maquina` (**147**) ·
+  `mide:ganador-b` (**78**). SQL `migraciones/SORTEO-RONDAS-1.sql` **ya corrido
+  y verificado contra la base**: 4 columnas, los 4 CHECKs, el índice único
+  `(slug,intento)`, la FK y el trigger que hace `rondas` inmutable.
+
+  **La mecánica:** el servidor revuelve el padrón UNA vez con azar de `crypto`
+  y las rondas son **PREFIJOS** de esa lista (24→12→6→3→1), así que
+  `P(ganar)=1/N`, cada ronda es subconjunto de la anterior y el ganador está en
+  todas — **gratis, sin comprobarlo a mano**. El navegador solo REVELA, gateado
+  por el reloj del servidor: el show dura **82 s** y el ganador viaja en el
+  **segundo 74**.
+
+  🔒 **NINGUNA RESPUESTA PÚBLICA EXPONE EL ORDEN DE LA REVOLTURA.** Las rondas
+  viajan ordenadas por FOLIO, que ya es público. `orden` se guarda en orden de
+  revoltura porque es lo que hace que las rondas sean prefijos; publicarlo tal
+  cual sería publicar al ganador desde el segundo cero.
+
+  🔴 **Y LA LECCIÓN GRANDE DE LA SERIE: un desempate «imparcial» entre
+  perdedores puede DELATAR la posición del ganador.** El final apaga a uno de
+  los 3 finalistas, y la primera versión elegía «el de folio más alto de los
+  dos perdedores» — razonado así en el código: *el folio ya es público y los dos
+  pierden igual*. Las dos frases son ciertas y la conclusión es falsa, porque el
+  mosaico va ordenado por folio: ese desempate es una **función de la posición
+  del ganador**. Medido sobre 2 000 corridas: la posición 0 **nunca** caía (0 de
+  2 000), la 1 el 35.3 % y la 2 el 64.8 % — así que si caía la del medio, el
+  ganador era la de la derecha **con certeza, cinco segundos antes**. Hoy el que
+  cae sale de un **bit de azar propio, guardado** con la escalera (`primero`):
+  guardado y no calculado al vuelo, porque dos personas en dos teléfonos tienen
+  que ver apagarse la MISMA tarjeta. Remedido: 33.0 / 33.4 / 33.6 %.
+  **La pregunta no es «¿este dato es público?» sino «¿de qué es FUNCIÓN?».**
+
+  **Lo demás que vive en prod:** tres botones con token (aceptó / no contestó /
+  no cumple las bases, con motivo de lista cerrada que **nunca** sale en
+  público: los dos descartes se ven igual, «Se vuelve a girar») · `acepto`
+  irreversible y un sorteo con ganador confirmado **CERRADO en el servidor**
+  (409 y cero filas, y el botón desaparece de la pantalla) · modo **ensayo**
+  blindado en los dos sentidos, con avatares generados · el consuelo exige un
+  ganador con `acepto` o se rehúsa diciendo por qué · la ciudad en cada ficha
+  del mosaico · el marco de campeón · el contacto del ganador con token · la
+  muestra de 30 s de Deezer con botón propio · y el **story PNG 1080×1920**.
+
+  🔒 **EL ARTISTA SE DERIVA DEL CATÁLOGO**, no se teclea:
+  `catalogo[EVENTO_CATALOGO].artista` (de `e.img`, el campo con el que el sitio
+  le busca la foto). Escribirlo habría sido la TERCERA copia del nombre en
+  `/sorteo`. ⚠️ Y **`nombre` no sirve**: es el titular del evento («Karol G en
+  Monterrey») y buscar eso en Deezer no encuentra nada.
+  ⚠️ Se pide **solo con el ganador ya revelado**: `giveaway-estado` es ruta
+  caliente (la página late cada 4 s durante 82 s) y traer el catálogo en cada
+  latido sería pagar una lectura de más 20 veces por espectador. Fail-soft duro:
+  sin artista, la pieza de música **no se pinta**.
+
+  🔒 **EL REPRODUCTOR OFICIAL INCRUSTADO NO CABE EN EL CSP** —`frame-src 'self'
+  https://*.supabase.co`—, así que va un `<audio>` **nuestro** con botón de
+  play: `*.dzcdn.net` ya está en `media-src` y la url la pide nuestra function
+  `deezer`. ⚠️ Esas urls están **FIRMADAS y caducan en 15-30 min**: se piden al
+  armar la tarjeta, nunca al cargar la página.
+
+  🔒 **LA FOTO DEL STORY ENTRA COMO DATA-URI POR `foto_datauri`**, y no es
+  capricho: el bucket es privado, la única forma de pintarla en un `<img>` es
+  una url FIRMADA, y una imagen de otro origen **CONTAMINA el canvas** —
+  `toBlob` truena con SecurityError y no hay archivo. Esa function le
+  **pregunta** el content-type al almacén en vez de adivinarlo por la extensión
+  (los avatares del ensayo son SVG con nombre `.png`: adivinando, la story
+  saldría con la cara en blanco).
+
+  🔒 **`karol-g.jpg` NO SE PIDE DURANTE EL SHOW.** Son 373 KB / 2048×2048 y
+  viste `.mosaico-caja` desde una regla colgada de `body.gano`, así que el
+  navegador solo la descarga cuando aplica; el precargado explícito va **al
+  arrancar el final** (segundo 63), donde hay red ociosa. Antes competiría con
+  las fotos firmadas del padrón. Medido: **0 peticiones antes del final**.
+  ⚠️ Y viste el MUEBLE, **no** `.mos.gana`: la foto del ganador llena su
+  tarjeta (una imagen detrás no se vería) y colgar un nodo del mosaico lo pone
+  donde `pintarMosaico` reescribe con `innerHTML` — la ley de `.hs-media`.
+
+  🔴 **El `52` del WhatsApp no es decorativo:** `giveaway-registro` guarda el
+  número a **diez dígitos exactos** («sin lada de país», lo dice su propio
+  error), así que un `wa.me/<10 dígitos>` abre un chat con **nadie**. Si el dato
+  no tiene esa forma, el botón **no se pinta**.
+
+  ⚠️ **Lo que NO cabe sin scroll, medido y dicho:** el bloque que pidió Memo
+  —foto → nombre → ciudad → premio → reloj— cabe en **y=12..669 de 844**. Las
+  herramientas de admin que van debajo suman **315 px** (tel 47 · contacto 34 ·
+  **botones 206** · repetir 28) y **sí piden desplazarse**. Los 206 px son los
+  tres botones apilados: caben en dos columnas el día que Memo lo pida.
+  ⚠️ El PNG de la story pesa **2.28 MB**; en JPEG al 92 % serían ~300 KB.
+  Se entregó en PNG porque es lo que pidió.
+
+  🔴 **CUATRO ERRORES DE MEDICIÓN PROPIOS que vale más recordar que la tuerca:**
+  (a) la aserción del bloque del ganador medía **el ALTO de la unión** —«769 px
+  caben en 844», verde— y nunca **DÓNDE caía**: el reloj vivía 155 px bajo el
+  pliegue; (b) su ayudante de visibilidad preguntaba `offsetParent !== null`, y
+  **una placa en `opacity:0` contesta que sí**, así que contó como visible una
+  placa vacía e invisible; (c) la aserción del temblor medía `.mos`, y el
+  temblor es un `transform` sobre el **envoltorio de adentro** — `.mos` no se
+  mueve nunca, así que habría pasado en vacío también en plena vibración;
+  (d) una aserción buscaba el nombre del ganador como CADENA y el padrón de
+  prueba trae «Ana»: cuando el sorteo le tocaba a Ana su nombre corto **era** el
+  completo, así que el rojo dependía **de a quién le tocara ganar** — y las
+  veces que pasaba, pasaba en verde sin avisar.
+
+
 - 🏆 **VIAJEROS-CONTADOR-1 EN PROD (21-sep-2026, #750): la portada presume los
   viajeros reales.** «**2,468** viajeros y contando», con el desglose por año
   debajo (**2026: 2,281 · 2027: 187**) como registro permanente. Endpoint

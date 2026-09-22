@@ -340,6 +340,45 @@ body.gano .mos.gana .mos-nom,
 body.gano .mos.gana .mos-ciu,
 body.gano .mos.gana .mos-folio{display:none}
 
+/* ═══ 🔴 [GANADOR-B1] EL MUEBLE SE VISTE, Y SOLO AL REVELARSE ═══════════
+   Orden de Memo: la tarjeta del ganador con `karol-g.jpg` como fondo/marco.
+
+   🔒 VA SOBRE `.mosaico-caja`, NO SOBRE `.mos.gana`. Dos razones medidas:
+   (a) la foto del ganador LLENA su tarjeta, así que una imagen detrás de ella
+   no se vería nunca — el marco tiene que estar AFUERA; y (b) colgar un nodo
+   nuevo del mosaico lo pone donde `pintarMosaico` reescribe con `innerHTML`,
+   que es la ley de `.hs-media` y ya costó un sello AGOTADO en la portada.
+   Vistiendo el mueble no se toca ni un nodo: la tarjeta queda encima, con su
+   marco de campeón, y la imagen es literalmente su fondo.
+
+   🔒 Y CUELGA DE `body.gano`, así que el navegador NO LA PIDE durante el show:
+   una regla de fondo solo descarga su imagen cuando aplica. Son 373 KB y
+   2048×2048 — durante la presentación de los 24 competiría con las fotos del
+   padrón. El precargado explícito va en el JS, al arrancar el final. */
+body.gano .mosaico-caja{
+  background-image:url('/imgs/giveaways/karol-g.jpg');
+  background-size:cover;background-position:center 18%;
+  border-color:rgba(232,255,76,.45);padding:16px 14px 14px}
+/* El velo, para que la foto y los letreros del ganador se lean encima. Va en
+   un pseudo-elemento y NO en la imagen: así el degradado no se descarga. */
+body.gano .mosaico-caja::before{content:'';position:absolute;inset:0;z-index:0;
+  border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 46%,rgba(0,0,0,.9) 100%)}
+body.gano .mosaico-caja > *{position:relative;z-index:1}
+
+/* ═══ [GANADOR-B2] EL CONTACTO DEL GANADOR, SOLO CON TOKEN ══════════════
+   El teléfono ya vivía enmascarado aquí; lo que faltaba eran las dos puertas
+   para hablarle. Nace apagado: lo enciende `pintarPanel` y SOLO con token. */
+.contacto{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+.contacto a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+  font-family:var(--font-display);font-weight:900;font-size:12px;letter-spacing:.08em;
+  text-transform:uppercase;padding:9px 13px;border-radius:9px;
+  border:1px solid rgba(255,255,255,.16)}
+.contacto .c-wa{background:rgba(136,234,78,.14);color:var(--c-verde);
+  border-color:rgba(136,234,78,.45)}
+.contacto .c-ig{background:rgba(255,255,255,.07);color:rgba(255,255,255,.9)}
+.contacto .c-ig[aria-disabled="true"]{opacity:.42;pointer-events:none}
+
 /* La entrada: caen escalonadas, desde un estado YA VISIBLE (sin esto, un JS
    caído deja el mosaico en blanco). */
 /* El escalonado sale de `--paso`, que lo calcula el JS desde la duración de la
@@ -938,6 +977,15 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
     </div>
 
+    <!-- [GANADOR-B2] Las dos puertas para hablarle, SOLO con token. El `href`
+         se arma en `pintarContacto` con el dato de `estado_admin`; nacen vacíos
+         a propósito para que un JS caído no deje un enlace a ningún lado. -->
+    <div class="contacto" id="contacto">
+      <a class="c-wa" id="c-wa" target="_blank" rel="noopener">
+        <svg class="ic"><use href="#ic-wa"/></svg> Escribirle por WhatsApp</a>
+      <a class="c-ig" id="c-ig" target="_blank" rel="noopener">@ Instagram</a>
+    </div>
+
     <!-- [SORTEO-RONDAS-1] TRES BOTONES, porque son tres HECHOS distintos.
          Meter «no cumple» dentro de «no contestó» grabaría la etiqueta
          equivocada sobre un hecho real —alguien que SÍ contestó marcado como
@@ -1210,6 +1258,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   var girando = false;
   var telVisible = false;
   var telAdmin = null;
+  var ADMG = null;            // el `ultimo` de estado_admin: solo existe con token
   var desfaseMs = 0;
 
   // El reloj es el del SERVIDOR: el contador de 10 minutos y el rótulo de
@@ -1987,6 +2036,8 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   }
 
   var COLS = { 24: 4, 12: 4, 6: 3, 3: 3, 1: 1 };
+  // 🔒 UNA sola definición de la ruta, leída por el JS y careada contra el CSS.
+  var VESTIDO = '/imgs/giveaways/karol-g.jpg';
 
   // ═══ [SORTEO-RONDAS-1] LOS 24 LOS SACA LA TRAGAMONEDAS, UNO POR UNO ═════
   //
@@ -2356,6 +2407,20 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     var tDos = TIEMPOS.momentoDosMs(esc);
     var tRev = SHOW.momentos[esc.length - 1];
 
+    // 🔴 [GANADOR-B1] AQUÍ SE PRECARGA `karol-g.jpg`, no antes y no después.
+    // Son 373 KB / 2048×2048. Antes competiría con las fotos del padrón que se
+    // piden firmadas durante la presentación de los 24; al revelarse llegaría
+    // tarde y el mueble se vestiría a medio destello. Arrancando el final hay
+    // trece segundos de red ociosa —la página solo late— y sobra margen.
+    // 🔒 Se pide la MISMA url que la regla de CSS, para que sea el mismo
+    // recurso y no dos descargas: ver el careo, que las carea.
+    if (!window.__vestidoPedido) {
+      window.__vestidoPedido = VESTIDO;
+      var pre = new Image();
+      pre.decoding = 'async';
+      pre.src = VESTIDO;
+    }
+
     // 1 · LOS 3 EN GRANDE, TEMBLANDO CADA VEZ MÁS.
     var ronda3 = SHOW.rondas[esc.length - 2];
     if (ronda3) pintarMosaico(ronda3, []);
@@ -2653,6 +2718,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
 
     $('tel').style.display = (TOKEN && telAdmin) ? 'flex' : 'none';
     if (TOKEN && telAdmin) mostrarTel(telVisible);
+    pintarContacto();
   }
 
   // ═══ 🔒 CON GANADOR CONFIRMADO, «GIRAR» SE VA ═══════════════════════════
@@ -2856,11 +2922,61 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('err-tok').textContent = '';
       $('llave').classList.add('abierta');
       $('admin').style.display = 'block';
+      // [GANADOR-B2] Se guarda el `ultimo` ENTERO, no solo el teléfono: de él
+      // salen el Instagram y el texto del WhatsApp, y más adelante el story.
+      ADMG = res.j.ultimo || null;
       if (res.j.ultimo) telAdmin = res.j.ultimo.whatsapp;
       if (estado && estado.ultimo && animado === estado.ultimo.id) pintarPanel(estado.ultimo);
     });
   }
   $('tok').addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+
+  // ═══ 🔒 [GANADOR-B2] LAS DOS PUERTAS PARA HABLARLE AL GANADOR ═════════
+  //
+  // 🔴 EL `52` NO ES DECORATIVO. `giveaway-registro` guarda el WhatsApp a
+  // DIEZ DÍGITOS EXACTOS, «sin lada de país» —lo dice su propio mensaje de
+  // error—, así que un `wa.me/<10 dígitos>` abre un chat con NADIE. Y si el
+  // dato no tiene esa forma, el botón NO SE PINTA: un enlace que lleva a la
+  // nada es peor que un botón ausente.
+  //
+  // 🔒 EL TEXTO SE DERIVA. El nombre y `premio_texto` vienen del servidor
+  // —y el premio ya salió de `premioPorCiudad` + `PREMIOS`—, así que aquí no
+  // se teclea ni el premio ni la fecha. Es la lección del correo de melanie,
+  // que anunció «las 12:00 PM» de un sorteo de las 9 durante dos giveaways.
+  function pintarContacto(){
+    var caja = $('contacto');
+    if (!caja) return;
+    var puede = !!(TOKEN && ADMG);
+    caja.style.display = puede ? 'flex' : 'none';
+    if (!puede) return;
+
+    var wa = $('c-wa'), ig = $('c-ig');
+    var digs = String(ADMG.whatsapp || '').replace(/\D/g, '');
+    if (digs.length === 10) {
+      var texto = '¡Hola ' + (ADMG.nombre || '') + '! Eres el ganador del sorteo de'
+        + ' Conecta Reynosa. Tu premio: ' + (ADMG.premio_texto || '')
+        + '. Contéstanos por aquí para confirmar que lo aceptas.';
+      wa.href = 'https://wa.me/52' + digs + '?text=' + encodeURIComponent(texto);
+      wa.style.display = '';
+    } else {
+      wa.removeAttribute('href');
+      wa.style.display = 'none';
+    }
+
+    var usr = String(ADMG.instagram || '').trim().replace(/^@+/, '');
+    if (usr) {
+      ig.href = 'https://instagram.com/' + encodeURIComponent(usr);
+      ig.textContent = '@' + usr;
+      ig.removeAttribute('aria-disabled');
+    } else {
+      // Se queda A LA VISTA pero apagado: que el Instagram FALTE es un dato
+      // que Memo necesita ver —es uno de los candados de las bases—, no algo
+      // que deba desaparecer de la pantalla.
+      ig.removeAttribute('href');
+      ig.textContent = 'sin Instagram';
+      ig.setAttribute('aria-disabled', 'true');
+    }
+  }
 
   function mostrarTel(ver){
     telVisible = ver;
@@ -2988,7 +3104,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('ens-msg').textContent = '';
       // 🔒 SE TIRA EL ESTADO. Sin esto la máquina seguiría animando el giro del
       // OTRO sorteo: `SHOW` y `estado` son del slug que se acaba de dejar.
-      SHOW = null; animado = null; estado = null; telAdmin = null;
+      SHOW = null; animado = null; estado = null; telAdmin = null; ADMG = null;
       enReposo = false;
       var caja = $('mosaico-caja'); if (caja) caja.hidden = true;
       $('panel').style.display = 'none';
@@ -3050,6 +3166,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('girar').disabled = false; $('girar').textContent = 'Girar otra vez';
       if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo girar'; return; }
       telAdmin = res.j.whatsapp;
+      if (res.j.ultimo) ADMG = res.j.ultimo;
       refrescar();   // el latido lo anima; no se duplica la animación aquí
     }).catch(function(){
       $('girar').disabled = false; $('girar').textContent = 'Girar';

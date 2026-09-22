@@ -147,6 +147,26 @@ let GIRO = 'g1';
 // `ultimo` — y es ESE `ultimo: null` el que hace `SHOW = null` en la página.
 // (Mi primera versión llamaba a un `window.__sorteoReset()` que no existe.)
 let SIN_GIRO = false;
+// 🔴 EL PADRON ES CONMUTABLE, y es lo que hace DETERMINISTA la carrera.
+// Los dos giros comparten `SHOW.t0` una vez reemplazado, pero NO comparten
+// `cuando`: con 40 participantes la revelacion cae en el segundo 76 y con 5
+// cae en el 7.5. Asi el `esperarDato` del show viejo —que todavia espera su
+// segundo 76— sigue vivo cuando el show nuevo YA REVELO a su ganador, y su
+// reloj de temblor alcanza a la ganadora ya anunciada.
+// Es un caso REAL del ensayo: borrar, sembrar menos, girar.
+let CUANTOS = 40;
+const padrones = {};
+function datos() {
+  if (!padrones[CUANTOS]) {
+    const lista = [];
+    for (let i = 1; i <= CUANTOS; i++) lista.push({ id: 'r' + CUANTOS + '-' + i,
+      nombre: 'Nombre' + i + ' Apellido' + i, folio: i, ciudad: CIUDADES[i % CIUDADES.length] });
+    const esc = TI.escalonesPara(CUANTOS);
+    padrones[CUANTOS] = { lista, esc, rondas: ESC.construirEscalera(lista, esc),
+                          mom: TI.momentos(esc) };
+  }
+  return padrones[CUANTOS];
+}
 let WA = '8990000001';            // 10 dígitos, como los guarda el registro
 let ARTISTA = null;               // se llena del catálogo del árbol medido
 let DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
@@ -160,24 +180,29 @@ function estado() {
       sorteo: '2026-10-01T21:00:00-05:00', modo: 'real', ultimo: null, giros: [] };
   }
   const t = Date.now() - ARRANQUE;
-  const proy = ESC.proyectarRondas({ rondas, momentos, margenMs: TI.T.MARGEN_ADELANTO_MS,
-    transcurridoMs: t, momentoDosMs: TI.momentoDosMs(escalones),
-    fotoDeId: () => null, ciudadDeId: ciudadDe });
+  const D = datos();
+  const proy = ESC.proyectarRondas({ rondas: D.rondas, momentos: D.mom,
+    margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: t,
+    momentoDosMs: TI.momentoDosMs(D.esc), fotoDeId: () => null,
+    ciudadDeId: (id) => (D.lista.find((x) => x.id === id) || {}).ciudad || null });
   const rev = !!proy.ganador_liberado;
-  return { ok: true, total: 40, ahora: new Date().toISOString(), registro_cerrado: true,
+  const G0 = D.rondas.orden[0];
+  return { ok: true, total: CUANTOS, ahora: new Date().toISOString(), registro_cerrado: true,
     sorteo: '2026-10-01T21:00:00-05:00', modo: 'real',
     ultimo: { id: GIRO, intento: (GIRO === 'g1' ? 1 : 2), resultado: RES,
-      nombre: rev ? GANADOR.nombre : null, folio: rev ? GANADOR.folio : null,
-      premio: rev ? G.PREMIOS[G.premioPorCiudad(ciudadDe(GANADOR.id))] : null,
-      ciudad: rev ? ciudadDe(GANADOR.id) : null,
-      total_participantes: 40, creado_at: new Date(ARRANQUE).toISOString(), de_cuantos: 40,
-      escalones, escalon: null, es_regiro: false,
+      nombre: rev ? G0.nombre : null, folio: rev ? G0.folio : null,
+      premio: rev ? G.PREMIOS[G.premioPorCiudad(
+        (D.lista.find((x) => x.id === G0.id) || {}).ciudad)] : null,
+      ciudad: rev ? (D.lista.find((x) => x.id === G0.id) || {}).ciudad : null,
+      total_participantes: CUANTOS, creado_at: new Date(ARRANQUE).toISOString(),
+      de_cuantos: CUANTOS,
+      escalones: D.esc, escalon: null, es_regiro: false,
       rondas: proy.rondas, rondas_totales: proy.rondas_totales,
       siguiente_ronda_en_ms: proy.siguiente_ronda_en_ms,
-      revelacion_en_ms: momentos[momentos.length - 1],
+      revelacion_en_ms: D.mom[D.mom.length - 1],
       dos: proy.dos || null,
-      momento_dos_en_ms: TI.momentoDosMs(escalones),
-      momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones),
+      momento_dos_en_ms: TI.momentoDosMs(D.esc),
+      momento_finalistas_en_ms: TI.momentoFinalistasMs(D.esc),
       // Como en producción: derivado del catálogo y SOLO con el ganador ya
       // revelado (la ruta es caliente y el catálogo no se pide en cada latido).
       artista: rev ? ARTISTA : null },
@@ -188,11 +213,10 @@ function estado() {
 function estadoAdmin() {
   return { ok: true, cadena: [], ultimo: {
     sorteo_id: 'g1', intento: 1, resultado: RES, descarte_motivo: null,
-    nombre: GANADOR.nombre, whatsapp: WA, instagram: IG,
-    ciudad: ciudadDe(GANADOR.id), foto_estado: 'aprobada', tiene_foto: true,
-    registro_id: GANADOR.id,
-    premio: G.premioPorCiudad(ciudadDe(GANADOR.id)),
-    premio_texto: G.PREMIOS[G.premioPorCiudad(ciudadDe(GANADOR.id))],
+    nombre: datos().rondas.orden[0].nombre, whatsapp: WA, instagram: IG,
+    ciudad: 'Reynosa', foto_estado: 'aprobada', tiene_foto: true,
+    registro_id: datos().rondas.orden[0].id,
+    premio: 'PLUS', premio_texto: G.PREMIOS.PLUS,
     creado_at: new Date(ARRANQUE).toISOString(), es_regiro: false } };
 }
 
@@ -258,6 +282,21 @@ function servidor(raiz) {
   await new Promise((ok) => sHead.listen(0, '127.0.0.1', ok));
   const pB = sBase.address().port, pH = sHead.address().port;
   const nav = await chromium.launch();
+  // 🔒 SE CUENTAN LOS RELOJES VIVOS, instrumentando `setInterval` ANTES de que
+  // corra el script de la página. Es la medición DIRECTA de la hipótesis: si
+  // queda un reloj de 120 ms huérfano, aquí se ve — sin inferirlo del temblor.
+  const ctx = await nav.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.addInitScript(() => {
+    window.__ivs = new Map();
+    const si = window.setInterval, ci = window.clearInterval;
+    window.setInterval = function (fn, ms) {
+      const id = si.apply(window, arguments); window.__ivs.set(id, ms); return id;
+    };
+    window.clearInterval = function (id) { window.__ivs.delete(id); return ci.apply(window, arguments); };
+    window.__relojes = () => { const c = {}; window.__ivs.forEach((ms) => { c[ms] = (c[ms] || 0) + 1; }); return c; };
+  });
+  const relojes120 = (pg) => pg.evaluate(() =>
+    (window.__relojes ? (window.__relojes()['120'] || 0) : -1));
   const marcaFin = TI.momentoFinalistasMs(escalones);
   const marcaRev = momentos[momentos.length - 1];
 
@@ -294,6 +333,27 @@ function servidor(raiz) {
     }
     return muestras;
   }
+  // 🔒 SE ESPERA A QUE ACABE LA ANIMACIÓN DE ENTRADA, no un número de ms.
+  // `mosGana` escala la tarjeta de 1 a 1.35 a 1.18 en .9 s: muestrear encima
+  // da «se mueve» por una animación que SÍ debe moverse, y eso es un rojo de
+  // instrumento, no un defecto. Se le pregunta al navegador por la animación
+  // POR SU NOMBRE — esperar «a que no haya ninguna» se colgaría en BASE, donde
+  // `tiembla` es infinita, que es justo lo que venimos a cazar.
+  async function esperarEntrada(pg, msMax) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < (msMax || 3000)) {
+      const corriendo = await pg.evaluate(() => {
+        const g = document.querySelector('.mos.gana');
+        if (!g || !g.getAnimations) return false;
+        return [g].concat([].slice.call(g.querySelectorAll('*')))
+          .some((e) => e.getAnimations().some((a) =>
+            a.playState === 'running' && String(a.animationName || '').indexOf('mosGana') !== -1));
+      });
+      if (!corriendo) return Date.now() - t0;
+      await pg.waitForTimeout(100);
+    }
+    return -1;
+  }
   const veredicto = (ms) => {
     const vistas = ms.filter((m) => m.hay);
     const pos = [...new Set(vistas.map((m) => m.x + '/' + m.y))];
@@ -313,7 +373,7 @@ function servidor(raiz) {
     GIRO = 'g1'; RES = 'pendiente';
     // La vuelta 1 entra justo antes del final: el reloj del temblor arranca…
     ARRANQUE = Date.now() - (marcaFin - 800);
-    const pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+    const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await pg.goto('http://127.0.0.1:' + puerto + '/sorteo.html', { waitUntil: 'load' });
 
@@ -343,19 +403,70 @@ function servidor(raiz) {
     af(movio, '🔒 CONTROL POSITIVO: el medidor NO VE moverse la tarjeta mientras tiembla en '
        + etiqueta);
 
-    // …y ahora el RE-GIRO: cambia el id del giro y el show arranca de nuevo,
-    // ya cerca de su revelación. El reloj de la vuelta 1 queda huérfano.
+    // …y ahora el RE-GIRO, COMO PASA DE VERDAD: Memo pica «Girar» y el giro
+    // nuevo nace con `creado_at` = AHORA, o sea t≈0.
+    //
+    // 🔴 ESTO ES EL CORAZÓN DEL CASO, y mi primera versión lo tenía al revés:
+    // puse el giro nuevo cerca de SU revelación (t≈73 s), y entonces el
+    // `esperarDato` de la vuelta 1 —que compara contra el `SHOW.t0` NUEVO y su
+    // propio `cuando` viejo— también se disparaba y llamaba a su `limpiar()`,
+    // matando el huérfano. Con t≈0 ese `esperarDato` se queda esperando y el
+    // reloj de la vuelta 1 sigue temblando durante TODO el show de la vuelta 2.
+    // El careo pasaba en verde midiendo un camino que se limpia solo.
     GIRO = 'g2';
-    ARRANQUE = Date.now() - (marcaRev - 2500);
-    // Se CAZA la fase, no se adivina el instante.
+    ARRANQUE = Date.now();
+    // 🔴 AQUÍ SE MIDE EL HUÉRFANO, que es lo que el instrumento destapó: con el
+    // reloj de la vuelta 1 vivo, las fichas de la vuelta 2 tiemblan DURANTE SU
+    // PRESENTACIÓN — cuando nada debe temblar todavía. Es el mismo defecto que
+    // reportó Memo (un reloj que resucita el temblor), visto en el momento en
+    // que SÍ se puede reproducir.
+    let orfano = { relojes: -1, tmb: 0, mos: 0, pintadas: -1 };
+    for (let i = 0; i < 26; i++) {
+      await pg.waitForTimeout(700);
+      const f = await pg.evaluate(() => ({
+        tmb: document.querySelectorAll('#mosaico .mos-tiembla').length,
+        mos: document.querySelectorAll('#mosaico .mos').length,
+        show: window.__sorteoShow ? window.__sorteoShow() : null,
+      }));
+      const r = await relojes120(pg);
+      const pintadas = f.show ? f.show.pintadas : -1;
+      // La ventana buena: la presentación de la vuelta 2 (ronda 0, con fichas).
+      if (pintadas === 0 && f.mos > 0) {
+        orfano = { relojes: r, tmb: f.tmb, mos: f.mos, pintadas };
+        break;
+      }
+    }
+    console.log('   durante la PRESENTACIÓN de la vuelta 2: relojes de 120 ms = '
+      + orfano.relojes + ' · fichas ' + orfano.mos + ' · temblando ' + orfano.tmb);
+    af(orfano.mos > 0,
+       '🔒 PREMISA: había que cazar la presentación de la vuelta 2 y no se alcanzó');
+    if (esperaQuieta) {
+      af(orfano.relojes === 0,
+         '🔴 quedó un reloj de temblor HUÉRFANO (' + orfano.relojes + ') durante la'
+         + ' presentación del show siguiente');
+      af(orfano.tmb === 0,
+         '🔴 las fichas tiemblan durante la PRESENTACIÓN: ' + orfano.tmb + ' de ' + orfano.mos
+         + ' — algo las está moviendo cuando nada debería');
+    } else {
+      // 🔒 CONTROL POSITIVO DEL PAR, y aquí SÍ muerde: en BASE el huérfano vive.
+      af(orfano.relojes >= 1 && orfano.tmb > 0,
+         '🔒 CONTROL POSITIVO EN ROJO: en BASE no quedó el reloj huérfano ('
+         + orfano.relojes + ') ni temblaron las fichas (' + orfano.tmb + '), así que'
+         + ' este careo NO reproduce el defecto');
+    }
+
+    // Se CAZA la fase, no se adivina el instante: el show entero son 82 s.
     let gana = false;
-    for (let i = 0; i < 90 && !gana; i++) {
-      await pg.waitForTimeout(200);
+    const tope = Date.now() + TI.duracionTotal(escalones) + 20000;
+    while (!gana && Date.now() < tope) {
+      await pg.waitForTimeout(300);
       gana = await pg.evaluate(() => document.querySelectorAll('.mos.gana').length === 1);
     }
     af(gana, '🔴 ' + etiqueta + ': nunca se reveló un ganador en la segunda vuelta');
     if (gana) {
-      await pg.waitForTimeout(900);
+      const tEnt = await esperarEntrada(pg);
+      console.log('   la animación de entrada acabó en ' + tEnt + 'ms');
+      await pg.waitForTimeout(150);
       const ms = await vigilarQuietud(pg, 4200, 150);
       const v = veredicto(ms);
       console.log('   ' + etiqueta + ': ' + v.n + ' muestras · posiciones distintas: '
@@ -375,15 +486,27 @@ function servidor(raiz) {
            '🔴 envoltorios ANIDADOS en la ganadora (' + v.nidos + '): `temblar` reconstruyó'
            + ' el envoltorio porque lo buscaba por la clase que se le quita');
       } else {
-        // 🔒 CONTROL POSITIVO DEL PAR: BASE tiene que REPROBAR este mismo
-        // careo. Si BASE pasara, el verde de HEAD no distingue «lo arreglé»
-        // de «no estoy midiendo».
-        const falla = (v.posiciones > 1) || (v.conTemblor > 0)
-          || v.anims.some((a) => a.indexOf('tiembla') !== -1);
-        af(falla,
-           '🔒 CONTROL POSITIVO EN ROJO: en BASE la ganadora se queda quieta, así que este'
-           + ' careo NO reproduce el defecto que Memo vio. Dio ' + JSON.stringify(v));
-        console.log('   (BASE reprueba, que es lo que debe hacer)');
+        // ⚠️ AQUÍ **NO** SE EXIGE QUE BASE FALLE, y hay que decir por qué: por
+        // este camino BASE llega con la ganadora QUIETA, porque el huérfano de
+        // la vuelta 1 muere cuando su propio `esperarDato` alcanza su momento
+        // —comparado contra el `SHOW.t0` NUEVO— justo antes de la revelación.
+        // Medido, no supuesto: al revelarse ya no hay ningún reloj de 120 ms.
+        //
+        // 🔴 O SEA QUE ESTE CAREO **NO REPRODUCE LA CAPTURA DE MEMO**: prueba
+        // el defecto de la MISMA CLASE (un reloj huérfano que resucita el
+        // temblor) en la ventana donde sí se ve, y garantiza la quietud en
+        // HEAD. Poner aquí un `af` que exigiera el rojo sería inventar un par
+        // que no existe; dejarlo sin nota sería peor.
+        console.log('   (por este camino BASE llega quieta: relojes de 120 ms al revelarse = '
+          + (await relojes120(pg)) + ')');
+        af(true, 'medido: por este camino el huérfano muere antes de la revelación');
+      }
+      // 🔒 Y LA ASERCIÓN ESTRUCTURAL, que no depende de ver temblar: tras la
+      // revelación NO puede quedar ni un reloj de temblor vivo.
+      const r120 = await relojes120(pg);
+      if (esperaQuieta) {
+        af(r120 === 0,
+           '🔴 tras la revelación queda ' + r120 + ' reloj(es) de temblor vivo(s)');
       }
     }
     // ── EL LETRERO, leído de la pantalla ──────────────────────────────────
@@ -414,7 +537,7 @@ function servidor(raiz) {
   console.log('\n── B · tras un reset del ensayo, la ganadora también queda quieta ──');
   GIRO = 'g1'; RES = 'pendiente';
   ARRANQUE = Date.now() - (marcaFin - 800);
-  let pg2 = await nav.newPage({ viewport: { width: 390, height: 844 } });
+  let pg2 = await ctx.newPage();
   const errs2 = []; pg2.on('pageerror', (e) => errs2.push(e.message));
   await pg2.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
   // Se deja temblar…
@@ -439,15 +562,17 @@ function servidor(raiz) {
   af(reposo, '🔒 PREMISA: la página tiene que haber visto el reset (SHOW en null)');
   SIN_GIRO = false;
   GIRO = 'g2';
-  ARRANQUE = Date.now() - (marcaRev - 2500);
+  ARRANQUE = Date.now();
   let gana2 = false;
-  for (let i = 0; i < 90 && !gana2; i++) {
-    await pg2.waitForTimeout(200);
+  const tope2 = Date.now() + TI.duracionTotal(escalones) + 20000;
+  while (!gana2 && Date.now() < tope2) {
+    await pg2.waitForTimeout(300);
     gana2 = await pg2.evaluate(() => document.querySelectorAll('.mos.gana').length === 1);
   }
   af(gana2, '🔴 tras el reset nunca se reveló un ganador');
   if (gana2) {
-    await pg2.waitForTimeout(900);
+    await esperarEntrada(pg2);
+    await pg2.waitForTimeout(150);
     const v2 = veredicto(await vigilarQuietud(pg2, 3600, 150));
     console.log('   tras el reset: ' + v2.n + ' muestras · posiciones: ' + v2.posiciones
       + ' · con temblor: ' + v2.conTemblor + ' · envoltorios: ' + v2.nidos);
@@ -456,6 +581,86 @@ function servidor(raiz) {
   }
   af(errs2.length === 0, 'errores en B: ' + JSON.stringify(errs2.slice(0, 2)));
   await pg2.close();
+
+  // ── C · 🔴 LA CARRERA, DETERMINISTA: EL HUÉRFANO ALCANZA A LA GANADORA ──
+  //
+  // Esto es la captura de Memo. Los dos giros comparten `SHOW.t0`, pero NO su
+  // `cuando`: con 40 participantes la revelación cae en el segundo 76 y con 5
+  // cae en el 7.5. Así el `esperarDato` del show viejo sigue esperando su
+  // segundo 76 —o sea que su `limpiar()` NO ha corrido— cuando el show nuevo
+  // YA REVELÓ a su ganadora, y su reloj de temblor la alcanza.
+  //
+  // 🔒 Y ES PERMANENTE: el temblor es una animación `infinite`, así que un solo
+  // tic tardío se la pega para siempre. Matar el reloj después ya no la quita.
+  // Por eso el defecto se veía intermitente y por eso una muestra tomada un
+  // segundo más tarde podía no verlo: la carrera dura ~150 ms, pero lo que deja
+  // NO SE VA.
+  //
+  // Es un caso REAL del ensayo: borrar, sembrar menos, girar.
+  for (const [etiqueta, puerto, esperaQuieta] of [['HEAD', pH, true], ['BASE', pB, false]]) {
+    console.log('\n── C · ' + etiqueta + ' · el huérfano alcanza a la ganadora ──');
+    CUANTOS = 40; GIRO = 'g1'; RES = 'pendiente'; SIN_GIRO = false;
+    ARRANQUE = Date.now() - (TI.momentoFinalistasMs(TI.escalonesPara(40)) - 800);
+    const pg3 = await ctx.newPage();
+    const errs3 = []; pg3.on('pageerror', (e) => errs3.push(e.message));
+    await pg3.goto('http://127.0.0.1:' + puerto + '/sorteo.html', { waitUntil: 'load' });
+    let vivo3 = false;
+    for (let i = 0; i < 40 && !vivo3; i++) {
+      await pg3.waitForTimeout(140);
+      vivo3 = await pg3.evaluate(() => !!document.querySelector('#mosaico .mos .mos-tiembla'));
+    }
+    af(vivo3, '🔒 CONTROL POSITIVO: el temblor de la vuelta 1 tiene que estar vivo en ' + etiqueta);
+    const antes = await relojes120(pg3);
+    // El giro nuevo: OTRO id, OTRO tamaño de padrón, y nace en t≈0.
+    CUANTOS = 5; GIRO = 'g2';
+    ARRANQUE = Date.now();
+    const escCorta = TI.escalonesPara(5);
+    console.log('   vuelta 1 revelaba en el ms ' + TI.momentos(TI.escalonesPara(40)).slice(-1)[0]
+      + ' · vuelta 2 revela en el ms ' + TI.momentos(escCorta).slice(-1)[0]
+      + ' · relojes de 120 ms antes del cambio: ' + antes);
+    let gana3 = false;
+    const tope3 = Date.now() + TI.duracionTotal(escCorta) + 25000;
+    while (!gana3 && Date.now() < tope3) {
+      await pg3.waitForTimeout(250);
+      gana3 = await pg3.evaluate(() => document.querySelectorAll('.mos.gana').length === 1);
+    }
+    af(gana3, '🔴 ' + etiqueta + ': la vuelta corta nunca reveló ganadora');
+    if (gana3) {
+      const r3 = await relojes120(pg3);
+      const tEnt3 = await esperarEntrada(pg3);
+      console.log('   la animación de entrada acabó en ' + tEnt3 + 'ms');
+      await pg3.waitForTimeout(150);
+      const v3 = veredicto(await vigilarQuietud(pg3, 3600, 150));
+      console.log('   ' + etiqueta + ': relojes de 120 ms al revelarse = ' + r3
+        + ' · ' + v3.n + ' muestras · posiciones: ' + v3.posiciones
+        + ' · con temblor: ' + v3.conTemblor + ' · envoltorios: ' + v3.nidos
+        + ' · animaciones: ' + JSON.stringify(v3.anims));
+      if (esperaQuieta) {
+        af(r3 === 0, '🔴 al revelarse la ganadora quedaba ' + r3 + ' reloj(es) de temblor vivo(s)');
+        af(v3.posiciones === 1,
+           '🔴 LA GANADORA SE MUEVE tras anunciarse: ' + v3.posiciones + ' posiciones en '
+           + v3.n + ' muestras');
+        af(v3.conTemblor === 0,
+           '🔴 la ganadora quedó con `.mos-tiembla` en ' + v3.conTemblor + ' de ' + v3.n
+           + ' muestras: el huérfano se la pegó, y una animación infinita no se va sola');
+        af(v3.anims.every((a) => a.indexOf('tiembla') === -1),
+           '🔴 la animación `tiembla` vive en la ganadora: ' + JSON.stringify(v3.anims));
+        af(v3.nidos <= 1, '🔴 envoltorios ANIDADOS: ' + v3.nidos);
+      } else {
+        // 🔒 EL PAR: BASE tiene que REPROBAR exactamente esto.
+        const falla = (v3.conTemblor > 0) || (v3.posiciones > 1)
+          || v3.anims.some((a) => a.indexOf('tiembla') !== -1);
+        af(falla,
+           '🔒 CONTROL POSITIVO EN ROJO: en BASE la ganadora NO tembló por este camino'
+           + ' (relojes=' + r3 + ', ' + JSON.stringify(v3) + '), así que el careo no'
+           + ' reproduce la captura de Memo');
+        if (falla) console.log('   🔴 BASE: la ganadora TIEMBLA ya anunciada — reproducido');
+      }
+    }
+    af(errs3.length === 0, etiqueta + ': errores en C: ' + JSON.stringify(errs3.slice(0, 2)));
+    await pg3.close();
+  }
+  CUANTOS = 40;
 
   await nav.close();
   sBase.close(); sHead.close();

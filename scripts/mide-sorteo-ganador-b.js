@@ -26,6 +26,19 @@ process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KE
 const G = require(RAIZ + '/netlify/functions/_lib/giveaway.js');
 
 const VESTIDO = '/imgs/giveaways/karol-g.jpg';
+const CAT = require(RAIZ + '/netlify/functions/_lib/catalogo-index.js');
+// 🔒 EL ARTISTA NO SE TECLEA NI EN EL CAREO. Se saca del catálogo del ÁRBOL
+// MEDIDO con el mismo parser y la misma llave que usa producción, así que la
+// aserción compara «lo que la página pidió» contra «lo que el catálogo dice»,
+// no contra un literal mío que podría estar de acuerdo con mi propio bug.
+function artistaDelArbol(dir) {
+  try {
+    const ev = CAT._parseEV(fs.readFileSync(path.join(dir, 'index.html'), 'utf8'));
+    const e = (ev || []).find((x) => x && x.id === G.EVENTO_CATALOGO);
+    return (e && e.img) ? String(e.img) : null;
+  } catch (e) { return null; }
+}
+const PEDIDOS_DEEZER = [];
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
 function af(cond, msg) {
@@ -69,6 +82,9 @@ const GANADOR = rondas.orden[0];
 let ARRANQUE = Date.now();
 let RES = 'pendiente';
 let WA = '8990000001';            // 10 dígitos, como los guarda el registro
+let ARTISTA = null;               // se llena del catálogo del árbol medido
+let DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
+               title: 'Provenza', artist: 'KAROL G' };
 let IG = 'karla.m';
 const PEDIDOS = [];               // toda url pedida, con su instante
 
@@ -91,7 +107,10 @@ function estado() {
       revelacion_en_ms: momentos[momentos.length - 1],
       dos: proy.dos || null,
       momento_dos_en_ms: TI.momentoDosMs(escalones),
-      momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones) },
+      momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones),
+      // Como en producción: derivado del catálogo y SOLO con el ganador ya
+      // revelado (la ruta es caliente y el catálogo no se pide en cada latido).
+      artista: rev ? ARTISTA : null },
     giros: [] };
 }
 // 🔒 `premio_texto` se DERIVA de `_lib`, igual que en producción: si el careo
@@ -125,6 +144,11 @@ function servidor(raiz) {
         if (b.accion === 'pendientes_foto') return r.end(JSON.stringify({ ok: true, pendientes: 0 }));
         return r.end(JSON.stringify({ ok: true }));
       });
+    }
+    if (/\.netlify\/functions\/deezer/.test(u)) {
+      PEDIDOS_DEEZER.push(q.url);
+      r.writeHead(200, { 'Content-Type': 'application/json' });
+      return r.end(JSON.stringify(DEEZER || {}));
     }
     if (/\.netlify\/functions\//.test(u)) {
       r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end('{"ok":false}');
@@ -380,6 +404,106 @@ function servidor(raiz) {
      '🔴 el reloj de 10 minutos queda pegado al borde o fuera: acaba en ' + caben.bot);
   af(caben.anchoDoc <= caben.anchoVista + 1,
      '🔴 la página desborda a lo ancho: ' + caben.anchoDoc + ' > ' + caben.anchoVista);
+  await pg.close();
+
+  // ── E · LA MUESTRA DE 30 s ──────────────────────────────────────────────
+  console.log('\n── E · la muestra de 30 s, con botón de play ──');
+  ARTISTA = artistaDelArbol(head.dir);
+  af(!!ARTISTA, '🔴 no se pudo derivar el artista del catálogo del árbol medido');
+  console.log('   el artista, DERIVADO del catálogo de HEAD: ' + JSON.stringify(ARTISTA));
+  PEDIDOS_DEEZER.length = 0;
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+  const errsE = []; pg.on('pageerror', (e) => errsE.push(e.message));
+  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(2600);
+  const mu = await pg.evaluate(() => {
+    const c = document.getElementById('muestra'), au = document.getElementById('m-audio');
+    const bt = document.getElementById('m-play'), ic = document.getElementById('m-icono');
+    const ve = (e) => !!e && !e.hidden && e.offsetParent !== null;
+    return { ve: ve(c), tit: (document.getElementById('m-tit') || {}).textContent,
+             src: au ? (au.getAttribute('src') || '') : null,
+             pausado: au ? au.paused : null, icono: ic ? ic.getAttribute('href') : null,
+             hayBoton: ve(bt), iframes: document.querySelectorAll('iframe').length };
+  });
+  console.log('   la pieza: ' + JSON.stringify({ ve: mu.ve, tit: mu.tit, icono: mu.icono }));
+  console.log('   se le pidió a la function: ' + JSON.stringify(PEDIDOS_DEEZER));
+  af(mu.ve, '🔴 la muestra no se ve tras la revelación');
+  af(mu.hayBoton, '🔴 no hay botón de play');
+  // 🔒 LA PETICIÓN LLEVA EL ARTISTA DEL CATÁLOGO, no un nombre tecleado.
+  af(PEDIDOS_DEEZER.length === 1,
+     '🔴 la function se pidió ' + PEDIDOS_DEEZER.length + ' veces (las urls de Deezer'
+     + ' caducan: se pide UNA, al armar la tarjeta)');
+  af(PEDIDOS_DEEZER.length === 1
+     && PEDIDOS_DEEZER[0].indexOf('q=' + encodeURIComponent(ARTISTA)) !== -1,
+     '🔴 la petición no lleva el artista DERIVADO («' + ARTISTA + '»): ' + PEDIDOS_DEEZER[0]);
+  af(PEDIDOS_DEEZER.length === 1 && /type=track/.test(PEDIDOS_DEEZER[0]),
+     'y pide el tipo `track`, que es el que trae el preview');
+  af(mu.src === DEEZER.preview,
+     '🔴 el `<audio>` no quedó con la url del preview: ' + mu.src);
+  af(/dzcdn\.net/.test(String(mu.src)),
+     '🔒 y el audio sale de `*.dzcdn.net`, que es lo que el CSP permite en `media-src`');
+  af(String(mu.tit).indexOf(DEEZER.title) !== -1,
+     '🔴 el título no es el que dijo la function: ' + mu.tit);
+  af(mu.pausado === true, '🔒 NADA suena solo: el audio nace pausado');
+  af(mu.icono === '#ic-play', 'y el botón muestra el play, dio ' + mu.icono);
+  // 🔒 NI UN IFRAME: el reproductor OFICIAL no cabe en el CSP y no se metió.
+  af(mu.iframes === 0,
+     '🔴 apareció un iframe en la página: el CSP dice frame-src \'self\' y un'
+     + ' reproductor incrustado de terceros no cargaría');
+  // El botón alterna de verdad.
+  await pg.click('#m-play');
+  await pg.waitForTimeout(350);
+  const tras = await pg.evaluate(() => {
+    const ic = document.getElementById('m-icono');
+    return { icono: ic ? ic.getAttribute('href') : null };
+  });
+  af(tras.icono === '#ic-pausa',
+     '🔴 al picarle el botón no cambió a pausa: ' + tras.icono);
+  af(errsE.length === 0, 'errores en E: ' + JSON.stringify(errsE.slice(0, 2)));
+  await pg.close();
+
+  // ── F · SIN CANCIÓN, NO HAY PIEZA (fail-soft) ───────────────────────────
+  console.log('\n── F · sin canción, la pieza no existe ──');
+  for (const [caso, resp] of [['la function contesta sin preview', { title: 'x' }],
+                              ['la function contesta vacío', {}]]) {
+    DEEZER = resp;
+    PEDIDOS_DEEZER.length = 0;
+    ARRANQUE = Date.now() - (marcaRev + 4000);
+    pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+    const errsF = []; pg.on('pageerror', (e) => errsF.push(e.message));
+    await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+    await pg.waitForTimeout(2600);
+    const f = await pg.evaluate(() => {
+      const c = document.getElementById('muestra');
+      return { ve: !!c && !c.hidden && c.offsetParent !== null,
+               gana: document.querySelectorAll('.mos.gana').length };
+    });
+    console.log('   ' + caso + ' → pieza visible: ' + f.ve + ' · ganador en pie: ' + f.gana);
+    af(!f.ve, '🔴 ' + caso + ': la pieza se pintó con un botón que no suena');
+    af(f.gana === 1, '🔒 y el ganador sigue en pie: el show no se cae por una canción');
+    af(errsF.length === 0, caso + ': errores: ' + JSON.stringify(errsF.slice(0, 2)));
+    await pg.close();
+  }
+  DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
+             title: 'Provenza', artist: 'KAROL G' };
+
+  // ── G · CONTROL POSITIVO: en BASE no hay muestra ni se le pide nada ─────
+  console.log('\n── G · en BASE no existe la muestra ──');
+  PEDIDOS_DEEZER.length = 0;
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+  await pg.goto('http://127.0.0.1:' + pB + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(2600);
+  const gB = await pg.evaluate(() => ({
+    muestra: !!document.getElementById('muestra'),
+    play: !!document.getElementById('m-play'),
+  }));
+  af(!gB.muestra && !gB.play,
+     '🔒 CONTROL POSITIVO: en BASE no existe la pieza de música: ' + JSON.stringify(gB));
+  af(PEDIDOS_DEEZER.length === 0,
+     '🔒 CONTROL POSITIVO: BASE no le pide nada a la function de Deezer, pidió '
+     + PEDIDOS_DEEZER.length);
   await pg.close();
 
   await nav.close();

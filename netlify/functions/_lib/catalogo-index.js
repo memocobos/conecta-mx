@@ -78,6 +78,14 @@ async function fetchCatalogo() {
       catalogo[e.id] = {
         // ADITIVO para contratos: nombre/venue/ciudad/banco. Transporte no los usa.
         nombre: (e.a != null) ? String(e.a) : null,
+        // [GANADOR-B3] ADITIVO: el ARTISTA, que no es `nombre`. `nombre` es el
+        // titular del evento («Karol G en Monterrey») y `img` es el nombre con
+        // el que se le busca su foto, o sea el artista a secas («Karol G»).
+        // Medido en el catálogo servido: 96 de 110 eventos lo traen, y son
+        // nombres de artista («Mon Laferte», «Young Miko», «Yandel»), no
+        // archivos. Quien lo pide es la muestra de 30 s del ganador: buscar
+        // «Karol G en Monterrey» en Deezer no encuentra nada.
+        artista: (e.img != null) ? String(e.img) : null,
         fecha:  (e.f != null) ? String(e.f) : null,   // display humano ("13 dic 2026")
         venue:  (e.v != null) ? String(e.v) : null,
         // [GR-8] ADITIVO para waitlist-notify: el estado de venta del evento.

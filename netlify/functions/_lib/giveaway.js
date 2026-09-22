@@ -36,6 +36,12 @@ const SLUG = 'karolg-bbva-2026';
 // es el candado que ya estaba, y el careo lo AFIRMA — porque un candado que
 // nadie carea es una nota.
 const SLUG_ENSAYO = 'karolg-bbva-2026-ensayo';
+// [GANADOR-B3] La llave de unión con el CATÁLOGO. Es un IDENTIFICADOR, no un
+// letrero: el nombre del artista NO se escribe aquí, se DERIVA del catálogo con
+// esta llave (`catalogo[EVENTO_CATALOGO].artista`). Vive al lado de `SLUG`
+// porque los dos nombran el mismo evento desde dos mundos, y el día que el
+// giveaway cambie de artista se mueven JUNTOS o no se mueve ninguno.
+const EVENTO_CATALOGO = 'karolg';
 
 // 🔒 DOS VALORES, NUNCA UN SLUG DEL CUERPO. Aceptar `body.slug` convertiría
 // estas functions en el «buzón abierto a cualquier slug inventado» contra el
@@ -222,7 +228,7 @@ const PREMIOS = {
 };
 
 module.exports = {
-  SB_URL, SB_KEY, SLUG, SLUG_ENSAYO, slugDe, esEnsayo, CIERRE, SORTEO, RECORDATORIO_VENTANA_MIN,
+  SB_URL, SB_KEY, SLUG, SLUG_ENSAYO, EVENTO_CATALOGO, slugDe, esEnsayo, CIERRE, SORTEO, RECORDATORIO_VENTANA_MIN,
   normalizarCiudad, esDeReynosa, premioPorCiudad, PREMIOS,
   corsCheck, cabeceras, json, faltaEnv, sbHeaders,
   registroCerrado, tokenAdminValido, ipDe,

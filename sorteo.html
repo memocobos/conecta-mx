@@ -366,6 +366,21 @@ body.gano .mosaico-caja::before{content:'';position:absolute;inset:0;z-index:0;
   background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 46%,rgba(0,0,0,.9) 100%)}
 body.gano .mosaico-caja > *{position:relative;z-index:1}
 
+/* ═══ [GANADOR-B3] LA MUESTRA DE 30 s ══════════════════════════════════ */
+.muestra{display:flex;align-items:center;gap:11px;margin:12px auto 0;max-width:290px;
+  padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.12);text-align:left}
+.muestra[hidden]{display:none}
+.m-play{flex:0 0 auto;width:38px;height:38px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  background:var(--c-amarillo);color:#000;border:0}
+.m-play:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.m-txt{min-width:0}
+.m-l{font-family:var(--font-display);font-size:8.5px;letter-spacing:.22em;
+  text-transform:uppercase;color:rgba(255,255,255,.45)}
+.m-tit{font-size:12px;color:rgba(255,255,255,.88);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ═══ [GANADOR-B2] EL CONTACTO DEL GANADOR, SOLO CON TOKEN ══════════════
    El teléfono ya vivía enmascarado aquí; lo que faltaba eran las dos puertas
    para hablarle. Nace apagado: lo enciende `pintarPanel` y SOLO con token. */
@@ -756,6 +771,8 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
 <body>
 
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5-13-7.5Z"/></symbol>
+  <symbol id="ic-pausa" viewBox="0 0 24 24"><path d="M8 4.5v15M16 4.5v15"/></symbol>
   <symbol id="ic-ojo" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="ic-llave" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3"/><path d="M17 6l2.5 2.5"/><path d="M14.5 8.5 17 11"/></symbol>
   <symbol id="ic-repetir" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 4v4h-4"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 20v-4h4"/></symbol>
@@ -970,6 +987,27 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     <div class="reloj" id="reloj">
       <div class="reloj-n" id="reloj-n">10:00</div>
       <div class="reloj-l" id="reloj-l">para contestar su WhatsApp</div>
+    </div>
+
+    <!-- [GANADOR-B3] LA MUESTRA DE 30 s, CON BOTÓN DE PLAY.
+         🔒 Va DESPUÉS del reloj a propósito: el orden que pidió Memo debajo de
+         la foto es nombre → ciudad → premio → reloj, y meter el reproductor en
+         medio lo rompería.
+         🔒 Es un `<audio>` NUESTRO, no el reproductor incrustado de Spotify ni
+         de Deezer: el CSP dice `frame-src 'self' https://*.supabase.co`, así
+         que un iframe de terceros NO CARGA — y además metería su tracking en
+         la pantalla del sorteo. El audio sí pasa: `*.dzcdn.net` ya está en
+         `media-src` y la url la pide nuestra propia function.
+         Nace OCULTO: sin canción no hay pieza. -->
+    <div class="muestra" id="muestra" hidden>
+      <button class="m-play" id="m-play" aria-label="Escuchar la muestra de 30 segundos">
+        <svg class="ic" aria-hidden="true"><use href="#ic-play" id="m-icono"/></svg>
+      </button>
+      <div class="m-txt">
+        <div class="m-l">Muestra de 30 s</div>
+        <div class="m-tit" id="m-tit">—</div>
+      </div>
+      <audio id="m-audio" preload="none"></audio>
     </div>
 
     <div class="tel" id="tel">
@@ -1960,6 +1998,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
         // La placa dice el nombre COMPLETO del servidor, no lo que quedó en
         // las ventanas: los rodillos son el show, esto es el dato.
         encenderPlaca(g);
+        pintarMuestra();
         revelar();
         alTerminar();
       }
@@ -2520,6 +2559,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
               // pliegue y habia que buscarlo.
               document.body.classList.add('gano');
               encenderPlaca(estado && estado.ultimo);
+              pintarMuestra();
               // Al frame siguiente, cuando el recogido de `gano` YA está en el
               // layout; y dos correcciones más tarde, cuando la placa acabó su
               // transición de .4s y la tarjeta su cambio de ancho.
@@ -2978,6 +3018,55 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     }
   }
 
+  // ═══ 🔒 [GANADOR-B3] LA MUESTRA DE 30 s ═══════════════════════════════
+  //
+  // 🔒 EL ARTISTA LO MANDA EL SERVIDOR, DERIVADO DEL CATÁLOGO. Aquí no se
+  // escribe «Karol G»: sería la tercera copia del nombre en esta página, y las
+  // otras dos ya se quedaron viejas dos veces (melanie → Natanael → Karol G).
+  //
+  // 🔒 LA URL SE PIDE AL ARMAR LA TARJETA, NO ANTES: las de Deezer están
+  // FIRMADAS y caducan en 15-30 min, así que una pedida al cargar la página
+  // estaría muerta para cuando alguien le picara al play.
+  //
+  // 🔒 FAIL-SOFT: sin artista, sin `preview` o con la red caída, la pieza se
+  // queda OCULTA. Una tarjeta de ganador con un botón de play que no suena es
+  // peor que una sin botón.
+  var muestraPedida = false;
+  function pintarMuestra(){
+    var caja = $('muestra');
+    if (!caja || muestraPedida) return;
+    var art = (estado && estado.ultimo && estado.ultimo.artista) || '';
+    if (!art) { caja.hidden = true; return; }
+    muestraPedida = true;
+    fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(art) + '&type=track')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if (!j || !j.preview) { caja.hidden = true; return; }
+        var au = $('m-audio');
+        au.src = j.preview;
+        // El título también es DERIVADO: lo que suene queda nombrado en
+        // pantalla, así que nadie tiene que adivinar qué canción es.
+        $('m-tit').textContent = [j.title, j.artist].filter(Boolean).join(' · ') || art;
+        caja.hidden = false;
+      })
+      .catch(function(){ caja.hidden = true; });
+  }
+  (function(){
+    var bt = $('m-play'), au = $('m-audio'), ic = $('m-icono');
+    if (!bt || !au) return;
+    function pinta(){
+      if (ic) ic.setAttribute('href', au.paused ? '#ic-play' : '#ic-pausa');
+      bt.setAttribute('aria-label', (au.paused ? 'Escuchar' : 'Pausar')
+        + ' la muestra de 30 segundos');
+    }
+    bt.addEventListener('click', function(){
+      if (au.paused) { au.play().catch(function(){}); } else { au.pause(); }
+      pinta();
+    });
+    ['play', 'pause', 'ended'].forEach(function(ev){ au.addEventListener(ev, pinta); });
+    pinta();
+  })();
+
   function mostrarTel(ver){
     telVisible = ver;
     var w = telAdmin || '';
@@ -2985,6 +3074,21 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     $('g-ver').innerHTML = '<svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> ' + (ver ? 'Ocultar' : 'Ver');
   }
   $('g-ver').addEventListener('click', function(){ mostrarTel(!telVisible); });
+
+  // 🔒 APAGAR EL SONIDO APAGA LA MÚSICA TAMBIÉN. El interruptor gobierna los
+  // sonidos sintetizados del show; si además suena una canción y el
+  // interruptor no la callara, el letrero estaría mintiendo.
+  // ⚠️ El interruptor es `#son` y el estado se lee con `son.on` (un getter),
+  // no con una función: los dos nombres que escribí primero —`#son-sw` y
+  // `son.activo()`— NO EXISTEN. Leídos del código, no recordados.
+  (function(){
+    var sw = $('son');
+    if (!sw) return;
+    sw.addEventListener('click', function(){
+      var au = $('m-audio');
+      if (au && !au.paused && !son.on) au.pause();
+    });
+  })();
 
   // ═══ [GIVEAWAY-KG-1] LA CUADRÍCULA DE REVISIÓN ══════════════════════════
   var FOTOS = [], filFoto = 'pendiente';

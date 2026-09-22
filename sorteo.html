@@ -2441,19 +2441,71 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   function fichaDe(folio){
     return fichas().filter(function(el){ return el.getAttribute('data-folio') === String(folio); })[0];
   }
-  // El temblor va en un envoltorio: `.mos` ya usa `transform` en su entrada y
-  // dos animaciones sobre la misma propiedad se anulan.
-  function temblar(el, amp, vel){
-    if (!el) return;
-    var env = el.querySelector('.mos-tiembla');
+  // ═══ 🔴 [GANADOR-QUIETO-1] EL TEMBLOR, CON DOS CANDADOS ESTRUCTURALES ══
+  //
+  // Memo vio temblar a la ganadora YA ANUNCIADA, con el código que la para a la
+  // vista. La causa no era el arreglo: era que algo la volvía a poner a
+  // temblar después. Dos defectos, los dos de FORMA:
+  //
+  // (a) EL ENVOLTORIO SE BUSCABA POR LA CLASE QUE SE LE QUITA. Al callar a la
+  //     ganadora se le sacaba `.mos-tiembla`; el div seguía ahí, pero
+  //     `querySelector('.mos-tiembla')` ya no lo encontraba, así que la
+  //     siguiente llamada construía OTRO envoltorio y le metía el anterior
+  //     adentro. Envoltorios ANIDADOS, cada uno con su animación.
+  //     Hoy el div lleva una clase ESTRUCTURAL (`mos-env`) que nunca se quita,
+  //     y `.mos-tiembla` es solo el interruptor de la animación.
+  //
+  // (b) NADIE PREGUNTABA SI ESA FICHA DEBÍA ESTAR QUIETA. El reloj del final
+  //     re-aplicaba el temblor a toda ficha sin `.muere`, y la ganadora lleva
+  //     `.gana`, no `.muere`. Hoy la ficha se MARCA (`data-quieta`) y `temblar`
+  //     se rehúsa: la quietud es un hecho de la ficha, no la ausencia de un
+  //     reloj. Así ningún reloj futuro —ni uno que todavía no existe— la puede
+  //     resucitar.
+  function envoltorio(el){
+    var env = el.querySelector('.mos-env');
     if (!env){
       env = document.createElement('div');
-      env.className = 'mos-tiembla';
+      env.className = 'mos-env';
       while (el.firstChild) env.appendChild(el.firstChild);
       el.appendChild(env);
     }
+    return env;
+  }
+  function temblar(el, amp, vel){
+    if (!el || el.getAttribute('data-quieta') === '1') return;
+    var env = envoltorio(el);
+    env.classList.add('mos-tiembla');
     env.style.setProperty('--amp', amp + 'px');
     env.style.setProperty('--tmb', vel + 's');
+  }
+  // Callar una ficha PARA SIEMPRE. Idempotente a propósito: se puede llamar
+  // dos veces sin consecuencia.
+  function quietar(el){
+    if (!el) return;
+    el.setAttribute('data-quieta', '1');
+    var env = el.querySelector('.mos-env');
+    if (env){
+      env.classList.remove('mos-tiembla');
+      env.style.removeProperty('--amp');
+      env.style.removeProperty('--tmb');
+    }
+  }
+
+  // ═══ 🔴 EL RELOJ DEL TEMBLOR TIENE UN SOLO DUEÑO ══════════════════════
+  // Vivía en un `var` LOCAL de `finalSinGiro`, y su `limpiar()` solo podía
+  // matar el suyo. `SHOW` se renueva cuando CAMBIA EL ID DEL GIRO
+  // (`SHOW = showDe(u)`), nunca pasando por null, así que en un re-giro
+  // —girar, «no contestó», girar otra vez: el camino del ensayo— nacía un
+  // segundo reloj con el primero VIVO, y la guarda `if (!SHOW)` del primero no
+  // se cumplía jamás. El de la vuelta 1 seguía temblando encima de la
+  // ganadora de la vuelta 2, después de su propia limpieza.
+  //
+  // Con un dueño único, arrancar el final MATA lo anterior: no hay forma de
+  // dejar un huérfano, ni por un camino que todavía no existe.
+  var relojTemblor = null;
+  function pararTemblor(){
+    if (relojTemblor){ clearInterval(relojTemblor); relojTemblor = null; }
+    son.tension(false);
   }
 
   function finalSinGiro(alTerminar){
@@ -2482,8 +2534,10 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     if (ronda3) pintarMosaico(ronda3, []);
     $('mos-quedan').textContent = 'Quedan ' + (esc[esc.length - 2] || 3);
     son.tension(true);
-    var tmb = setInterval(function(){
-      if (!SHOW) { clearInterval(tmb); return; }
+    // 🔒 Mata cualquier reloj anterior ANTES de crear el suyo.
+    pararTemblor();
+    relojTemblor = setInterval(function(){
+      if (!SHOW) { pararTemblor(); return; }
       var t = ahora() - SHOW.t0;
       // El temblor crece de 1 px a 4 px entre que quedan los 3 y que muere uno,
       // y de 4 a 9 px en el tramo de las dos. Derivado, no por pasos fijos.
@@ -2492,11 +2546,15 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       else { k = Math.min(1, Math.max(0, (t - tDos) / (tRev - tDos))); amp = 4 + k * 5; vel = .28 - k * .14; }
       son.tension(true, k);
       fichas().forEach(function(el){
-        if (!el.classList.contains('muere')) temblar(el, amp.toFixed(1), Math.max(.1, vel).toFixed(2));
+        // `.gana` también queda fuera: la ganadora ya está anunciada. Y
+        // `temblar` se rehúsa sola con `data-quieta`, así que son dos candados
+        // independientes — si alguien quita uno, el otro sigue.
+        if (el.classList.contains('muere') || el.classList.contains('gana')) return;
+        temblar(el, amp.toFixed(1), Math.max(.1, vel).toFixed(2));
       });
     }, 120);
 
-    function limpiar(){ clearInterval(tmb); son.tension(false); }
+    function limpiar(){ pararTemblor(); }
 
     // 2 · EN SU MOMENTO, MUERE UNO. Se ESPERA el dato.
     esperarDato(function(){ return (estado && estado.ultimo && estado.ultimo.dos) || null; },
@@ -2553,22 +2611,26 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
             }
             var eg = fichaDe(folioG);
             if (eg){
-              // 🔒 QUIETA DE VERDAD. El temblor son dos variables EN LINEA
-              // (`--amp` y `--tmb`) sobre el envoltorio: quitar la clase deja
-              // los valores puestos, y basta que algo las vuelva a leer para
-              // que la ganadora tiemble en la foto del final.
-              var env = eg.querySelector('.mos-tiembla');
-              if (env){
-                env.classList.remove('mos-tiembla');
-                env.style.removeProperty('--amp');
-                env.style.removeProperty('--tmb');
-              }
+              // 🔒 QUIETA DE VERDAD, Y PARA SIEMPRE: `quietar` la MARCA, así
+              // que ningún reloj la puede volver a mover. Quitarle la clase a
+              // mano —lo que hacía antes— dejaba la ficha indistinguible de
+              // una que nunca ha temblado, y el siguiente tic la resucitaba.
+              quietar(eg);
               eg.classList.add('gana');
             }
             setTimeout(function(){
               var rej = $('mosaico');
               if (rej) rej.style.setProperty('--cols', 1);
               $('mos-quedan').textContent = 'Ganador';
+              // 🔴 EL LETRERO SE QUEDABA EN «ronda 4 de 5» EN LA PANTALLA DEL
+              // GANADOR: `mos-de` lo escribe cada ronda y nadie lo cerraba.
+              // Decisión de Memo (22-sep): dice «1 de N · al azar», que cierra
+              // el arco que abrió «24 de N · al azar» al empezar el show. El
+              // número es DERIVADO de `de_cuantos`; si no llegara, se vacía
+              // antes que mentir con la ronda anterior.
+              var n = (estado && estado.ultimo && estado.ultimo.de_cuantos) || 0;
+              $('mos-de').textContent = n ? ('1 de ' + n + ' · al azar') : '';
+              quietar(eg);
               // 🔴 EL BLOQUE DEL GANADOR, COMPLETO Y A LA VISTA. Se recoge lo
               // que ya no dice nada (ver `body.gano`) y se lleva la tarjeta al
               // borde de arriba: la placa y el reloj de 10 min caen debajo, en
@@ -2904,6 +2966,16 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       // ── [SORTEO-RONDAS-1] EL CAMINO DE LA ESCALERA ──────────────────────
       if (TIEMPOS && u.escalones && u.escalones.length){
         if (!SHOW || SHOW.id !== u.id){
+          // 🔴 AQUÍ MUERE EL TEMBLOR DEL SHOW ANTERIOR, y es LA raíz del
+          // defecto — no el arranque del final, que es donde lo había puesto.
+          //
+          // El temblor pertenece a UN show. `SHOW` se reemplaza aquí, sin pasar
+          // nunca por null, así que el reloj del show viejo sobrevivía: medido
+          // con `setInterval` instrumentado, durante la PRESENTACIÓN del show
+          // nuevo quedaba un reloj de 120 ms vivo y las fichas temblaban
+          // cuando nada debía temblar todavía. Matarlo solo al arrancar el
+          // final llegaba 63 segundos tarde.
+          pararTemblor();
           SHOW = showDe(u);
           animado = null;
           $('espera').style.display = 'none';
@@ -3391,6 +3463,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       // 🔒 SE TIRA EL ESTADO. Sin esto la máquina seguiría animando el giro del
       // OTRO sorteo: `SHOW` y `estado` son del slug que se acaba de dejar.
       SHOW = null; animado = null; estado = null; telAdmin = null; ADMG = null;
+      pararTemblor();
       enReposo = false;
       var caja = $('mosaico-caja'); if (caja) caja.hidden = true;
       $('panel').style.display = 'none';
@@ -3414,6 +3487,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
             : acc === 'ensayo_reiniciar' ? ('Borrados ' + d.giros_borrados + ' giro(s): ya puedes volver a girar')
             : ('Ensayo borrado · ' + d.fotos_borradas + ' foto(s)');
           SHOW = null; animado = null;
+          pararTemblor();
           refrescar();
         })
         .catch(function(){ $('ens-msg').textContent = 'Se cayó la conexión'; });

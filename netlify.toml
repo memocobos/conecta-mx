@@ -63,6 +63,24 @@
 # Recordatorio del giveaway: 16:45 UTC = 11:45 AM en Reynosa (America/Matamoros,
 # con horario de verano en agosto). Corre DIARIO porque Netlify no agenda "solo
 # el 5 de agosto"; la función se sale sola cualquier otro día y lo dice en el log.
+# ═══════════════════════════════════════════════════════════════════════════
+# [SORTEO-RONDAS-1] sorteo-tiempos.js VIVE EN LA RAÍZ y lo requieren DOS
+# functions con ruta relativa fuera de netlify/functions.
+#
+# 🔴 NINGUNA otra function de este repo hace eso, así que el empaquetado no
+# estaba medido: `included_files` se lo dice al bundler de forma EXPLÍCITA en
+# vez de confiar en que trace el require solo. Si aun así no llega, la function
+# contesta 500 NOMBRANDO el archivo — jamás un respaldo silencioso a números
+# tecleados, que es exactamente cómo dos runtimes se separan sin que nadie lo
+# note (las cuatro constantes de fecha se quedaron en el 13-sep de Natanael así).
+#
+# ⏳ Solo se puede CONFIRMAR en el preview deploy: va en los pasos manuales.
+[functions."giveaway-estado"]
+  included_files = ["sorteo-tiempos.js"]
+
+[functions."giveaway-sortear"]
+  included_files = ["sorteo-tiempos.js"]
+
 [functions."giveaway-recordatorio"]
   # ⏰ EN UTC, Y SE MUEVE CON `SORTEO` DE netlify/functions/_lib/giveaway.js.
   # La función solo manda si el disparo cae dentro de su ventana (40 min antes

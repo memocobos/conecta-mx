@@ -167,6 +167,57 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **GANADOR-QUIETO-1 EN PROD (22-sep-2026, #753): la ganadora se queda
+  quieta, y el letrero deja de decir «ronda 4 de 5».** Dos defectos que Memo vio
+  en el ensayo, con captura. `npm run mide:ganador-quieto` (**44**), cero SQL.
+
+  🔴 **LA RAÍZ: EL DUEÑO DE UN RELOJ NO ES LA FUNCIÓN QUE LO CREA.** El
+  `setInterval` del temblor vivía en un `var` local de `finalSinGiro`, así que
+  su `limpiar()` solo podía matar **el suyo** — y `SHOW = showDe(u)` se
+  reemplaza cuando **cambia el id del giro**, sin pasar nunca por `null`, así
+  que la guarda `if (!SHOW)` del reloj anterior **no se cumplía jamás**. El
+  temblor es de UN show: hoy muere cuando el show se reemplaza.
+  ⚠️ Y ponerlo a morir al arrancar el final —la primera versión del arreglo—
+  llegaba **63 segundos tarde**: el careo lo cazó porque mide el huérfano
+  DURANTE la presentación del show siguiente, no solo al final.
+
+  🔴 **Y UNA ANIMACIÓN `infinite` CONVIERTE UN INSTANTE EN UN ESTADO
+  PERMANENTE.** Un solo tic tardío del huérfano le pega `.mos-tiembla` a la
+  ganadora **para siempre**: matar el reloj después ya no la quita. La ventana
+  de la carrera es de **~150 ms en 82 s**, y de ahí que el defecto pareciera
+  intermitente y que una muestra un segundo más tarde no lo viera.
+  🔒 **Corolario:** la quietud se hace un **HECHO DE LA FICHA**
+  (`data-quieta`, y `temblar` se rehúsa), no la ausencia de un reloj.
+
+  🔒 **Y NO SE BUSCA UN NODO POR LA CLASE QUE SE LE VA A QUITAR.** El envoltorio
+  se buscaba con `querySelector('.mos-tiembla')` y al callar la ficha se le
+  quitaba ESA clase: el div seguía ahí pero ya no se encontraba, así que la
+  llamada siguiente construía **otro envoltorio con el anterior adentro**. Hoy
+  la clase estructural (`mos-env`) nunca se quita y `.mos-tiembla` es solo el
+  interruptor de la animación.
+
+  **El letrero** (decisión de Memo): `mos-de` dice **«1 de N · al azar»** en la
+  pantalla del ganador, cerrando el arco que abrió «24 de N · al azar». La N es
+  derivada de `de_cuantos`; sin dato **se vacía** antes que mentir con la ronda
+  anterior.
+
+  🔒 **CÓMO SE MIDIÓ, que es la mitad de la lección:** se **instrumenta
+  `setInterval`** en el navegador y se **cuentan los relojes vivos** en vez de
+  inferirlos del síntoma —eso destapó el caso después de dos hipótesis fallidas—;
+  la quietud se mide **SOSTENIDA** (24-28 muestras en 3.6-4.2 s, todas tienen
+  que coincidir) sobre el **envoltorio de adentro**, porque `.mos` no se mueve
+  nunca y medirlo pasaría en vacío; y se espera a que acabe la animación de
+  entrada preguntándole al navegador **por su nombre**, porque esperar «a que no
+  haya ninguna» se cuelga en BASE, donde `tiembla` es infinita.
+  ⚠️ **El primer careo pasó en VERDE midiendo un camino que se limpia solo**
+  (el giro nuevo cerca de SU revelación dispara también el `esperarDato` del
+  viejo, que mata al huérfano). El **control positivo en rojo** impidió reportar
+  un arreglo «verificado» que no verificaba nada. La reproducción determinista
+  salió de que los dos shows **no comparten su `cuando`**: con 40 participantes
+  la revelación cae en el ms 76 000 y con 5 en el 20 500 — caso real del ensayo,
+  **borrar, sembrar menos, girar**.
+
+
 - 🏆 **GIVEAWAY FASE 2 COMPLETA EN PROD (22-sep-2026, #751 y #752): el sorteo
   de Karol G se corre por RONDAS y la tarjeta del ganador está vestida.**
   `npm run mide:sorteo-rondas` (**1 280**) · `mide:sorteo-maquina` (**147**) ·

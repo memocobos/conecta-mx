@@ -39,6 +39,24 @@ function artistaDelArbol(dir) {
   } catch (e) { return null; }
 }
 const PEDIDOS_DEEZER = [];
+// 🔴 UN AUDIO DE VERDAD, GENERADO. Para probar que el botón ALTERNA hace falta
+// que `play()` no se rechace, y una url inventada de `dzcdn.net` no resuelve en
+// el navegador del careo: el audio se queda pausado y el icono no cambia —el
+// rojo era del arnés, no del botón—. Así que el careo sirve medio segundo de
+// silencio en WAV y mide el botón contra ESO, y deja la url con forma de
+// producción para medir la tubería. Dos preguntas, dos fuentes.
+function wavSilencio(ms) {
+  const hz = 8000, n = Math.round(hz * ms / 1000);
+  const b = Buffer.alloc(44 + n);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVE', 8);
+  b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20);
+  b.writeUInt16LE(1, 22); b.writeUInt32LE(hz, 24); b.writeUInt32LE(hz, 28);
+  b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
+  b.write('data', 36); b.writeUInt32LE(n, 40);
+  b.fill(128, 44);
+  return b;
+}
+const WAV = wavSilencio(600);
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
 function af(cond, msg) {
@@ -144,6 +162,10 @@ function servidor(raiz) {
         if (b.accion === 'pendientes_foto') return r.end(JSON.stringify({ ok: true, pendientes: 0 }));
         return r.end(JSON.stringify({ ok: true }));
       });
+    }
+    if (u === '/careo-30s.wav') {
+      r.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': WAV.length });
+      return r.end(WAV);
     }
     if (/\.netlify\/functions\/deezer/.test(u)) {
       PEDIDOS_DEEZER.push(q.url);
@@ -451,16 +473,50 @@ function servidor(raiz) {
   af(mu.iframes === 0,
      '🔴 apareció un iframe en la página: el CSP dice frame-src \'self\' y un'
      + ' reproductor incrustado de terceros no cargaría');
-  // El botón alterna de verdad.
-  await pg.click('#m-play');
-  await pg.waitForTimeout(350);
-  const tras = await pg.evaluate(() => {
-    const ic = document.getElementById('m-icono');
-    return { icono: ic ? ic.getAttribute('href') : null };
-  });
-  af(tras.icono === '#ic-pausa',
-     '🔴 al picarle el botón no cambió a pausa: ' + tras.icono);
   af(errsE.length === 0, 'errores en E: ' + JSON.stringify(errsE.slice(0, 2)));
+  await pg.close();
+
+  // ── E2 · EL BOTÓN ALTERNA DE VERDAD, con un audio que sí se puede oír ───
+  console.log('\n── E2 · el botón: play → pausa → play ──');
+  DEEZER = { preview: '/careo-30s.wav', title: 'Silencio', artist: 'Careo' };
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(2600);
+  const leer = () => pg.evaluate(() => {
+    const au = document.getElementById('m-audio'), ic = document.getElementById('m-icono');
+    return { pausado: au ? au.paused : null, icono: ic ? ic.getAttribute('href') : null,
+             etiqueta: (document.getElementById('m-play') || {}).ariaLabel || null };
+  });
+  const e0 = await leer();
+  af(e0.pausado === true && e0.icono === '#ic-play',
+     '🔒 nace pausado y con el play: ' + JSON.stringify(e0));
+  await pg.click('#m-play');
+  await pg.waitForTimeout(500);
+  const e1 = await leer();
+  console.log('   tras el primer clic: ' + JSON.stringify(e1));
+  af(e1.pausado === false, '🔴 el botón no arrancó la muestra: ' + JSON.stringify(e1));
+  af(e1.icono === '#ic-pausa', '🔴 el icono no cambió a pausa: ' + e1.icono);
+  await pg.click('#m-play');
+  await pg.waitForTimeout(400);
+  const e2 = await leer();
+  console.log('   tras el segundo: ' + JSON.stringify(e2));
+  af(e2.pausado === true, '🔴 el segundo clic no pausó: ' + JSON.stringify(e2));
+  af(e2.icono === '#ic-play', '🔴 el icono no volvió al play: ' + e2.icono);
+  // 🔒 Y APAGAR EL SONIDO CALLA LA CANCIÓN: si el interruptor no la callara,
+  // el letrero «Activar sonido» estaría mintiendo.
+  await pg.click('#m-play');
+  await pg.waitForTimeout(400);
+  const e3 = await leer();
+  af(e3.pausado === false, 'suena otra vez para medir el interruptor');
+  await pg.click('#son');            // lo ENCIENDE
+  await pg.waitForTimeout(250);
+  await pg.click('#son');            // y lo APAGA
+  await pg.waitForTimeout(400);
+  const e4 = await leer();
+  console.log('   tras apagar el sonido: ' + JSON.stringify(e4));
+  af(e4.pausado === true,
+     '🔴 apagar el sonido no calló la canción: ' + JSON.stringify(e4));
   await pg.close();
 
   // ── F · SIN CANCIÓN, NO HAY PIEZA (fail-soft) ───────────────────────────

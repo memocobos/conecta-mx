@@ -1445,8 +1445,16 @@ if (dirBase) {
        '🔴 en el HEAD ANCLADO se filtró folio, premio o ciudad en t=0: '
        + JSON.stringify([dAnc.ultimo && dAnc.ultimo.folio, dAnc.ultimo && dAnc.ultimo.premio,
                          dAnc.ultimo && dAnc.ultimo.ciudad]));
-    af(() => (rAnc.body || '').indexOf(fila13.ganador_nombre + '"') === -1,
-       'y en el anclado no aparece identificable en ningún otro campo');
+    // 🔴 LA PREGUNTA ES «¿ES IDENTIFICABLE?», NO «¿APARECE LA CADENA?».
+    // Buscar el nombre a secas se pone rojo SOLO CUANDO EL GANADOR SORTEADO
+    // ES «Ana»: su nombre corto es igual al completo, así que la cadena sale
+    // entre las 24 fichas del mosaico sin señalar a nadie. Una aserción que
+    // depende de a quién le tocó ganar no mide la tuerca, mide la suerte — y
+    // en verde no avisa. Lo identificable es el CAMPO `nombre` del ganador.
+    af(() => (rAnc.body || '').indexOf('"nombre":"' + fila13.ganador_nombre + '"') === -1,
+       '🔴 en el anclado el ganador viaja identificable en el campo `nombre`');
+    af(() => (dAnc.ultimo.rondas || []).every((x) => x.miembros.length > 1),
+       'y las fichas que sí viajan son un GRUPO, no una sola señalada');
   }
   // EL VIGILANTE VIVO, sobre el árbol de hoy: si alguien reabre el spoiler
   // después del merge, el careo congelado de arriba no lo vería.
@@ -1454,9 +1462,13 @@ if (dirBase) {
   af(() => rHead.d.ultimo && rHead.d.ultimo.nombre === null,
      '🔴 VIGILANTE VIVO: en el árbol de HOY el nombre TIENE que venir en null; vino '
      + JSON.stringify(rHead.d.ultimo && rHead.d.ultimo.nombre));
-  af(() => rHead.crudo.indexOf(fila13.ganador_nombre + '"') === -1
-        || rHead.d.ultimo.rondas.some((x) => x.miembros.length > 1),
-     'y no aparece identificable en ningún otro campo');
+  // La MISMA pregunta que arriba, y por la misma razón: la versión anterior
+  // («la cadena no aparece, O el mosaico trae más de uno») pasaba por su
+  // segunda mitad casi siempre, así que su primera mitad nunca se ejercía.
+  af(() => rHead.crudo.indexOf('"nombre":"' + fila13.ganador_nombre + '"') === -1,
+     '🔴 VIGILANTE VIVO: el ganador viaja identificable en el campo `nombre`');
+  af(() => rHead.d.ultimo.rondas.every((x) => x.miembros.length > 1),
+     'y las fichas que sí viajan son un GRUPO, no una sola señalada');
 
   // Lo que BASE no tenía, para que el resto del PR también tenga su contraste.
   const libBase = path.join(dirBase, 'netlify/functions/_lib/sorteo-escalera.js');

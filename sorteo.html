@@ -2966,6 +2966,16 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       // ── [SORTEO-RONDAS-1] EL CAMINO DE LA ESCALERA ──────────────────────
       if (TIEMPOS && u.escalones && u.escalones.length){
         if (!SHOW || SHOW.id !== u.id){
+          // 🔴 AQUÍ MUERE EL TEMBLOR DEL SHOW ANTERIOR, y es LA raíz del
+          // defecto — no el arranque del final, que es donde lo había puesto.
+          //
+          // El temblor pertenece a UN show. `SHOW` se reemplaza aquí, sin pasar
+          // nunca por null, así que el reloj del show viejo sobrevivía: medido
+          // con `setInterval` instrumentado, durante la PRESENTACIÓN del show
+          // nuevo quedaba un reloj de 120 ms vivo y las fichas temblaban
+          // cuando nada debía temblar todavía. Matarlo solo al arrancar el
+          // final llegaba 63 segundos tarde.
+          pararTemblor();
           SHOW = showDe(u);
           animado = null;
           $('espera').style.display = 'none';

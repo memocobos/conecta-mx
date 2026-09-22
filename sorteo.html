@@ -135,6 +135,58 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 /* El golpe al frenar: un tirón corto, no un rebote de juguete. */
 @keyframes golpe{0%{transform:translateY(0)}35%{transform:translateY(5px)}100%{transform:translateY(0)}}
 .rod.golpe{animation:golpe .17s ease-out}
+/* ═══ EL FINAL: TEMBLOR, CUENTA Y EXPLOSIÓN ═════════════════════════════
+   [SORTEO-RONDAS-1, cuarta vuelta] Se quitó la tragamonedas final: el clímax
+   es la eliminación. La pantalla no se queda quieta ni un segundo.
+
+   🔒 El temblor va en un CONTENEDOR aparte (`.mos-tiembla`), no sobre `.mos`:
+   `.mos` ya usa `transform` en su animación de entrada y en el reacomodo, y dos
+   animaciones peleándose por la misma propiedad se anulan — la de después gana
+   y el temblor no se vería. */
+.mos-tiembla{animation:tiembla var(--tmb,.42s) linear infinite}
+@keyframes tiembla{
+  0%{transform:translate(0,0) rotate(0)}
+  20%{transform:translate(var(--amp,1px),calc(var(--amp,1px) * -.7)) rotate(-.4deg)}
+  40%{transform:translate(calc(var(--amp,1px) * -.8),var(--amp,1px)) rotate(.5deg)}
+  60%{transform:translate(calc(var(--amp,1px) * .6),var(--amp,1px)) rotate(.3deg)}
+  80%{transform:translate(calc(var(--amp,1px) * -1),calc(var(--amp,1px) * -.5)) rotate(-.5deg)}
+  100%{transform:translate(0,0) rotate(0)}}
+
+/* La ficha que se apaga y SE VA. No se queda gris ocupando espacio: el bloque
+   del ganador tiene que caber en una pantalla de celular sin scroll. */
+.mos.muere{animation:mosMuere .55s cubic-bezier(.4,0,.6,1) forwards}
+@keyframes mosMuere{
+  0%{opacity:1;transform:none;filter:none}
+  25%{opacity:1;transform:scale(1.06);filter:brightness(2.2) saturate(.3)}
+  100%{opacity:0;transform:scale(.72) translateY(14px);filter:grayscale(1) brightness(.2)}}
+
+/* La cuenta 5·4·3·2·1 del último tramo, encima del mosaico. */
+.cuenta-final{position:absolute;inset:0;z-index:5;display:flex;
+  align-items:center;justify-content:center;pointer-events:none}
+.cuenta-final[hidden]{display:none}
+.cuenta-final span{font-family:var(--font-display);font-weight:900;
+  font-size:clamp(90px,34vw,210px);line-height:.8;color:#fff;
+  text-shadow:0 0 40px rgba(255,40,59,.9),0 0 90px rgba(255,40,59,.55);
+  animation:cfLate .9s cubic-bezier(.2,1,.3,1)}
+@keyframes cfLate{0%{opacity:0;transform:scale(2.1)}30%{opacity:1;transform:scale(1)}
+  100%{opacity:.25;transform:scale(.9)}}
+
+/* EL GANADOR: la ficha que queda explota y se queda en grande. */
+.mos.gana{animation:mosGana .9s cubic-bezier(.2,1.4,.3,1) forwards;z-index:4}
+@keyframes mosGana{
+  0%{transform:scale(1)}
+  35%{transform:scale(1.35)}
+  100%{transform:scale(1.18)}}
+.mos.gana{box-shadow:0 0 0 3px var(--c-amarillo),0 10px 40px rgba(232,255,76,.45),
+  0 0 90px rgba(232,255,76,.3)}
+.mos.gana .mos-nom{color:var(--c-amarillo);font-size:clamp(13px,4vw,22px)}
+
+@media (prefers-reduced-motion: reduce){
+  .mos-tiembla,.cuenta-final span{animation:none}
+  .mos.muere{animation:none;opacity:0}
+  .mos.gana{animation:none;transform:scale(1.1)}
+}
+
 /* ═══ EL RELOJ «GANADOR EN» ═════════════════════════════════════════════
    [SORTEO-RONDAS-1] Orden de Memo tras el ensayo. Va DENTRO del mueble, sobre
    el mosaico, como el display de una máquina: dígitos grandes, condensados,
@@ -170,7 +222,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
    El tamaño lo da la rejilla (`--cols`), no cada tarjeta: bajar de 4 a 3 a 2
    columnas ES el «crecen» del encargo, sin tocar un ancho. */
-.mosaico-caja{margin-top:10px;background:#000;border-radius:12px;padding:8px;
+.mosaico-caja{position:relative;margin-top:10px;background:#000;border-radius:12px;padding:8px;
   border:1px solid rgba(255,255,255,.09);
   box-shadow:inset 0 3px 14px rgba(0,0,0,.9)}
 .mosaico-caja[hidden]{display:none}
@@ -766,6 +818,17 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         <span id="mos-de"></span>
       </div>
       <div class="mosaico" id="mosaico" style="--cols:4"></div>
+      <!-- 🔴 CUELGA DE `.mosaico-caja`, **NO** DE `#mosaico`.
+           `pintarMosaico()` hace `innerHTML =` sobre `#mosaico`, así que un
+           hijo de ahí lo BORRA — y eso fue exactamente el defecto: la primera
+           línea de `finalSinGiro` destruía este contenedor antes de usarlo,
+           `getElementById` devolvía null y la guarda se lo tragaba en silencio.
+           La cuenta no se veía nunca y el careo lo cazó.
+           Es la misma ley que `.hs-media`: lo que tiene que sobrevivir cuelga
+           del HERMANO, no del interior. La pregunta no es «quién escribe aquí
+           ahora» sino «quién puede reescribir esto alguna vez».
+           🔒 VACÍO A PROPÓSITO: los números salen de FINAL_DOS_MS. -->
+      <div class="cuenta-final" id="cuenta-final" hidden></div>
     </div>
 
     <div class="placa-ganador" id="placa-ganador">
@@ -1209,6 +1272,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // ═══════════════════════════════════════════════════════════════════════
   var son = (function(){
     var ctx = null, encendido = false, ultimoTic = 0, redob = null, redobVivo = false;
+    var tenOsc = null, tenGan = null;
     function nota(freq, dur, tipo, vol, cuando){
       if (!ctx) return;
       var o = ctx.createOscillator(), g = ctx.createGain();
@@ -1245,6 +1309,15 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         nota(1250, .022, 'square', .035);
       },
       golpe: function(){ if (encendido){ nota(150, .13, 'triangle', .16); nota(74, .19, 'sine', .13); } },
+      // El «clac» de cada uno de los 24 que sale. Sube de tono con el índice,
+      // así que la presentación se oye como una escala que avanza en vez de 24
+      // golpes iguales — que a 1.5 s cada uno sería monótono.
+      sale: function(i, total){
+        if (!encendido) return;
+        var k = total ? Math.min(1, i / total) : 0;
+        nota(300 + k * 420, .07, 'square', .10);
+        nota(120, .09, 'triangle', .09);
+      },
       arranque: function(){ if (encendido) nota(320, .1, 'sawtooth', .06); },
       fanfarria: function(){
         if (!encendido) return;
@@ -1252,10 +1325,10 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
           nota(p[0], .30, 'square', .11, p[1]);
         });
       },
-      // [SORTEO-RONDAS-1] EL REDOBLE DE RONDA. No es un tono sostenido: son
-      // golpes que se ACELERAN, que es lo que el oído lee como «va a pasar
-      // algo». Se construye sobre el mismo `nota()` y respeta el interruptor:
-      // si nadie activó el sonido no suena y no truena, igual que tic/golpe.
+      // ═══ [SORTEO-RONDAS-1] EL REDOBLE DE RONDA, CON CRESCENDO ═════════
+      // No es un tono sostenido: son golpes que se ACELERAN **y suben de
+      // volumen y de tono**, que es lo que el oído lee como «va a pasar algo».
+      // Todo sintetizado con Web Audio: ni un sample de nadie.
       //
       // ⚠️ Va con setTimeout que SE RE-AGENDA, no con setInterval: un interval
       // tiene un solo periodo, y acelerar obligaba a matarlo y recrearlo — mi
@@ -1266,22 +1339,68 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         if (!encendido || redobVivo) return;
         redobVivo = true;
         var t0 = Date.now();
+        var dur = (window.SORTEO_TIEMPOS && window.SORTEO_TIEMPOS.T.RONDA_REDOBLE_MS) || 4600;
         (function golpear(){
           if (!redobVivo) return;
-          nota(96, .07, 'triangle', .11);
-          nota(150, .05, 'sine', .07);
-          // Acelera de 190 ms a 95 ms a lo largo de ~14 s y ahí se queda: más
-          // rápido se vuelve zumbido y deja de contar nada.
-          var k = Math.min(1, (Date.now() - t0) / 14000);
-          redob = setTimeout(golpear, Math.round(190 - 95 * k));
+          var k = Math.min(1, (Date.now() - t0) / dur);      // 0 → 1 en la ronda
+          // CRESCENDO: el parche sube de 84 a 128 Hz y de .08 a .20 de volumen.
+          nota(84 + k * 44, .075, 'triangle', .08 + k * .12);
+          nota(132 + k * 70, .05, 'sine', .05 + k * .07);
+          // Y a partir de la mitad entra un armónico que tensa.
+          if (k > .5) nota(420 + k * 260, .04, 'sawtooth', (k - .5) * .07);
+          redob = setTimeout(golpear, Math.round(200 - 130 * k));
         })();
       },
+      // ═══ LA TENSIÓN DEL TEMBLOR FINAL ═════════════════════════════════
+      // Un zumbido que SUBE mientras las tarjetas tiemblan. Es un oscilador
+      // sostenido, no golpes: el temblor es continuo y el sonido tiene que
+      // acompañarlo sin marcar ritmo.
+      tension: function(on, k){
+        if (!on){
+          if (tenOsc){ try { tenGan.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + .25);
+            tenOsc.stop(ctx.currentTime + .3); } catch (e) {} tenOsc = null; tenGan = null; }
+          return;
+        }
+        if (!encendido || !ctx) return;
+        if (!tenOsc){
+          tenOsc = ctx.createOscillator(); tenGan = ctx.createGain();
+          tenOsc.type = 'sawtooth';
+          tenOsc.frequency.setValueAtTime(70, ctx.currentTime);
+          tenGan.gain.setValueAtTime(0.0001, ctx.currentTime);
+          tenGan.gain.exponentialRampToValueAtTime(.035, ctx.currentTime + .4);
+          tenOsc.connect(tenGan); tenGan.connect(ctx.destination);
+          tenOsc.start();
+        }
+        var kk = Math.max(0, Math.min(1, Number(k) || 0));
+        try {
+          tenOsc.frequency.linearRampToValueAtTime(70 + kk * 130, ctx.currentTime + .2);
+          tenGan.gain.linearRampToValueAtTime(.035 + kk * .05, ctx.currentTime + .2);
+        } catch (e) {}
+      },
+      // Cada número de la cuenta 5·4·3·2·1, subiendo de tono hacia el cero.
+      cuenta: function(n){
+        if (!encendido) return;
+        var tonos = { 5: 392, 4: 440, 3: 494, 2: 554, 1: 659 };
+        nota(tonos[n] || 392, .16, 'square', .13);
+        nota(98, .12, 'triangle', .14);
+      },
+      // ═══ EL REMATE, EN GRANDE ═════════════════════════════════════════
+      // Golpe de bajo + fanfarria ascendente + un acorde que se queda
+      // sonando. Es el único momento del show que dura más de medio segundo:
+      // todo lo demás son golpes.
       remate: function(){
         if (!encendido) return;
-        nota(74, .30, 'sine', .18);
-        [[659,0],[880,.12],[1175,.24],[1568,.38]].forEach(function(p){
-          nota(p[0], .38, 'square', .12, p[1]);
+        nota(55, .55, 'sine', .22);                       // el golpe de pecho
+        nota(110, .40, 'triangle', .14);
+        // La subida.
+        [[523,0],[659,.07],[784,.14],[1047,.21],[1319,.28]].forEach(function(p){
+          nota(p[0], .30, 'square', .13, p[1]);
         });
+        // Y el acorde que se sostiene (do-mi-sol-do), con brillo encima.
+        [[523,.34],[659,.34],[784,.34],[1047,.34]].forEach(function(p){
+          nota(p[0], .95, 'triangle', .10, p[1]);
+        });
+        nota(2093, .70, 'sine', .05, .36);
       },
     };
   })();
@@ -1291,6 +1410,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     // Con escalera va el REMATE (trae el golpe de bajo que cierra las rondas);
     // sin escalera, la fanfarria de siempre — el camino viejo no se toca.
     if (SHOW) son.remate(); else son.fanfarria();
+    // [SORTEO-RONDAS-1] Un segundo destello, más tarde y más suave: el primero
+    // es el golpe, éste es el eco. Un solo flash se leía como un error de
+    // pintado; dos se leen como una explosión.
+    if (!reducido) setTimeout(function(){
+      var d2 = $('destello');
+      if (!d2) return;
+      d2.classList.remove('on'); void d2.offsetWidth; d2.classList.add('on');
+    }, 260);
     if (navigator.vibrate) { try { navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
     if (reducido) return;
     var d = $('destello');
@@ -1303,14 +1430,29 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var c = $('confeti'), ctx2 = c.getContext('2d');
     var W = c.width = window.innerWidth, H = c.height = window.innerHeight;
     c.classList.add('on');
-    var COL = ['#e8ff4c', '#ff283b', '#ffffff', '#0000cd'];
+    var COL = ['#e8ff4c', '#ff283b', '#ffffff', '#0000cd', '#f4ff6b', '#88ea4e'];
     var piezas = [];
-    for (var i = 0; i < 130; i++){
-      piezas.push({ x: Math.random() * W, y: -20 - Math.random() * H * .5,
-        w: 5 + Math.random() * 7, h: 8 + Math.random() * 10,
-        vy: 2.2 + Math.random() * 3.4, vx: -1.4 + Math.random() * 2.8,
-        rot: Math.random() * 6.28, vr: -.14 + Math.random() * .28,
-        col: COL[Math.floor(Math.random() * COL.length)] });
+    // [SORTEO-RONDAS-1] MÁS GENEROSO, por orden de Memo. 130 → 320, y la mitad
+    // sale DISPARADA desde abajo como un cañón en vez de solo caer: la caída a
+    // secas se leía como lluvia, no como celebración.
+    //
+    // ⚠️ 320 piezas es el techo que aguanta un celular de gama media a 60 fps
+    // con el mosaico animándose detrás. Si Memo dice que pica, este número es
+    // el que baja — no hay nada más que tocar.
+    var N = reducido ? 60 : 320;
+    for (var i = 0; i < N; i++){
+      var canon = i % 2 === 0;
+      piezas.push(canon
+        ? { x: W * (.15 + Math.random() * .7), y: H + 10,
+            w: 5 + Math.random() * 8, h: 8 + Math.random() * 12,
+            vy: -(9 + Math.random() * 7), vx: -4 + Math.random() * 8,
+            rot: Math.random() * 6.28, vr: -.3 + Math.random() * .6,
+            col: COL[Math.floor(Math.random() * COL.length)] }
+        : { x: Math.random() * W, y: -20 - Math.random() * H * .6,
+            w: 5 + Math.random() * 7, h: 8 + Math.random() * 10,
+            vy: 2.2 + Math.random() * 3.8, vx: -1.6 + Math.random() * 3.2,
+            rot: Math.random() * 6.28, vr: -.16 + Math.random() * .32,
+            col: COL[Math.floor(Math.random() * COL.length)] });
     }
     // 🔒 Desde `REVELACION_MS`: si el confeti durara más que la revelación que
     // el reloj cuenta, seguiría cayendo sobre la fase siguiente.
@@ -1318,7 +1460,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     (function pinta(){
       ctx2.clearRect(0, 0, W, H);
       piezas.forEach(function(p){
-        p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vy += .035;
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vy += .16;
         ctx2.save(); ctx2.translate(p.x, p.y); ctx2.rotate(p.rot);
         ctx2.fillStyle = p.col; ctx2.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx2.restore();
       });
@@ -1694,7 +1836,11 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var esc = u.escalones;
     var dentro = (ahora() - creado) < TIEMPOS.duracionTotal(esc);
     return {
-      id: u.id, escalones: esc, momentos: TIEMPOS.momentos(esc),
+      id: u.id, escalones: esc,
+      // `momentos` = cuándo se LIBERA el dato de cada escalón (lo del servidor).
+      // `arranques` = cuándo ARRANCA la animación de cada fase. Coinciden salvo
+      // en la última: su momento es la REVELACIÓN y su fase arranca 13 s antes.
+      momentos: TIEMPOS.momentos(esc), arranques: TIEMPOS.arranques(esc),
       // En REPETICIÓN el 3·2·1 no corre (ya se sabe qué pasó), así que el t0
       // se adelanta esa cuenta: el mosaico entra de inmediato y los momentos
       // siguientes conservan su separación. Sin esto la repetición regalaba
@@ -1790,6 +1936,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       + '</div>'
       + '<div class="mos-nom">' + esc(m.corto || '') + '</div>';
     rej.appendChild(div);
+    son.sale(idx, tam);
     $('mos-quedan').textContent = (idx + 1) + ' de ' + tam;
     $('mos-de').textContent = (estado && estado.ultimo)
       ? (tam + ' de ' + (estado.ultimo.de_cuantos || 0) + ' · al azar') : '';
@@ -1974,7 +2121,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var T = TIEMPOS.T;
     var n = SHOW.escalones.length;
     var ultima = (k === n - 1);
-    var finDeEsta = ultima ? null : SHOW.momentos[k + 1];
+    var finDeEsta = ultima ? null : SHOW.arranques[k + 1];
 
     if (k === 0){
       // 🔴 NO se pinta de golpe: los saca la tragamonedas uno por uno, y la
@@ -1996,14 +2143,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       //   APAGADO   · se ven QUIÉNES salieron, en su sitio, con el foco muerto
       //   REACOMODO · los apagados se van, la rejilla baja de columnas y los
       //               que quedan crecen solos (el tamaño lo da `--cols`)
-      enElMomento(SHOW.momentos[k] + T.RONDA_REDOBLE_MS, function(){
+      enElMomento(SHOW.arranques[k] + T.RONDA_REDOBLE_MS, function(){
         if (caja) caja.classList.remove('redoble');
         son.redoble(false);
         son.golpe();
         // APAGADO: se les corta la corriente a los MISMOS elementos, para que
         // el foco se muera de verdad (ver `apagarEnMosaico`).
         apagarEnMosaico(ronda);
-        enElMomento(SHOW.momentos[k] + T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS, function(){
+        enElMomento(SHOW.arranques[k] + T.RONDA_REDOBLE_MS + T.RONDA_APAGADO_MS, function(){
           // REACOMODO: aquí sí se reconstruye, porque la rejilla CAMBIA —los
           // apagados se van y los que quedan crecen solos con `--cols`.
           pintarMosaico(ronda, []);
@@ -2012,10 +2159,159 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       });
       return;
     }
-    // La última: los finalistas quedan en grande y la tragamonedas gira una
-    // vez más. `animarHacia` ya trae su propio perfil de 11 s y su revelación.
-    pintarMosaico(ronda, fueraDe(k - 1, ronda));
-    animarHacia(estado.ultimo, alTerminar);
+    // ═══ LA ÚLTIMA: EL FINAL, SIN TRAGAMONEDAS ══════════════════════════
+    // Orden de Memo tras el ensayo: con los 3 finalistas YA NO SE GIRA — la
+    // eliminación es el clímax. Y la pantalla no se queda quieta ni un
+    // segundo, porque la gente tiene que estar entretenida hasta el final.
+    finalSinGiro(alTerminar);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EL FINAL: 3 TEMBLANDO → MUERE UNO → 2 CON CUENTA → EXPLOTA EL GANADOR
+  //
+  // 🔒 TODO ANCLADO AL RELOJ, como el resto del show: los tres momentos salen
+  // de `momentoFinalistasMs`, `momentoDosMs` y `momentos[último]`, o sea del
+  // MISMO archivo que usa el servidor para liberar los datos. Si la pantalla
+  // los contara por su cuenta, se iría desfasando del gateo.
+  //
+  // 🔒 Y ESPERA EL DATO, no lo adivina: para apagar a uno de los 3 hace falta
+  // `estado.ultimo.dos`, y para apagar a la segunda hace falta el ganador. Si
+  // no han llegado, se sigue temblando — nunca se apaga a alguien al azar.
+  // ═══════════════════════════════════════════════════════════════════════
+  function fichas(){
+    var rej = $('mosaico');
+    return rej ? [].slice.call(rej.querySelectorAll('.mos')) : [];
+  }
+  function fichaDe(folio){
+    return fichas().filter(function(el){ return el.getAttribute('data-folio') === String(folio); })[0];
+  }
+  // El temblor va en un envoltorio: `.mos` ya usa `transform` en su entrada y
+  // dos animaciones sobre la misma propiedad se anulan.
+  function temblar(el, amp, vel){
+    if (!el) return;
+    var env = el.querySelector('.mos-tiembla');
+    if (!env){
+      env = document.createElement('div');
+      env.className = 'mos-tiembla';
+      while (el.firstChild) env.appendChild(el.firstChild);
+      el.appendChild(env);
+    }
+    env.style.setProperty('--amp', amp + 'px');
+    env.style.setProperty('--tmb', vel + 's');
+  }
+
+  function finalSinGiro(alTerminar){
+    var T = TIEMPOS.T;
+    var esc = SHOW.escalones;
+    var tFin = TIEMPOS.momentoFinalistasMs(esc);
+    var tDos = TIEMPOS.momentoDosMs(esc);
+    var tRev = SHOW.momentos[esc.length - 1];
+
+    // 1 · LOS 3 EN GRANDE, TEMBLANDO CADA VEZ MÁS.
+    var ronda3 = SHOW.rondas[esc.length - 2];
+    if (ronda3) pintarMosaico(ronda3, []);
+    $('mos-quedan').textContent = 'Quedan ' + (esc[esc.length - 2] || 3);
+    son.tension(true);
+    var tmb = setInterval(function(){
+      if (!SHOW) { clearInterval(tmb); return; }
+      var t = ahora() - SHOW.t0;
+      // El temblor crece de 1 px a 4 px entre que quedan los 3 y que muere uno,
+      // y de 4 a 9 px en el tramo de las dos. Derivado, no por pasos fijos.
+      var k, amp, vel;
+      if (t < tDos){ k = Math.min(1, Math.max(0, (t - tFin) / (tDos - tFin))); amp = 1 + k * 3; vel = .42 - k * .14; }
+      else { k = Math.min(1, Math.max(0, (t - tDos) / (tRev - tDos))); amp = 4 + k * 5; vel = .28 - k * .14; }
+      son.tension(true, k);
+      fichas().forEach(function(el){
+        if (!el.classList.contains('muere')) temblar(el, amp.toFixed(1), Math.max(.1, vel).toFixed(2));
+      });
+    }, 120);
+
+    function limpiar(){ clearInterval(tmb); son.tension(false); }
+
+    // 2 · EN SU MOMENTO, MUERE UNO. Se ESPERA el dato.
+    esperarDato(function(){ return (estado && estado.ultimo && estado.ultimo.dos) || null; },
+      tDos, function(dos){
+        var muere = ronda3 ? ronda3.miembros.filter(function(m){ return dos.indexOf(m.folio) === -1; })[0] : null;
+        if (muere){
+          var el = fichaDe(muere.folio);
+          if (el){ el.classList.add('muere'); son.golpe(); }
+          // Se QUITA del DOM al acabar la animación: dejarla gris ocupando
+          // espacio empujaría el bloque del ganador fuera de la pantalla.
+          setTimeout(function(){ if (el && el.parentNode) el.parentNode.removeChild(el); }, 600);
+        }
+        var rDos = { i: ronda3 ? ronda3.i : 0, tam: 2,
+                     miembros: (ronda3 ? ronda3.miembros : []).filter(function(m){ return dos.indexOf(m.folio) !== -1; }) };
+        setTimeout(function(){
+          var rej = $('mosaico');
+          if (rej) rej.style.setProperty('--cols', 2);
+          $('mos-quedan').textContent = 'Quedan 2';
+        }, 620);
+
+        // 3 · LOS ÚLTIMOS SEGUNDOS: LA CUENTA 5·4·3·2·1, DERIVADA.
+        var segs = Math.max(1, Math.round(T.FINAL_DOS_MS / 1000));
+        var caja = $('cuenta-final');
+        for (var i = 0; i < segs; i++){
+          (function(n){
+            var cuando = (SHOW.t0 + tRev - (n + 1) * 1000) - ahora();
+            if (cuando < -900) return;                    // ese número ya pasó
+            setTimeout(function(){
+              if (!SHOW) return;
+              // 🔒 SE VUELVE A BUSCAR, y si no está SE DICE. La versión que se
+              // guardaba la referencia y hacía `if (!caja) return` convirtió un
+              // contenedor borrado en un silencio: la cuenta simplemente no
+              // salía y nada lo reportaba.
+              var c2 = $('cuenta-final');
+              if (!c2){ console.error('[sorteo] #cuenta-final no está en el DOM: ¿alguien lo reescribió?'); return; }
+              caja = c2;
+              caja.hidden = false;
+              caja.innerHTML = '<span>' + (n + 1) + '</span>';
+              son.cuenta(n + 1);
+            }, Math.max(0, cuando));
+          })(i);
+        }
+
+        // 4 · AL CERO: MUERE LA OTRA Y EXPLOTA EL GANADOR. Se ESPERA el dato.
+        esperarDato(function(){ return (estado && estado.ultimo && estado.ultimo.folio) || null; },
+          tRev, function(folioG){
+            limpiar();
+            if (caja) { caja.hidden = true; caja.innerHTML = ''; }
+            var otra = rDos.miembros.filter(function(m){ return m.folio !== folioG; })[0];
+            if (otra){
+              var eo = fichaDe(otra.folio);
+              if (eo){ eo.classList.add('muere'); }
+              setTimeout(function(){ if (eo && eo.parentNode) eo.parentNode.removeChild(eo); }, 600);
+            }
+            var eg = fichaDe(folioG);
+            if (eg){
+              var env = eg.querySelector('.mos-tiembla');
+              if (env) env.classList.remove('mos-tiembla');
+              eg.classList.add('gana');
+            }
+            setTimeout(function(){
+              var rej = $('mosaico');
+              if (rej) rej.style.setProperty('--cols', 1);
+              $('mos-quedan').textContent = 'Ganador';
+              revelar();
+              alTerminar();
+            }, 520);
+          });
+      });
+  }
+
+  // 🔒 EL PATRÓN DE «ESPERAR EL DATO», igual que el redoble sostenido: cuando
+  // llega el momento pero el dato no, se sigue temblando y se vuelve a mirar.
+  // Nunca se apaga a alguien al azar por no tener la respuesta.
+  function esperarDato(leer, cuando, alLlegar){
+    var listo = false;
+    var iv = setInterval(function(){
+      if (listo) { clearInterval(iv); return; }
+      if (!SHOW) { clearInterval(iv); return; }
+      if ((ahora() - SHOW.t0) < cuando) return;
+      var d = leer();
+      if (d == null) { refrescar(); return; }        // falta: se pide otra vez
+      listo = true; clearInterval(iv);
+      alLlegar(d);
+    }, 150);
   }
 
   // El redoble sostenido: la máquina no avanza, pero el ojo no ve nada roto.
@@ -2052,14 +2348,31 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var k = SHOW.pintadas;
     if (k >= SHOW.escalones.length) return;
     var t = ahora() - SHOW.t0;
-    if (t < SHOW.momentos[k]) return;              // todavía no le toca: manda el reloj
-    if (!SHOW.rondas[k]){                          // le toca y NO llegó el dato
+    // 🔴 Por ARRANQUE, no por momento: la última fase arranca cuando quedan los
+    // finalistas, no cuando se revela el ganador.
+    if (t < SHOW.arranques[k]) return;             // todavía no le toca: manda el reloj
+    // 🔴 QUÉ DATO HACE FALTA DEPENDE DE LA FASE, y confundirlo costó once
+    // segundos de máquina quieta.
+    //
+    // Para una ronda de eliminación hace falta ESA ronda. Pero la fase FINAL no
+    // necesita `rondas[último]` para arrancar: `rondas[último]` ES EL GANADOR, y
+    // el ganador no llega hasta el segundo 74 justamente porque la animación
+    // que lo revela empieza en el 63. Exigirlo dejaba el final en «sostenido»
+    // esperando el dato que él mismo existe para destapar — medido en el
+    // navegador: el temblor aparecía a los 74 s en vez de a los 63.
+    //
+    // Lo que el final necesita para ARRANCAR son los finalistas (la ronda
+    // anterior). `dos` y el ganador los espera adentro, uno por uno, con
+    // `esperarDato` — el mismo patrón del redoble sostenido.
+    var ultimaFase = (k === SHOW.escalones.length - 1);
+    var necesito = ultimaFase ? (k - 1) : k;
+    if (!SHOW.rondas[necesito]){                   // le toca y NO llegó el dato
       if (!SHOW.sostenido){ SHOW.sostenido = true; sostenerRedoble(k); }
       return;                                      // 🔒 SE SOSTIENE, no se salta
     }
     if (SHOW.sostenido){ SHOW.sostenido = false; soltarRedoble(); }
     SHOW.corriendo = true;
-    var ronda = SHOW.rondas[k];
+    var ronda = SHOW.rondas[necesito];
     animarRonda(k, ronda, function(){
       SHOW.corriendo = false;
       SHOW.pintadas = k + 1;
@@ -2095,6 +2408,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   window.__sorteoShow = function(){
     if (!SHOW) return null;
     return { id: SHOW.id, escalones: SHOW.escalones.slice(), pintadas: SHOW.pintadas,
+             arranques: SHOW.arranques.slice(),
              corriendo: SHOW.corriendo, sostenido: SHOW.sostenido,
              sincronizado: SHOW.sincronizado, t: ahora() - SHOW.t0,
              tengo: SHOW.rondas.map(function(r){ return r ? r.tam : null; }) };

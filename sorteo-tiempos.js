@@ -43,12 +43,18 @@
     RONDA_REDOBLE_MS:    4600,   // el suspenso de cada eliminación
     RONDA_APAGADO_MS:    2200,   // se apaga la mitad, escalonado
     RONDA_REACOMODO_MS:  1200,   // los que siguen se reacomodan y crecen
-    // ⚠️ LOS 6 s QUE MEMO NO NOMBRÓ. Sus fases suman 84 s y su total dice 1:30:
-    // la diferencia es esta pausa entre los 3 finalistas en grande y el último
-    // giro. Si el total tenía que ser 1:24, este número es el que se va a 0.
-    SUSPENSO_MS:         6000,   // los finalistas en grande, antes del último giro
-    GIRO_FINAL_MS:      15000,   // el perfil del tercer rodillo lo escala de aquí
+    // ═══ EL FINAL, SIN TRAGAMONEDAS ══════════════════════════════════════
+    // [21-sep, cuarta vuelta] Orden de Memo: con los 3 finalistas YA NO SE
+    // GIRA. La eliminación es el clímax, y la pantalla no puede quedarse
+    // quieta ni un segundo.
+    FINAL_TRES_MS:       8000,   // los 3 en grande temblando · al final muere UNO
+    FINAL_DOS_MS:        5000,   // las 2 temblando fuerte, con cuenta 5·4·3·2·1
     REVELACION_MS:       6000,   // destello + confeti, los dos escalados de aquí
+
+    // 🔒 SOBREVIVE PARA EL CAMINO VIEJO. Los dos giros de Natanael no tienen
+    // escalera: su show es el de siempre —la tragamonedas girando hacia el
+    // ganador— y `perfil()` escala de aquí. Quitarlo rompería esas dos filas.
+    GIRO_FINAL_MS:      15000,
 
     // Cuánto ANTES de que le toque se publica una ronda, para que la página no
     // se quede esperando el latido. Corto a propósito: es el único adelanto que
@@ -94,7 +100,11 @@
     var base = T.CUENTA_321_MS + presentarMs(e);
     var out = [0];                                             // el primero se presenta
     for (var k = 1; k < n - 1; k++) out.push(base + (k - 1) * T.RONDA_MS);
-    out.push(base + (n - 2) * T.RONDA_MS + T.SUSPENSO_MS);     // el último suma suspenso
+    // 🔴 EL ÚLTIMO MOMENTO ES LA REVELACIÓN, no el arranque de un giro.
+    // Antes el último escalón marcaba cuándo EMPEZABA la tragamonedas y la
+    // cara aparecía 15 s después; sin giro final, ese momento ES cuando se ve.
+    // Por eso el ganador ahora viaja 2 s antes de verse en vez de 17.
+    out.push(momentoDosMs(e) + T.FINAL_DOS_MS);
     return out;
   }
 
@@ -104,10 +114,39 @@
     });
   }
 
+  // 🔴 SALE DE `revelacionVisibleMs`, no de `momentos[último] + GIRO_FINAL`.
+  // Al quitar el giro final se me quedó sumándolo y el total daba 97 s en vez
+  // de 82: `duracionTotal` gobierna el umbral de «dentro del show» —el que
+  // decide sincronizar o repetir—, así que habría mentido por quince segundos.
+  // Derivándolo de la revelación, los dos caminos (con y sin escalera) salen
+  // bien sin un caso especial.
   function duracionTotal(escalones) {
-    var m = momentos(escalones);
-    if (!m.length) return 0;
-    return m[m.length - 1] + T.GIRO_FINAL_MS + T.REVELACION_MS;
+    if (!momentos(escalones).length) return 0;
+    return revelacionVisibleMs(escalones) + T.REVELACION_MS;
+  }
+
+  // ── Cuándo quedan los FINALISTAS en pie, en ms desde `creado_at` ─────────
+  // Es el fin de la última ronda de eliminación: de ahí arranca el final.
+  function momentoFinalistasMs(escalones) {
+    var e = Array.isArray(escalones) ? escalones : [];
+    var n = e.length;
+    if (n < 2) return T.CUENTA_321_MS;
+    return T.CUENTA_321_MS + presentarMs(e) + (n - 2) * T.RONDA_MS;
+  }
+
+  // ── Cuándo se apaga UNO de los 3 y quedan DOS ────────────────────────────
+  // 🔴 ESTE MOMENTO GOBIERNA UN GATEO PROPIO. Para apagar a uno de los tres, la
+  // página necesita saber CUÁL — o sea, quiénes son los DOS que siguen. Ese
+  // dato NO puede viajar antes, porque saber quiénes son los dos es saber
+  // quién NO ganó, y a cinco segundos del final eso es medio spoiler.
+  //
+  // ⚠️ No se agrega un escalón de 2 a `escalones`: el POZO DEL RE-GIRO sigue
+  // siendo el de 3, por orden de Memo. Esto es revelación VISUAL de la misma
+  // escalera, y viaja como un campo aparte (`dos`) con su propio momento.
+  function momentoDosMs(escalones) {
+    var e = Array.isArray(escalones) ? escalones : [];
+    if (e.length < 2) return T.CUENTA_321_MS;
+    return momentoFinalistasMs(e) + T.FINAL_TRES_MS;
   }
 
   // ── Cuándo TERMINA la presentación, en ms desde `creado_at` ──────────────
@@ -124,9 +163,39 @@
   // No es `momentos[último]` —ése es cuando ARRANCA el último giro—: la
   // revelación es cuando la tragamonedas frena y la cara aparece.
   function revelacionVisibleMs(escalones) {
-    var m = momentos(escalones);
+    var e = Array.isArray(escalones) ? escalones : [];
+    var m = momentos(e);
     if (!m.length) return 0;
-    return m[m.length - 1] + T.GIRO_FINAL_MS;
+    // Con escalera, el último momento YA ES la revelación (no hay giro final).
+    // Sin escalera —los dos giros de Natanael— la cara aparece cuando la
+    // tragamonedas frena, así que ahí sí se suma el giro.
+    if (e.length < 2) return m[m.length - 1] + T.GIRO_FINAL_MS;
+    return m[m.length - 1];
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 🔴 CUÁNDO **ARRANCA** CADA FASE — QUE NO ES CUÁNDO SE LIBERA SU DATO
+  //
+  // `momentos()` es el calendario de LIBERACIÓN: cuándo puede salir el dato de
+  // cada escalón. Para las rondas de eliminación coincide con el arranque de su
+  // animación, pero para la ÚLTIMA no: su momento es LA REVELACIÓN, y la
+  // secuencia final (los 3 temblando → muere uno → la cuenta) tiene que
+  // ARRANCAR trece segundos antes, en cuanto quedan los finalistas.
+  //
+  // Los tenía confundidos y el defecto fue exactamente éste: la pantalla
+  // esperaba hasta el segundo 76 para empezar un final que debía TERMINAR ahí,
+  // así que las tres fases se atropellaban en un instante. Medido: a t=75.8 s
+  // las tarjetas estaban puestas y `tiemblan` valía 0.
+  //
+  // No son dos calendarios: es el MISMO, con la última entrada leída para lo
+  // que es. El dato del ganador sigue saliendo en `momentos[último]`.
+  function arranques(escalones) {
+    var e = Array.isArray(escalones) ? escalones : [];
+    var m = momentos(e);
+    if (e.length < 2) return m.slice();
+    var out = m.slice();
+    out[e.length - 1] = momentoFinalistasMs(e);
+    return out;
   }
 
   // ── El reloj «GANADOR EN», de punta a punta ──────────────────────────────
@@ -171,6 +240,8 @@
     liberaciones: liberaciones, duracionTotal: duracionTotal,
     presentarMs: presentarMs, revelacionVisibleMs: revelacionVisibleMs,
     cuentaGanadorMs: cuentaGanadorMs, finPresentacionMs: finPresentacionMs,
+    momentoFinalistasMs: momentoFinalistasMs, momentoDosMs: momentoDosMs,
+    arranques: arranques,
     textoComoFunciona: textoComoFunciona,
   };
 

@@ -53,7 +53,7 @@ function estado() {
   }
   const t = Date.now() - ARRANQUE;
   const proy = ESC.proyectarRondas({ rondas, momentos, margenMs: TI.T.MARGEN_ADELANTO_MS,
-    transcurridoMs: t, fotoDeId: () => null });
+    transcurridoMs: t, momentoDosMs: TI.momentoDosMs(escalones), fotoDeId: () => null });
   // 🔒 EL CORTE SIMULA UN LATIDO QUE NO TRAE LA RONDA: el servidor deja de
   // publicar de la ronda `TOPE` en adelante, como si su respuesta se cayera.
   const recortadas = proy.rondas.filter((r) => r.i < TOPE);
@@ -66,7 +66,10 @@ function estado() {
       escalones, escalon: null, es_regiro: false,
       rondas: recortadas, rondas_totales: proy.rondas_totales,
       siguiente_ronda_en_ms: proy.siguiente_ronda_en_ms,
-      revelacion_en_ms: momentos[momentos.length - 1] },
+      revelacion_en_ms: momentos[momentos.length - 1],
+      dos: proy.dos || null,
+      momento_dos_en_ms: TI.momentoDosMs(escalones),
+      momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones) },
     giros: RESUELTOS };
 }
 const srv = http.createServer((q, r) => {
@@ -121,6 +124,11 @@ const foto = (pg) => pg.evaluate(() => ({
   cols: (document.getElementById('mosaico')||{}).style?.getPropertyValue('--cols'),
   show: window.__sorteoShow ? window.__sorteoShow() : null,
   rgVis: !!document.querySelector('#reloj-ganador:not([hidden])'),
+  tiemblan: document.querySelectorAll('.mos .mos-tiembla').length,
+  muriendo: document.querySelectorAll('.mos.muere').length,
+  gana: document.querySelectorAll('.mos.gana').length,
+  cuentaVis: !!document.querySelector('#cuenta-final:not([hidden])'),
+  cuentaN: ((document.querySelector('#cuenta-final span') || {}).textContent || '').trim(),
   rgN: (document.getElementById('rg-n') || {}).textContent,
   comoArriba: (() => {
     const c = document.getElementById('como-func'), m = document.getElementById('maquina');
@@ -580,6 +588,76 @@ async function cazar(pg, foto, pred, msMax, nombre) {
     await pg.close();
   }
   SIN_GIRO = false; CAER = false;
+
+  // ── I · EL FINAL SIN TRAGAMONEDAS, Y QUE QUEPA EN UNA PANTALLA ─────────
+  // Orden de Memo: con los 3 ya no se gira, la eliminacion es el climax, y la
+  // pantalla no se queda quieta ni un segundo.
+  console.log('\n── I · el final: 3 temblando → muere uno → 2 con cuenta → gana ──');
+  SIN_GIRO = false; CAER = false; RES = 'pendiente'; RESUELTOS = [];
+  // Se entra JUSTO ANTES de que queden los tres, para cazar las cuatro fases.
+  const tAntesFin = TI.momentoFinalistasMs(escalones) - 1500;
+  ARRANQUE = Date.now() - tAntesFin; TOPE = Infinity;
+  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });   // iPhone
+  const errsI = []; pg.on('pageerror', (e) => errsI.push(e.message));
+  await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
+
+  // 1 · LOS TRES, TEMBLANDO.
+  let cI = await cazar(pg, foto, (x) => x.total === 3 && x.tiemblan === 3,
+                       TI.T.FINAL_TRES_MS + 6000, 'los 3 temblando');
+  console.log('   3 temblando  @' + cI.ms + 'ms · tiemblan ' + (cI.f || {}).tiemblan
+            + ' · reloj ' + (cI.f || {}).rgN);
+  af(cI.visto, '🔴 nunca se vieron los 3 TEMBLANDO: ' + JSON.stringify(cI.f));
+
+  // 2 · MUERE UNO, y su tarjeta SE VA (no se queda gris ocupando espacio).
+  cI = await cazar(pg, foto, (x) => x.total === 2 && x.muriendo === 0,
+                   TI.T.FINAL_TRES_MS + 6000, 'quedan 2');
+  console.log('   quedan 2     @' + cI.ms + 'ms · total ' + (cI.f || {}).total
+            + ' · cols ' + (cI.f || {}).cols);
+  af(cI.visto, '🔴 nunca quedaron DOS: ' + JSON.stringify(cI.f));
+  af(cI.visto && cI.f.total === 2,
+     '🔴 la tarjeta del eliminado tiene que DESAPARECER, no quedarse apagada: quedaron '
+     + (cI.f || {}).total);
+
+  // 3 · LA CUENTA 5·4·3·2·1, visible.
+  cI = await cazar(pg, foto, (x) => x.cuentaVis === true && /^[1-9]$/.test(x.cuentaN || ''),
+                   TI.T.FINAL_DOS_MS + 3000, 'la cuenta');
+  console.log('   la cuenta    @' + cI.ms + 'ms · «' + (cI.f || {}).cuentaN + '»');
+  af(cI.visto, '🔴 nunca se vio la cuenta 5·4·3·2·1: ' + JSON.stringify(cI.f));
+  af(cI.visto && cI.f.tiemblan === 2, 'y las DOS siguen temblando durante la cuenta');
+
+  // 4 · GANA UNA, y queda SOLA.
+  cI = await cazar(pg, foto, (x) => x.gana === 1 && x.total === 1,
+                   TI.T.FINAL_DOS_MS + 8000, 'el ganador');
+  console.log('   gana         @' + cI.ms + 'ms · total ' + (cI.f || {}).total
+            + ' · quedan «' + (cI.f || {}).quedan + '»');
+  af(cI.visto, '🔴 nunca gano nadie, o quedo mas de una: ' + JSON.stringify(cI.f));
+  af(cI.visto && cI.f.cuentaVis === false, 'y la cuenta se va al revelarse');
+
+  // 5 · 🔴 QUE TODO EL BLOQUE DEL GANADOR QUEPA EN UNA PANTALLA DE CELULAR.
+  // Orden de Memo: sin scroll largo entre la foto, el «ganó» y el reloj de
+  // 10 min. Se mide la UNION de los tres rectangulos contra el viewport.
+  await pg.waitForTimeout(1800);
+  const caben = await pg.evaluate(() => {
+    const vis = (e) => e && e.offsetParent !== null && !e.hidden;
+    const partes = [document.querySelector('.mos.gana'),
+                    document.getElementById('placa-ganador'),
+                    document.getElementById('panel')].filter(vis);
+    if (!partes.length) return { ok: false, motivo: 'no hay bloque del ganador' };
+    const rs = partes.map((e) => e.getBoundingClientRect());
+    const top = Math.min.apply(null, rs.map((r) => r.top));
+    const bot = Math.max.apply(null, rs.map((r) => r.bottom));
+    return { ok: true, alto: Math.round(bot - top), viewport: innerHeight,
+             partes: partes.length,
+             nombres: partes.map((e) => e.id || e.className) };
+  });
+  console.log('   bloque del ganador: ' + caben.alto + 'px de alto en un viewport de '
+            + caben.viewport + 'px · ' + JSON.stringify(caben.nombres));
+  af(caben.ok, 'el bloque del ganador existe: ' + caben.motivo);
+  af(caben.ok && caben.alto <= caben.viewport,
+     '🔴 el bloque del ganador mide ' + caben.alto + 'px y NO CABE en los '
+     + caben.viewport + 'px de un celular: habria que hacer scroll entre la foto y el reloj');
+  af(errsI.length === 0, 'errores en I: ' + JSON.stringify(errsI.slice(0, 3)));
+  await pg.close();
 
   await nav.close(); srv.close();
   console.log('\n' + (mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' en verde, ' + mal + ' en rojo');

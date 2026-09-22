@@ -224,8 +224,49 @@ function proyectarRondas(o) {
   // del ciclo de arriba.
   const ganador_liberado = esc.length > 0 && t >= libera(esc.length - 1);
 
+  // ═══ 🔴 «LOS DOS» — EL GATEO PROPIO DEL FINAL ═══════════════════════════
+  //
+  // Sin tragamonedas final, el clímax es la eliminación: de los 3 se apaga
+  // UNO y quedan 2 temblando con la cuenta. Para apagar a uno, la página
+  // necesita saber CUÁL — o sea quiénes son los dos que siguen — y ese dato NO
+  // puede viajar antes de su momento, porque saber quiénes son los dos es
+  // saber quién NO ganó.
+  //
+  // ⚠️ NO es un escalón de la escalera. `escalones` sigue siendo
+  // [24,12,6,3,1] y el POZO DEL RE-GIRO sigue saliendo del 3 (orden de Memo):
+  // esto es revelación VISUAL de la misma escalera, y por eso viaja aparte.
+  //
+  // 🔒 QUIÉN MUERE PRIMERO SE DECIDE POR FOLIO, no por la revoltura. Tomar
+  // `orden[2]` habría sido lo natural de escribir y habría publicado un bit
+  // del orden de la revoltura: quien juntara varios giros aprendería que el
+  // primero en morir siempre es el índice 2. Por folio no se filtra nada —el
+  // folio ya es público— y el resultado es igual de imparcial, porque los dos
+  // son perdedores de todos modos.
+  let dos = null;
+  // `>= 2` y no `>= 3`: con la escalera corta [3,1] la longitud es DOS y
+  // aun así hay tres finalistas y un ganador — el final es idéntico. Con
+  // `>= 3` el sorteo de 3-5 personas se quedaba sin su clímax.
+  if (esc.length >= 2 && Number.isFinite(o.momentoDosMs)) {
+    const liberaDos = Math.max(0, o.momentoDosMs - margen);
+    if (t >= liberaDos) {
+      const tres = orden.slice(0, esc[esc.length - 2]);       // los 3 finalistas
+      const ganadorId = String((orden[0] || {}).id);
+      const perdedores = tres.filter((r) => String(r.id) !== ganadorId)
+        .sort((a, b) => (Number(b.folio) || 0) - (Number(a.folio) || 0));
+      const muere = perdedores[0];                            // el de folio MÁS ALTO
+      if (muere) {
+        dos = tres.filter((r) => String(r.id) !== String(muere.id))
+          .sort((a, b) => (Number(a.folio) || 0) - (Number(b.folio) || 0))
+          .map((r) => Number(r.folio) || null);
+      }
+    } else if (siguiente === null || (liberaDos - t) < siguiente) {
+      // El latido dirigido también tiene que despertar para ESTE momento.
+      siguiente = liberaDos - t;
+    }
+  }
+
   return { rondas: out, rondas_totales: esc.length,
-           siguiente_ronda_en_ms: siguiente, ganador_liberado };
+           siguiente_ronda_en_ms: siguiente, ganador_liberado, dos };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

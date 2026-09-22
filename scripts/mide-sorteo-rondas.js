@@ -112,15 +112,15 @@ af(() => JSON.stringify(TI.escalonesPara(0)) === '[]', 'escalonesPara(0) debe se
 
 // Los momentos: los del acta, al milisegundo.
 const M24 = TI.momentos([24, 12, 6, 3, 1]);
-af(() => JSON.stringify(M24) === JSON.stringify([0, 39000, 47000, 55000, 69000]),
+af(() => JSON.stringify(M24) === JSON.stringify([0, 39000, 47000, 55000, 76000]),
    'momentos([24,12,6,3,1]) dio ' + JSON.stringify(M24));
 af(() => JSON.stringify(TI.momentos([1])) === JSON.stringify([3000]),
    'momentos([1]) dio ' + JSON.stringify(TI.momentos([1])) + ' — el caso degenerado NO libera en 0');
-af(() => JSON.stringify(TI.momentos([3, 1])) === JSON.stringify([0, 13500]),
+af(() => JSON.stringify(TI.momentos([3, 1])) === JSON.stringify([0, 20500]),
    'momentos([3,1]) dio ' + JSON.stringify(TI.momentos([3, 1])));
-af(() => JSON.stringify(TI.momentos([6, 3, 1])) === JSON.stringify([0, 12000, 26000]),
+af(() => JSON.stringify(TI.momentos([6, 3, 1])) === JSON.stringify([0, 12000, 33000]),
    'momentos([6,3,1]) dio ' + JSON.stringify(TI.momentos([6, 3, 1])));
-af(() => JSON.stringify(TI.momentos([12, 6, 3, 1])) === JSON.stringify([0, 21000, 29000, 43000]),
+af(() => JSON.stringify(TI.momentos([12, 6, 3, 1])) === JSON.stringify([0, 21000, 29000, 50000]),
    'momentos([12,6,3,1]) dio ' + JSON.stringify(TI.momentos([12, 6, 3, 1])));
 af(() => JSON.stringify(TI.momentos([])) === '[]', 'momentos([]) debe ser []');
 
@@ -130,12 +130,12 @@ console.log('    duración con escalera de 24: ' + (dur / 1000).toFixed(1) + ' s
 // Firmado por Memo el 21-sep: el show completo en ~40 s. La banda es estrecha
 // a propósito —35-45 s— porque salirse de ahí es un cambio de decisión, no un
 // ajuste fino, y tiene que verse.
-af(() => dur >= 85000 && dur <= 95000, 'la escalera completa dura ' + dur + ' ms, fuera de los ~1:30 firmados');
+af(() => dur >= 78000 && dur <= 86000, 'la escalera completa dura ' + dur + ' ms, fuera de los ~82 s (1:30 menos el giro final que Memo quitó)');
 af(() => TI.duracionTotal([1]) === 24000, 'duracionTotal([1]) dio ' + TI.duracionTotal([1]));
 // La progresión por escalera, para que ninguna quede desproporcionada.
-af(() => TI.duracionTotal([3, 1]) === 34500, 'duracionTotal([3,1]) dio ' + TI.duracionTotal([3, 1]));
-af(() => TI.duracionTotal([6, 3, 1]) === 47000, 'duracionTotal([6,3,1]) dio ' + TI.duracionTotal([6, 3, 1]));
-af(() => TI.duracionTotal([12, 6, 3, 1]) === 64000, 'duracionTotal([12,6,3,1]) dio ' + TI.duracionTotal([12, 6, 3, 1]));
+af(() => TI.duracionTotal([3, 1]) === 26500, 'duracionTotal([3,1]) dio ' + TI.duracionTotal([3, 1]));
+af(() => TI.duracionTotal([6, 3, 1]) === 39000, 'duracionTotal([6,3,1]) dio ' + TI.duracionTotal([6, 3, 1]));
+af(() => TI.duracionTotal([12, 6, 3, 1]) === 56000, 'duracionTotal([12,6,3,1]) dio ' + TI.duracionTotal([12, 6, 3, 1]));
 af(() => TI.duracionTotal([]) === 0, 'duracionTotal([]) debe ser 0');
 
 // 🔒 LOS MOMENTOS SON ESTRICTAMENTE CRECIENTES. Dos rondas en el mismo instante
@@ -149,7 +149,7 @@ af(() => TI.duracionTotal([]) === 0, 'duracionTotal([]) debe ser 0');
 // La liberación se adelanta el margen, y nunca es negativa.
 const L24 = TI.liberaciones([24, 12, 6, 3, 1]);
 af(() => L24[0] === 0, 'la primera liberación debe ser 0, dio ' + L24[0]);
-af(() => L24[4] === 69000 - TI.T.MARGEN_ADELANTO_MS,
+af(() => L24[4] === 76000 - TI.T.MARGEN_ADELANTO_MS,
    '🔴 el GANADOR se libera en ' + L24[4] + ', se esperaba ' + (116700 - TI.T.MARGEN_ADELANTO_MS));
 af(() => L24.every((x) => x >= 0), 'ninguna liberación puede ser negativa');
 // Y el ganador NO puede salir al principio: es todo el punto del ajuste (b).
@@ -164,7 +164,7 @@ af(() => L24[4] >= dur - TI.T.GIRO_FINAL_MS - TI.T.REVELACION_MS - TI.T.MARGEN_A
 // La forma del objeto: si alguien le quita un campo, el gemelo del navegador
 // dejaría de cuadrar y esto lo dice antes.
 ['V', 'CUENTA_321_MS', 'SACA_UNO_MS', 'RONDA_REDOBLE_MS', 'RONDA_APAGADO_MS',
- 'RONDA_REACOMODO_MS', 'RONDA_MS', 'SUSPENSO_MS', 'GIRO_FINAL_MS', 'REVELACION_MS',
+ 'RONDA_REACOMODO_MS', 'RONDA_MS', 'FINAL_TRES_MS', 'FINAL_DOS_MS', 'GIRO_FINAL_MS', 'REVELACION_MS',
  'MARGEN_ADELANTO_MS', 'LATIDO_MS'].forEach((c) => {
   af(() => typeof TI.T[c] === 'number', 'falta la constante ' + c + ' en TIEMPOS.T');
 });
@@ -1461,24 +1461,36 @@ af(() => TI.presentarMs([]) === 0 && TI.presentarMs(null) === 0, 'sin escalera n
        '🔴 con ' + e[0] + ' la presentación no acaba en momentos[1]: ' + m[1]
        + ' vs ' + TI.finPresentacionMs(e));
   } else {
-    af(() => m[1] === TI.finPresentacionMs(e) + TI.T.SUSPENSO_MS,
-       '🔒 con [3,1] momentos[1] lleva el suspenso: ' + m[1] + ' vs ' + TI.finPresentacionMs(e));
+    af(() => m[1] === TI.finPresentacionMs(e) + TI.T.FINAL_TRES_MS + TI.T.FINAL_DOS_MS,
+       '🔒 con [3,1] momentos[1] es la REVELACIÓN y lleva el final entero: '
+       + m[1] + ' vs ' + TI.finPresentacionMs(e));
   }
 });
 
 // ── El reloj «GANADOR EN», derivado de punta a punta ──────────────────────
 const ESC24 = [24, 12, 6, 3, 1];
 const M24b = TI.momentos(ESC24);
-af(() => TI.revelacionVisibleMs(ESC24) === M24b[4] + TI.T.GIRO_FINAL_MS,
-   '🔒 la revelación VISIBLE es cuando la placa se enciende, no cuando arranca el último giro');
+// 🔴 SIN TRAGAMONEDAS FINAL, el último momento YA ES la revelación: la cara
+// aparece cuando se apaga la segunda finalista, no 15 s después.
+af(() => TI.revelacionVisibleMs(ESC24) === M24b[4],
+   '🔴 con escalera, la revelación ES el último momento (no + GIRO_FINAL); dio '
+   + TI.revelacionVisibleMs(ESC24) + ' vs ' + M24b[4]);
+// 🔒 Y el camino VIEJO no se rompe: sin escalera la cara aparece cuando la
+// tragamonedas frena, así que ahí SÍ se suma el giro.
+af(() => TI.revelacionVisibleMs([1]) === TI.momentos([1])[0] + TI.T.GIRO_FINAL_MS,
+   '🔒 sin escalera la revelación sí suma el giro final: es el show de Natanael');
+// 🔴 LA VENTANA DE SPOILER SE CERRÓ: de 17 s a 2 s. Es el margen, y nada más.
+af(() => TI.revelacionVisibleMs(ESC24) - TI.liberaciones(ESC24)[4] === TI.T.MARGEN_ADELANTO_MS,
+   '🔴 el ganador viaja ' + ((TI.revelacionVisibleMs(ESC24) - TI.liberaciones(ESC24)[4]) / 1000)
+   + ' s antes de verse; sin giro final tiene que ser exactamente el margen');
 af(() => TI.cuentaGanadorMs(ESC24) === TI.revelacionVisibleMs(ESC24) - TI.finPresentacionMs(ESC24),
    'el reloj cuenta desde que los 24 YA ESTÁN hasta que la placa se enciende');
 // Y en la escalera CORTA también arranca al acabar la presentación, no 6 s
 // después: es el caso que destapó el defecto.
 af(() => TI.cuentaGanadorMs([3, 1]) === TI.revelacionVisibleMs([3, 1]) - TI.finPresentacionMs([3, 1]),
    '🔴 con [3,1] el reloj tiene que arrancar al acabar la presentación (7.5 s), no en momentos[1] (13.5 s)');
-af(() => TI.cuentaGanadorMs([3, 1]) === 21000,
-   'con [3,1] el reloj cuenta 21 s, dio ' + TI.cuentaGanadorMs([3, 1]));
+af(() => TI.cuentaGanadorMs([3, 1]) === 13000,
+   'con [3,1] el reloj cuenta 13 s, dio ' + TI.cuentaGanadorMs([3, 1]));
 console.log('    GANADOR EN arranca en ' + (M24b[1] / 1000) + 's y cuenta '
           + (TI.cuentaGanadorMs(ESC24) / 1000).toFixed(1) + 's · placa en el '
           + (TI.revelacionVisibleMs(ESC24) / 1000).toFixed(1) + 's');
@@ -1486,7 +1498,7 @@ af(() => TI.cuentaGanadorMs([1]) === 0, '🔒 con giro directo no hay nada que c
 // Y CADA fase que se mueva tiene que mover el reloj: se comprueba que no haya
 // un número tecleado en medio.
 af(() => TI.cuentaGanadorMs(ESC24)
-      === (ESC24.length - 2) * TI.T.RONDA_MS + TI.T.SUSPENSO_MS + TI.T.GIRO_FINAL_MS,
+      === (ESC24.length - 2) * TI.T.RONDA_MS + TI.T.FINAL_TRES_MS + TI.T.FINAL_DOS_MS,
    '🔴 el reloj no es la suma de las fases que faltan: hay un número que no se deriva');
 
 // ── 🔒 LA COPY DE «CÓMO FUNCIONA», UNA SOLA DEFINICIÓN ───────────────────
@@ -1518,6 +1530,180 @@ af(() => TI.textoComoFunciona(2).length === 0 && TI.textoComoFunciona(0).length 
   });
 af(() => TI.textoComoFunciona(-5).length === 0, 'un total negativo se trata como 0');
 af(() => /De los <b>73<\/b>/.test(TI.textoComoFunciona('73')[0]), 'una cadena numérica se coacciona');
+
+
+// ═══ [15] EL FINAL SIN TRAGAMONEDAS: EL GATEO DE «LOS DOS» ══════════════════
+console.log('\n── [15] «los dos»: su propio gateo, y sin filtrar la revoltura ──');
+const MOMD = TI.momentoDosMs(ESC24);
+const projD = (t) => ESC.proyectarRondas({
+  rondas: RF, momentos: TI.momentos(ESC24), margenMs: TI.T.MARGEN_ADELANTO_MS,
+  transcurridoMs: t, momentoDosMs: MOMD, fotoDeId: () => null,
+});
+console.log('    finalistas en el ' + (TI.momentoFinalistasMs(ESC24) / 1000) + 's · «dos» se libera en el '
+          + ((MOMD - TI.T.MARGEN_ADELANTO_MS) / 1000) + 's · revelación en el '
+          + (TI.revelacionVisibleMs(ESC24) / 1000) + 's');
+
+// 🔴 ANTES DE SU MOMENTO, `dos` ES null. Saber quiénes son los dos es saber
+// quién NO ganó, y a cinco segundos del final eso es medio spoiler.
+[0, 30000, 55000, 63000, 68000].forEach((t) => {
+  const r = projD(t);
+  af(() => r.dos === null,
+     '🔴 en t=' + t + ' `dos` tiene que ser null, vino ' + JSON.stringify(r.dos));
+  af(() => JSON.stringify(r).indexOf('"dos":[') === -1, 'y no aparece en el JSON en t=' + t);
+});
+// En su momento sí, y son DOS folios.
+[69000, 72000, 75000].forEach((t) => {
+  const r = projD(t);
+  af(() => Array.isArray(r.dos) && r.dos.length === 2,
+     '🔴 en t=' + t + ' `dos` debe traer 2 folios, vino ' + JSON.stringify(r.dos));
+  af(() => r.ganador_liberado === (t >= 74000),
+     'en t=' + t + ' el ganador ' + (t >= 74000 ? 'ya' : 'todavía no') + ' salió');
+});
+// 🔒 LOS DOS SON FINALISTAS, Y EL GANADOR ESTÁ ENTRE ELLOS. Si el ganador no
+// estuviera, la pantalla apagaría a los dos y no quedaría nadie.
+const rD = projD(72000);
+const tresF = RF.orden.slice(0, 3).map((r) => r.folio);
+af(() => rD.dos.every((f) => tresF.indexOf(f) !== -1), 'los dos salen de los 3 finalistas');
+af(() => rD.dos.indexOf(RF.orden[0].folio) !== -1,
+   '🔴 EL GANADOR TIENE QUE ESTAR entre los dos: si no, se apagan los dos y no queda nadie');
+af(() => rD.dos[0] < rD.dos[1], 'vienen ordenados por folio, como todo lo público');
+
+// 🔒 QUIÉN MUERE PRIMERO NO FILTRA LA REVOLTURA. Se decide por FOLIO, no por
+// `orden[2]`: tomar el índice 2 habría publicado un bit del orden de la
+// revoltura —quien juntara varios giros aprendería que el primero en morir
+// siempre es ese índice—. Se mide sobre muchas escaleras REALES.
+let porFolio = 0, porIndice = 0;
+for (let i = 0; i < 3000; i++) {
+  const e = ESC.construirEscalera(PADRON, esc66);
+  const r = ESC.proyectarRondas({ rondas: e, momentos: TI.momentos(esc66),
+    margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: 72000,
+    momentoDosMs: MOMD, fotoDeId: () => null });
+  const tres = e.orden.slice(0, 3);
+  const muerto = tres.filter((x) => r.dos.indexOf(x.folio) === -1)[0];
+  const perdedores = tres.slice(1);
+  // ¿coincide con «el de folio más alto de los dos perdedores»?
+  const altoFolio = perdedores.reduce((a, b) => ((b.folio > a.folio) ? b : a));
+  if (String(muerto.id) === String(altoFolio.id)) porFolio++;
+  // ¿coincide con «orden[2]», el último de la revoltura?
+  if (String(muerto.id) === String(tres[2].id)) porIndice++;
+}
+console.log('    de 3000: coincide con «folio más alto» ' + porFolio + ' · con «orden[2]» ' + porIndice);
+af(() => porFolio === 3000,
+   '🔴 el primero en morir NO se decide por folio: coincidió ' + porFolio + '/3000');
+// Y el control positivo: por índice de revoltura coincide solo la MITAD de las
+// veces (cuando orden[2] resulta ser el de folio más alto). Si coincidiera
+// siempre, se estaría publicando el orden de la revoltura.
+af(() => porIndice > 1100 && porIndice < 1900,
+   '🔴 CONTROL POSITIVO: «orden[2]» coincidió ' + porIndice + '/3000. Si fuera ~3000, '
+   + 'el primero en morir SERÍA el orden de la revoltura y lo estaríamos publicando');
+
+// Escaleras cortas: con [3,1] el final es el mismo; con [1] no hay «dos».
+const P31b = { v: 1, escalones: [3, 1], orden: ordenFijo.slice(0, 3) };
+const r31 = ESC.proyectarRondas({ rondas: P31b, momentos: TI.momentos([3, 1]),
+  margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: 99000,
+  momentoDosMs: TI.momentoDosMs([3, 1]), fotoDeId: () => null });
+af(() => Array.isArray(r31.dos) && r31.dos.length === 2, 'con [3,1] también hay dos finalistas');
+const r1b = ESC.proyectarRondas({ rondas: { v: 1, escalones: [1], orden: ordenFijo.slice(0, 1) },
+  momentos: TI.momentos([1]), margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: 99000,
+  momentoDosMs: TI.momentoDosMs([1]), fotoDeId: () => null });
+af(() => r1b.dos === null, '🔒 con [1] no hay «dos»: es el giro directo de siempre');
+// Sin `momentoDosMs` no se inventa nada.
+const rSinM = ESC.proyectarRondas({ rondas: RF, momentos: TI.momentos(ESC24),
+  margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: 99000, fotoDeId: () => null });
+af(() => rSinM.dos === null, 'sin `momentoDosMs` la proyección no adivina el final');
+
+// El latido dirigido despierta también para ESTE momento.
+af(() => projD(63000).siguiente_ronda_en_ms === (MOMD - TI.T.MARGEN_ADELANTO_MS) - 63000,
+   '🔴 el latido dirigido tiene que apuntar al momento de «los dos», dio '
+   + projD(63000).siguiente_ronda_en_ms);
+
+
+// ═══ [16] 🔴 ARRANQUE ≠ LIBERACIÓN ══════════════════════════════════════════
+// El defecto que esto fija, medido: la pantalla gateaba las fases con
+// `momentos`, y al quitar la tragamonedas el último momento pasó a ser LA
+// REVELACIÓN. O sea que la secuencia final —13 s de temblor, muerte y cuenta—
+// arrancaba en el segundo 76, que es cuando debía TERMINAR: las tres fases se
+// atropellaban en un instante. En el navegador se vio como `tiemblan: 0` con
+// las tarjetas ya puestas y el reloj en 0:01.
+console.log('\n── [16] arranque ≠ liberación ──');
+const ARR = TI.arranques(ESC24), MOM = TI.momentos(ESC24);
+console.log('    momentos  ' + JSON.stringify(MOM));
+console.log('    arranques ' + JSON.stringify(ARR));
+// Coinciden en todas menos la última.
+for (let k = 0; k < ESC24.length - 1; k++) {
+  af(() => ARR[k] === MOM[k], 'la fase ' + k + ' arranca cuando se libera su dato');
+}
+af(() => ARR[ESC24.length - 1] === TI.momentoFinalistasMs(ESC24),
+   '🔴 la ÚLTIMA fase arranca cuando quedan los finalistas (' + (TI.momentoFinalistasMs(ESC24) / 1000)
+   + 's), dio ' + (ARR[ESC24.length - 1] / 1000) + 's');
+af(() => ARR[ESC24.length - 1] < MOM[ESC24.length - 1],
+   '🔴 y arranca ANTES de revelarse: si no, no hay final que animar');
+af(() => MOM[ESC24.length - 1] - ARR[ESC24.length - 1] === TI.T.FINAL_TRES_MS + TI.T.FINAL_DOS_MS,
+   'y la diferencia es exactamente el final (FINAL_TRES + FINAL_DOS), dio '
+   + (MOM[ESC24.length - 1] - ARR[ESC24.length - 1]));
+// Los arranques son estrictamente crecientes: si no, la pantalla se saltaría
+// una fase o correría dos a la vez.
+[[24, 12, 6, 3, 1], [12, 6, 3, 1], [6, 3, 1], [3, 1]].forEach((e) => {
+  const a = TI.arranques(e);
+  af(() => a.every((x, i) => i === 0 || x > a[i - 1]),
+     '🔴 los arranques de ' + JSON.stringify(e) + ' no son crecientes: ' + JSON.stringify(a));
+  af(() => a.length === e.length, 'un arranque por fase');
+  // Y el arranque del final va DESPUÉS de que acabe la última eliminación.
+  if (e.length >= 3) {
+    af(() => a[e.length - 1] === a[e.length - 2] + TI.T.RONDA_MS,
+       '🔴 el final arranca justo al acabar la última eliminación, no antes ni después');
+  }
+});
+// Sin escalera, arranques y momentos son lo mismo: no hay final que separar.
+af(() => JSON.stringify(TI.arranques([1])) === JSON.stringify(TI.momentos([1])),
+   'sin escalera no hay nada que separar');
+af(() => JSON.stringify(TI.arranques([])) === '[]', 'sin nada, nada');
+
+
+// ═══ [17] 🔴 QUÉ DATO NECESITA CADA FASE PARA ARRANCAR ══════════════════════
+// El defecto, medido en el navegador: la máquina exigía `rondas[k]` para
+// arrancar la fase k, y `rondas[último]` ES EL GANADOR — que no llega hasta el
+// segundo 74 precisamente porque la animación que lo revela empieza en el 63.
+// El final se quedaba en «sostenido» esperando el dato que él mismo existe
+// para destapar: once segundos de máquina quieta, y el temblor aparecía a los
+// 74 s en vez de a los 63.
+//
+// Aquí se fija la relación en números, que es lo que la pantalla implementa:
+// la última fase arranca con la ronda ANTERIOR (los finalistas), y el ganador
+// se espera adentro.
+console.log('\n── [17] qué dato necesita cada fase ──');
+const ARR2 = TI.arranques(ESC24), LIB2 = TI.liberaciones(ESC24);
+// Para cada fase de eliminación: su dato se libera ANTES o justo cuando arranca.
+for (let k = 1; k < ESC24.length - 1; k++) {
+  af(() => LIB2[k] <= ARR2[k],
+     '🔴 la ronda ' + k + ' arranca en ' + ARR2[k] + ' pero su dato sale en ' + LIB2[k]
+     + ': arrancaría sostenida');
+}
+// 🔴 Y LA ÚLTIMA **NO**: su dato sale MUCHO DESPUÉS de que arranque su fase.
+// Ésa es la asimetría que hay que respetar, y la que se me fue.
+const ult = ESC24.length - 1;
+af(() => LIB2[ult] > ARR2[ult],
+   '🔴 el dato del ganador TIENE que salir después de que arranque el final: '
+   + LIB2[ult] + ' vs ' + ARR2[ult]);
+console.log('    el final arranca en ' + (ARR2[ult] / 1000) + 's y el ganador sale en '
+          + (LIB2[ult] / 1000) + 's → ' + ((LIB2[ult] - ARR2[ult]) / 1000)
+          + 's en que la fase corre SIN su dato');
+// Lo que sí tiene que estar cuando arranca el final: los FINALISTAS.
+af(() => LIB2[ult - 1] <= ARR2[ult],
+   '🔴 los finalistas tienen que estar liberados cuando arranca el final: '
+   + LIB2[ult - 1] + ' vs ' + ARR2[ult]);
+// Y `dos` cae en medio: después del arranque, antes del ganador.
+const libDos = TI.momentoDosMs(ESC24) - TI.T.MARGEN_ADELANTO_MS;
+af(() => libDos > ARR2[ult] && libDos < LIB2[ult],
+   '🔴 «dos» tiene que salir DENTRO del final: ' + libDos + ' entre ' + ARR2[ult] + ' y ' + LIB2[ult]);
+console.log('    orden de llegada: finalistas ' + (LIB2[ult - 1] / 1000) + 's → arranca el final '
+          + (ARR2[ult] / 1000) + 's → «dos» ' + (libDos / 1000) + 's → ganador ' + (LIB2[ult] / 1000) + 's');
+// La misma asimetría en las escaleras cortas.
+[[12, 6, 3, 1], [6, 3, 1], [3, 1]].forEach((e) => {
+  const a = TI.arranques(e), l = TI.liberaciones(e), u = e.length - 1;
+  af(() => l[u] > a[u], 'con ' + JSON.stringify(e) + ' el ganador sale después del arranque del final');
+  af(() => l[u - 1] <= a[u], 'y los finalistas ya están cuando arranca');
+});
 
 // <<<SIGUIENTES-BLOQUES>>>
 

@@ -198,6 +198,10 @@ exports.handler = async (event) => {
     proy = ESC.proyectarRondas({
       rondas: conEsc.rondas, momentos, margenMs: TI.T.MARGEN_ADELANTO_MS,
       transcurridoMs: transcurrido, fotoDeId: (id) => fotoUrl[String(id)] || null,
+      // 🔴 El momento propio del final: de los 3 se apaga UNO y quedan 2. Sale
+      // del MISMO archivo que la pantalla, así que no hay un segundo calendario
+      // que se pueda desincronizar.
+      momentoDosMs: TI.momentoDosMs(escalones),
     });
     // Sin ?fotos=1 la clave se OMITE (no se pone en null): así la página
     // distingue «no me lo dijeron» de «no tiene foto aprobada», y conserva la
@@ -246,6 +250,11 @@ exports.handler = async (event) => {
     escalon: ultimoCrudo.escalon != null ? ultimoCrudo.escalon : null,
     es_regiro: !!ultimoCrudo.origen_sorteo_id,
     rondas: (proy && proy.rondas) || [],
+    // Los DOS folios que llegan a la cuenta final. `null` hasta su momento:
+    // saber quiénes son los dos es saber quién NO ganó.
+    dos: (proy && proy.dos) || null,
+    momento_dos_en_ms: TI.momentoDosMs(escalones),
+    momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones),
     rondas_totales: (proy && proy.rondas_totales) || 0,
     // Para que la página programe un latido DIRIGIDO justo después de que se
     // libere la ronda que sigue, en vez de martillar cada segundo.

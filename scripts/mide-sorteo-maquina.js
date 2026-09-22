@@ -38,6 +38,7 @@ let ARRANQUE = Date.now();
 let TOPE = Infinity;          // cuantas rondas COMO MAXIMO libera el servidor
 let pedidos = 0;
 let SIN_GIRO = false;         // para medir «Como funciona», que vive ANTES del giro
+let CAER = false;             // el estado contesta 502: el bloque debe CALLARSE
 let N = 66;                   // registrados, cuando no hay giro
 let RES = 'pendiente';        // el resultado PUBLICO del giro vivo
 let RESUELTOS = [];           // los `giros` que ve el publico
@@ -72,6 +73,7 @@ const srv = http.createServer((q, r) => {
   const u = q.url.split('?')[0];
   if (/giveaway-estado/.test(u)) {
     QUERIES.push(q.url);
+    if (CAER) { r.writeHead(502, {'Content-Type':'application/json'}); return r.end('{"ok":false}'); }
     const e = estado();
     // Refleja el modo que le pidieron: la banda tiene que salir de AQUI, no de
     // lo que la pagina crea.
@@ -118,6 +120,18 @@ const foto = (pg) => pg.evaluate(() => ({
   redoble: !!document.querySelector('.mosaico-caja.redoble'),
   cols: (document.getElementById('mosaico')||{}).style?.getPropertyValue('--cols'),
   show: window.__sorteoShow ? window.__sorteoShow() : null,
+  rgVis: !!document.querySelector('#reloj-ganador:not([hidden])'),
+  rgN: (document.getElementById('rg-n') || {}).textContent,
+  comoArriba: (() => {
+    const c = document.getElementById('como-func'), m = document.getElementById('maquina');
+    if (!c || !m) return null;
+    // 🔒 «ARRIBA de la máquina» se mide con la GEOMETRÍA, no con el orden del
+    // DOM: un `order` de flexbox o un `position` los reordena sin tocar el HTML.
+    return { visible: !c.hidden && c.offsetParent !== null,
+             arriba: c.getBoundingClientRect().top < m.getBoundingClientRect().top,
+             pasos: document.querySelectorAll('#como-pasos li').length,
+             txt: (document.getElementById('como-pasos') || {}).textContent || '' };
+  })(),
 }));
 
 // 🔴 NO SE ADIVINA EL INSTANTE: SE CAZA LA FASE.
@@ -154,11 +168,39 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
   const T = TI.T;
-  // 1 · PRESENTACION: las 24 vivas.
-  let c = await cazar(pg, foto, (x) => x.total === 24 && x.vivas === 24 && x.fuera === 0,
-                      T.CUENTA_321_MS + T.PRESENTAR_MS + 4000, 'presentacion');
-  console.log('   presentacion @' + c.ms + 'ms ', JSON.stringify(c.f));
-  af(c.visto, '🔴 nunca se vio la presentacion con las 24 vivas: ' + JSON.stringify(c.f));
+  // 1 · 🔴 LA PRESENTACION ES UNO POR UNO. Se caza un estado INTERMEDIO —entre
+  // 3 y 20 fichas— para probar que van APILANDOSE y no apareciendo de golpe.
+  // Si aparecieran todas juntas, este estado no existiria nunca.
+  let c = await cazar(pg, foto, (x) => x.total >= 3 && x.total <= 20,
+                      T.CUENTA_321_MS + 6 * T.SACA_UNO_MS + 4000, 'presentacion a medias');
+  console.log('   saliendo uno por uno @' + c.ms + 'ms · ' + (c.f && c.f.total) + ' fichas · '
+            + JSON.stringify((c.f || {}).quedan));
+  af(c.visto, '🔴 nunca se vio la presentacion A MEDIAS: o aparecen de golpe, o no aparecen');
+  af(c.visto && /\d+ de 24/.test((c.f || {}).quedan || ''),
+     'y el encabezado lleva la cuenta «N de 24», dijo ' + (c.f || {}).quedan);
+  // Y el reloj GANADOR EN todavia NO, porque no estan los 24.
+  af(c.visto && c.f.rgVis === false,
+     '🔴 el reloj «GANADOR EN» no puede arrancar antes de que esten los 24');
+
+  // 1b · La presentacion COMPLETA: las 24, y ahi si arranca el reloj.
+  c = await cazar(pg, foto, (x) => x.total === 24 && x.vivas === 24 && x.fuera === 0,
+                  T.CUENTA_321_MS + 24 * T.SACA_UNO_MS + 6000, 'presentacion completa');
+  console.log('   los 24 completos     @' + c.ms + 'ms ', JSON.stringify((c.f || {}).quedan),
+              '· reloj', (c.f || {}).rgN);
+  af(c.visto, '🔴 nunca se completaron las 24: ' + JSON.stringify(c.f));
+  af(c.visto && /Quedan 24/.test((c.f || {}).quedan || ''),
+     'al completarse dice «Quedan 24», dijo ' + (c.f || {}).quedan);
+  // 🔴 EL RELOJ «GANADOR EN», visible y con el numero DERIVADO.
+  const cr = await cazar(pg, foto, (x) => x.rgVis === true, 3000, 'reloj ganador');
+  af(cr.visto, '🔴 el reloj «GANADOR EN» tiene que aparecer al completarse los 24');
+  if (cr.visto) {
+    const mm = /^(\d+):(\d\d)$/.exec((cr.f.rgN || '').trim());
+    const seg = mm ? Number(mm[1]) * 60 + Number(mm[2]) : -1;
+    const esp = Math.round(TI.cuentaGanadorMs(escalones) / 1000);
+    console.log('   reloj GANADOR EN = ' + cr.f.rgN + ' (' + seg + 's) · esperado ~' + esp + 's');
+    af(Math.abs(seg - esp) <= 3,
+       '🔴 el reloj marco ' + seg + 's y el derivado dice ' + esp + 's — hay un numero tecleado');
+  }
 
   // 2 · APAGADO: las MISMAS 24 en la rejilla, 12 con el foco muerto.
   c = await cazar(pg, foto, (x) => x.total === 24 && x.fuera === 12 && x.vivas === 12,
@@ -201,7 +243,9 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs2 = []; pg.on('pageerror', (e) => errs2.push(e.message));
   await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(momentos[1] + 2500);   // ya paso el momento de la ronda 2
+  // Ya pasado el momento de la ronda 2 (que con la presentacion uno por uno
+  // cae en el segundo 39, no en el 7).
+  await pg.waitForTimeout(momentos[1] + 3000);
   f = await foto(pg);
   console.log('   t≈24s, servidor recortado ', JSON.stringify(f));
   af(f.redoble === true, '🔴 pasado el momento sin dato, el redoble tiene que estar SOSTENIDO');
@@ -242,7 +286,7 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   // Dentro de la ventana y en la fase de APAGADO de la ronda de 3.
   // Se entra JUSTO ANTES de la ronda de 3 y se caza su apagado: asi la carga
   // de la pagina cabe dentro de la ventana en vez de comersela.
-  const tDentro = momentos[3] - 800;
+  const tDentro = momentos[3] - 1200;
   ARRANQUE = Date.now() - tDentro; TOPE = Infinity;
   pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
   const errs3 = []; pg.on('pageerror', (e) => errs3.push(e.message));
@@ -253,7 +297,7 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   af(f.show && f.show.sincronizado === true, '🔴 dentro del show tiene que ir SINCRONIZADO');
   af(f.show && f.show.pintadas >= 3,
      '🔴 y ALCANZAR al instante: pintadas=' + (f.show && f.show.pintadas) + ', se esperaban >=3');
-  af(f.show && Math.abs(f.show.t - (tDentro + 1500)) < 2500,
+  af(f.show && Math.abs(f.show.t - (tDentro + 1500)) < 3000,
      'el reloj del show va pegado al del servidor, t=' + (f.show && f.show.t));
   // El apagado de la ronda de 3: se ven los SEIS de la anterior, 3 con el foco
   // muerto. Y despues el reacomodo deja solo a los tres, mas grandes.
@@ -281,8 +325,19 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   af(f.show && f.show.sincronizado === false, '🔴 fuera de la ventana NO se sincroniza: se repite');
   af(f.show && f.show.pintadas === 0,
      '🔴 y arranca DESDE LA RONDA 0: pintadas=' + (f.show && f.show.pintadas));
-  af(f.vivas === 24 && f.fuera === 0,
-     '🔴 la repeticion empieza con las 24, hubo ' + f.vivas + '/' + f.fuera);
+  // ⚠️ Antes aqui se afirmaba «empieza con las 24». Dejo de ser cierto cuando
+  // los 24 pasaron a salir UNO POR UNO: a los 3 s legitimamente hay dos o
+  // tres. Lo que importa es que arranque en la RONDA 0 y los vaya APILANDO,
+  // no que aparezcan de golpe — que es justo lo que Memo pidio quitar.
+  af(f.fuera === 0, 'en la repeticion nadie esta apagado todavia, hubo ' + f.fuera);
+  af(f.vivas >= 1 && f.vivas < 24,
+     '🔴 la repeticion tiene que estar SACANDOLOS uno por uno, no con las 24 puestas: hubo ' + f.vivas);
+  af(/\d+ de 24/.test(f.quedan || ''),
+     'y el encabezado lleva la cuenta, dijo ' + f.quedan);
+  // Y llega a las 24: la repeticion corre la presentacion COMPLETA.
+  const cD = await cazar(pg, foto, (x) => x.total === 24 && x.vivas === 24,
+                         TI.T.CUENTA_321_MS + 24 * TI.T.SACA_UNO_MS + 6000, 'repeticion completa');
+  af(cD.visto, '🔴 la repeticion no llego a las 24: ' + JSON.stringify(cD.f));
   af(f.show && f.show.tengo.filter(Boolean).length === 5,
      'y el servidor le dio TODAS las rondas de una: tengo=' + JSON.stringify(f.show && f.show.tengo));
   af(errs4.length === 0, 'errores en D: ' + JSON.stringify(errs4.slice(0, 3)));
@@ -301,12 +356,17 @@ async function cazar(pg, foto, pred, msMax, nombre) {
     const errsE = []; pg.on('pageerror', (e) => errsE.push(e.message));
     await pg.goto('http://127.0.0.1:' + p + '/sorteo.html', { waitUntil: 'load' });
     await pg.waitForTimeout(1200);
-    const m = await pg.evaluate(() => { const c = document.getElementById('como-func');
+    const m = await pg.evaluate(() => {
+      const c = document.getElementById('como-func'), mq = document.getElementById('maquina');
       return { visible: !!(c && !c.hidden && c.offsetParent !== null),
+               arriba: !!(c && mq && c.getBoundingClientRect().top < mq.getBoundingClientRect().top),
                txt: (document.getElementById('como-pasos') || {}).textContent || '',
                pasos: document.querySelectorAll('#como-pasos li').length }; });
-    console.log('   N=' + String(n).padStart(3) + ' visible=' + m.visible + ' pasos=' + m.pasos
-              + '  ' + m.txt.slice(0, 80).replace(/\s+/g, ' '));
+    console.log('   N=' + String(n).padStart(3) + ' visible=' + m.visible + ' arriba=' + m.arriba
+              + ' pasos=' + m.pasos + '  ' + m.txt.slice(0, 66).replace(/\s+/g, ' '));
+    // 🔴 ARRIBA DE LA MAQUINA, por orden de Memo: en el ensayo estaba debajo y
+    // NO LO ENCONTRO. Se mide la GEOMETRIA, no el orden del DOM.
+    if (n >= 3) af(m.arriba === true, '🔴 con N=' + n + ' el bloque tiene que estar ARRIBA de la maquina');
     af(errsE.length === 0, 'errores con N=' + n + ': ' + JSON.stringify(errsE.slice(0, 2)));
     if (n >= 3) {
       af(m.visible, '🔴 con N=' + n + ' el bloque debe verse');
@@ -314,13 +374,13 @@ async function cazar(pg, foto, pred, msMax, nombre) {
     } else {
       af(!m.visible, '🔴 con N=' + n + ' NO hay rondas: el bloque tiene que CALLARSE');
     }
-    if (n === 66) af(/24 de los 66/.test(m.txt) && /24 · 12 · 6 · 3 · 1/.test(m.txt),
-                     'con 66: «24 de los 66» y la escalera completa');
-    if (n === 23) af(/12 de los 23/.test(m.txt) && !/24/.test(m.txt),
+    if (n === 66) af(/De los 66 registrados/.test(m.txt) && /24 → 12 → 6 → 3 → 1/.test(m.txt),
+                     'con 66: «De los 66 registrados» y la escalera completa. Dijo: ' + m.txt.slice(0, 90));
+    if (n === 23) af(/De los 23 registrados/.test(m.txt) && !/24/.test(m.txt),
                      '🔴 con 23 NO puede mencionar los 24. Dijo: ' + m.txt.slice(0, 110));
-    if (n === 11) af(/6 de los 11/.test(m.txt) && !/\b12\b/.test(m.txt),
+    if (n === 11) af(/De los 11 registrados/.test(m.txt) && !/\b12\b/.test(m.txt),
                      '🔴 con 11 no puede mencionar 12. Dijo: ' + m.txt.slice(0, 110));
-    if (n === 5)  af(/3 de los 5/.test(m.txt) && /3 · 1/.test(m.txt), 'con 5 dice 3 · 1');
+    if (n === 5)  af(/De los 5 registrados/.test(m.txt) && /3 → 1/.test(m.txt), 'con 5 dice 3 → 1');
     await pg.close();
   }
   SIN_GIRO = false;
@@ -470,6 +530,56 @@ async function cazar(pg, foto, pred, msMax, nombre) {
      '🔴 apagado el ensayo, el modo NO puede seguir viajando');
   af(errsG.length === 0, 'errores en G: ' + JSON.stringify(errsG.slice(0, 3)));
   await pg.close();
+
+  // ── H · «COMO FUNCIONA» TAMBIEN EN /giveaway, CON LA MISMA COPY ────────
+  // Orden de Memo: quien se esta inscribiendo tiene derecho a saber la
+  // mecanica ANTES de dar sus datos. Y la copy sale de sorteo-tiempos.js, no
+  // copiada en los dos HTML: el dia que la mecanica cambie, una copia se queda
+  // vieja y nadie se entera.
+  console.log('\n── H · «Como funciona» en /giveaway ──');
+  SIN_GIRO = true;
+  for (const [n, caer] of [[73, false], [23, false], [2, false], [73, true]]) {
+    N = n; CAER = caer;
+    pg = await nav.newPage({ viewport: { width: 390, height: 900 } });
+    const errsH = []; pg.on('pageerror', (e) => errsH.push(e.message));
+    await pg.goto('http://127.0.0.1:' + p + '/giveaway.html', { waitUntil: 'load' });
+    await pg.waitForTimeout(1800);
+    const m = await pg.evaluate(() => {
+      const c = document.getElementById('como-func');
+      const cu = document.querySelector('.cuerpo');
+      return { tiempos: !!window.SORTEO_TIEMPOS,
+               visible: !!(c && !c.hidden && c.offsetParent !== null),
+               pasos: document.querySelectorAll('#como-pasos li').length,
+               txt: (document.getElementById('como-pasos') || {}).textContent || '',
+               arriba: !!(c && cu && c.getBoundingClientRect().top < cu.getBoundingClientRect().bottom),
+               desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    console.log('   N=' + String(n).padStart(3) + (caer ? ' (estado CAIDO)' : '              ')
+      + ' visible=' + m.visible + ' pasos=' + m.pasos + '  ' + m.txt.slice(0, 58).replace(/\s+/g, ' '));
+    af(m.tiempos, 'sorteo-tiempos.js carga en /giveaway (N=' + n + ')');
+    af(errsH.length === 0, 'errores en /giveaway con N=' + n + ': ' + JSON.stringify(errsH.slice(0, 2)));
+    af(m.desborde === 0, 'sin desborde horizontal a 390px en /giveaway (N=' + n + ')');
+    if (caer) {
+      // 🔒 Si no se puede leer el total, el bloque se CALLA. Prometer una
+      // mecanica con un numero inventado es peor que no prometerla.
+      af(!m.visible, '🔴 con el estado caido el bloque tiene que CALLARSE, no inventar el N');
+    } else if (n >= 3) {
+      af(m.visible, '🔴 con N=' + n + ' el bloque tiene que verse en /giveaway');
+      af(m.pasos === 4, 'cuatro renglones, hubo ' + m.pasos);
+      af(new RegExp('De los ' + n + ' registrados').test(m.txt),
+         'trae el N VIVO (' + n + '), dijo: ' + m.txt.slice(0, 70));
+      // 🔒 LA MISMA COPY, careada contra la funcion compartida caracter por
+      // caracter: es la unica forma de que «una sola definicion» sea un hecho.
+      const esp = TI.textoComoFunciona(n).map((t) => t.replace(/<\/?b>/g, '')).join('');
+      af(m.txt.replace(/\s+/g, ' ').trim() === esp.replace(/\s+/g, ' ').trim(),
+         '🔴 la copy de /giveaway NO es la de sorteo-tiempos.js');
+      if (n === 23) af(!/24/.test(m.txt), '🔴 con 23 no puede mencionar los 24');
+    } else {
+      af(!m.visible, '🔴 con N=' + n + ' no hay rondas: el bloque se calla');
+    }
+    await pg.close();
+  }
+  SIN_GIRO = false; CAER = false;
 
   await nav.close(); srv.close();
   console.log('\n' + (mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' en verde, ' + mal + ' en rojo');

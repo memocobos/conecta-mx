@@ -135,6 +135,26 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 /* El golpe al frenar: un tirón corto, no un rebote de juguete. */
 @keyframes golpe{0%{transform:translateY(0)}35%{transform:translateY(5px)}100%{transform:translateY(0)}}
 .rod.golpe{animation:golpe .17s ease-out}
+/* ═══ EL RELOJ «GANADOR EN» ═════════════════════════════════════════════
+   [SORTEO-RONDAS-1] Orden de Memo tras el ensayo. Va DENTRO del mueble, sobre
+   el mosaico, como el display de una máquina: dígitos grandes, condensados,
+   sobre negro hundido. El número lo deriva `pintarRelojGanador()` —tecleado se
+   quedaría viejo el día que cualquier fase se mueva. */
+.reloj-ganador{margin-top:12px;background:#000;border-radius:10px;
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:inset 0 3px 14px rgba(0,0,0,.9);
+  padding:9px 12px;display:flex;align-items:center;justify-content:center;gap:12px}
+.reloj-ganador[hidden]{display:none}
+.rg-l{font-family:var(--font-display);font-size:11px;font-weight:900;
+  letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.46)}
+.rg-n{font-family:var(--font-display);font-weight:900;
+  font-size:clamp(26px,7.5vw,40px);line-height:1;color:var(--c-amarillo);
+  font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.reloj-ganador.urge .rg-n{color:#ff283b;animation:rgLate .7s ease-in-out infinite}
+.reloj-ganador.urge .rg-l{color:rgba(255,40,59,.7)}
+@keyframes rgLate{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion: reduce){ .reloj-ganador.urge .rg-n{animation:none} }
+
 /* ═══ EL MOSAICO DE LA ESCALERA ═════════════════════════════════════════
    [SORTEO-RONDAS-1] Vive DENTRO del mueble, en un segundo pozo hundido —el
    mismo negro con sombra interior que `.rodillos`— y no como una rejilla de
@@ -227,6 +247,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .mos{animation:mosCae .42s cubic-bezier(.16,1,.3,1) backwards;
   animation-delay:calc(var(--n,0) * var(--paso,40ms))}
 @keyframes mosCae{from{opacity:0;transform:translateY(-9px)}to{opacity:1;transform:none}}
+/* La ficha que acaba de SALIR de la tragamonedas cae desde arriba con un
+   golpe: es la que el rodillo soltó, y tiene que leerse como una sola. */
+.mos.entra{animation:mosSuelta .34s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes mosSuelta{
+  0%{opacity:0;transform:translateY(-28px) scale(.86)}
+  60%{opacity:1;transform:translateY(2px) scale(1.04)}
+  100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){ .mos.entra{animation:none} }
 
 /* El redoble SOSTENIDO: la máquina vibra y el encabezado late, para que
    esperar un dato no se vea como algo roto. */
@@ -643,6 +671,20 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <div style="text-align:center"><span class="vivo"><span class="punto"></span> Sorteo en vivo</span></div>
 
   <div class="centro">
+  <!-- [SORTEO-RONDAS-1] ⬆️ VA ARRIBA DE LA MÁQUINA, por orden de Memo: en el
+       ensayo estaba debajo y NO LO ENCONTRÓ. Un bloque que hay que buscar no
+       cumple la base 8, que promete que la mecánica «se publica en la página
+       del sorteo antes del giro».
+       🔒 VACÍO A PROPÓSITO: lo escribe `pintarComoFunciona()`
+       desde `escalonesPara(total)`. Tecleado, con 11 participantes diría «24» y
+       no habría ronda de 24 — es la forma de `flash_promo` y de las tres
+       fechas: letrero vivo = código vivo. La BASE 8 promete este bloque. -->
+  <div class="como-func" id="como-func" hidden>
+    <h3>Cómo funciona el sorteo</h3>
+    <ol id="como-pasos"></ol>
+  </div>
+
+
   <!-- El marcador de participantes: dígitos sueltos, como un display. Lo
        llena contarHasta() con conteo animado, no de un jalón. -->
   <div class="marcador" id="marcador" aria-live="polite"><span>—</span></div>
@@ -707,6 +749,15 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
          🔒 Va aquí, DENTRO de `.maquina`, en el hueco que quedaba entre los
          rodillos y la placa del ganador — que es justo el espacio grande que
          Memo pidió usar. -->
+    <!-- [SORTEO-RONDAS-1] 🔒 VACÍO A PROPÓSITO: lo escribe
+         `pintarRelojGanador()` desde `revelacionVisibleMs`. Un «0:45» tecleado
+         se queda viejo el día que cualquier fase se mueva — y ya se movieron
+         tres veces. -->
+    <div class="reloj-ganador" id="reloj-ganador" hidden>
+      <span class="rg-l">Ganador en</span>
+      <span class="rg-n" id="rg-n">—</span>
+    </div>
+
     <div class="mosaico-caja" id="mosaico-caja" hidden>
       <div class="mos-cab">
         <span class="mos-quedan" id="mos-quedan">—</span>
@@ -727,15 +778,6 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <div class="espera" id="espera">
     Todavía no se gira.<br>El sorteo es <b id="espera-cuando"></b>.<br>
     Deja esta página abierta: se actualiza sola.
-  </div>
-
-  <!-- [SORTEO-RONDAS-1] 🔒 VACÍO A PROPÓSITO: lo escribe `pintarComoFunciona()`
-       desde `escalonesPara(total)`. Tecleado, con 11 participantes diría «24» y
-       no habría ronda de 24 — es la forma de `flash_promo` y de las tres
-       fechas: letrero vivo = código vivo. La BASE 8 promete este bloque. -->
-  <div class="como-func" id="como-func" hidden>
-    <h3>Cómo funciona el sorteo</h3>
-    <ol id="como-pasos"></ol>
   </div>
 
   <div class="panel" id="panel">
@@ -1334,29 +1376,18 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // 24 que no va a existir — y con menos de 3 prometerían rondas donde hay un
   // giro directo. Un bloque que explica una mecánica que no va a ocurrir es
   // peor que no tenerlo.
-  function mmss(ms){
-    var s = Math.round(ms / 1000);
-    return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
-  }
   function pintarComoFunciona(total){
     var caja = $('como-func');
     if (!caja || !TIEMPOS) return;
     // Con un giro ya en pantalla el bloque sobra: la mecánica se está viendo.
     if (estado && estado.ultimo){ caja.hidden = true; return; }
-    var esc = TIEMPOS.escalonesPara(total);
-    // Con menos de 3 no hay rondas: giro directo, y explicar rondas sería
-    // prometer algo que no pasa.
-    if (esc.length < 2){ caja.hidden = true; return; }
+    // 🔒 EL TEXTO SALE DE `sorteo-tiempos.js`, no de aquí: lo piden ESTA página
+    // y /giveaway, y copiado en los dos HTML el día que la mecánica cambie uno
+    // se queda viejo y nadie se entera.
+    var lineas = TIEMPOS.textoComoFunciona(total);
+    if (!lineas.length){ caja.hidden = true; return; }   // menos de 3: no hay rondas
     caja.hidden = false;
-    var finalistas = esc[esc.length - 2];
-    $('como-pasos').innerHTML = [
-      'El servidor sortea al azar <b>' + esc[0] + '</b> de los <b>' + total
-        + '</b> registrados y los pone en pantalla.',
-      'Cada ronda se apaga la mitad: <b>' + esc.join(' · ') + '</b>.',
-      'Los <b>' + finalistas + '</b> finalistas pasan a la tragamonedas, que gira una última vez.',
-      'Las <b>' + esc.length + ' rondas se sortean completas ANTES de empezar</b>, en el servidor. '
-        + 'El show dura unos <b>' + mmss(TIEMPOS.duracionTotal(esc)) + '</b>.',
-    ].map(function(t){ return '<li>' + t + '</li>'; }).join('');
+    $('como-pasos').innerHTML = lineas.map(function(t){ return '<li>' + t + '</li>'; }).join('');
   }
 
   // ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════
@@ -1490,7 +1521,11 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     ] };
   }
 
-  function girarUno(idx, fuente, ganador, esFolio, alFrenar){
+  // `msForzado` existe para la PRESENTACIÓN: sacar a 24 personas con los
+  // perfiles del giro final (15 s cada uno) serían seis minutos. El perfil de
+  // la presentación es corto y sin frenados falsos: es un tirón, no un
+  // suspenso.
+  function girarUno(idx, fuente, ganador, esFolio, alFrenar, msForzado){
     var el = $('rod-' + idx), tira = $('tira-' + idx);
     el.classList.remove('frenado');
     var t = tiraDe(fuente, ganador, esFolio);
@@ -1503,6 +1538,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     // ajuste que traía el carrusel viejo y que se me fue al reescribirlo.
     var centro = (el.clientHeight / 2) - (alto / 2);
     var pf = perfil(idx, t.idx + 1);
+    if (msForzado) pf = { ms: msForzado, pts: [{t:0,p:0},{t:.14,p:.04},{t:.7,p:.86},{t:1,p:1}] };
 
     if (reducido){
       // Sin movimiento: el rodillo aparece ya frenado, respetando el ORDEN
@@ -1528,7 +1564,16 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         el.classList.add('golpe');
         setTimeout(function(){ el.classList.remove('golpe'); }, 200);
         son.golpe();
-        if (navigator.vibrate) { try { navigator.vibrate(idx === 2 ? [60, 40, 90] : 45); } catch (e) {} }
+        // 🔴 EN LA PRESENTACIÓN NO SE VIBRA. `girarUno` corre 3 veces por
+        // persona, así que sacar a los 24 serían SETENTA Y DOS vibraciones en
+        // 36 segundos: un teléfono que no para de zumbar. El careo no puede
+        // sentir eso —solo vio la advertencia de Chrome en la consola—, así que
+        // queda dicho aquí.
+        // La vibración se guarda para lo que sí es un momento: las
+        // eliminaciones y la revelación del ganador.
+        if (!msForzado && navigator.vibrate) {
+          try { navigator.vibrate(idx === 2 ? [60, 40, 90] : 45); } catch (e) {}
+        }
         alFrenar();
       }
     }
@@ -1678,6 +1723,132 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
 
   var COLS = { 24: 4, 12: 4, 6: 3, 3: 3, 1: 1 };
+
+  // ═══ [SORTEO-RONDAS-1] LOS 24 LOS SACA LA TRAGAMONEDAS, UNO POR UNO ═════
+  //
+  // Orden de Memo tras ver el ensayo: aparecer de golpe no se sentía a sorteo.
+  // Ahora los rodillos giran y frenan 24 veces y cada uno que sale CAE a su
+  // tarjeta del mosaico.
+  //
+  // ⚠️ De lo público solo se conoce `corto` («Ana M.»), así que el rodillo del
+  // apellido gira con INICIALES, no con apellidos completos: es exactamente lo
+  // que el público puede ver de un finalista, y hacerlo girar con apellidos
+  // enteros para frenar en una letra se vería roto.
+  function partirCorto(corto){
+    var t = String(corto || '').trim();
+    var i = t.lastIndexOf(' ');
+    if (i < 0) return { nom: t, ini: '' };
+    var cola = t.slice(i + 1);
+    // «Ana M.» → la cola ES la inicial. Si no lo parece, es un nombre de varias
+    // palabras sin apellido y se deja entero.
+    if (/^[A-ZÁÉÍÓÚÑ]\.$/.test(cola)) return { nom: t.slice(0, i), ini: cola };
+    return { nom: t, ini: '' };
+  }
+
+  function inicialesDe(apellidos){
+    var vistas = {}, out = [];
+    (apellidos || []).forEach(function(a){
+      var c = String(a || '').charAt(0).toUpperCase();
+      if (c && !vistas[c]) { vistas[c] = 1; out.push(c + '.'); }
+    });
+    return out.length ? out.sort() : ['·'];
+  }
+
+  function sacarUno(m, alTerminar){
+    var r = (estado && estado.rodillos) || {};
+    var p = partirCorto(m.corto);
+    var folios = [];
+    var nF = Number(r.folios) || 0;
+    for (var i = 1; i <= Math.min(nF, 60); i++) folios.push('#' + i);
+    if (!folios.length) folios = ['#—'];
+    // El tirón ocupa el 72 % de su hueco; el resto es la tarjeta cayendo.
+    var ms = Math.max(240, Math.round(TIEMPOS.T.SACA_UNO_MS * 0.72));
+    var frenados = 0;
+    function uno(){ if (++frenados === 3) alTerminar(); }
+    $('maquina').classList.add('girando');
+    girarUno(0, r.nombres, p.nom || '—', false, uno, ms);
+    girarUno(1, inicialesDe(r.apellidos), p.ini || '·', false, uno, ms);
+    girarUno(2, folios, '#' + m.folio, true, uno, ms);
+  }
+
+  // Una ficha, al mosaico. No repinta la rejilla: APILA.
+  function agregarAlMosaico(m, idx, tam){
+    var caja = $('mosaico-caja'), rej = $('mosaico');
+    if (!caja || !rej || !SHOW) return;
+    caja.hidden = false;
+    rej.style.setProperty('--cols', COLS[tam] || 4);
+    rej.style.setProperty('--paso', '0ms');   // entra UNA: no hay qué escalonar
+    var viva = Math.min(1, 0.18 + (1 - tam / (SHOW.escalones[0] || 24)) * 0.9);
+    var div = document.createElement('div');
+    div.className = 'mos vive entra';
+    div.setAttribute('data-folio', String(m.folio));
+    div.style.setProperty('--viva', viva.toFixed(2));
+    div.innerHTML = '<div class="mos-folio">#' + esc(String(m.folio)) + '</div>'
+      + '<div class="mos-foto">'
+      +   (m.foto ? '<img alt="" src="' + esc(m.foto) + '" data-folio="' + esc(String(m.folio)) + '">'
+                  : '<div class="mos-ini">' + esc(m.ini || '·') + '</div>')
+      + '</div>'
+      + '<div class="mos-nom">' + esc(m.corto || '') + '</div>';
+    rej.appendChild(div);
+    $('mos-quedan').textContent = (idx + 1) + ' de ' + tam;
+    $('mos-de').textContent = (estado && estado.ultimo)
+      ? (tam + ' de ' + (estado.ultimo.de_cuantos || 0) + ' · al azar') : '';
+    if (idx + 1 >= tam) $('mos-quedan').textContent = 'Quedan ' + tam;
+  }
+
+  // La presentación completa, ANCLADA AL RELOJ: la persona `i` sale en
+  // `CUENTA_321 + i * SACA_UNO`. Si su momento ya pasó —el que llega tarde y
+  // se sincroniza— se coloca sin animar y se sigue, para alcanzar al instante.
+  function presentarUnoPorUno(ronda, alTerminar){
+    var T = TIEMPOS.T;
+    var caja = $('mosaico-caja'), rej = $('mosaico');
+    if (caja) caja.hidden = false;
+    if (rej) rej.innerHTML = '';
+    (function siguiente(i){
+      if (!SHOW || i >= ronda.miembros.length){
+        $('maquina').classList.remove('girando');
+        alTerminar();
+        return;
+      }
+      var m = ronda.miembros[i];
+      var cuando = T.CUENTA_321_MS + i * T.SACA_UNO_MS;
+      var falta = (SHOW.t0 + cuando) - ahora();
+      if (falta <= 0 || reducido){
+        agregarAlMosaico(m, i, ronda.tam);
+        siguiente(i + 1);
+        return;
+      }
+      setTimeout(function(){
+        if (!SHOW) return;
+        sacarUno(m, function(){
+          agregarAlMosaico(m, i, ronda.tam);
+          siguiente(i + 1);
+        });
+      }, falta);
+    })(0);
+  }
+
+  // ═══ EL RELOJ «GANADOR EN» ══════════════════════════════════════════════
+  // 🔒 DERIVADO de los tiempos, no tecleado: arranca cuando los 24 ya están
+  // (`momentos[1]`) y cuenta hasta que la PLACA se enciende —no hasta que
+  // empieza el último giro—, que es cuando de verdad se ve la cara.
+  function pintarRelojGanador(){
+    var el = $('reloj-ganador');
+    if (!el) return;
+    if (!SHOW || !TIEMPOS || SHOW.escalones.length < 2){ el.hidden = true; return; }
+    var t = ahora() - SHOW.t0;
+    var fin = TIEMPOS.revelacionVisibleMs(SHOW.escalones);
+    // 🔒 Arranca al FIN DE LA PRESENTACIÓN, no en `momentos[1]`: con la
+    // escalera corta [3,1] el escalón 1 es el último y su momento ya lleva el
+    // suspenso, así que el reloj habría arrancado 6 s tarde.
+    if (t < TIEMPOS.finPresentacionMs(SHOW.escalones) || t > fin + 800){ el.hidden = true; return; }
+    el.hidden = false;
+    var falta = Math.max(0, fin - t);
+    var sg = Math.ceil(falta / 1000);
+    $('rg-n').textContent = Math.floor(sg / 60) + ':' + (sg % 60 < 10 ? '0' : '') + (sg % 60);
+    el.classList.toggle('urge', falta <= 10000);
+  }
+  setInterval(pintarRelojGanador, 250);
   function pintarMosaico(ronda, fuera){
     var caja = $('mosaico-caja'), rej = $('mosaico');
     if (!caja || !rej || !SHOW) return;
@@ -1806,9 +1977,11 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     var finDeEsta = ultima ? null : SHOW.momentos[k + 1];
 
     if (k === 0){
-      pintarMosaico(ronda, []);
+      // 🔴 NO se pinta de golpe: los saca la tragamonedas uno por uno, y la
+      // presentación acaba EXACTAMENTE en `momentos[1]` porque su duración es
+      // `escalones[0] * SACA_UNO_MS` (ver `presentarMs`).
       son.arranque();
-      enElMomento(finDeEsta, alTerminar);
+      presentarUnoPorUno(ronda, function(){ enElMomento(finDeEsta, alTerminar); });
       return;
     }
     if (!ultima){

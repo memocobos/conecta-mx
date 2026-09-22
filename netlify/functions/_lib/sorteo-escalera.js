@@ -58,11 +58,47 @@ function construirEscalera(elegibles, escalones, azar) {
   const lista = Array.isArray(elegibles) ? elegibles : [];
   const esc = Array.isArray(escalones) ? escalones : [];
   if (!lista.length || !esc.length) return null;
-  const revuelto = revolver(lista, azar);
+  const f = azar || alAzar;
+  const revuelto = revolver(lista, f);
   const orden = revuelto.slice(0, esc[0]).map((r) => ({
     id: r.id, nombre: r.nombre, folio: r.folio,
   }));
-  return { v: 1, escalones: esc, orden };
+  return { v: 1, escalones: esc, orden, primero: primeroEnMorir(orden, esc, f) };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔴 QUIÉN SE APAGA PRIMERO EN EL FINAL — UN BIT DE AZAR PROPIO, GUARDADO
+//
+// De los 3 finalistas se apaga UNO y quedan 2 con la cuenta. Elegir a ése
+// «por folio más alto» —como se hacía— parecía imparcial (los dos pierden
+// igual) y era una FUGA peor que la que venía a tapar: el que muere primero
+// resulta ser una FUNCIÓN DE LA POSICIÓN DEL GANADOR, porque el mosaico va
+// ordenado por folio. Medido sobre 2 000 corridas:
+//
+//     posición 0 → muere primero   0 de 2 000   ( 0.0 %)
+//     posición 1 →               705 de 2 000   (35.3 %)
+//     posición 2 →              1295 de 2 000   (64.8 %)
+//
+// O sea: la tarjeta de la IZQUIERDA nunca se apaga en ese momento —lo que se
+// ve igual en cada ensayo—, y peor: si se apaga la del MEDIO, el ganador es
+// la de la derecha con CERTEZA, cinco segundos antes de la revelación.
+//
+// Se arregla con un bit de azar que no depende del ganador: cuál de los DOS
+// perdedores cae primero, sorteado con el mismo `crypto` y GUARDADO en la
+// escalera. Guardado —y no calculado al vuelo en cada respuesta— porque dos
+// personas mirando en dos teléfonos tienen que ver apagarse la MISMA tarjeta.
+//
+// Así P(cada posición muera primero) = 2/3 · 1/2 = 1/3, y ver quién cae deja
+// a los otros dos en 50/50: es la MÍNIMA información que se puede dar, porque
+// apagar a alguien es decir que ése perdió.
+function primeroEnMorir(orden, esc, azar) {
+  const f = azar || alAzar;
+  if (!Array.isArray(orden) || !Array.isArray(esc) || esc.length < 2) return null;
+  const finalistas = orden.slice(0, esc[esc.length - 2]);
+  const ganadorId = String((orden[0] || {}).id);
+  const perdedores = finalistas.filter((r) => String(r.id) !== ganadorId);
+  if (!perdedores.length) return null;
+  return String(perdedores[f(perdedores.length)].id);
 }
 
 // ── EL POZO DE UN RE-GIRO ──────────────────────────────────────────────────
@@ -195,6 +231,10 @@ function proyectarRondas(o) {
   const margen = Number((o && o.margenMs) || 0);
   const t = Number((o && o.transcurridoMs) || 0);
   const fotoDeId = (o && o.fotoDeId) || function () { return null; };
+  // La ciudad la inyecta el llamador, igual que la foto: aquí no hay IO. Es
+  // dato PÚBLICO por decisión de Memo (de ella depende el premio), y va en la
+  // ficha para que el mosaico diga «Karla M. · Guadalajara».
+  const ciudadDeId = (o && o.ciudadDeId) || function () { return null; };
 
   const libera = (k) => Math.max(0, (mm[k] || 0) - margen);
 
@@ -216,6 +256,7 @@ function proyectarRondas(o) {
         // Se re-declara en CADA ronda —con null explícito— para que un
         // «invalidar» posterior llegue a quien ya está mirando.
         foto: fotoDeId(r.id) || null,
+        ciudad: ciudadDeId(r.id) || null,
       }));
     out.push({ i: k, tam: esc[k], miembros });
   }
@@ -251,9 +292,16 @@ function proyectarRondas(o) {
     if (t >= liberaDos) {
       const tres = orden.slice(0, esc[esc.length - 2]);       // los 3 finalistas
       const ganadorId = String((orden[0] || {}).id);
-      const perdedores = tres.filter((r) => String(r.id) !== ganadorId)
-        .sort((a, b) => (Number(b.folio) || 0) - (Number(a.folio) || 0));
-      const muere = perdedores[0];                            // el de folio MÁS ALTO
+      const perdedores = tres.filter((r) => String(r.id) !== ganadorId);
+      // 🔒 DEL BIT GUARDADO, no del folio. Ver `primeroEnMorir`: por folio la
+      // posición del que caía era una función del ganador (la izquierda NUNCA
+      // caía, y la del medio lo delataba). `primero` es un sorteo aparte.
+      //
+      // ⚠️ El respaldo por folio se queda SOLO para las escaleras guardadas
+      // antes de que `primero` existiera —las del ensayo— para que un show a
+      // medias no se quede sin su clímax. No es el camino.
+      const muere = perdedores.find((r) => String(r.id) === String(rondas.primero))
+        || perdedores.slice().sort((a, b) => (Number(b.folio) || 0) - (Number(a.folio) || 0))[0];
       if (muere) {
         dos = tres.filter((r) => String(r.id) !== String(muere.id))
           .sort((a, b) => (Number(a.folio) || 0) - (Number(b.folio) || 0))
@@ -292,7 +340,7 @@ function resultadoPublico(resultado, ganadorLiberado) {
 }
 
 module.exports = {
-  alAzar, revolver, construirEscalera, pozoDeReGiro, folios,
+  alAzar, revolver, construirEscalera, primeroEnMorir, pozoDeReGiro, folios,
   PARTICULAS, partirNombre, nombreCorto, iniciales,
   proyectarRondas, resultadoPublico,
 };

@@ -109,8 +109,12 @@ exports.handler = async (event) => {
       // El orden de registro define el FOLIO (el 1º en inscribirse es el #1),
       // y se necesita el orden aunque no se pidan nombres para poder ubicar al
       // ganador.
+      // [SORTEO-CIUDAD-1] `ciudad` entra a la whitelist: va en cada ficha del
+      // mosaico («Karla M. · Guadalajara») y de ella se DERIVA el premio del
+      // ganador. Es público por decisión de Memo. `whatsapp`, `correo` e
+      // `instagram` siguen fuera.
       fetch(`${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${slugQ}`
-        + `&select=id${quiereRodillos ? ',nombre' : ''}&order=creado_at.asc`,
+        + `&select=id,ciudad${quiereRodillos ? ',nombre' : ''}&order=creado_at.asc`,
         { headers: G.sbHeaders() }),
       fetch(`${G.SB_URL}/rest/v1/giveaway_sorteos?slug=eq.${slugQ}&select=${COLS_PUBLICAS}&order=intento.asc`,
         { headers: G.sbHeaders() }),
@@ -130,6 +134,8 @@ exports.handler = async (event) => {
   // en la escalera. Contados distinto, el número del mosaico y el del tercer
   // rodillo dirían cosas diferentes en cámara.
   const folioPorId = ESC.folios(filas);
+  const ciudadPorId = {};
+  filas.forEach((r) => { if (r && r.id) ciudadPorId[String(r.id)] = r.ciudad || null; });
 
   // ── Las fotos de los finalistas, firmadas y EN LOTE ─────────────────────
   // 🔒 SOLO de los miembros de las rondas YA LIBERADAS, solo si se piden, y
@@ -202,6 +208,7 @@ exports.handler = async (event) => {
       // del MISMO archivo que la pantalla, así que no hay un segundo calendario
       // que se pueda desincronizar.
       momentoDosMs: TI.momentoDosMs(escalones),
+      ciudadDeId: (id) => ciudadPorId[String(id)] || null,
     });
     // Sin ?fotos=1 la clave se OMITE (no se pone en null): así la página
     // distingue «no me lo dijeron» de «no tiene foto aprobada», y conserva la
@@ -228,6 +235,11 @@ exports.handler = async (event) => {
       // El folio del ganador, para que el tercer rodillo frene en un número de
       // verdad y no en uno decorativo.
       folio: ver ? (folioPorId[String(s.registro_id)] || null) : null,
+      // 🔒 EL PREMIO SE DERIVA DE `_lib`, no se teclea: es `premioPorCiudad` +
+      // `PREMIOS`, las MISMAS que usa `estado_admin` y las que cobran en el
+      // correo. Y viaja GATEADO como el nombre — antes de la revelación el
+      // premio diría de qué ciudad es quien va ganando.
+      premio: ver ? (G.PREMIOS[G.premioPorCiudad(ciudadPorId[String(s.registro_id)])] || null) : null,
       total_participantes: s.total_participantes,
       creado_at: s.creado_at,
     };

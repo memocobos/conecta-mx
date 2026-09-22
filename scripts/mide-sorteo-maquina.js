@@ -27,9 +27,19 @@ const { chromium } = require('playwright');
 const RAIZ = path.join(__dirname, '..');
 const TI = require(RAIZ + '/sorteo-tiempos.js');
 const ESC = require(RAIZ + '/netlify/functions/_lib/sorteo-escalera.js');
+// El premio del ganador NO se teclea aquí: sale de `_lib`, como en producción.
+// (Las llaves son de mentira; el lib solo las lee al arrancar.)
+process.env.PORTAL_SUPABASE_URL = process.env.PORTAL_SUPABASE_URL || 'https://careo.sb';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || 'k';
+const G = require(RAIZ + '/netlify/functions/_lib/giveaway.js');
 
+// Ciudades REALES del padrón, con la más larga dentro a propósito: «San
+// Nicolás de los Garza» es el caso que tiene que caber a 390px sin recortarse.
+const CIUDADES = ['Reynosa', 'Monterrey', 'San Nicolás de los Garza', 'Río Bravo', 'Guadalajara'];
 const padron = [];
-for (let i = 1; i <= 66; i++) padron.push({ id: 'r' + i, nombre: 'Nombre' + i + ' Apellido' + i, folio: i });
+for (let i = 1; i <= 66; i++) padron.push({ id: 'r' + i, nombre: 'Nombre' + i + ' Apellido' + i, folio: i,
+                                            ciudad: CIUDADES[i % CIUDADES.length] });
+const ciudadDe = (id) => (padron.find((x) => x.id === id) || {}).ciudad || null;
 const escalones = TI.escalonesPara(66);
 const rondas = ESC.construirEscalera(padron, escalones);
 const momentos = TI.momentos(escalones);
@@ -53,7 +63,8 @@ function estado() {
   }
   const t = Date.now() - ARRANQUE;
   const proy = ESC.proyectarRondas({ rondas, momentos, margenMs: TI.T.MARGEN_ADELANTO_MS,
-    transcurridoMs: t, momentoDosMs: TI.momentoDosMs(escalones), fotoDeId: () => null });
+    transcurridoMs: t, momentoDosMs: TI.momentoDosMs(escalones), fotoDeId: () => null,
+    ciudadDeId: ciudadDe });
   // 🔒 EL CORTE SIMULA UN LATIDO QUE NO TRAE LA RONDA: el servidor deja de
   // publicar de la ronda `TOPE` en adelante, como si su respuesta se cayera.
   const recortadas = proy.rondas.filter((r) => r.i < TOPE);
@@ -62,6 +73,8 @@ function estado() {
     sorteo: '2026-10-01T21:00:00-05:00', modo: 'real',
     ultimo: { id: 'g1', intento: 1, resultado: RES,
       nombre: rev ? rondas.orden[0].nombre : null, folio: rev ? rondas.orden[0].folio : null,
+      // Gateado igual que el nombre, y DERIVADO: `premioPorCiudad` + `PREMIOS`.
+      premio: rev ? G.PREMIOS[G.premioPorCiudad(ciudadDe(rondas.orden[0].id))] : null,
       total_participantes: 66, creado_at: new Date(ARRANQUE).toISOString(), de_cuantos: 66,
       escalones, escalon: null, es_regiro: false,
       rondas: recortadas, rondas_totales: proy.rondas_totales,
@@ -198,6 +211,46 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   af(c.visto, '🔴 nunca se completaron las 24: ' + JSON.stringify(c.f));
   af(c.visto && /Quedan 24/.test((c.f || {}).quedan || ''),
      'al completarse dice «Quedan 24», dijo ' + (c.f || {}).quedan);
+  // 1c · 🔴 LA CIUDAD EN CADA FICHA, Y QUE QUEPA A 390px SIN RECORTARSE.
+  // Orden de Memo: nombre corto Y ciudad. La ciudad sale de
+  // `giveaway_registros.ciudad` y viaja en la proyeccion publica (de ella
+  // depende el premio, asi que no es dato privado).
+  //
+  // 🔒 No se mide «existe el div»: se mide que el TEXTO no este cortado
+  // (scrollHeight/scrollWidth contra el cliente) y que la pagina no desborde a
+  // lo ancho. La ciudad mas larga del padron de prueba —«San Nicolas de los
+  // Garza»— esta ahi para eso: envuelve en dos renglones, no se trunca.
+  const ciu = await pg.evaluate(() => {
+    const fichas = [].slice.call(document.querySelectorAll('#mosaico .mos'));
+    const ces = fichas.map((f) => f.querySelector('.mos-ciu'));
+    const conTexto = ces.filter((e) => e && e.textContent.trim().length);
+    const cortadas = conTexto.filter((e) =>
+      e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1);
+    const vis = conTexto.filter((e) => {
+      const cs = getComputedStyle(e);
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > .05;
+    });
+    return { fichas: fichas.length, con: conTexto.length, vis: vis.length,
+             cortadas: cortadas.map((e) => e.textContent.trim()),
+             textos: [...new Set(conTexto.map((e) => e.textContent.trim()))],
+             anchoDoc: document.documentElement.scrollWidth, anchoVista: innerWidth,
+             fuente: conTexto.length ? getComputedStyle(conTexto[0]).fontSize : null };
+  });
+  console.log('   ciudad en las fichas: ' + ciu.con + '/' + ciu.fichas + ' · ' + ciu.fuente
+            + ' · ' + JSON.stringify(ciu.textos.slice(0, 3)));
+  af(ciu.fichas > 0 && ciu.con === ciu.fichas,
+     '🔴 hay fichas SIN ciudad: ' + ciu.con + ' de ' + ciu.fichas);
+  af(ciu.vis === ciu.con, '🔴 alguna ciudad no se VE: ' + ciu.vis + ' de ' + ciu.con);
+  af(ciu.cortadas.length === 0,
+     '🔴 a 390px se RECORTA la ciudad de ' + ciu.cortadas.length + ' fichas: '
+     + JSON.stringify(ciu.cortadas.slice(0, 3)));
+  // 🔒 CANDADO DE CARDINALIDAD: sin la ciudad larga dentro, un verde aqui no
+  // dice nada — seria medir «Reynosa» 24 veces.
+  af(ciu.textos.some((x) => x.length >= 20),
+     '🔒 el padron de prueba tiene que traer una ciudad LARGA: ' + JSON.stringify(ciu.textos));
+  af(ciu.anchoDoc <= ciu.anchoVista + 1,
+     '🔴 la pagina desborda a lo ancho con la ciudad: ' + ciu.anchoDoc + ' > ' + ciu.anchoVista);
+
   // 🔴 EL RELOJ «GANADOR EN», visible y con el numero DERIVADO.
   const cr = await cazar(pg, foto, (x) => x.rgVis === true, 3000, 'reloj ganador');
   af(cr.visto, '🔴 el reloj «GANADOR EN» tiene que aparecer al completarse los 24');
@@ -607,6 +660,20 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   console.log('   3 temblando  @' + cI.ms + 'ms · tiemblan ' + (cI.f || {}).tiemblan
             + ' · reloj ' + (cI.f || {}).rgN);
   af(cI.visto, '🔴 nunca se vieron los 3 TEMBLANDO: ' + JSON.stringify(cI.f));
+  // 🔒 CONTROL POSITIVO DE LA PLACA, y el careo lo necesitaba: la version
+  // anterior preguntaba `offsetParent !== null`, que una placa en `opacity:0`
+  // CONTESTA QUE SI. Midiendo las dos caras —apagada aqui, encendida despues—
+  // un verde ya no puede significar «no mido».
+  const plAntes = await pg.evaluate(() => {
+    const e = document.getElementById('placa-ganador');
+    return { op: e ? getComputedStyle(e).opacity : null,
+             n: ((document.getElementById('pg-n') || {}).textContent || '').trim(),
+             p: ((document.getElementById('pg-p') || {}).textContent || '').trim() };
+  });
+  af(Number(plAntes.op) === 0,
+     '🔴 la placa del ganador está ENCENDIDA antes de la revelación (opacity ' + plAntes.op + ')');
+  af(plAntes.n === '—' && plAntes.p === '',
+     '🔴 la placa ya traía el nombre o el premio antes de tiempo: ' + JSON.stringify(plAntes));
 
   // 2 · MUERE UNO, y su tarjeta SE VA (no se queda gris ocupando espacio).
   cI = await cazar(pg, foto, (x) => x.total === 2 && x.muriendo === 0,
@@ -633,29 +700,71 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   af(cI.visto, '🔴 nunca gano nadie, o quedo mas de una: ' + JSON.stringify(cI.f));
   af(cI.visto && cI.f.cuentaVis === false, 'y la cuenta se va al revelarse');
 
-  // 5 · 🔴 QUE TODO EL BLOQUE DEL GANADOR QUEPA EN UNA PANTALLA DE CELULAR.
-  // Orden de Memo: sin scroll largo entre la foto, el «ganó» y el reloj de
-  // 10 min. Se mide la UNION de los tres rectangulos contra el viewport.
-  await pg.waitForTimeout(1800);
+  // 5 · 🔴 TODO EL BLOQUE DEL GANADOR, DENTRO DE UNA PANTALLA DE CELULAR.
+  //
+  // ⚠️ LA VERSION ANTERIOR DE ESTE CAREO MEDIA EL ALTO DE LA UNION Y NADA MAS
+  // —769px en 844, verde— mientras en el celular no se veia ni el reloj: el
+  // bloque EMPEZABA en y=502 y el panel del reloj arrancaba en y=999, o sea
+  // 155px abajo del pliegue. Medir «cuanto mide» no es medir «donde cae»: es
+  // la misma leccion que el contador de viajeros de la portada.
+  // Ahora se exige que la union caiga DENTRO de [0, innerHeight] sin que nadie
+  // haya hecho scroll a mano.
+  await pg.waitForTimeout(2200);
   const caben = await pg.evaluate(() => {
-    const vis = (e) => e && e.offsetParent !== null && !e.hidden;
-    const partes = [document.querySelector('.mos.gana'),
-                    document.getElementById('placa-ganador'),
-                    document.getElementById('panel')].filter(vis);
-    if (!partes.length) return { ok: false, motivo: 'no hay bloque del ganador' };
+    // 🔒 «SE VE» ES UNA CADENA, NO UNA PROPIEDAD: `offsetParent` no sabe de
+    // opacidad, y justo eso fue lo que dejo pasar una placa invisible.
+    const vis = (e) => {
+      if (!e || e.hidden || e.offsetParent === null) return false;
+      const cs = getComputedStyle(e);
+      return cs.visibility !== 'hidden' && Number(cs.opacity) > .05;
+    };
+    const g = document.querySelector('.mos.gana');
+    const pl = document.getElementById('placa-ganador');
+    const pa = document.getElementById('panel');
+    const partes = [g, pl, pa].filter(vis);
+    const t = (id) => ((document.getElementById(id) || {}).textContent || '').trim();
+    const env = g ? g.querySelector('.mos-tiembla') : null;
     const rs = partes.map((e) => e.getBoundingClientRect());
-    const top = Math.min.apply(null, rs.map((r) => r.top));
-    const bot = Math.max.apply(null, rs.map((r) => r.bottom));
-    return { ok: true, alto: Math.round(bot - top), viewport: innerHeight,
-             partes: partes.length,
-             nombres: partes.map((e) => e.id || e.className) };
+    return {
+      hay: partes.length, nombres: partes.map((e) => e.id || e.className),
+      top: rs.length ? Math.round(Math.min.apply(null, rs.map((r) => r.top))) : null,
+      bot: rs.length ? Math.round(Math.max.apply(null, rs.map((r) => r.bottom))) : null,
+      vh: innerHeight, scrollY: Math.round(scrollY),
+      placaVis: vis(pl), panelVis: vis(pa), ganaVis: vis(g),
+      pgN: t('pg-n'), pgF: t('pg-f'), pgP: t('pg-p'), reloj: t('reloj').split('\n')[0].trim(),
+      // Quieta de verdad: el temblor son dos variables EN LINEA.
+      amp: env ? (env.style.getPropertyValue('--amp') || '') : '',
+      ciudadGana: (g ? (g.querySelector('.mos-ciu') || {}).textContent : '') || '',
+    };
   });
-  console.log('   bloque del ganador: ' + caben.alto + 'px de alto en un viewport de '
-            + caben.viewport + 'px · ' + JSON.stringify(caben.nombres));
-  af(caben.ok, 'el bloque del ganador existe: ' + caben.motivo);
-  af(caben.ok && caben.alto <= caben.viewport,
-     '🔴 el bloque del ganador mide ' + caben.alto + 'px y NO CABE en los '
-     + caben.viewport + 'px de un celular: habria que hacer scroll entre la foto y el reloj');
+  console.log('   bloque del ganador: y=' + caben.top + '..' + caben.bot + ' en un viewport de '
+            + caben.vh + 'px (scrollY ' + caben.scrollY + ') · ' + JSON.stringify(caben.nombres));
+  console.log('   la placa: «' + caben.pgN + '» · ' + caben.pgF + ' · premio «'
+            + caben.pgP.slice(0, 46) + '…» · reloj ' + caben.reloj);
+  af(caben.hay === 3,
+     '🔴 el bloque del ganador no está COMPLETO y VISIBLE: solo ' + caben.hay
+     + ' de 3 (' + JSON.stringify(caben.nombres) + ')');
+  af(caben.placaVis, '🔴 la placa del ganador no se VE (no se encendió al revelar)');
+  af(caben.panelVis, '🔴 el panel con el reloj de 10 minutos no se VE');
+  af(caben.top !== null && caben.top >= 0 && caben.bot <= caben.vh,
+     '🔴 el bloque del ganador cae FUERA de la pantalla: y=' + caben.top + '..' + caben.bot
+     + ' en ' + caben.vh + 'px. Habría que hacer scroll entre la foto y el reloj');
+  // El CONTENIDO, que es lo que Memo pidió ver debajo de la tarjeta.
+  af(/^Nombre\d+ Apellido\d+$/.test(caben.pgN),
+     '🔴 la placa no trae el nombre COMPLETO del servidor: «' + caben.pgN + '»');
+  af(/^Folio #\d+$/.test(caben.pgF), '🔴 la placa no trae el folio: «' + caben.pgF + '»');
+  // 🔒 El premio no se compara contra un texto tecleado aquí: se le PREGUNTA a
+  // `_lib`, que es de donde sale en producción.
+  const premioEsperado = G.PREMIOS[G.premioPorCiudad(ciudadDe(rondas.orden[0].id))];
+  af(caben.pgP === premioEsperado,
+     '🔴 el premio de la placa no es el que DERIVA `_lib` de su ciudad ('
+     + ciudadDe(rondas.orden[0].id) + '): «' + caben.pgP + '»');
+  af(/^\d?\d:\d\d$/.test(caben.reloj) && caben.reloj !== '00:00',
+     '🔴 el reloj de 10 minutos no está corriendo: «' + caben.reloj + '»');
+  af(caben.amp === '',
+     '🔴 la tarjeta ganadora se quedó TEMBLANDO (--amp=' + caben.amp + '): al cero se queda quieta');
+  af(caben.ciudadGana.length > 0,
+     '🔴 la tarjeta del ganador no dice su ciudad: «' + caben.ciudadGana + '»');
   af(errsI.length === 0, 'errores en I: ' + JSON.stringify(errsI.slice(0, 3)));
   await pg.close();
 

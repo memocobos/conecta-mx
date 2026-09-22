@@ -267,6 +267,18 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
      un error, no como un límite. */
   min-height:2.1em;display:flex;align-items:center;justify-content:center;
   overflow-wrap:anywhere}
+/* [SORTEO-CIUDAD-1] LA CIUDAD, EN SU PROPIA LINEA CHICA. De ella DEPENDE el
+   premio (Reynosa = PLUS, fuera = CHEAP), asi que es parte de quien es esa
+   persona en este sorteo. Se deja ENVOLVER en vez de recortar: a 390px
+   «San Nicolas de los Garza» cabe en dos renglones, y unos puntos suspensivos
+   en la tarjeta de una persona se leen como un error, no como un limite. */
+.mos-ciu{padding:0 3px 5px;text-align:center;font-family:var(--font-display);
+  font-size:8px;line-height:1.16;letter-spacing:.02em;
+  color:rgba(255,255,255,.46);overflow-wrap:anywhere}
+.mos.vive .mos-ciu{color:rgba(255,255,255,.66)}
+.mos.fuera .mos-ciu{color:rgba(255,255,255,.22)}
+.mos.finalista .mos-ciu{font-size:11px;color:rgba(232,255,76,.78)}
+.mos.gana .mos-ciu{font-size:12.5px;color:var(--c-amarillo)}
 .mos-folio{position:absolute;top:3px;left:4px;z-index:2;
   font-family:var(--font-display);font-size:9px;font-weight:900;
   color:rgba(255,255,255,.5);text-shadow:0 1px 3px rgba(0,0,0,.9)}
@@ -361,12 +373,34 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .rod-lbl{text-align:center;font-size:9px;letter-spacing:.2em;text-transform:uppercase;
   color:rgba(255,255,255,.34);margin-top:7px}
 
+/* ═══ [SORTEO-GANADOR-1] EL ESTADO «YA GANO» ═════════════════════════════
+   Orden de Memo: la tarjeta ganadora se queda quieta e iluminada y DEBAJO, sin
+   scroll, el nombre completo, el premio y el reloj de 10 minutos.
+   Medido antes de esto, en un viewport de 844px: la tarjeta acababa en y=890
+   (ya cortada), la placa venia en `opacity:0` con el nombre en «—» y el panel
+   del reloj arrancaba en y=999 — 155px ABAJO del pliegue.
+   Se recoge lo que ya no dice nada: los rodillos del giro que no hubo, el
+   subtitulo, la mecanica, y la cuenta «GANADOR EN» que llego a cero. */
+body.gano .rodillos,
+body.gano .placa-sub,
+body.gano #como-func,
+body.gano #reloj-ganador{display:none}
+/* Y la tarjeta del ganador deja de ir a todo lo ancho: con `--cols:1` medía
+   388px de alto y se comia el espacio de la placa. */
+body.gano .mosaico{justify-content:center}
+body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
+
 /* La placa de abajo: el nombre COMPLETO, para que quede claro que es una
    persona y no la suma de tres rodillos. */
 .placa-ganador{margin-top:14px;text-align:center;padding:14px 12px;border-radius:12px;
   background:rgba(232,255,76,.07);border:1px solid rgba(232,255,76,.3);
   opacity:0;transform:scale(.94);transition:opacity .4s ease-out,transform .4s cubic-bezier(.16,1,.3,1)}
 .placa-ganador.on{opacity:1;transform:none}
+/* El PREMIO, derivado de `_lib` y servido por el estado. Va dentro de la
+   placa porque es la respuesta a «y que gane»: nombre, premio y reloj. */
+.placa-ganador .pg-p{font-size:11.5px;line-height:1.35;margin-top:8px;padding-top:8px;
+  color:rgba(255,255,255,.84);border-top:1px solid rgba(232,255,76,.2)}
+.placa-ganador .pg-p:empty{display:none}
 .placa-ganador.no{background:rgba(255,40,59,.08);border-color:rgba(255,40,59,.42)}
 .placa-ganador.no .pg-f{color:var(--c-rojo)}
 .placa-ganador .pg-l{font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--c-muted)}
@@ -835,6 +869,9 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       <div class="pg-l" id="pg-l">Ganador</div>
       <div class="pg-n" id="pg-n">—</div>
       <div class="pg-f" id="pg-f"></div>
+      <!-- El PREMIO, derivado de `_lib` en el servidor. Nace vacio: un premio
+           tecleado aqui seria una cuarta copia de `PREMIOS`. -->
+      <div class="pg-p" id="pg-p"></div>
     </div>
   </div>
 
@@ -1312,11 +1349,29 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       // El «clac» de cada uno de los 24 que sale. Sube de tono con el índice,
       // así que la presentación se oye como una escala que avanza en vez de 24
       // golpes iguales — que a 1.5 s cada uno sería monótono.
+      // ═══ [SORTEO-PING-1] EL «PING» DE CADA UNO DE LOS 24 ══════════════
+      // Orden de Memo: no un «clac», sino un ping BRILLANTE de dos notas
+      // ASCENDENTES, tipo moneda de videojuego — y que suba de tono conforme
+      // avanzan los 24.
+      //
+      // 🔒 SINTETIZADO Y ORIGINAL. Son dos osciladores y una quinta justa
+      // (×1.5), que es un intervalo, no una melodia de nadie: ni un sample ni
+      // la linea de ningun juego. Suena SOLO tras el interruptor, como todo.
+      //
+      // Las dos notas suben juntas casi una quinta a lo largo de la
+      // presentacion (~740 → ~1244 Hz), asi que los 24 son su propia escalera
+      // musical: el oido sabe por donde va la cuenta sin mirar.
       sale: function(i, total){
         if (!encendido) return;
         var k = total ? Math.min(1, i / total) : 0;
-        nota(300 + k * 420, .07, 'square', .10);
-        nota(120, .09, 'triangle', .09);
+        var f = 740 * Math.pow(2, k * .75);
+        nota(f,       .07, 'square',   .085);          // la primera
+        nota(f * 1.5, .15, 'square',   .075, .068);    // y la de arriba
+        // El armonico dos octavas y media arriba es lo que lo hace «moneda»
+        // en vez de «pitido»; muy cortito y muy bajo para que no chille.
+        nota(f * 3,   .09, 'triangle', .032, .068);
+        // Y un cuerpo abajo, para que en bocina de celular no suene flaco.
+        nota(f / 4,   .07, 'sine',     .045);
       },
       arranque: function(){ if (encendido) nota(320, .1, 'sawtooth', .06); },
       fanfarria: function(){
@@ -1768,6 +1823,26 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     enReposo = true;
   }
 
+  // ═══ 🔴 LA PLACA SE ENCIENDE DESDE UN SOLO SITIO ══════════════════════
+  // Estaba escrita DENTRO del camino viejo de la tragamonedas (en `unoMenos`,
+  // cuando frenaban los tres rodillos). Al quitar el giro final, el camino
+  // nuevo revelaba al ganador y NADIE llenaba la placa: medido, se quedaba en
+  // `opacity:0` con el nombre en «—» y el folio vacio. El careo la dio por
+  // visible porque preguntaba `offsetParent !== null`, y una placa en
+  // opacity:0 pasa esa prueba.
+  //
+  // 🔒 Y el PREMIO sale del servidor, derivado de `_lib` (`premioPorCiudad` +
+  // `PREMIOS`): las mismas que usa el panel con token y las que cobran en el
+  // correo. Tecleado aqui seria la cuarta copia.
+  function encenderPlaca(g){
+    var pl = $('placa-ganador');
+    if (!pl){ console.error('[sorteo] #placa-ganador no esta en el DOM'); return; }
+    $('pg-n').textContent = (g && g.nombre) || '—';
+    $('pg-f').textContent = (g && g.folio) ? ('Folio #' + g.folio) : '';
+    $('pg-p').textContent = (g && g.premio) || '';
+    pl.classList.add('on');
+  }
+
   function animarHacia(g, alTerminar){
     var nombreCompleto = (g && g.nombre) || '';
     var partido = partir(nombreCompleto);
@@ -1790,9 +1865,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
         $('maquina').classList.remove('girando');
         // La placa dice el nombre COMPLETO del servidor, no lo que quedó en
         // las ventanas: los rodillos son el show, esto es el dato.
-        $('pg-n').textContent = nombreCompleto;
-        $('pg-f').textContent = (g && g.folio) ? ('Folio ' + folioGanador) : '';
-        $('placa-ganador').classList.add('on');
+        encenderPlaca(g);
         revelar();
         alTerminar();
       }
@@ -1918,6 +1991,22 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
 
   // Una ficha, al mosaico. No repinta la rejilla: APILA.
+  // ═══ 🔒 EL MARKUP DE LA FICHA VIVE EN UN SOLO SITIO ═══════════════════
+  // Lo pintan DOS caminos —la presentacion uno por uno y el repintado de cada
+  // ronda— y estaba escrito dos veces. Tener dos copias es exactamente como la
+  // ciudad habria entrado en una y no en la otra: la trampa de la plantilla
+  // gemela, que en esta casa ya mordio con el chip, con `flash_promo` y con
+  // las cuatro constantes de fecha del giveaway.
+  function fichaHTML(m){
+    return '<div class="mos-folio">#' + esc(String(m.folio)) + '</div>'
+      + '<div class="mos-foto">'
+      +   (m.foto ? '<img alt="" src="' + esc(m.foto) + '" data-folio="' + esc(String(m.folio)) + '">'
+                  : '<div class="mos-ini">' + esc(m.ini || '·') + '</div>')
+      + '</div>'
+      + '<div class="mos-nom">' + esc(m.corto || '') + '</div>'
+      + '<div class="mos-ciu">' + esc(m.ciudad || '') + '</div>';
+  }
+
   function agregarAlMosaico(m, idx, tam){
     var caja = $('mosaico-caja'), rej = $('mosaico');
     if (!caja || !rej || !SHOW) return;
@@ -1929,12 +2018,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     div.className = 'mos vive entra';
     div.setAttribute('data-folio', String(m.folio));
     div.style.setProperty('--viva', viva.toFixed(2));
-    div.innerHTML = '<div class="mos-folio">#' + esc(String(m.folio)) + '</div>'
-      + '<div class="mos-foto">'
-      +   (m.foto ? '<img alt="" src="' + esc(m.foto) + '" data-folio="' + esc(String(m.folio)) + '">'
-                  : '<div class="mos-ini">' + esc(m.ini || '·') + '</div>')
-      + '</div>'
-      + '<div class="mos-nom">' + esc(m.corto || '') + '</div>';
+    div.innerHTML = fichaHTML(m);
     rej.appendChild(div);
     son.sale(idx, tam);
     $('mos-quedan').textContent = (idx + 1) + ' de ' + tam;
@@ -2031,12 +2115,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       var cls = 'mos ' + (dentro ? 'vive' : 'fuera') + (dentro && finalistas ? ' finalista' : '');
       return '<div class="' + cls + '" data-folio="' + esc(String(m.folio)) + '"'
         + ' style="--n:' + i + ';--viva:' + (dentro ? viva.toFixed(2) : 0) + '">'
-        + '<div class="mos-folio">#' + esc(String(m.folio)) + '</div>'
-        + '<div class="mos-foto">'
-        +   (m.foto ? '<img alt="" src="' + esc(m.foto) + '" data-folio="' + esc(String(m.folio)) + '">'
-                    : '<div class="mos-ini">' + esc(m.ini || '·') + '</div>')
-        + '</div>'
-        + '<div class="mos-nom">' + esc(m.corto || '') + '</div>'
+        + fichaHTML(m)
         + '</div>';
     }).join('');
   }
@@ -2090,14 +2169,6 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     });
   }
 
-  // Qué folios están en la rejilla pero ya no en la ronda que sigue.
-  function fueraDe(kAnterior, ronda){
-    if (kAnterior == null || !SHOW.rondas[kAnterior]) return [];
-    var siguen = ronda.miembros.map(function(m){ return m.folio; });
-    return SHOW.rondas[kAnterior].miembros.filter(function(m){
-      return siguen.indexOf(m.folio) === -1;
-    });
-  }
 
   // 🔴 CADA PASO SE ANCLA AL RELOJ DEL SHOW, no a «ahora + 18 s».
   //
@@ -2178,6 +2249,39 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   // `estado.ultimo.dos`, y para apagar a la segunda hace falta el ganador. Si
   // no han llegado, se sigue temblando — nunca se apaga a alguien al azar.
   // ═══════════════════════════════════════════════════════════════════════
+  // ═══ 🔴 EL BLOQUE DEL GANADOR, ENTERO Y A LA VISTA ═════════════════════
+  // Orden de Memo: tarjeta, nombre completo, premio y reloj de 10 minutos en
+  // UNA pantalla de celular, sin scroll.
+  //
+  // ⚠️ NO se hace con `scrollIntoView` a secas, y se probó: llamarlo en el
+  // mismo instante en que `body.gano` recoge los rodillos usa la geometría de
+  // ANTES del recogido, así que se pasó 352px —la tarjeta quedó ARRIBA del
+  // borde superior— mientras el scroll animaba hacia un destino que ya se
+  // había movido.
+  //
+  // Se mide la UNIÓN de las tres piezas y se corre el scroll ESE delta, que es
+  // autocorrectivo: si ya está a la vista el delta es ~0 y no hace nada. Por
+  // eso se llama tres veces —al frame siguiente y tras las transiciones—: cada
+  // llamada mide de nuevo en vez de repetir un destino viejo.
+  function traerGanadorALaVista(suave){
+    var g = document.querySelector('.mos.gana');
+    var ps = [g, $('placa-ganador'), $('panel')].filter(function(e){
+      return e && !e.hidden && e.offsetParent !== null;
+    });
+    if (!ps.length) return;
+    var rs = ps.map(function(e){ return e.getBoundingClientRect(); });
+    var top = Math.min.apply(null, rs.map(function(r){ return r.top; }));
+    var bot = Math.max.apply(null, rs.map(function(r){ return r.bottom; }));
+    var vh = window.innerHeight || 0, margen = 12, alto = bot - top, d;
+    // Si cabe entero, se acomoda con el aire repartido; si no cabe (pantalla
+    // muy chica), al menos que EMPIECE arriba en vez de quedar a media altura.
+    if (alto <= vh - margen * 2) d = top - Math.max(margen, Math.floor((vh - alto) / 2));
+    else d = top - margen;
+    if (Math.abs(d) < 2) return;
+    try { window.scrollBy({ top: d, behavior: (suave && !reducido) ? 'smooth' : 'auto' }); }
+    catch (e) { window.scrollBy(0, d); }
+  }
+
   function fichas(){
     var rej = $('mosaico');
     return rej ? [].slice.call(rej.querySelectorAll('.mos')) : [];
@@ -2283,14 +2387,37 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
             }
             var eg = fichaDe(folioG);
             if (eg){
+              // 🔒 QUIETA DE VERDAD. El temblor son dos variables EN LINEA
+              // (`--amp` y `--tmb`) sobre el envoltorio: quitar la clase deja
+              // los valores puestos, y basta que algo las vuelva a leer para
+              // que la ganadora tiemble en la foto del final.
               var env = eg.querySelector('.mos-tiembla');
-              if (env) env.classList.remove('mos-tiembla');
+              if (env){
+                env.classList.remove('mos-tiembla');
+                env.style.removeProperty('--amp');
+                env.style.removeProperty('--tmb');
+              }
               eg.classList.add('gana');
             }
             setTimeout(function(){
               var rej = $('mosaico');
               if (rej) rej.style.setProperty('--cols', 1);
               $('mos-quedan').textContent = 'Ganador';
+              // 🔴 EL BLOQUE DEL GANADOR, COMPLETO Y A LA VISTA. Se recoge lo
+              // que ya no dice nada (ver `body.gano`) y se lleva la tarjeta al
+              // borde de arriba: la placa y el reloj de 10 min caen debajo, en
+              // la misma pantalla. Sin esto el reloj vivia 155px abajo del
+              // pliegue y habia que buscarlo.
+              document.body.classList.add('gano');
+              encenderPlaca(estado && estado.ultimo);
+              // Al frame siguiente, cuando el recogido de `gano` YA está en el
+              // layout; y dos correcciones más tarde, cuando la placa acabó su
+              // transición de .4s y la tarjeta su cambio de ancho.
+              var alaVista = function(suave){ return function(){ traerGanadorALaVista(suave); }; };
+              if (window.requestAnimationFrame) requestAnimationFrame(alaVista(true));
+              else setTimeout(alaVista(true), 20);
+              setTimeout(alaVista(false), 1000);
+              setTimeout(alaVista(false), 1700);
               revelar();
               alTerminar();
             }, 520);

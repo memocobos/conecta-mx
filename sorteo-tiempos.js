@@ -229,7 +229,12 @@
       'De los <b>' + n + '</b> registrados, la máquina saca <b>' + e[0] + '</b> al azar,'
         + ' uno por uno.',
       'Cada ronda se apaga la mitad: <b>' + e.join(' → ') + '</b>.',
-      'Los <b>' + finalistas + '</b> finalistas pasan a la tragamonedas, que gira una última vez.',
+      // 🔴 ESTE RENGLON QUEDO MINTIENDO al quitar el giro final: decia «pasan a
+      // la tragamonedas, que gira una última vez» y la tragamonedas ya no
+      // gira — la eliminación ES el clímax. Un letrero vivo es código vivo,
+      // también cuando el cambio fue solo visual.
+      'Los <b>' + finalistas + '</b> finalistas se quedan en pantalla y se van'
+        + ' apagando de uno en uno: la última que queda encendida gana.',
       '<b>Todo al azar, todos con la misma probabilidad.</b> Lo decide el servidor'
         + ' antes de empezar.',
     ];

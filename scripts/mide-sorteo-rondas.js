@@ -613,6 +613,13 @@ global.fetch = async (url, opts) => {
                           json: async () => v, text: async () => JSON.stringify(v),
                           headers: { get: (k) => (String(k).toLowerCase() === 'content-type' ? (ctype || null) : null) },
                           arrayBuffer: async () => Buffer.from('fotofalsa') });
+  // 🔴 PostgREST devuelve las filas BORRADAS cuando se le pide
+  // `Prefer: return=representation` — y `ensayo_reiniciar` cuenta ESE arreglo
+  // para decir «giros_borrados». El mock contestaba `[]` siempre, así que la
+  // cuenta salía 0 con las filas borradas de verdad: un número que la base
+  // real no puede dar. Es la cuarta forma de «la base de mentira inventa».
+  const representa = (o) => /return=representation/.test(
+    String(((o && o.headers) || {}).Prefer || ((o && o.headers) || {}).prefer || ''));
   if (/giveaway_registros/.test(u)) {
     if (m === 'PATCH') {
       const cambios = JSON.parse(opts.body || '{}');
@@ -632,7 +639,7 @@ global.fetch = async (url, opts) => {
       BORRADOS.push({ tabla: 'registros', u, n: fuera.length });
       const ids = new Set(fuera.map((r) => r.id));
       REG = REG.filter((r) => !ids.has(r.id));
-      return J([]);
+      return J(representa(opts) ? fuera : []);
     }
     return J(proyectar(u, filtrarReg(u, REG)));
   }
@@ -668,7 +675,7 @@ global.fetch = async (url, opts) => {
       BORRADOS.push({ tabla: 'sorteos', u, n: fuera.length });
       const ids = new Set(fuera.map((x) => x.id));
       SOR = SOR.filter((x) => !ids.has(x.id));
-      return J([]);
+      return J(representa(opts) ? fuera : []);
     }
     return J(proyectar(u, filtrarSor(u, SOR)));
   }
@@ -1568,10 +1575,20 @@ af(() => rD.dos.indexOf(RF.orden[0].folio) !== -1,
    '🔴 EL GANADOR TIENE QUE ESTAR entre los dos: si no, se apagan los dos y no queda nadie');
 af(() => rD.dos[0] < rD.dos[1], 'vienen ordenados por folio, como todo lo público');
 
-// 🔒 QUIÉN MUERE PRIMERO NO FILTRA LA REVOLTURA. Se decide por FOLIO, no por
-// `orden[2]`: tomar el índice 2 habría publicado un bit del orden de la
-// revoltura —quien juntara varios giros aprendería que el primero en morir
-// siempre es ese índice—. Se mide sobre muchas escaleras REALES.
+// 🔒 QUIÉN MUERE PRIMERO NO FILTRA NADA: NI LA REVOLTURA, NI LA POSICIÓN.
+//
+// ⚰️ AQUÍ VIVÍA `af(() => porFolio === 3000)` —«se decide por FOLIO»— y se
+// retira CON SU RAZÓN ESCRITA, no en silencio: el bloque [18] midió que decidir
+// por folio hacía que la posición del que cae fuera una FUNCIÓN DEL GANADOR
+// (posición 0: cero muertes en 2 000 corridas; si caía la del medio, el ganador
+// era el de la derecha con certeza). Se cambió por un bit de azar guardado
+// (`primero`), y esta aserción dejó de ser la verdad.
+//
+// Lo que se mide hoy son las DOS fugas a la vez: el que cae no puede coincidir
+// SIEMPRE con «el de folio más alto» (delataría la posición) ni SIEMPRE con
+// `orden[2]` (delataría la revoltura). Con un bit propio, cada una coincide la
+// MITAD de las veces — y esa mitad es la prueba de que no es ninguna de las dos.
+// Se mide sobre muchas escaleras REALES.
 let porFolio = 0, porIndice = 0;
 for (let i = 0; i < 3000; i++) {
   const e = ESC.construirEscalera(PADRON, esc66);
@@ -1588,14 +1605,27 @@ for (let i = 0; i < 3000; i++) {
   if (String(muerto.id) === String(tres[2].id)) porIndice++;
 }
 console.log('    de 3000: coincide con «folio más alto» ' + porFolio + ' · con «orden[2]» ' + porIndice);
-af(() => porFolio === 3000,
-   '🔴 el primero en morir NO se decide por folio: coincidió ' + porFolio + '/3000');
-// Y el control positivo: por índice de revoltura coincide solo la MITAD de las
-// veces (cuando orden[2] resulta ser el de folio más alto). Si coincidiera
-// siempre, se estaría publicando el orden de la revoltura.
-af(() => porIndice > 1100 && porIndice < 1900,
-   '🔴 CONTROL POSITIVO: «orden[2]» coincidió ' + porIndice + '/3000. Si fuera ~3000, '
-   + 'el primero en morir SERÍA el orden de la revoltura y lo estaríamos publicando');
+// La banda sale de la binomial (4σ sobre 3 000 tiros a p=0.5), no de un número
+// tecleado: son 1 500 ± 110.
+const tol15 = Math.round(4 * Math.sqrt(3000 * .25));
+af(() => Math.abs(porFolio - 1500) <= tol15,
+   '🔴 «folio más alto» coincidió ' + porFolio + '/3000 (esperado 1500 ± ' + tol15 + '). '
+   + 'Si fueran 3000, la posición del que cae DELATARÍA al ganador');
+af(() => Math.abs(porIndice - 1500) <= tol15,
+   '🔴 «orden[2]» coincidió ' + porIndice + '/3000 (esperado 1500 ± ' + tol15 + '). '
+   + 'Si fueran 3000, el primero en morir SERÍA el orden de la revoltura');
+// Y que sea exactamente el bit GUARDADO, no un parecido estadístico.
+let porBit = 0;
+for (let i = 0; i < 300; i++) {
+  const e = ESC.construirEscalera(PADRON, esc66);
+  const r = ESC.proyectarRondas({ rondas: e, momentos: TI.momentos(esc66),
+    margenMs: TI.T.MARGEN_ADELANTO_MS, transcurridoMs: 72000,
+    momentoDosMs: MOMD, fotoDeId: () => null });
+  const muerto = e.orden.slice(0, 3).filter((x) => r.dos.indexOf(x.folio) === -1)[0];
+  if (String(muerto.id) === String(e.primero)) porBit++;
+}
+af(() => porBit === 300,
+   '🔴 el que cae tiene que ser SIEMPRE `primero`, el bit guardado: fue ' + porBit + '/300');
 
 // Escaleras cortas: con [3,1] el final es el mismo; con [1] no hay «dos».
 const P31b = { v: 1, escalones: [3, 1], orden: ordenFijo.slice(0, 3) };
@@ -1704,6 +1734,231 @@ console.log('    orden de llegada: finalistas ' + (LIB2[ult - 1] / 1000) + 's �
   af(() => l[u] > a[u], 'con ' + JSON.stringify(e) + ' el ganador sale después del arranque del final');
   af(() => l[u - 1] <= a[u], 'y los finalistas ya están cuando arranca');
 });
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// [18] 🔴 LA POSICIÓN DEL QUE SE APAGA ES UNIFORME, RONDA POR RONDA
+//
+// Lo reportó Memo del ensayo: «la eliminación se ve IGUAL en cada ensayo;
+// cuando quedan 6 siempre se va la fila de arriba». Se midió sobre 2 000
+// corridas y el defecto no estaba donde se veía: las rondas de eliminación son
+// uniformes (~50 % por posición, sin sesgo de fila ni de columna). El que NO lo
+// era es EL FINAL, y la forma es fea:
+//
+//     con la regla vieja («muere el de folio MÁS ALTO de los dos perdedores»)
+//     posición 0 → 0 de 2 000   ·   posición 1 → 35.3 %   ·   posición 2 → 64.8 %
+//
+// O sea que la tarjeta de la izquierda NUNCA se apagaba ahí, y si se apagaba la
+// del medio el ganador era el de la derecha con CERTEZA — cinco segundos antes.
+// Ver `primeroEnMorir`.
+//
+// 🔒 SE MIDE SOBRE LA PROYECCIÓN PÚBLICA, no sobre `orden`: la posición en la
+// pantalla es el índice en `rondas[k].miembros`, que es lo que la página pinta.
+// Medir sobre la revoltura mediría otra cosa.
+console.log('\n── [18] la POSICIÓN del que se apaga, sobre 2 000 corridas ──');
+{
+  const CORRIDAS = 2000;
+  const elegibles = [];
+  for (let i = 1; i <= 24; i++) elegibles.push({ id: 'u' + i, nombre: 'Ana Lopez ' + i, folio: i });
+  const escP = TI.escalonesPara(24);
+  const mm = TI.momentos(escP);
+
+  // Devuelve las rondas TAL COMO LAS PUBLICA el servidor, con el show acabado.
+  const publicar = (rondas) => ESC.proyectarRondas({
+    rondas, momentos: mm, transcurridoMs: mm[mm.length - 1] + 1,
+    momentoDosMs: TI.momentoDosMs(escP), margenMs: 0,
+  });
+
+  // Se cuentan las muertes por posición, por ronda, y la del final aparte.
+  const porRonda = {}, finalPos = {}, finalViejo = {};
+  for (let c = 0; c < CORRIDAS; c++) {
+    const rondas = ESC.construirEscalera(elegibles, escP);
+    const proy = publicar(rondas);
+    for (let k = 1; k < proy.rondas.length; k++) {
+      const antes = proy.rondas[k - 1].miembros.map((m) => m.folio);
+      const siguen = proy.rondas[k].miembros.map((m) => m.folio);
+      porRonda[k] = porRonda[k] || { n: 0, muertes: {} };
+      porRonda[k].n++;
+      antes.forEach((f, i) => {
+        if (siguen.indexOf(f) === -1) porRonda[k].muertes[i] = (porRonda[k].muertes[i] || 0) + 1;
+      });
+    }
+    // EL FINAL: la rejilla son los finalistas publicados y `dos` dice quiénes
+    // siguen; el que falta es el que se apaga.
+    const tres = proy.rondas[escP.length - 2].miembros.map((m) => m.folio);
+    const iMuere = tres.findIndex((f) => (proy.dos || []).indexOf(f) === -1);
+    finalPos[iMuere] = (finalPos[iMuere] || 0) + 1;
+    // Y EL CONTROL POSITIVO: la regla VIEJA, sobre la misma escalera.
+    const gid = String(rondas.orden[0].id);
+    const peorFolio = rondas.orden.slice(0, escP[escP.length - 2])
+      .filter((r) => String(r.id) !== gid)
+      .sort((a, b) => b.folio - a.folio)[0].folio;
+    finalViejo[tres.indexOf(peorFolio)] = (finalViejo[tres.indexOf(peorFolio)] || 0) + 1;
+  }
+
+  // 🔒 LA BANDA SE DERIVA DE LA BINOMIAL, NO SE INVENTA: 4σ sobre n corridas.
+  // Un umbral tecleado («±5 %») es de los que esta casa ya pagó cuatro veces.
+  const banda = (n, pr) => 4 * Math.sqrt(n * pr * (1 - pr)) / n;
+
+  Object.keys(porRonda).forEach((k) => {
+    const { n, muertes } = porRonda[k];
+    const vivas = escP[k - 1], quedan = escP[k];
+    const pr = (vivas - quedan) / vivas;                 // P(morir) de cada ficha
+    const tol = banda(n, pr);
+    const pcts = [];
+    for (let i = 0; i < vivas; i++) pcts.push((muertes[i] || 0) / n);
+    const peor = pcts.reduce((a, x) => Math.max(a, Math.abs(x - pr)), 0);
+    console.log('    ronda ' + k + ' (de ' + vivas + ' quedan ' + quedan + '): '
+      + (100 * Math.min.apply(null, pcts)).toFixed(1) + '% … '
+      + (100 * Math.max.apply(null, pcts)).toFixed(1) + '%  (esperado '
+      + (100 * pr).toFixed(1) + '% ± ' + (100 * tol).toFixed(1) + ')');
+    af(() => peor <= tol,
+       '🔴 ronda ' + k + ': alguna POSICIÓN se apaga fuera de la banda ('
+       + (100 * peor).toFixed(1) + '% de desvío contra ' + (100 * tol).toFixed(1) + '% permitido)');
+    // Ninguna FILA ni COLUMNA puede ser «la que se va»: se agregan con las
+    // columnas REALES del mosaico, que las decide `COLS` de la página.
+    const cols = { 24: 4, 12: 4, 6: 3, 3: 3, 1: 1 }[vivas] || 4;
+    const agrupa = (fn) => {
+      const g = {};
+      pcts.forEach((x, i) => { const key = fn(i, cols); (g[key] = g[key] || []).push(x); });
+      return Object.keys(g).map((key) => g[key].reduce((a, b) => a + b, 0) / g[key].length);
+    };
+    [['FILA', (i, c) => Math.floor(i / c)], ['COLUMNA', (i, c) => i % c]].forEach(([como, fn]) => {
+      const gs = agrupa(fn);
+      const dv = gs.reduce((a, x) => Math.max(a, Math.abs(x - pr)), 0);
+      af(() => dv <= tol,
+         '🔴 ronda ' + k + ': una ' + como + ' entera se va más que las otras ('
+         + (100 * dv).toFixed(1) + '% de desvío)');
+    });
+  });
+
+  // ── EL FINAL, que es donde estaba el defecto ────────────────────────────
+  const tolF = banda(CORRIDAS, 1 / 3);
+  const trio = [0, 1, 2].map((i) => (finalPos[i] || 0) / CORRIDAS);
+  console.log('    EL FINAL, quién se apaga primero de los 3: '
+    + trio.map((x) => (100 * x).toFixed(1) + '%').join(' · ')
+    + '  (esperado 33.3% ± ' + (100 * tolF).toFixed(1) + ')');
+  trio.forEach((x, i) => {
+    af(() => Math.abs(x - 1 / 3) <= tolF,
+       '🔴 la posición ' + i + ' se apaga primero el ' + (100 * x).toFixed(1)
+       + '% de las veces: el final DELATA la posición del ganador');
+  });
+  af(() => trio.every((x) => x > 0),
+     '🔴 hay una posición que NUNCA se apaga primero: eso es lo que se veía igual cada ensayo');
+
+  // 🔒 CONTROL POSITIVO: la regla VIEJA tiene que REPROBAR este mismo careo.
+  // Sin esto, los verdes de arriba no distinguen «está bien» de «no mido».
+  const trioV = [0, 1, 2].map((i) => (finalViejo[i] || 0) / CORRIDAS);
+  console.log('    CONTROL POSITIVO · la regla vieja (folio más alto): '
+    + trioV.map((x) => (100 * x).toFixed(1) + '%').join(' · '));
+  af(() => trioV[0] === 0,
+     '🔒 CONTROL POSITIVO: con la regla vieja la posición 0 NUNCA moría, dio '
+     + (100 * trioV[0]).toFixed(1) + '%');
+  af(() => trioV.some((x) => Math.abs(x - 1 / 3) > tolF),
+     '🔒 CONTROL POSITIVO: la regla vieja tiene que caer FUERA de la banda');
+
+  // Y el bit vive en la escalera GUARDADA, no se calcula en cada respuesta:
+  // dos personas en dos teléfonos tienen que ver apagarse la MISMA tarjeta.
+  const unaEscalera = ESC.construirEscalera(elegibles, escP);
+  af(() => typeof unaEscalera.primero === 'string' && unaEscalera.primero,
+     '🔒 la escalera guarda `primero`, dio ' + JSON.stringify(unaEscalera.primero));
+  const gid0 = String(unaEscalera.orden[0].id);
+  af(() => String(unaEscalera.primero) !== gid0,
+     '🔴 `primero` no puede ser el GANADOR');
+  af(() => unaEscalera.orden.slice(0, escP[escP.length - 2])
+        .some((r) => String(r.id) === String(unaEscalera.primero)),
+     '🔴 `primero` tiene que ser uno de los FINALISTAS');
+  const dosA = publicar(unaEscalera).dos, dosB = publicar(unaEscalera).dos;
+  af(() => JSON.stringify(dosA) === JSON.stringify(dosB),
+     '🔴 dos lecturas de la MISMA escalera dieron «dos» distintos: '
+     + JSON.stringify(dosA) + ' vs ' + JSON.stringify(dosB));
+  // El respaldo por folio sigue sirviendo a las escaleras viejas del ensayo.
+  const vieja = { v: 1, escalones: escP, orden: unaEscalera.orden };   // sin `primero`
+  af(() => (publicar(vieja).dos || []).length === 2,
+     '🔒 una escalera GUARDADA antes de `primero` sigue teniendo su final');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// [19] 🔴 «REINICIAR GIROS» + «GIRAR» DA UNA ESCALERA NUEVA, CADA VEZ
+//
+// La otra mitad de lo que reportó Memo: si el ensayo repitiera la misma
+// revoltura, TODO se vería igual y ninguna medición de uniformidad lo notaría
+// —cada corrida sería la misma corrida—. Se mide por el HANDLER REAL, con los
+// dos botones que Memo pica: reiniciar y girar.
+console.log('\n── [19] reiniciar + girar: escalera NUEVA cada vez ──');
+{
+  const VUELTAS = 20;
+  await llamar({ accion: 'ensayo_borrar', modo: 'ensayo' });
+  const sem = await llamar({ accion: 'ensayo_sembrar', modo: 'ensayo' });
+  af(() => sem.code === 200, 'el ensayo se sembró para medir, dio ' + sem.code);
+
+  const ordenes = [], ganadores = [], primeros = [];
+  for (let v = 0; v < VUELTAS; v++) {
+    const g = await llamar({ accion: 'girar', modo: 'ensayo' });
+    af(() => g.code === 200, 'vuelta ' + (v + 1) + ': girar dio ' + g.code + ' ' + g.d.error);
+    const fila = SOR.filter((x) => x.slug === G.SLUG_ENSAYO && x.rondas)
+      .sort((a, b) => Number(b.intento) - Number(a.intento))[0];
+    af(() => !!fila, 'vuelta ' + (v + 1) + ': el giro del ensayo guardó su escalera');
+    if (!fila) break;
+    ordenes.push(fila.rondas.orden.map((r) => String(r.id)).join('|'));
+    ganadores.push(String(fila.registro_id));
+    primeros.push(String(fila.rondas.primero));
+    const re = await llamar({ accion: 'ensayo_reiniciar', modo: 'ensayo' });
+    af(() => re.code === 200 && re.d.giros_borrados >= 1,
+       'vuelta ' + (v + 1) + ': reiniciar borró los giros, dio ' + re.code + '/' + re.d.giros_borrados);
+    af(() => SOR.filter((x) => x.slug === G.SLUG_ENSAYO).length === 0,
+       '🔴 vuelta ' + (v + 1) + ': reiniciar dejó giros vivos, y el siguiente HEREDARÍA la escalera');
+    af(() => REG.filter((x) => x.slug === G.SLUG_ENSAYO).length === 24,
+       '🔒 reiniciar NO se lleva a los participantes, quedaron '
+       + REG.filter((x) => x.slug === G.SLUG_ENSAYO).length);
+  }
+  const distintas = new Set(ordenes).size;
+  const gDistintos = new Set(ganadores).size;
+  console.log('    ' + VUELTAS + ' vueltas · ' + distintas + ' revolturas distintas · '
+            + gDistintos + ' ganadores distintos · ' + new Set(primeros).size + ' «primero» distintos');
+  af(() => ordenes.length === VUELTAS, 'se completaron las ' + VUELTAS + ' vueltas, hubo ' + ordenes.length);
+  af(() => distintas === VUELTAS,
+     '🔴 DOS VUELTAS DIERON LA MISMA REVOLTURA: el ensayo estaría repitiendo el mismo show ('
+     + distintas + ' distintas de ' + VUELTAS + ')');
+  // Con 24 participantes y 20 vueltas, que el ganador saliera siempre el mismo
+  // es P ≈ 24^-19: si pasa, es un candado pegado, no la suerte.
+  af(() => gDistintos > 1,
+     '🔴 el ganador fue EL MISMO en las ' + VUELTAS + ' vueltas');
+  af(() => new Set(primeros).size > 1,
+     '🔴 el que se apaga primero fue EL MISMO en las ' + VUELTAS + ' vueltas');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// [20] LA CIUDAD VIAJA EN LA FICHA · EL PREMIO SE DERIVA Y VA GATEADO
+console.log('\n── [20] la ciudad en el mosaico y el premio derivado ──');
+{
+  await girarYFijar(TI.duracionTotal(TI.escalonesPara(28)) + 5000);   // show acabado
+  const r = await pedir({});
+  const m0 = r.d.ultimo.rondas[0].miembros;
+  af(() => m0.every((m) => typeof m.ciudad === 'string' && m.ciudad.length > 0),
+     '🔴 alguna ficha viajó SIN ciudad: ' + JSON.stringify(m0.slice(0, 3)));
+  af(() => new Set(m0.map((m) => m.ciudad)).size > 1,
+     'y no es una sola ciudad para todos: ' + JSON.stringify([...new Set(m0.map((m) => m.ciudad))]));
+  // 🔒 La ciudad es lo ÚNICO nuevo: ni instagram, ni whatsapp, ni correo.
+  af(() => !/instagram|whatsapp|correo|foto_path/.test(r.crudo),
+     '🔴 se colaron datos privados en la respuesta pública');
+  const g = r.d.ultimo;
+  const esperado = G.PREMIOS[G.premioPorCiudad(
+    REG.find((x) => x.id === SOR[SOR.length - 1].registro_id).ciudad)];
+  af(() => g.premio === esperado,
+     '🔴 el premio no es el que DERIVA `_lib` de su ciudad: ' + g.premio);
+  af(() => Object.values(G.PREMIOS).indexOf(g.premio) !== -1,
+     'y el texto sale de `PREMIOS`, no de la pantalla');
+
+  // GATEADO como el nombre: antes de la revelación, `premio` es null — si no,
+  // diría de qué ciudad es quien va ganando.
+  await girarYFijar(1000);
+  const r2 = await pedir({});
+  af(() => r2.d.ultimo.nombre === null && r2.d.ultimo.premio === null,
+     '🔴 el premio viajó ANTES de la revelación: ' + JSON.stringify(r2.d.ultimo.premio));
+  af(() => (r2.d.ultimo.rondas[0].miembros || []).every((m) => m.ciudad),
+     '🔒 pero la ciudad de las fichas sí va desde el primer momento: es pública');
+}
 
 // <<<SIGUIENTES-BLOQUES>>>
 

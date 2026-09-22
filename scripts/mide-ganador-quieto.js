@@ -13,7 +13,13 @@
 //                     está midiendo nada.
 //     HEAD = $HEAD_SHA (default: el commit de HEAD)
 //
-// Se corre:  npm run mide:ganador-b      (o HEAD_SHA=<sha> node scripts/…)
+// Se corre:  npm run mide:ganador-quieto
+//            (o HEAD_SHA=HEAD npm run mide:ganador-quieto, para remedir el
+//             árbol de HOY contra el MISMO BASE)
+//
+// ⚠️ Este renglón decía `mide:ganador-b` — de la copia del arnés hermano. Lo
+// cazó Jane leyendo la PR. Un comando de arranque equivocado en la cabecera
+// manda a correr OTRO careo y a leer su verde como si fuera el de aquí.
 // ══════════════════════════════════════════════════════════════════════════
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os');
 const { execSync } = require('child_process');
@@ -116,10 +122,14 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'f816e5b';
-// ⏳ `HEAD_SHA` se ancla al commit del arreglo ANTES del merge. Mientras la PR
-// vive, el commit de HEAD es lo correcto — y el careo SIEMPRE sirve un commit,
-// nunca el árbol sucio, porque lo saca con `git archive`.
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+// 🔒 HEAD ANCLADO A UN COMMIT FIJO, no a `HEAD`. Con `HEAD` el careo mediría
+// SIEMPRE el árbol de hoy, así que dentro de tres tuercas estaría midiendo
+// código ajeno y culpándole a esta tuerca lo que otros cambien. `036e5df` es el
+// commit cuyo árbol trae los tres candados y el letrero.
+//   · careo CONGELADO (el default): reproducible, no caduca.
+//   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:ganador-quieto`, que remide el
+//     árbol de hoy contra el MISMO BASE — útil el día que alguien toque esto.
+const HEAD_SHA = process.env.HEAD_SHA || '036e5df';
 let base = null, head = null;
 try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sacar BASE: ' + e.message); }
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }

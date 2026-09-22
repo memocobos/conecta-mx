@@ -25,6 +25,7 @@
     "mide:luces-placa": "node scripts/mide-luces-placa.js",
     "mide:viajeros-contador": "node scripts/mide-viajeros-contador.js",
     "mide:sorteo-rondas": "node scripts/mide-sorteo-rondas.js",
-    "mide:sorteo-maquina": "node scripts/mide-sorteo-maquina.js"
+    "mide:sorteo-maquina": "node scripts/mide-sorteo-maquina.js",
+    "mide:ganador-b": "node scripts/mide-sorteo-ganador-b.js"
   }
 }

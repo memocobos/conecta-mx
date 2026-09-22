@@ -340,6 +340,68 @@ body.gano .mos.gana .mos-nom,
 body.gano .mos.gana .mos-ciu,
 body.gano .mos.gana .mos-folio{display:none}
 
+/* ═══ 🔴 [GANADOR-B1] EL MUEBLE SE VISTE, Y SOLO AL REVELARSE ═══════════
+   Orden de Memo: la tarjeta del ganador con `karol-g.jpg` como fondo/marco.
+
+   🔒 VA SOBRE `.mosaico-caja`, NO SOBRE `.mos.gana`. Dos razones medidas:
+   (a) la foto del ganador LLENA su tarjeta, así que una imagen detrás de ella
+   no se vería nunca — el marco tiene que estar AFUERA; y (b) colgar un nodo
+   nuevo del mosaico lo pone donde `pintarMosaico` reescribe con `innerHTML`,
+   que es la ley de `.hs-media` y ya costó un sello AGOTADO en la portada.
+   Vistiendo el mueble no se toca ni un nodo: la tarjeta queda encima, con su
+   marco de campeón, y la imagen es literalmente su fondo.
+
+   🔒 Y CUELGA DE `body.gano`, así que el navegador NO LA PIDE durante el show:
+   una regla de fondo solo descarga su imagen cuando aplica. Son 373 KB y
+   2048×2048 — durante la presentación de los 24 competiría con las fotos del
+   padrón. El precargado explícito va en el JS, al arrancar el final. */
+body.gano .mosaico-caja{
+  background-image:url('/imgs/giveaways/karol-g.jpg');
+  background-size:cover;background-position:center 18%;
+  border-color:rgba(232,255,76,.45);padding:16px 14px 14px}
+/* El velo, para que la foto y los letreros del ganador se lean encima. Va en
+   un pseudo-elemento y NO en la imagen: así el degradado no se descarga. */
+body.gano .mosaico-caja::before{content:'';position:absolute;inset:0;z-index:0;
+  border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 46%,rgba(0,0,0,.9) 100%)}
+body.gano .mosaico-caja > *{position:relative;z-index:1}
+
+/* ═══ [GANADOR-B4] EL STORY DESCARGABLE ════════════════════════════════ */
+.story{margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.1)}
+.story[hidden]{display:none}
+.st-sw{display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  font-size:11.5px;color:rgba(255,255,255,.72);margin-bottom:9px}
+.st-sw input{width:16px;height:16px;accent-color:var(--c-amarillo)}
+.st-msg{font-size:11px;color:rgba(255,255,255,.6);margin-top:7px;min-height:1.2em}
+
+/* ═══ [GANADOR-B3] LA MUESTRA DE 30 s ══════════════════════════════════ */
+.muestra{display:flex;align-items:center;gap:11px;margin:12px auto 0;max-width:290px;
+  padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.12);text-align:left}
+.muestra[hidden]{display:none}
+.m-play{flex:0 0 auto;width:38px;height:38px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  background:var(--c-amarillo);color:#000;border:0}
+.m-play:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.m-txt{min-width:0}
+.m-l{font-family:var(--font-display);font-size:8.5px;letter-spacing:.22em;
+  text-transform:uppercase;color:rgba(255,255,255,.45)}
+.m-tit{font-size:12px;color:rgba(255,255,255,.88);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ═══ [GANADOR-B2] EL CONTACTO DEL GANADOR, SOLO CON TOKEN ══════════════
+   El teléfono ya vivía enmascarado aquí; lo que faltaba eran las dos puertas
+   para hablarle. Nace apagado: lo enciende `pintarPanel` y SOLO con token. */
+.contacto{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+.contacto a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+  font-family:var(--font-display);font-weight:900;font-size:12px;letter-spacing:.08em;
+  text-transform:uppercase;padding:9px 13px;border-radius:9px;
+  border:1px solid rgba(255,255,255,.16)}
+.contacto .c-wa{background:rgba(136,234,78,.14);color:var(--c-verde);
+  border-color:rgba(136,234,78,.45)}
+.contacto .c-ig{background:rgba(255,255,255,.07);color:rgba(255,255,255,.9)}
+.contacto .c-ig[aria-disabled="true"]{opacity:.42;pointer-events:none}
+
 /* La entrada: caen escalonadas, desde un estado YA VISIBLE (sin esto, un JS
    caído deja el mosaico en blanco). */
 /* El escalonado sale de `--paso`, que lo calcula el JS desde la duración de la
@@ -717,6 +779,8 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
 <body>
 
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5-13-7.5Z"/></symbol>
+  <symbol id="ic-pausa" viewBox="0 0 24 24"><path d="M8 4.5v15M16 4.5v15"/></symbol>
   <symbol id="ic-ojo" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="ic-llave" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3"/><path d="M17 6l2.5 2.5"/><path d="M14.5 8.5 17 11"/></symbol>
   <symbol id="ic-repetir" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 4v4h-4"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 20v-4h4"/></symbol>
@@ -933,9 +997,39 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       <div class="reloj-l" id="reloj-l">para contestar su WhatsApp</div>
     </div>
 
+    <!-- [GANADOR-B3] LA MUESTRA DE 30 s, CON BOTÓN DE PLAY.
+         🔒 Va DESPUÉS del reloj a propósito: el orden que pidió Memo debajo de
+         la foto es nombre → ciudad → premio → reloj, y meter el reproductor en
+         medio lo rompería.
+         🔒 Es un `<audio>` NUESTRO, no el reproductor incrustado de Spotify ni
+         de Deezer: el CSP dice `frame-src 'self' https://*.supabase.co`, así
+         que un iframe de terceros NO CARGA — y además metería su tracking en
+         la pantalla del sorteo. El audio sí pasa: `*.dzcdn.net` ya está en
+         `media-src` y la url la pide nuestra propia function.
+         Nace OCULTO: sin canción no hay pieza. -->
+    <div class="muestra" id="muestra" hidden>
+      <button class="m-play" id="m-play" aria-label="Escuchar la muestra de 30 segundos">
+        <svg class="ic" aria-hidden="true"><use href="#ic-play" id="m-icono"/></svg>
+      </button>
+      <div class="m-txt">
+        <div class="m-l">Muestra de 30 s</div>
+        <div class="m-tit" id="m-tit">—</div>
+      </div>
+      <audio id="m-audio" preload="none"></audio>
+    </div>
+
     <div class="tel" id="tel">
       <span id="g-tel">—</span>
       <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
+    </div>
+
+    <!-- [GANADOR-B2] Las dos puertas para hablarle, SOLO con token. El `href`
+         se arma en `pintarContacto` con el dato de `estado_admin`; nacen vacíos
+         a propósito para que un JS caído no deje un enlace a ningún lado. -->
+    <div class="contacto" id="contacto">
+      <a class="c-wa" id="c-wa" target="_blank" rel="noopener">
+        <svg class="ic"><use href="#ic-wa"/></svg> Escribirle por WhatsApp</a>
+      <a class="c-ig" id="c-ig" target="_blank" rel="noopener">@ Instagram</a>
     </div>
 
     <!-- [SORTEO-RONDAS-1] TRES BOTONES, porque son tres HECHOS distintos.
@@ -948,6 +1042,15 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       <button class="btn btn-si" id="si">Aceptó el premio</button>
       <button class="btn btn-no" id="no">No contestó — volver a girar</button>
       <button class="btn btn-no" id="nocumple">No cumple las bases</button>
+    </div>
+
+    <!-- [GANADOR-B4] EL STORY. Nace oculto: solo con token Y con el premio ya
+         ACEPTADO. Antes del acepto, un story de alguien que todavía puede no
+         contestar es un anuncio que habría que desmentir. -->
+    <div class="story" id="story" hidden>
+      <label class="st-sw"><input type="checkbox" id="st-ig" checked> Poner su @ de Instagram</label>
+      <button class="btn btn-si" id="st-bajar">Descargar story 1080×1920</button>
+      <div class="st-msg" id="st-msg"></div>
     </div>
 
     <div style="margin-top:16px">
@@ -1210,6 +1313,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   var girando = false;
   var telVisible = false;
   var telAdmin = null;
+  var ADMG = null;            // el `ultimo` de estado_admin: solo existe con token
   var desfaseMs = 0;
 
   // El reloj es el del SERVIDOR: el contador de 10 minutos y el rótulo de
@@ -1911,6 +2015,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
         // La placa dice el nombre COMPLETO del servidor, no lo que quedó en
         // las ventanas: los rodillos son el show, esto es el dato.
         encenderPlaca(g);
+        pintarMuestra();
         revelar();
         alTerminar();
       }
@@ -1987,6 +2092,8 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   }
 
   var COLS = { 24: 4, 12: 4, 6: 3, 3: 3, 1: 1 };
+  // 🔒 UNA sola definición de la ruta, leída por el JS y careada contra el CSS.
+  var VESTIDO = '/imgs/giveaways/karol-g.jpg';
 
   // ═══ [SORTEO-RONDAS-1] LOS 24 LOS SACA LA TRAGAMONEDAS, UNO POR UNO ═════
   //
@@ -2356,6 +2463,20 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     var tDos = TIEMPOS.momentoDosMs(esc);
     var tRev = SHOW.momentos[esc.length - 1];
 
+    // 🔴 [GANADOR-B1] AQUÍ SE PRECARGA `karol-g.jpg`, no antes y no después.
+    // Son 373 KB / 2048×2048. Antes competiría con las fotos del padrón que se
+    // piden firmadas durante la presentación de los 24; al revelarse llegaría
+    // tarde y el mueble se vestiría a medio destello. Arrancando el final hay
+    // trece segundos de red ociosa —la página solo late— y sobra margen.
+    // 🔒 Se pide la MISMA url que la regla de CSS, para que sea el mismo
+    // recurso y no dos descargas: ver el careo, que las carea.
+    if (!window.__vestidoPedido) {
+      window.__vestidoPedido = VESTIDO;
+      var pre = new Image();
+      pre.decoding = 'async';
+      pre.src = VESTIDO;
+    }
+
     // 1 · LOS 3 EN GRANDE, TEMBLANDO CADA VEZ MÁS.
     var ronda3 = SHOW.rondas[esc.length - 2];
     if (ronda3) pintarMosaico(ronda3, []);
@@ -2455,6 +2576,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
               // pliegue y habia que buscarlo.
               document.body.classList.add('gano');
               encenderPlaca(estado && estado.ultimo);
+              pintarMuestra();
               // Al frame siguiente, cuando el recogido de `gano` YA está en el
               // layout; y dos correcciones más tarde, cuando la placa acabó su
               // transición de .4s y la tarjeta su cambio de ancho.
@@ -2653,6 +2775,8 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
 
     $('tel').style.display = (TOKEN && telAdmin) ? 'flex' : 'none';
     if (TOKEN && telAdmin) mostrarTel(telVisible);
+    pintarContacto();
+    pintarStory();
   }
 
   // ═══ 🔒 CON GANADOR CONFIRMADO, «GIRAR» SE VA ═══════════════════════════
@@ -2856,11 +2980,274 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('err-tok').textContent = '';
       $('llave').classList.add('abierta');
       $('admin').style.display = 'block';
+      // [GANADOR-B2] Se guarda el `ultimo` ENTERO, no solo el teléfono: de él
+      // salen el Instagram y el texto del WhatsApp, y más adelante el story.
+      ADMG = res.j.ultimo || null;
       if (res.j.ultimo) telAdmin = res.j.ultimo.whatsapp;
       if (estado && estado.ultimo && animado === estado.ultimo.id) pintarPanel(estado.ultimo);
     });
   }
   $('tok').addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+
+  // ═══ 🔒 [GANADOR-B2] LAS DOS PUERTAS PARA HABLARLE AL GANADOR ═════════
+  //
+  // 🔴 EL `52` NO ES DECORATIVO. `giveaway-registro` guarda el WhatsApp a
+  // DIEZ DÍGITOS EXACTOS, «sin lada de país» —lo dice su propio mensaje de
+  // error—, así que un `wa.me/<10 dígitos>` abre un chat con NADIE. Y si el
+  // dato no tiene esa forma, el botón NO SE PINTA: un enlace que lleva a la
+  // nada es peor que un botón ausente.
+  //
+  // 🔒 EL TEXTO SE DERIVA. El nombre y `premio_texto` vienen del servidor
+  // —y el premio ya salió de `premioPorCiudad` + `PREMIOS`—, así que aquí no
+  // se teclea ni el premio ni la fecha. Es la lección del correo de melanie,
+  // que anunció «las 12:00 PM» de un sorteo de las 9 durante dos giveaways.
+  function pintarContacto(){
+    var caja = $('contacto');
+    if (!caja) return;
+    var puede = !!(TOKEN && ADMG);
+    caja.style.display = puede ? 'flex' : 'none';
+    if (!puede) return;
+
+    var wa = $('c-wa'), ig = $('c-ig');
+    var digs = String(ADMG.whatsapp || '').replace(/\D/g, '');
+    if (digs.length === 10) {
+      var texto = '¡Hola ' + (ADMG.nombre || '') + '! Eres el ganador del sorteo de'
+        + ' Conecta Reynosa. Tu premio: ' + (ADMG.premio_texto || '')
+        + '. Contéstanos por aquí para confirmar que lo aceptas.';
+      wa.href = 'https://wa.me/52' + digs + '?text=' + encodeURIComponent(texto);
+      wa.style.display = '';
+    } else {
+      wa.removeAttribute('href');
+      wa.style.display = 'none';
+    }
+
+    var usr = String(ADMG.instagram || '').trim().replace(/^@+/, '');
+    if (usr) {
+      ig.href = 'https://instagram.com/' + encodeURIComponent(usr);
+      ig.textContent = '@' + usr;
+      ig.removeAttribute('aria-disabled');
+    } else {
+      // Se queda A LA VISTA pero apagado: que el Instagram FALTE es un dato
+      // que Memo necesita ver —es uno de los candados de las bases—, no algo
+      // que deba desaparecer de la pantalla.
+      ig.removeAttribute('href');
+      ig.textContent = 'sin Instagram';
+      ig.setAttribute('aria-disabled', 'true');
+    }
+  }
+
+  // ═══ 🔒 [GANADOR-B3] LA MUESTRA DE 30 s ═══════════════════════════════
+  //
+  // 🔒 EL ARTISTA LO MANDA EL SERVIDOR, DERIVADO DEL CATÁLOGO. Aquí no se
+  // escribe «Karol G»: sería la tercera copia del nombre en esta página, y las
+  // otras dos ya se quedaron viejas dos veces (melanie → Natanael → Karol G).
+  //
+  // 🔒 LA URL SE PIDE AL ARMAR LA TARJETA, NO ANTES: las de Deezer están
+  // FIRMADAS y caducan en 15-30 min, así que una pedida al cargar la página
+  // estaría muerta para cuando alguien le picara al play.
+  //
+  // 🔒 FAIL-SOFT: sin artista, sin `preview` o con la red caída, la pieza se
+  // queda OCULTA. Una tarjeta de ganador con un botón de play que no suena es
+  // peor que una sin botón.
+  var muestraPedida = false;
+  function pintarMuestra(){
+    var caja = $('muestra');
+    if (!caja || muestraPedida) return;
+    var art = (estado && estado.ultimo && estado.ultimo.artista) || '';
+    if (!art) { caja.hidden = true; return; }
+    muestraPedida = true;
+    fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(art) + '&type=track')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if (!j || !j.preview) { caja.hidden = true; return; }
+        var au = $('m-audio');
+        au.src = j.preview;
+        // El título también es DERIVADO: lo que suene queda nombrado en
+        // pantalla, así que nadie tiene que adivinar qué canción es.
+        $('m-tit').textContent = [j.title, j.artist].filter(Boolean).join(' · ') || art;
+        caja.hidden = false;
+      })
+      .catch(function(){ caja.hidden = true; });
+  }
+  (function(){
+    var bt = $('m-play'), au = $('m-audio'), ic = $('m-icono');
+    if (!bt || !au) return;
+    function pinta(){
+      if (ic) ic.setAttribute('href', au.paused ? '#ic-play' : '#ic-pausa');
+      bt.setAttribute('aria-label', (au.paused ? 'Escuchar' : 'Pausar')
+        + ' la muestra de 30 segundos');
+    }
+    bt.addEventListener('click', function(){
+      if (au.paused) { au.play().catch(function(){}); } else { au.pause(); }
+      pinta();
+    });
+    ['play', 'pause', 'ended'].forEach(function(ev){ au.addEventListener(ev, pinta); });
+    pinta();
+  })();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔒 [GANADOR-B4] EL STORY 1080×1920, DIBUJADO EN EL NAVEGADOR
+  //
+  // 🔴 LA FOTO ENTRA COMO DATA-URI, Y NO ES UN CAPRICHO. El bucket es PRIVADO:
+  // la única manera de pintar la foto en un `<img>` es una url FIRMADA, y una
+  // imagen de otro origen CONTAMINA el canvas — `toBlob` y `toDataURL` truenan
+  // con SecurityError y no hay archivo. Por eso existe `foto_datauri`, que trae
+  // los bytes por la puerta con token y le PREGUNTA su tipo al almacén en vez
+  // de adivinarlo por la extensión (los avatares del ensayo son SVG con nombre
+  // .png: adivinando, la story saldría con la cara en blanco).
+  //
+  // 🔒 SOLO CON TOKEN Y SOLO TRAS EL `acepto`. Antes del acepto el ganador
+  // todavía puede no contestar, y una story de alguien que después pierde el
+  // premio es un anuncio que habría que desmentir.
+  //
+  // 🔒 Y SE ESPERAN LAS TIPOGRAFÍAS (`document.fonts.ready`). Sin eso el canvas
+  // dibuja con la de respaldo y la story sale con otra letra que el sitio — la
+  // misma trampa de pedir Kaneda y que caiga a Montserrat en silencio.
+  var LIENZO = { w: 1080, h: 1920 };
+  function storyPuede(){
+    return !!(TOKEN && ADMG && ADMG.resultado === 'acepto' && ADMG.registro_id);
+  }
+  function pintarStory(){
+    var caja = $('story');
+    if (caja) caja.hidden = !storyPuede();
+  }
+  function dibujarCover(cx, img, w, h){
+    // `cover`: llena el lienzo sin deformar, recortando lo que sobra.
+    var r = Math.max(w / img.width, h / img.height);
+    var aw = img.width * r, ah = img.height * r;
+    cx.drawImage(img, (w - aw) / 2, (h - ah) / 2, aw, ah);
+  }
+  function cargarImg(src){
+    return new Promise(function(ok, no){
+      var im = new Image();
+      im.onload = function(){ ok(im); };
+      im.onerror = function(){ no(new Error('no cargó ' + String(src).slice(0, 40))); };
+      im.src = src;
+    });
+  }
+  function ajustar(cx, txt, max, desde, familia){
+    // Baja el tamaño hasta que quepa. Recortar el nombre de una persona con
+    // puntos suspensivos se lee como un error; achicarlo, no.
+    var t = desde;
+    do { cx.font = familia.replace('%%', t); t -= 4; }
+    while (t > 24 && cx.measureText(txt).width > max);
+    return cx;
+  }
+  async function armarStory(){
+    var msg = $('st-msg');
+    if (!storyPuede()) { if (msg) msg.textContent = 'Todavía no: falta que acepte el premio.'; return null; }
+    if (msg) msg.textContent = 'Armando la story…';
+    var res = await api('giveaway-sortear', { method: 'POST',
+      body: JSON.stringify({ accion: 'foto_datauri', registro_id: ADMG.registro_id }) });
+    if (!res.j || !res.j.ok || !res.j.datauri) throw new Error('sin foto: ' + ((res.j || {}).error || ''));
+    var fondo = await cargarImg(VESTIDO);
+    var cara = await cargarImg(res.j.datauri);
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+
+    var cv = document.createElement('canvas');
+    cv.width = LIENZO.w; cv.height = LIENZO.h;
+    var cx = cv.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, LIENZO.w, LIENZO.h);
+    dibujarCover(cx, fondo, LIENZO.w, LIENZO.h);
+    // El velo, para que la letra se lea encima de cualquier foto.
+    var g = cx.createLinearGradient(0, 0, 0, LIENZO.h);
+    g.addColorStop(0, 'rgba(0,0,0,.34)');
+    g.addColorStop(.42, 'rgba(0,0,0,.66)');
+    g.addColorStop(1, 'rgba(0,0,0,.94)');
+    cx.fillStyle = g; cx.fillRect(0, 0, LIENZO.w, LIENZO.h);
+
+    // LA FOTO DEL GANADOR, cuadrada y con el marco de campeón.
+    var lado = 560, fx = (LIENZO.w - lado) / 2, fy = 430;
+    cx.save();
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx, fy, lado, lado, 34); else cx.rect(fx, fy, lado, lado);
+    cx.clip();
+    var r2 = Math.max(lado / cara.width, lado / cara.height);
+    cx.drawImage(cara, fx + (lado - cara.width * r2) / 2, fy + (lado - cara.height * r2) / 2,
+                 cara.width * r2, cara.height * r2);
+    cx.restore();
+    cx.lineWidth = 12; cx.strokeStyle = '#e8ff4c';
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx, fy, lado, lado, 34); else cx.rect(fx, fy, lado, lado);
+    cx.stroke();
+    cx.lineWidth = 6; cx.strokeStyle = '#88ea4e';
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx - 9, fy - 9, lado + 18, lado + 18, 42);
+    else cx.rect(fx - 9, fy - 9, lado + 18, lado + 18);
+    cx.stroke();
+
+    cx.textAlign = 'center';
+    cx.fillStyle = '#e8ff4c';
+    cx.font = '900 46px "Barlow Condensed","Montserrat",sans-serif';
+    cx.fillText('GANADOR DEL SORTEO', LIENZO.w / 2, 300);
+
+    // 🔒 TODO lo que dice la story viene del SERVIDOR: nombre, ciudad y el
+    // premio DERIVADO de `_lib`. Ni una línea tecleada aquí.
+    cx.fillStyle = '#fff';
+    ajustar(cx, ADMG.nombre || '', LIENZO.w - 120, 104,
+            '900 %%px "Barlow Condensed","Montserrat",sans-serif');
+    cx.fillText(ADMG.nombre || '', LIENZO.w / 2, 1140);
+
+    var bajo = 1210;
+    if (ADMG.ciudad) {
+      cx.fillStyle = 'rgba(255,255,255,.82)';
+      cx.font = '600 40px "Montserrat",sans-serif';
+      cx.fillText(ADMG.ciudad, LIENZO.w / 2, bajo);
+      bajo += 62;
+    }
+    var conIg = !!($('st-ig') && $('st-ig').checked) && !!ADMG.instagram;
+    if (conIg) {
+      cx.fillStyle = '#e8ff4c';
+      cx.font = '900 38px "Barlow Condensed","Montserrat",sans-serif';
+      cx.fillText('@' + String(ADMG.instagram).replace(/^@+/, ''), LIENZO.w / 2, bajo);
+      bajo += 62;
+    }
+    // El premio, en las líneas que haga falta.
+    cx.fillStyle = 'rgba(255,255,255,.9)';
+    cx.font = '600 34px "Montserrat",sans-serif';
+    var pal = String(ADMG.premio_texto || '').split(' ');
+    var linea = '', y = bajo + 34;
+    for (var i = 0; i < pal.length; i++) {
+      var prueba = linea ? (linea + ' ' + pal[i]) : pal[i];
+      if (cx.measureText(prueba).width > LIENZO.w - 150 && linea) {
+        cx.fillText(linea, LIENZO.w / 2, y); y += 46; linea = pal[i];
+      } else { linea = prueba; }
+    }
+    if (linea) cx.fillText(linea, LIENZO.w / 2, y);
+
+    cx.fillStyle = 'rgba(255,255,255,.5)';
+    cx.font = '900 30px "Barlow Condensed","Montserrat",sans-serif';
+    cx.fillText('CONECTA REYNOSA', LIENZO.w / 2, LIENZO.h - 84);
+    if (msg) msg.textContent = '';
+    return cv;
+  }
+  (function(){
+    var bt = $('st-bajar');
+    if (!bt) return;
+    bt.addEventListener('click', function(){
+      var msg = $('st-msg');
+      bt.disabled = true;
+      armarStory().then(function(cv){
+        if (!cv) return;
+        // `toBlob` es la prueba de que el canvas NO quedó contaminado: con una
+        // imagen de otro origen dentro, esto truena con SecurityError.
+        cv.toBlob(function(b){
+          if (!b) { if (msg) msg.textContent = 'No se pudo generar el archivo.'; return; }
+          var url = URL.createObjectURL(b);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'ganador-' + String(ADMG.nombre || 'sorteo')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase() + '.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+          if (msg) msg.textContent = 'Lista: ' + LIENZO.w + '×' + LIENZO.h + '.';
+        }, 'image/png');
+      }).catch(function(e){
+        if (msg) msg.textContent = 'No se pudo armar: ' + e.message;
+      }).then(function(){ bt.disabled = false; });
+    });
+  })();
 
   function mostrarTel(ver){
     telVisible = ver;
@@ -2869,6 +3256,21 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     $('g-ver').innerHTML = '<svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> ' + (ver ? 'Ocultar' : 'Ver');
   }
   $('g-ver').addEventListener('click', function(){ mostrarTel(!telVisible); });
+
+  // 🔒 APAGAR EL SONIDO APAGA LA MÚSICA TAMBIÉN. El interruptor gobierna los
+  // sonidos sintetizados del show; si además suena una canción y el
+  // interruptor no la callara, el letrero estaría mintiendo.
+  // ⚠️ El interruptor es `#son` y el estado se lee con `son.on` (un getter),
+  // no con una función: los dos nombres que escribí primero —`#son-sw` y
+  // `son.activo()`— NO EXISTEN. Leídos del código, no recordados.
+  (function(){
+    var sw = $('son');
+    if (!sw) return;
+    sw.addEventListener('click', function(){
+      var au = $('m-audio');
+      if (au && !au.paused && !son.on) au.pause();
+    });
+  })();
 
   // ═══ [GIVEAWAY-KG-1] LA CUADRÍCULA DE REVISIÓN ══════════════════════════
   var FOTOS = [], filFoto = 'pendiente';
@@ -2988,7 +3390,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('ens-msg').textContent = '';
       // 🔒 SE TIRA EL ESTADO. Sin esto la máquina seguiría animando el giro del
       // OTRO sorteo: `SHOW` y `estado` son del slug que se acaba de dejar.
-      SHOW = null; animado = null; estado = null; telAdmin = null;
+      SHOW = null; animado = null; estado = null; telAdmin = null; ADMG = null;
       enReposo = false;
       var caja = $('mosaico-caja'); if (caja) caja.hidden = true;
       $('panel').style.display = 'none';
@@ -3050,6 +3452,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       $('girar').disabled = false; $('girar').textContent = 'Girar otra vez';
       if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo girar'; return; }
       telAdmin = res.j.whatsapp;
+      if (res.j.ultimo) ADMG = res.j.ultimo;
       refrescar();   // el latido lo anima; no se duplica la animación aquí
     }).catch(function(){
       $('girar').disabled = false; $('girar').textContent = 'Girar';

@@ -56,7 +56,11 @@ function wavSilencio(ms) {
   b.fill(128, 44);
   return b;
 }
-const WAV = wavSilencio(600);
+// ⚠️ CUATRO SEGUNDOS, no medio: con 600 ms el clip YA HABÍA TERMINADO para el
+// tercer clic, así que `paused` era true por haber acabado —no por un defecto—
+// y la aserción del interruptor se puso roja midiendo mi fixture. La premisa de
+// un caso («todavía está sonando») tiene que ALCANZARSE para que el caso mida.
+const WAV = wavSilencio(4000);
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
 function af(cond, msg) {
@@ -508,7 +512,9 @@ function servidor(raiz) {
   await pg.click('#m-play');
   await pg.waitForTimeout(400);
   const e3 = await leer();
-  af(e3.pausado === false, 'suena otra vez para medir el interruptor');
+  af(e3.pausado === false,
+     '🔒 PREMISA del caso: tiene que estar SONANDO para poder medir que el '
+     + 'interruptor la calla. Dio ' + JSON.stringify(e3));
   await pg.click('#son');            // lo ENCIENDE
   await pg.waitForTimeout(250);
   await pg.click('#son');            // y lo APAGA

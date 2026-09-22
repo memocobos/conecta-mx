@@ -177,9 +177,8 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   0%{transform:scale(1)}
   35%{transform:scale(1.35)}
   100%{transform:scale(1.18)}}
-.mos.gana{box-shadow:0 0 0 3px var(--c-amarillo),0 10px 40px rgba(232,255,76,.45),
-  0 0 90px rgba(232,255,76,.3)}
-.mos.gana .mos-nom{color:var(--c-amarillo);font-size:clamp(13px,4vw,22px)}
+/* El marco de campeón NO va aquí: vive después de `.mos.vive` — ver
+   [SORTEO-CAMPEON-1] más abajo. */
 
 @media (prefers-reduced-motion: reduce){
   .mos-tiembla,.cuenta-final span{animation:none}
@@ -303,6 +302,44 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .mos.finalista .mos-nom{color:var(--c-amarillo);font-size:clamp(11px,3.4vw,19px);
   min-height:1.5em;padding:6px 4px 7px}
 
+/* ═══ 🔴 [SORTEO-CAMPEON-1] EL MARCO DE CAMPEON ═════════════════════════
+   Orden de Memo: borde grueso brillante con el amarillo-verde de Conecta y un
+   destello sutil. Anillo DOBLE —amarillo pegado, verde por fuera— y el halo.
+
+   🔴 VA AQUI, DESPUES DE `.mos.vive`, Y NO ES COSMETICA: las dos reglas tienen
+   la MISMA especificidad (dos clases) y en CSS gana la ULTIMA en llegar. Con el
+   bloque escrito arriba, `.mos.vive{box-shadow:...}` le ganaba y el marco no se
+   pintaba. Medido: el `box-shadow` computado de la tarjeta ganadora era el de
+   `.vive`, con su anillo de 1px.
+   ⚠️ Y el anillo de 3px que estaba antes de esta tuerca llevaba muerto POR LO
+   MISMO: nunca se vio. La señal es la de siempre — el número no se movía al
+   apretar la regla. Ver «una regla antes de su base es letra muerta».
+
+   🔒 Los dos colores son TOKENS de la marca (`--c-amarillo` y `--c-verde`): no
+   se inventa paleta (la lección de COLOR-1, donde tres colores sin token se
+   ESCALARON en vez de inventarse). */
+.mos.gana{box-shadow:0 0 0 5px var(--c-amarillo),0 0 0 8px var(--c-verde),
+  0 10px 46px rgba(232,255,76,.5),0 0 110px rgba(232,255,76,.34)}
+/* El destello: un anillo interior que respira. 🔒 ANIMA `opacity` Y NADA MAS
+   —la regla de la casa para lo que pinta por frame—, así que no hay reflow ni
+   repintado de sombra en cada fotograma. */
+.mos.gana::after{content:'';position:absolute;inset:0;z-index:3;
+  border-radius:inherit;pointer-events:none;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),inset 0 0 26px rgba(232,255,76,.55);
+  animation:ganaBrillo 2.2s ease-in-out infinite}
+@keyframes ganaBrillo{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){
+  /* El destello se apaga y se queda en su punto alto: el marco sigue viéndose
+     de campeón, solo no respira. Va DESPUES de su regla, por lo mismo. */
+  .mos.gana::after{animation:none;opacity:1}
+}
+/* 🔴 EN EL ESTADO «GANO» LA TARJETA ES SOLO LA FOTO. El nombre completo, la
+   ciudad y el premio van DEBAJO, en la placa y en ese orden (orden de Memo);
+   dejar aquí el nombre corto y la ciudad los repetía y rompía el orden. */
+body.gano .mos.gana .mos-nom,
+body.gano .mos.gana .mos-ciu,
+body.gano .mos.gana .mos-folio{display:none}
+
 /* La entrada: caen escalonadas, desde un estado YA VISIBLE (sin esto, un JS
    caído deja el mosaico en blanco). */
 /* El escalonado sale de `--paso`, que lo calcula el JS desde la duración de la
@@ -402,11 +439,13 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
   color:rgba(255,255,255,.84);border-top:1px solid rgba(232,255,76,.2)}
 .placa-ganador .pg-p:empty{display:none}
 .placa-ganador.no{background:rgba(255,40,59,.08);border-color:rgba(255,40,59,.42)}
-.placa-ganador.no .pg-f{color:var(--c-rojo)}
+.placa-ganador.no .pg-c{color:var(--c-rojo)}
 .placa-ganador .pg-l{font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--c-muted)}
 .placa-ganador .pg-n{font-family:var(--font-display);font-size:clamp(24px,5.2vw,40px);
   line-height:1.04;margin-top:5px;text-transform:uppercase;text-wrap:balance}
-.placa-ganador .pg-f{font-size:11px;color:var(--c-amarillo);margin-top:5px;letter-spacing:.14em}
+.placa-ganador .pg-c{font-size:12.5px;color:var(--c-amarillo);margin-top:4px;
+  letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-display)}
+.placa-ganador .pg-c:empty{display:none}
 
 /* ═══ EL MARCADOR DIGITAL ═══════════════════════════════════════════════ */
 .marcador{display:flex;justify-content:center;gap:5px;margin-bottom:6px}
@@ -868,7 +907,10 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     <div class="placa-ganador" id="placa-ganador">
       <div class="pg-l" id="pg-l">Ganador</div>
       <div class="pg-n" id="pg-n">—</div>
-      <div class="pg-f" id="pg-f"></div>
+      <!-- La ciudad va DEBAJO del nombre (orden de Memo) y lleva el folio en
+           la misma línea: dos renglones donde cabe uno le quitan aire a la
+           pantalla, y todo el bloque tiene que caber sin scroll. -->
+      <div class="pg-c" id="pg-c"></div>
       <!-- El PREMIO, derivado de `_lib` en el servidor. Nace vacio: un premio
            tecleado aqui seria una cuarta copia de `PREMIOS`. -->
       <div class="pg-p" id="pg-p"></div>
@@ -1838,7 +1880,10 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     var pl = $('placa-ganador');
     if (!pl){ console.error('[sorteo] #placa-ganador no esta en el DOM'); return; }
     $('pg-n').textContent = (g && g.nombre) || '—';
-    $('pg-f').textContent = (g && g.folio) ? ('Folio #' + g.folio) : '';
+    // Ciudad y folio en un renglón: «Reynosa · Folio #45». La ciudad viene del
+    // servidor (es pública: de ella DEPENDE el premio), no del mosaico.
+    $('pg-c').textContent = [(g && g.ciudad) || '', (g && g.folio) ? ('Folio #' + g.folio) : '']
+      .filter(Boolean).join(' · ');
     $('pg-p').textContent = (g && g.premio) || '';
     pl.classList.add('on');
   }

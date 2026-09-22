@@ -1949,13 +1949,18 @@ console.log('\n── [20] la ciudad en el mosaico y el premio derivado ──')
      '🔴 el premio no es el que DERIVA `_lib` de su ciudad: ' + g.premio);
   af(() => Object.values(G.PREMIOS).indexOf(g.premio) !== -1,
      'y el texto sale de `PREMIOS`, no de la pantalla');
+  // La ciudad del ganador va en la placa, debajo del nombre.
+  af(() => g.ciudad === REG.find((x) => x.id === SOR[SOR.length - 1].registro_id).ciudad,
+     '🔴 la ciudad del ganador no es la suya: ' + g.ciudad);
 
   // GATEADO como el nombre: antes de la revelación, `premio` es null — si no,
   // diría de qué ciudad es quien va ganando.
   await girarYFijar(1000);
   const r2 = await pedir({});
-  af(() => r2.d.ultimo.nombre === null && r2.d.ultimo.premio === null,
-     '🔴 el premio viajó ANTES de la revelación: ' + JSON.stringify(r2.d.ultimo.premio));
+  af(() => r2.d.ultimo.nombre === null && r2.d.ultimo.premio === null
+        && r2.d.ultimo.ciudad === null,
+     '🔴 el premio o la ciudad del ganador viajaron ANTES de la revelación: '
+     + JSON.stringify([r2.d.ultimo.premio, r2.d.ultimo.ciudad]));
   af(() => (r2.d.ultimo.rondas[0].miembros || []).every((m) => m.ciudad),
      '🔒 pero la ciudad de las fichas sí va desde el primer momento: es pública');
 }

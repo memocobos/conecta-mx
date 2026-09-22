@@ -75,6 +75,7 @@ function estado() {
       nombre: rev ? rondas.orden[0].nombre : null, folio: rev ? rondas.orden[0].folio : null,
       // Gateado igual que el nombre, y DERIVADO: `premioPorCiudad` + `PREMIOS`.
       premio: rev ? G.PREMIOS[G.premioPorCiudad(ciudadDe(rondas.orden[0].id))] : null,
+      ciudad: rev ? ciudadDe(rondas.orden[0].id) : null,
       total_participantes: 66, creado_at: new Date(ARRANQUE).toISOString(), de_cuantos: 66,
       escalones, escalon: null, es_regiro: false,
       rondas: recortadas, rondas_totales: proy.rondas_totales,
@@ -674,6 +675,25 @@ async function cazar(pg, foto, pred, msMax, nombre) {
      '🔴 la placa del ganador está ENCENDIDA antes de la revelación (opacity ' + plAntes.op + ')');
   af(plAntes.n === '—' && plAntes.p === '',
      '🔴 la placa ya traía el nombre o el premio antes de tiempo: ' + JSON.stringify(plAntes));
+  // 🔒 CONTROL POSITIVO DEL MEDIDOR DE VIBRACIÓN, tomado AQUÍ porque es el
+  // único momento en que las tarjetas SÍ tiemblan. Sin él, el «no se movió» de
+  // después no distingue una tarjeta quieta de un medidor ciego — y el medidor
+  // ya había estado ciego una vez, midiendo `.mos` en lugar del envoltorio.
+  const posTmb = () => pg.evaluate(() => {
+    const e = document.querySelector('#mosaico .mos .mos-tiembla');
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return { y: Math.round(r.top + scrollY), x: Math.round(r.left) };
+  });
+  let TEMBLO_ANTES = false;
+  const t1 = await posTmb();
+  for (let i = 0; i < 12 && !TEMBLO_ANTES; i++) {
+    await pg.waitForTimeout(120);
+    const t2 = await posTmb();
+    if (t1 && t2 && (t1.y !== t2.y || t1.x !== t2.x)) TEMBLO_ANTES = true;
+  }
+  console.log('   el medidor de vibración ' + (TEMBLO_ANTES ? 'SÍ ve' : '🔴 NO ve')
+            + ' moverse la tarjeta mientras tiembla');
 
   // 2 · MUERE UNO, y su tarjeta SE VA (no se queda gris ocupando espacio).
   cI = await cazar(pg, foto, (x) => x.total === 2 && x.muriendo === 0,
@@ -731,15 +751,44 @@ async function cazar(pg, foto, pred, msMax, nombre) {
       bot: rs.length ? Math.round(Math.max.apply(null, rs.map((r) => r.bottom))) : null,
       vh: innerHeight, scrollY: Math.round(scrollY),
       placaVis: vis(pl), panelVis: vis(pa), ganaVis: vis(g),
-      pgN: t('pg-n'), pgF: t('pg-f'), pgP: t('pg-p'), reloj: t('reloj').split('\n')[0].trim(),
+      pgN: t('pg-n'), pgC: t('pg-c'), pgP: t('pg-p'), reloj: t('reloj').split('\n')[0].trim(),
       // Quieta de verdad: el temblor son dos variables EN LINEA.
       amp: env ? (env.style.getPropertyValue('--amp') || '') : '',
-      ciudadGana: (g ? (g.querySelector('.mos-ciu') || {}).textContent : '') || '',
+      tiembla: !!env,
+      // 🔒 TODAS las animaciones vivas de la tarjeta y de sus hijos, por nombre.
+      // Preguntar solo por la clase no basta: una animacion puede seguir
+      // corriendo por CSS sin que la clase este puesta.
+      animaciones: [g].concat(g ? [].slice.call(g.querySelectorAll('*')) : [])
+        .filter(Boolean)
+        .map((e) => getComputedStyle(e).animationName)
+        .filter((x) => x && x !== 'none'),
+      // El ORDEN de lo que va debajo de la foto, por geometria.
+      orden: ['mos-foto', 'pg-n', 'pg-c', 'pg-p', 'reloj'].map((k) => {
+        const e = document.getElementById(k)
+          || (g ? g.querySelector('.' + k) : null) || document.querySelector('.' + k);
+        if (!e) return { k, y: null };
+        const cs = getComputedStyle(e);
+        return { k, y: Math.round(e.getBoundingClientRect().top),
+                 ve: cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > .05 };
+      }),
+      // Lo que YA NO debe verse en la tarjeta: el nombre corto y la ciudad
+      // repetidos romperian el orden que pidio Memo.
+      enTarjeta: ['mos-nom', 'mos-ciu', 'mos-folio'].map((c) => {
+        const e = g ? g.querySelector('.' + c) : null;
+        return { c, ve: !!e && getComputedStyle(e).display !== 'none' };
+      }),
+      // 🔴 LA POSICION SE MIDE DEL ENVOLTORIO DE ADENTRO, NO DE `.mos`. El
+      // temblor es un `transform` sobre `.mos-tiembla` (un div que `temblar()`
+      // crea dentro), asi que `.mos` NO SE MUEVE NUNCA y medirlo habria dado
+      // «quieta» tambien en plena vibracion: la asercion habria pasado en
+      // vacio. Y en absoluto (top + scrollY) para no confundirla con scroll.
+      abs: g ? Math.round((g.firstElementChild || g).getBoundingClientRect().top + scrollY) : null,
+      absIzq: g ? Math.round((g.firstElementChild || g).getBoundingClientRect().left) : null,
     };
   });
   console.log('   bloque del ganador: y=' + caben.top + '..' + caben.bot + ' en un viewport de '
             + caben.vh + 'px (scrollY ' + caben.scrollY + ') · ' + JSON.stringify(caben.nombres));
-  console.log('   la placa: «' + caben.pgN + '» · ' + caben.pgF + ' · premio «'
+  console.log('   la placa: «' + caben.pgN + '» · ' + caben.pgC + ' · premio «'
             + caben.pgP.slice(0, 46) + '…» · reloj ' + caben.reloj);
   af(caben.hay === 3,
      '🔴 el bloque del ganador no está COMPLETO y VISIBLE: solo ' + caben.hay
@@ -752,7 +801,9 @@ async function cazar(pg, foto, pred, msMax, nombre) {
   // El CONTENIDO, que es lo que Memo pidió ver debajo de la tarjeta.
   af(/^Nombre\d+ Apellido\d+$/.test(caben.pgN),
      '🔴 la placa no trae el nombre COMPLETO del servidor: «' + caben.pgN + '»');
-  af(/^Folio #\d+$/.test(caben.pgF), '🔴 la placa no trae el folio: «' + caben.pgF + '»');
+  const ciudadG = ciudadDe(rondas.orden[0].id);
+  af(caben.pgC === ciudadG + ' · Folio #' + rondas.orden[0].folio,
+     '🔴 la placa no trae CIUDAD · folio: «' + caben.pgC + '»');
   // 🔒 El premio no se compara contra un texto tecleado aquí: se le PREGUNTA a
   // `_lib`, que es de donde sale en producción.
   const premioEsperado = G.PREMIOS[G.premioPorCiudad(ciudadDe(rondas.orden[0].id))];
@@ -763,8 +814,60 @@ async function cazar(pg, foto, pred, msMax, nombre) {
      '🔴 el reloj de 10 minutos no está corriendo: «' + caben.reloj + '»');
   af(caben.amp === '',
      '🔴 la tarjeta ganadora se quedó TEMBLANDO (--amp=' + caben.amp + '): al cero se queda quieta');
-  af(caben.ciudadGana.length > 0,
-     '🔴 la tarjeta del ganador no dice su ciudad: «' + caben.ciudadGana + '»');
+  // 🔴 EL ORDEN DEBAJO DE LA FOTO: nombre completo → ciudad → premio → reloj.
+  console.log('   el orden: ' + caben.orden.map((o) => o.k + ' y=' + o.y).join(' → '));
+  af(caben.orden.every((o) => o.y !== null && o.ve),
+     '🔴 alguna pieza del orden no está o no se ve: ' + JSON.stringify(caben.orden));
+  for (let i = 1; i < caben.orden.length; i++) {
+    af(caben.orden[i].y > caben.orden[i - 1].y,
+       '🔴 el orden está mal: ' + caben.orden[i].k + ' (y=' + caben.orden[i].y + ') no va debajo de '
+       + caben.orden[i - 1].k + ' (y=' + caben.orden[i - 1].y + ')');
+  }
+  af(caben.enTarjeta.every((x) => !x.ve),
+     '🔴 la tarjeta repite lo que ya va en la placa: '
+     + JSON.stringify(caben.enTarjeta.filter((x) => x.ve)));
+
+  // ═══ 🔴 NINGUNA ANIMACIÓN DE TEMBLOR ACTIVA (orden de Memo) ═══════════
+  // Tres preguntas distintas, porque cada una sola se puede contestar bien por
+  // la razón equivocada: la CLASE puede no estar y la animación seguir; la
+  // animación puede estar en `none` y las variables en línea seguir puestas; y
+  // las dos pueden estar limpias con otra cosa moviendo la tarjeta.
+  af(!caben.tiembla, '🔴 la tarjeta ganadora sigue con el envoltorio `.mos-tiembla`');
+  af(caben.amp === '',
+     '🔴 la tarjeta ganadora conserva el temblor en línea (--amp=' + caben.amp + ')');
+  af(caben.animaciones.indexOf('tiembla') === -1,
+     '🔴 la animación `tiembla` sigue VIVA en la tarjeta del ganador: '
+     + JSON.stringify(caben.animaciones));
+  console.log('   animaciones vivas en la tarjeta: ' + JSON.stringify(caben.animaciones));
+  // Y la prueba de que NO se mueve: la misma caja, dos veces, 500ms aparte. Se
+  // mide en absoluto (top + scrollY) para no confundir vibración con scroll.
+  await pg.waitForTimeout(500);
+  const quieta = await pg.evaluate(() => {
+    const g = document.querySelector('.mos.gana');
+    if (!g) return null;
+    const r = (g.firstElementChild || g).getBoundingClientRect();
+    return { abs: Math.round(r.top + scrollY), izq: Math.round(r.left) };
+  });
+  af(quieta && quieta.abs === caben.abs && quieta.izq === caben.absIzq,
+     '🔴 la tarjeta ganadora SE MUEVE tras la revelación: y ' + caben.abs + '→'
+     + (quieta || {}).abs + ' · x ' + caben.absIzq + '→' + (quieta || {}).izq);
+  // 🔒 CONTROL POSITIVO DEL MEDIDOR: durante el temblor la MISMA medición tiene
+  // que ver movimiento. Sin esto, «no se movió» no distingue quieta de ciega.
+  af(TEMBLO_ANTES === true,
+     '🔒 CONTROL POSITIVO: el medidor de vibración no vio moverse la tarjeta '
+     + 'MIENTRAS temblaba, así que su «quieta» no dice nada');
+
+  // El marco de campeón: anillo grueso y destello, medidos.
+  const marco = await pg.evaluate(() => {
+    const g = document.querySelector('.mos.gana');
+    if (!g) return null;
+    const cs = getComputedStyle(g), pos = getComputedStyle(g, '::after');
+    return { sombra: cs.boxShadow, brillo: pos.animationName, op: pos.opacity };
+  });
+  af(marco && /5px/.test(marco.sombra) && /8px/.test(marco.sombra),
+     '🔴 el marco de campeón no tiene el anillo doble grueso: ' + (marco || {}).sombra);
+  af(marco && marco.brillo === 'ganaBrillo',
+     '🔴 el destello del campeón no está vivo: ' + JSON.stringify((marco || {}).brillo));
   af(errsI.length === 0, 'errores en I: ' + JSON.stringify(errsI.slice(0, 3)));
   await pg.close();
 

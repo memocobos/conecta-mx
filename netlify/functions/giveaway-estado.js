@@ -240,6 +240,9 @@ exports.handler = async (event) => {
       // correo. Y viaja GATEADO como el nombre — antes de la revelación el
       // premio diría de qué ciudad es quien va ganando.
       premio: ver ? (G.PREMIOS[G.premioPorCiudad(ciudadPorId[String(s.registro_id)])] || null) : null,
+      // La ciudad del ganador va en la placa, debajo del nombre. Gateada por la
+      // misma razón que el premio: antes de la revelación diría de dónde es.
+      ciudad: ver ? (ciudadPorId[String(s.registro_id)] || null) : null,
       total_participantes: s.total_participantes,
       creado_at: s.creado_at,
     };

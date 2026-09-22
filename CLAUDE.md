@@ -167,6 +167,89 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **ROL-MONTO-MUDO-1 EN PROD (22-sep-2026, #754): el paso 4 de `/rol` dice
+  qué le falta, en vez de quedarse mudo.** Reporte real de **Ximena, con
+  captura**: dos clientes no podían capturar el monto del separo — veían el
+  título, **ningún campo** y el botón muerto, sin una palabra.
+  `npm run mide:rol-mudo` (**44**), cero SQL.
+
+  **La causa:** `#sep-monto-wrap` nace oculto y `recomputeDefaultSepMonto` lo
+  volvía a esconder cada vez que `computeDefaultSep()` daba null. *Un cero es
+  una afirmación, y un paso mudo también.*
+
+  🔴 **LA FECHA ES LA RAÍZ, Y EL ORDEN DEL LETRERO NO ES COSMÉTICO.** Medido:
+  sin fecha, `pedirPrecioVigente` se sale sin pedir nada y
+  `precioZonaVigente()` devuelve null — o sea que en el caso de Ximena faltan
+  **los dos**, fecha y precio. Nombrar el precio primero diría «vuelve al paso
+  2», que es **la causa equivocada**, y mandaría al cliente a buscar donde no
+  está. El precio nulo es **consecuencia** de la fecha vacía: solo se nombra
+  cuando la fecha ya está y el precio sigue sin resolverse.
+  ⚠️ **La fecha vacía sin default está BIEN** y no se re-litiga (ROL-HIST-2):
+  lo roto era el silencio.
+
+  🔒 **EL CASO DEL PRECIO NO SE RE-EXPLICA EN EL PASO 4**: el paso 2 ya dice por
+  qué (buscando, error, zona cerrada, varios precios ese día, sin historial) en
+  `pintarPrecioHist`. Repetirlo sería la segunda lista que todavía no ha
+  divergido. El paso 4 lo **nombra** y manda para allá.
+
+  **DOS HECHOS DE MÓVIL que decidieron el diseño** —y ahí están los clientes:
+  (a) `@media(max-width:600px)` pone los pasos `.locked` **y los `.done`** en
+  `display:none`, así que se ve **un paso a la vez**; (b) `#sep-date-wrap` nace
+  oculto y **solo aparece al elegir la zona** — y en CHEAP esa misma acción
+  dispara `setStep(4)`, que manda el paso 3 a `display:none` y **se lleva el
+  campo que acababa de aparecer**. El cliente nunca vio la fecha.
+  **Por eso el paso 4 SIGUE desbloqueándose sin fecha** (decisión mía, que Memo
+  dejó abierta): bloquearlo lo haría **desaparecer** del teléfono, el letrero
+  hace falta igual porque el precio puede faltar solo, y un paso bloqueado es
+  igual de mudo que uno vacío.
+
+  🔴 **LEY NUEVA, y salió de un defecto de mi propio arreglo: SE VUELVE CON EL
+  DATO QUE FUE A BUSCAR, NO CON LA LISTA VACÍA.** El «camino de regreso» del
+  aviso tiene que mover el paso (en móvil el destino está oculto si no), y como
+  el `change` de la fecha es **el único de los cuatro sitios que no llama a
+  `setStep(4)`**, eso atrapaba al cliente en el paso 3. La primera versión
+  esperaba a que **no faltara nada** para volver — y eso lo atrapaba en el caso
+  del precio: llenaba la fecha, el precio seguía sin resolver, el paso 4 se
+  quedaba cerrado e invisible, y el aviso que le habría dicho «la razón está en
+  el paso 2» se pintaba en un paso que no se ve. **Lo cazó el careo, no una
+  lectura.**
+
+  **El careo entra POR LA PUERTA DEL CLIENTE y en 390×844**: onboarding →
+  nombre → «+ tour» → evento → CHEAP → zona. No se fabrica el `state`; y
+  saltarse el onboarding dejaba el paso 2 bloqueado —invisible en móvil—, así
+  que el botón del paquete no existía para el clic: el arnés se caía midiendo
+  una pantalla que ningún cliente ve. 🔒 **«Existe» no es «se ve»**: cada pieza
+  por su cadena completa (`display`, `visibility`, `opacity`, `offsetParent` y
+  su caja), y el veredicto de BASE se toma del **texto que el cliente LEE**
+  (`innerText` del paso 4), no de la ausencia de mi propio `div`.
+
+- 🔴⏳ **`vigia:rol-hist-padre` CADUCÓ ENTERO — tuerca propia, sin resolver
+  (22-sep-2026).** Sale con **348 rojos y ninguno es del código**:
+  - su bloque **[A]** quita `LLAVES_NUEVAS` (`heredado`, `llave_usada`,
+    `filas_historial_padre`, `padre_error`) **solo del lado de HEAD**, porque
+    cuando se escribió no existían en producción. **Hoy sí existen** —
+    ROL-HIST-PADRE-1 (#732) se mergeó—, así que las **252 comparaciones
+    difieren por construcción**;
+  - y su bloque **[B]** exige que **BASE esté roto** (`sin_historial: true`)
+    como control positivo: producción ya trae la rampa, así que ese control
+    **no puede pasar nunca más**.
+
+  🔒 **LA LEY: un careo BASE↔HEAD donde BASE es «producción» caduca el día de
+  su propio merge.** Con dos commits el par se congela; con un SITIO VIVO, el
+  «antes» desaparece en cuanto la tuerca sale.
+  🔴 **Y NO SE MEDIO-ARREGLA:** arreglar solo [A] era una línea y lo habría
+  puesto **en verde** dejando [B] estructuralmente muerto — un verde engañoso
+  sobre un arnés que ya no mide nada. Se revirtió a propósito.
+  **Mientras tanto, lo que sí se puede afirmar se mide directo:** la respuesta
+  de `precios-vigentes` es **idéntica byte a byte** entre producción y el
+  preview (5 de 5 casos, 17 llaves), que es el hecho que ese vigía existía para
+  proteger.
+  ⏳ **La decisión pendiente es de Memo:** revivirlo como **vigilante vivo**
+  (producción y preview tienen que contestar IGUAL, y [B] se retira con su
+  razón escrita) o como careo anclado a **dos commits servidos**. Son dos
+  arneses distintos.
+
+
 - 🏆🔴 **GANADOR-QUIETO-1 EN PROD (22-sep-2026, #753): la ganadora se queda
   quieta, y el letrero deja de decir «ronda 4 de 5».** Dos defectos que Memo vio
   en el ensayo, con captura. `npm run mide:ganador-quieto` (**44**), cero SQL.

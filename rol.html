@@ -268,6 +268,22 @@ button{cursor:pointer;border:none;background:none}
   margin-top:6px;font-size:11px;color:var(--ink-mute);
   line-height:1.4;font-weight:500;
 }
+/* [ROL-MONTO-MUDO-1] El aviso de lo que falta. 🔒 Color y fondo van en PAREJA y
+   los dos son TOKENS (`--yel`, `--ink`): es la unidad de conversión que dejó
+   COLOR-1, porque un color con un fondo a mano se vuelve ilegible en otro tema. */
+.sep-falta{
+  background:rgba(232,255,76,.1);border:1px solid var(--yel);
+  border-radius:12px;padding:12px 14px;margin:2px 0 12px;color:var(--ink);
+}
+.sep-falta[hidden]{display:none}
+.sep-falta .sf-txt{font-size:13px;line-height:1.5}
+.sep-falta .sf-txt b{color:var(--yel);font-weight:800}
+.sep-falta .sf-ir{
+  margin-top:10px;background:var(--yel);color:#000;border:0;border-radius:9px;
+  padding:9px 13px;font-weight:800;font-size:12px;cursor:pointer;
+  font-family:inherit;letter-spacing:.02em;
+}
+.sep-falta .sf-ir:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .fld-help b{color:var(--yel);font-weight:700}
 
 /* Buy-type pills */
@@ -1348,6 +1364,18 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
         <input type="text" inputmode="decimal" id="sep-monto" autocomplete="off">
       </div>
       <div class="fld-help">¿Pagaste un monto diferente? <b>Ajústalo aquí.</b></div>
+    </div>
+    <!-- 🔴 [ROL-MONTO-MUDO-1] EL PASO MUDO. Reporte real de Ximena: dos
+         clientes no podían capturar el monto. `#sep-monto-wrap` nace oculto y
+         se volvía a esconder cada vez que el monto no se podía calcular, así
+         que el cliente veía el título, NINGÚN campo y el botón muerto — sin una
+         palabra. Un cero es una afirmación, y un paso mudo también.
+         Va ARRIBA del botón: la razón se lee antes de topar con lo que no
+         funciona. Lo pinta `pintarFaltaSeparo`, derivado de cuál prerequisito
+         falta; nace oculto para que un JS caído no deje un aviso en falso. -->
+    <div class="sep-falta" id="sep-falta" hidden>
+      <div class="sf-txt" id="sep-falta-txt"></div>
+      <button type="button" class="sf-ir" id="sep-falta-ir"></button>
     </div>
     <button class="cta" id="btn-calc" disabled>Generar mi plan ↘</button>
   </section>
@@ -2748,6 +2776,89 @@ function computeDefaultSep(){
   return sep;
 }
 
+// ═══ 🔴 [ROL-MONTO-MUDO-1] QUÉ LE FALTA AL PASO 4, DERIVADO ═════════════
+//
+// 🔴 LA FECHA ES LA RAÍZ, Y EL ORDEN NO ES COSMÉTICO. Sin fecha,
+// `pedirPrecioVigente` se sale sin pedir nada y `precioZonaVigente()` devuelve
+// null — o sea que en el caso de Ximena faltan LOS DOS, fecha y precio. Si el
+// letrero nombrara el precio primero le diría «no pudimos leer el precio,
+// vuelve al paso 2», que es LA CAUSA EQUIVOCADA y lo mandaría a buscar donde
+// no está. El precio nulo es CONSECUENCIA de la fecha vacía, así que solo se
+// nombra cuando la fecha YA está y el precio sigue sin resolverse.
+//
+// 🔒 Y EL CASO DEL PRECIO NO SE RE-EXPLICA AQUÍ: el paso 2 ya dice por qué
+// (buscando, error, zona cerrada, varios precios ese día, sin historial) en
+// `pintarPrecioHist`. Repetir esos textos sería la segunda lista que todavía no
+// ha divergido. Aquí se NOMBRA y se manda para allá.
+//
+// ⚠️ La fecha vacía sin default está BIEN y no se re-litiga (ROL-HIST-2): lo
+// roto era que el paso 4 no dijera qué le faltaba.
+var PREREQ_SEPARO = [
+  { k:'ev', paso:1, foco:null,
+    falta:function(){ return !state.ev; },
+    txt:'Falta elegir el <b>evento</b> — está en el paso 1.' },
+  { k:'pkg', paso:2, foco:null,
+    falta:function(){ return !!state.ev && !state.pkg; },
+    txt:'Falta elegir el <b>paquete</b> — está en el paso 2.' },
+  { k:'fecha', paso:3, foco:'sep-date',
+    falta:function(){ return !state.sepDate; },
+    txt:'Falta la <b>fecha del separo</b> — está en el paso 3, y es la de tu comprobante.' },
+  { k:'precio', paso:2, foco:'precio-hist',
+    // Solo cuenta cuando la fecha YA está: si no, es el eco de la fecha vacía.
+    falta:function(){ return !!state.ev && !!state.pkg && !!state.sepDate && state.precio==null; },
+    txt:'Todavía no hay <b>precio</b> para esa fecha. La razón está en el paso 2, junto al precio.' },
+];
+function faltaDelSeparo(){
+  return PREREQ_SEPARO.filter(function(p){ return p.falta(); });
+}
+// 🔴 EL PASO AL QUE HAY QUE VOLVER. En móvil —que es donde están los clientes
+// de Ximena— `@media(max-width:600px)` esconde los pasos `.locked` **y los
+// `.done`**: se ve UN paso a la vez. O sea que:
+//   · un `scrollIntoView` a `#step3` desde el paso 4 iría a un elemento
+//     OCULTO y no haría nada (defecto de mi primera versión de este arreglo);
+//   · y por eso el regreso SÍ tiene que mover el paso con `setStep`.
+// Pero `setStep(3)` re-bloquea el 4 y el `change` de la fecha no vuelve a
+// abrirlo (medido: de los cuatro sitios que llaman `setStep(4)`, ninguno es
+// el de la fecha). Se anota a dónde volver, y CON QUÉ DATO.
+//
+// 🔴 EL REGRESO SE DISPARA CON EL DATO QUE FUE A BUSCAR, NO CON «YA NO FALTA
+// NADA». La primera versión esperaba a que la lista quedara vacía y eso
+// ATRAPABA al cliente en el caso del precio: llenaba la fecha, el precio
+// seguía sin resolverse, el paso 4 se quedaba cerrado —y en móvil, invisible—
+// y el aviso que le habría dicho «la razón está en el paso 2» se pintaba en un
+// paso que no se ve. Lo cazó el careo, no una lectura.
+var _sepVolverA = null;    // { paso: 4, k: 'fecha' }
+function pintarFaltaSeparo(){
+  var caja = document.getElementById('sep-falta');
+  var txt  = document.getElementById('sep-falta-txt');
+  var bt   = document.getElementById('sep-falta-ir');
+  if(!caja || !txt || !bt) return;
+  var f = faltaDelSeparo();
+  // El regreso: en cuanto el dato por el que se fue YA no falta, se vuelve —
+  // aunque quede otro pendiente, porque el aviso del que queda vive en el
+  // paso 4 y allá tiene que poder leerse.
+  if(_sepVolverA && !f.some(function(p){ return p.k === _sepVolverA.k; })){
+    var vv = _sepVolverA; _sepVolverA = null;
+    setStep(vv.paso);
+  }
+  if(!f.length){ caja.hidden = true; txt.innerHTML=''; return; }
+  txt.innerHTML = f.map(function(p){ return p.txt; }).join(' ');
+  // El camino de regreso apunta al PRIMER faltante, y su rótulo lo dice.
+  var d = f[0];
+  bt.textContent = 'Ir al paso ' + d.paso + ' ↑';
+  bt.onclick = function(){
+    // Se MUEVE el paso (en móvil el destino está oculto si no) y se apunta el
+    // regreso, que ocurre solo cuando ya no falte nada.
+    _sepVolverA = { paso: 4, k: d.k };
+    setStep(d.paso);
+    var sec = document.getElementById('step' + d.paso);
+    if(sec && sec.scrollIntoView) { try { sec.scrollIntoView({behavior:'smooth', block:'start'}); } catch(e){ sec.scrollIntoView(true); } }
+    var el = d.foco ? document.getElementById(d.foco) : null;
+    if(el && el.focus) setTimeout(function(){ try { el.focus({preventScroll:true}); } catch(e){ el.focus(); } }, 320);
+  };
+  caja.hidden = false;
+}
+
 function recomputeDefaultSepMonto(){
   var wrap=document.getElementById('sep-monto-wrap');
   var input=document.getElementById('sep-monto');
@@ -2756,9 +2867,11 @@ function recomputeDefaultSepMonto(){
     wrap.style.display='none';
     state.sepMonto=null; state.sepTouched=false;
     input.value='';
+    pintarFaltaSeparo();
     return;
   }
   wrap.style.display='block';
+  pintarFaltaSeparo();
   if(!state.sepTouched){
     state.sepMonto = def;
     input.value = def;

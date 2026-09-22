@@ -1383,19 +1383,36 @@ try {
 } catch (e) {
   af(false, '🔴 no se pudo extraer el árbol de BASE (' + BASE + '): ' + e.message);
 }
-// 🔒 EL LADO DE HEAD SE DICE EN VOZ ALTA. Este careo mide el ÁRBOL DE TRABAJO
-// (que es lo que quieres de un vigilante vivo), no un commit congelado — pero
-// entonces el verde no vale nada si no se sabe QUÉ árbol midió. Se imprime el
-// sha y si está sucio, para que el veredicto no sea ambiguo nunca.
+// ═══ 🔒 EL LADO DE HEAD, ANCLADO A UN COMMIT (y el vigilante vivo aparte) ══
 //
-// ⏳ ANTES DEL MERGE: aquí se ancla `HEAD` al sha del merge y se corre una vez
-// más, para dejar un verdadero careo entre DOS COMMITS que no caduque. Mientras
-// la PR vive, el árbol de trabajo es lo correcto.
+// Este careo mide DOS COSAS A PROPÓSITO, porque son dos preguntas distintas y
+// la casa ya pagó por confundirlas:
+//
+//   · EL CAREO CONGELADO — `HEAD_SHA` es un commit. Es el «después» del par
+//     BASE↔HEAD y NO CADUCA: dentro de seis meses sigue diciendo lo mismo,
+//     porque los dos lados son commits (la mitad que le faltaba a 11 de 13
+//     arneses de KH-4).
+//   · EL VIGILANTE VIVO — el ÁRBOL DE TRABAJO de hoy. Si alguien reabre el
+//     spoiler el mes que entra, el congelado no lo vería: sigue midiendo su
+//     commit. Este sí, y por eso va en su propio renglón con su propio nombre.
+//
+// El sha y si el árbol está sucio se IMPRIMEN: un verde sin saber qué árbol se
+// midió no vale nada.
+const HEAD_SHA = process.env.HEAD_SHA || 'a390212';
+let dirHead = null;
+try {
+  const shaH = execSync('git rev-parse ' + HEAD_SHA, { cwd: RAIZ, encoding: 'utf8' }).trim();
+  dirHead = require('fs').mkdtempSync(require('path').join(os.tmpdir(), 'head-' + shaH.slice(0, 7) + '-'));
+  execSync('git archive ' + shaH + ' | tar -x -C ' + dirHead, { cwd: RAIZ, shell: '/bin/bash' });
+  console.log('    HEAD anclado = ' + shaH.slice(0, 9) + ' extraído');
+} catch (e) {
+  af(false, '🔴 no se pudo extraer el árbol de HEAD (' + HEAD_SHA + '): ' + e.message);
+}
 try {
   const shaHead = execSync('git rev-parse --short HEAD', { cwd: RAIZ, encoding: 'utf8' }).trim();
   const sucio = execSync('git status --porcelain -- sorteo.html sorteo-tiempos.js netlify/functions scripts',
     { cwd: RAIZ, encoding: 'utf8' }).trim();
-  console.log('    HEAD medido = ÁRBOL DE TRABAJO sobre ' + shaHead
+  console.log('    y el vigilante vivo = ÁRBOL DE TRABAJO sobre ' + shaHead
             + (sucio ? '  ⚠️ CON CAMBIOS SIN COMMITEAR:\n      ' + sucio.split('\n').join('\n      ') : '  (limpio)'));
 } catch (e) { console.log('    (no se pudo leer el sha de HEAD: ' + e.message + ')'); }
 if (dirBase) {
@@ -1412,10 +1429,30 @@ if (dirBase) {
      + JSON.stringify(dBase.ultimo && dBase.ultimo.nombre));
   af(() => dBase.ultimo && dBase.ultimo.folio != null,
      '🔴 CONTROL POSITIVO: en BASE el folio del ganador también salía en t=0');
-  // Y HEAD, en el MISMO instante, NO lo suelta. Los dos lados, medidos juntos.
+  // Y HEAD, en el MISMO instante, NO lo suelta. Los dos lados son COMMITS.
+  if (dirHead) {
+    const estadoHead = require(path.join(dirHead, 'netlify/functions/giveaway-estado.js')).handler;
+    const rAnc = await estadoHead(evG({}));
+    let dAnc = {}; try { dAnc = JSON.parse(rAnc.body || '{}'); } catch (_) {}
+    console.log('    HEAD anclado en t=0 → ultimo.nombre = '
+              + JSON.stringify(dAnc.ultimo && dAnc.ultimo.nombre));
+    af(() => rAnc.statusCode === 200, 'el estado de HEAD anclado contesta 200, dio ' + rAnc.statusCode);
+    af(() => dAnc.ultimo && dAnc.ultimo.nombre === null,
+       '🔴 en el HEAD ANCLADO el nombre TIENE que venir en null; vino '
+       + JSON.stringify(dAnc.ultimo && dAnc.ultimo.nombre));
+    af(() => dAnc.ultimo && dAnc.ultimo.folio === null && dAnc.ultimo.premio === null
+          && dAnc.ultimo.ciudad === null,
+       '🔴 en el HEAD ANCLADO se filtró folio, premio o ciudad en t=0: '
+       + JSON.stringify([dAnc.ultimo && dAnc.ultimo.folio, dAnc.ultimo && dAnc.ultimo.premio,
+                         dAnc.ultimo && dAnc.ultimo.ciudad]));
+    af(() => (rAnc.body || '').indexOf(fila13.ganador_nombre + '"') === -1,
+       'y en el anclado no aparece identificable en ningún otro campo');
+  }
+  // EL VIGILANTE VIVO, sobre el árbol de hoy: si alguien reabre el spoiler
+  // después del merge, el careo congelado de arriba no lo vería.
   const rHead = await pedir({});
   af(() => rHead.d.ultimo && rHead.d.ultimo.nombre === null,
-     '🔴 en HEAD, mismo instante, el nombre TIENE que venir en null; vino '
+     '🔴 VIGILANTE VIVO: en el árbol de HOY el nombre TIENE que venir en null; vino '
      + JSON.stringify(rHead.d.ultimo && rHead.d.ultimo.nombre));
   af(() => rHead.crudo.indexOf(fila13.ganador_nombre + '"') === -1
         || rHead.d.ultimo.rondas.some((x) => x.miembros.length > 1),

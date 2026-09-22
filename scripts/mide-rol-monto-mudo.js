@@ -45,7 +45,14 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '7cf0021';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+// 🔒 HEAD ANCLADO A UN COMMIT FIJO, no a `HEAD`: con `HEAD` el careo mediría
+// siempre el árbol de hoy y dentro de tres tuercas le estaría culpando a ésta
+// lo que otros cambien. `a7660f3` es el commit cuyo árbol trae el letrero
+// derivado y la regla del regreso.
+//   · careo CONGELADO (el default): reproducible, no caduca.
+//   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:rol-mudo`, que remide el
+//     árbol de hoy contra el MISMO BASE.
+const HEAD_SHA = process.env.HEAD_SHA || 'a7660f3';
 
 // ── La respuesta de `precios-vigentes`, conmutable ───────────────────────
 // 🔒 Son formas REALES de la function, no inventos: un precio aplicable (el

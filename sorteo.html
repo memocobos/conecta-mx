@@ -366,6 +366,14 @@ body.gano .mosaico-caja::before{content:'';position:absolute;inset:0;z-index:0;
   background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 46%,rgba(0,0,0,.9) 100%)}
 body.gano .mosaico-caja > *{position:relative;z-index:1}
 
+/* ═══ [GANADOR-B4] EL STORY DESCARGABLE ════════════════════════════════ */
+.story{margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.1)}
+.story[hidden]{display:none}
+.st-sw{display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  font-size:11.5px;color:rgba(255,255,255,.72);margin-bottom:9px}
+.st-sw input{width:16px;height:16px;accent-color:var(--c-amarillo)}
+.st-msg{font-size:11px;color:rgba(255,255,255,.6);margin-top:7px;min-height:1.2em}
+
 /* ═══ [GANADOR-B3] LA MUESTRA DE 30 s ══════════════════════════════════ */
 .muestra{display:flex;align-items:center;gap:11px;margin:12px auto 0;max-width:290px;
   padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.05);
@@ -1034,6 +1042,15 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       <button class="btn btn-si" id="si">Aceptó el premio</button>
       <button class="btn btn-no" id="no">No contestó — volver a girar</button>
       <button class="btn btn-no" id="nocumple">No cumple las bases</button>
+    </div>
+
+    <!-- [GANADOR-B4] EL STORY. Nace oculto: solo con token Y con el premio ya
+         ACEPTADO. Antes del acepto, un story de alguien que todavía puede no
+         contestar es un anuncio que habría que desmentir. -->
+    <div class="story" id="story" hidden>
+      <label class="st-sw"><input type="checkbox" id="st-ig" checked> Poner su @ de Instagram</label>
+      <button class="btn btn-si" id="st-bajar">Descargar story 1080×1920</button>
+      <div class="st-msg" id="st-msg"></div>
     </div>
 
     <div style="margin-top:16px">
@@ -2759,6 +2776,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     $('tel').style.display = (TOKEN && telAdmin) ? 'flex' : 'none';
     if (TOKEN && telAdmin) mostrarTel(telVisible);
     pintarContacto();
+    pintarStory();
   }
 
   // ═══ 🔒 CON GANADOR CONFIRMADO, «GIRAR» SE VA ═══════════════════════════
@@ -3065,6 +3083,170 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     });
     ['play', 'pause', 'ended'].forEach(function(ev){ au.addEventListener(ev, pinta); });
     pinta();
+  })();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔒 [GANADOR-B4] EL STORY 1080×1920, DIBUJADO EN EL NAVEGADOR
+  //
+  // 🔴 LA FOTO ENTRA COMO DATA-URI, Y NO ES UN CAPRICHO. El bucket es PRIVADO:
+  // la única manera de pintar la foto en un `<img>` es una url FIRMADA, y una
+  // imagen de otro origen CONTAMINA el canvas — `toBlob` y `toDataURL` truenan
+  // con SecurityError y no hay archivo. Por eso existe `foto_datauri`, que trae
+  // los bytes por la puerta con token y le PREGUNTA su tipo al almacén en vez
+  // de adivinarlo por la extensión (los avatares del ensayo son SVG con nombre
+  // .png: adivinando, la story saldría con la cara en blanco).
+  //
+  // 🔒 SOLO CON TOKEN Y SOLO TRAS EL `acepto`. Antes del acepto el ganador
+  // todavía puede no contestar, y una story de alguien que después pierde el
+  // premio es un anuncio que habría que desmentir.
+  //
+  // 🔒 Y SE ESPERAN LAS TIPOGRAFÍAS (`document.fonts.ready`). Sin eso el canvas
+  // dibuja con la de respaldo y la story sale con otra letra que el sitio — la
+  // misma trampa de pedir Kaneda y que caiga a Montserrat en silencio.
+  var LIENZO = { w: 1080, h: 1920 };
+  function storyPuede(){
+    return !!(TOKEN && ADMG && ADMG.resultado === 'acepto' && ADMG.registro_id);
+  }
+  function pintarStory(){
+    var caja = $('story');
+    if (caja) caja.hidden = !storyPuede();
+  }
+  function dibujarCover(cx, img, w, h){
+    // `cover`: llena el lienzo sin deformar, recortando lo que sobra.
+    var r = Math.max(w / img.width, h / img.height);
+    var aw = img.width * r, ah = img.height * r;
+    cx.drawImage(img, (w - aw) / 2, (h - ah) / 2, aw, ah);
+  }
+  function cargarImg(src){
+    return new Promise(function(ok, no){
+      var im = new Image();
+      im.onload = function(){ ok(im); };
+      im.onerror = function(){ no(new Error('no cargó ' + String(src).slice(0, 40))); };
+      im.src = src;
+    });
+  }
+  function ajustar(cx, txt, max, desde, familia){
+    // Baja el tamaño hasta que quepa. Recortar el nombre de una persona con
+    // puntos suspensivos se lee como un error; achicarlo, no.
+    var t = desde;
+    do { cx.font = familia.replace('%%', t); t -= 4; }
+    while (t > 24 && cx.measureText(txt).width > max);
+    return cx;
+  }
+  async function armarStory(){
+    var msg = $('st-msg');
+    if (!storyPuede()) { if (msg) msg.textContent = 'Todavía no: falta que acepte el premio.'; return null; }
+    if (msg) msg.textContent = 'Armando la story…';
+    var res = await api('giveaway-sortear', { method: 'POST',
+      body: JSON.stringify({ accion: 'foto_datauri', registro_id: ADMG.registro_id }) });
+    if (!res.j || !res.j.ok || !res.j.datauri) throw new Error('sin foto: ' + ((res.j || {}).error || ''));
+    var fondo = await cargarImg(VESTIDO);
+    var cara = await cargarImg(res.j.datauri);
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+
+    var cv = document.createElement('canvas');
+    cv.width = LIENZO.w; cv.height = LIENZO.h;
+    var cx = cv.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, LIENZO.w, LIENZO.h);
+    dibujarCover(cx, fondo, LIENZO.w, LIENZO.h);
+    // El velo, para que la letra se lea encima de cualquier foto.
+    var g = cx.createLinearGradient(0, 0, 0, LIENZO.h);
+    g.addColorStop(0, 'rgba(0,0,0,.34)');
+    g.addColorStop(.42, 'rgba(0,0,0,.66)');
+    g.addColorStop(1, 'rgba(0,0,0,.94)');
+    cx.fillStyle = g; cx.fillRect(0, 0, LIENZO.w, LIENZO.h);
+
+    // LA FOTO DEL GANADOR, cuadrada y con el marco de campeón.
+    var lado = 560, fx = (LIENZO.w - lado) / 2, fy = 430;
+    cx.save();
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx, fy, lado, lado, 34); else cx.rect(fx, fy, lado, lado);
+    cx.clip();
+    var r2 = Math.max(lado / cara.width, lado / cara.height);
+    cx.drawImage(cara, fx + (lado - cara.width * r2) / 2, fy + (lado - cara.height * r2) / 2,
+                 cara.width * r2, cara.height * r2);
+    cx.restore();
+    cx.lineWidth = 12; cx.strokeStyle = '#e8ff4c';
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx, fy, lado, lado, 34); else cx.rect(fx, fy, lado, lado);
+    cx.stroke();
+    cx.lineWidth = 6; cx.strokeStyle = '#88ea4e';
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(fx - 9, fy - 9, lado + 18, lado + 18, 42);
+    else cx.rect(fx - 9, fy - 9, lado + 18, lado + 18);
+    cx.stroke();
+
+    cx.textAlign = 'center';
+    cx.fillStyle = '#e8ff4c';
+    cx.font = '900 46px "Barlow Condensed","Montserrat",sans-serif';
+    cx.fillText('GANADOR DEL SORTEO', LIENZO.w / 2, 300);
+
+    // 🔒 TODO lo que dice la story viene del SERVIDOR: nombre, ciudad y el
+    // premio DERIVADO de `_lib`. Ni una línea tecleada aquí.
+    cx.fillStyle = '#fff';
+    ajustar(cx, ADMG.nombre || '', LIENZO.w - 120, 104,
+            '900 %%px "Barlow Condensed","Montserrat",sans-serif');
+    cx.fillText(ADMG.nombre || '', LIENZO.w / 2, 1140);
+
+    var bajo = 1210;
+    if (ADMG.ciudad) {
+      cx.fillStyle = 'rgba(255,255,255,.82)';
+      cx.font = '600 40px "Montserrat",sans-serif';
+      cx.fillText(ADMG.ciudad, LIENZO.w / 2, bajo);
+      bajo += 62;
+    }
+    var conIg = !!($('st-ig') && $('st-ig').checked) && !!ADMG.instagram;
+    if (conIg) {
+      cx.fillStyle = '#e8ff4c';
+      cx.font = '900 38px "Barlow Condensed","Montserrat",sans-serif';
+      cx.fillText('@' + String(ADMG.instagram).replace(/^@+/, ''), LIENZO.w / 2, bajo);
+      bajo += 62;
+    }
+    // El premio, en las líneas que haga falta.
+    cx.fillStyle = 'rgba(255,255,255,.9)';
+    cx.font = '600 34px "Montserrat",sans-serif';
+    var pal = String(ADMG.premio_texto || '').split(' ');
+    var linea = '', y = bajo + 34;
+    for (var i = 0; i < pal.length; i++) {
+      var prueba = linea ? (linea + ' ' + pal[i]) : pal[i];
+      if (cx.measureText(prueba).width > LIENZO.w - 150 && linea) {
+        cx.fillText(linea, LIENZO.w / 2, y); y += 46; linea = pal[i];
+      } else { linea = prueba; }
+    }
+    if (linea) cx.fillText(linea, LIENZO.w / 2, y);
+
+    cx.fillStyle = 'rgba(255,255,255,.5)';
+    cx.font = '900 30px "Barlow Condensed","Montserrat",sans-serif';
+    cx.fillText('CONECTA REYNOSA', LIENZO.w / 2, LIENZO.h - 84);
+    if (msg) msg.textContent = '';
+    return cv;
+  }
+  (function(){
+    var bt = $('st-bajar');
+    if (!bt) return;
+    bt.addEventListener('click', function(){
+      var msg = $('st-msg');
+      bt.disabled = true;
+      armarStory().then(function(cv){
+        if (!cv) return;
+        // `toBlob` es la prueba de que el canvas NO quedó contaminado: con una
+        // imagen de otro origen dentro, esto truena con SecurityError.
+        cv.toBlob(function(b){
+          if (!b) { if (msg) msg.textContent = 'No se pudo generar el archivo.'; return; }
+          var url = URL.createObjectURL(b);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'ganador-' + String(ADMG.nombre || 'sorteo')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase() + '.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+          if (msg) msg.textContent = 'Lista: ' + LIENZO.w + '×' + LIENZO.h + '.';
+        }, 'image/png');
+      }).catch(function(e){
+        if (msg) msg.textContent = 'No se pudo armar: ' + e.message;
+      }).then(function(){ bt.disabled = false; });
+    });
   })();
 
   function mostrarTel(ver){

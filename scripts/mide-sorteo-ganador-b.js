@@ -39,6 +39,7 @@ function artistaDelArbol(dir) {
   } catch (e) { return null; }
 }
 const PEDIDOS_DEEZER = [];
+const PEDIDOS_FOTO = [];
 // 🔴 UN AUDIO DE VERDAD, GENERADO. Para probar que el botón ALTERNA hace falta
 // que `play()` no se rechace, y una url inventada de `dzcdn.net` no resuelve en
 // el navegador del careo: el audio se queda pausado y el icono no cambia —el
@@ -61,6 +62,36 @@ function wavSilencio(ms) {
 // y la aserción del interruptor se puso roja midiendo mi fixture. La premisa de
 // un caso («todavía está sonando») tiene que ALCANZARSE para que el caso mida.
 const WAV = wavSilencio(4000);
+// Un PNG de verdad para `foto_datauri`: 4×4 rojo, construido con zlib. Un
+// literal de 1×1 copiado de internet también serviría, pero construirlo deja
+// claro qué bytes son y permite cambiarlo si un día hace falta otro tamaño.
+function pngRojo(n) {
+  const zlib = require('zlib');
+  const crc = (buf) => { let c = ~0;
+    for (const b of buf) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); }
+    return (~c) >>> 0; };
+  const trozo = (tipo, datos) => {
+    const t = Buffer.from(tipo, 'ascii');
+    const len = Buffer.alloc(4); len.writeUInt32BE(datos.length);
+    const cs = Buffer.alloc(4); cs.writeUInt32BE(crc(Buffer.concat([t, datos])));
+    return Buffer.concat([len, t, datos, cs]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(n, 0); ihdr.writeUInt32BE(n, 4);
+  ihdr[8] = 8; ihdr[9] = 2;                       // 8 bits, RGB
+  const cruda = Buffer.concat(Array.from({ length: n }, () =>
+    Buffer.concat([Buffer.from([0]), Buffer.concat(Array.from({ length: n },
+      () => Buffer.from([220, 40, 60])))])));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    trozo('IHDR', ihdr), trozo('IDAT', zlib.deflateSync(cruda)), trozo('IEND', Buffer.alloc(0))]);
+}
+const FOTO_DATAURI = 'data:image/png;base64,' + pngRojo(4).toString('base64');
+// Lee el IHDR de un PNG: es la ÚNICA prueba de que la story salió 1080×1920.
+// Creerle al mensaje de la pantalla sería creerle al que la escribió.
+function medidaPNG(buf) {
+  if (buf.length < 24 || buf.readUInt32BE(12) !== 0x49484452) return null;
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
 function af(cond, msg) {
@@ -163,6 +194,11 @@ function servidor(raiz) {
         let b = {}; try { b = JSON.parse(cuerpo || '{}'); } catch (_) {}
         r.writeHead(200, { 'Content-Type': 'application/json' });
         if (b.accion === 'estado_admin') return r.end(JSON.stringify(estadoAdmin()));
+        if (b.accion === 'foto_datauri') {
+          if (!b.registro_id) return r.end(JSON.stringify({ ok: false, error: 'Falta el participante' }));
+          PEDIDOS_FOTO.push(b.registro_id);
+          return r.end(JSON.stringify({ ok: true, foto_estado: 'aprobada', datauri: FOTO_DATAURI }));
+        }
         if (b.accion === 'pendientes_foto') return r.end(JSON.stringify({ ok: true, pendientes: 0 }));
         return r.end(JSON.stringify({ ok: true }));
       });
@@ -567,6 +603,110 @@ function servidor(raiz) {
      '🔒 CONTROL POSITIVO: BASE no le pide nada a la function de Deezer, pidió '
      + PEDIDOS_DEEZER.length);
   await pg.close();
+
+  // ── H · EL STORY 1080×1920, PROBADO CON UNA EXPORTACIÓN REAL ───────────
+  // 🔒 NO se mide «el botón existe» ni se le cree al mensaje de la pantalla:
+  // se APRIETA el botón, se atrapa el archivo que baja y se le leen los bytes
+  // del IHDR. Y que el archivo EXISTA es la prueba de que el canvas no quedó
+  // contaminado: con una imagen de otro origen dentro, `toBlob` truena con
+  // SecurityError y no baja nada.
+  console.log('\n── H · el story 1080×1920, exportado de verdad ──');
+  const ctxD = await nav.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+
+  // 1 · ANTES DEL `acepto` NO EXISTE. Un story de alguien que todavía puede no
+  // contestar es un anuncio que habría que desmentir.
+  RES = 'pendiente';
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await ctxD.newPage();
+  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(1300);
+  await pg.evaluate(() => { const q = document.getElementById('puerta'); if (q) q.style.display = 'block'; });
+  await pg.fill('#tok', 'tok-de-careo');
+  await pg.press('#tok', 'Enter');
+  await pg.waitForTimeout(1500);
+  const stPend = await pg.evaluate(() => {
+    const c = document.getElementById('story');
+    return { ve: !!c && !c.hidden && c.offsetParent !== null };
+  });
+  af(!stPend.ve, '🔴 el story se ofrece ANTES de que acepte el premio');
+  await pg.close();
+
+  // 2 · CON EL `acepto`: se ofrece, y baja un PNG de 1080×1920.
+  RES = 'acepto';
+  PEDIDOS_FOTO.length = 0;
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await ctxD.newPage();
+  const errsH = []; pg.on('pageerror', (e) => errsH.push(e.message));
+  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(1300);
+  await pg.evaluate(() => { const q = document.getElementById('puerta'); if (q) q.style.display = 'block'; });
+  await pg.fill('#tok', 'tok-de-careo');
+  await pg.press('#tok', 'Enter');
+  await pg.waitForTimeout(1800);
+  const stOk = await pg.evaluate(() => {
+    const c = document.getElementById('story'), sw = document.getElementById('st-ig');
+    return { ve: !!c && !c.hidden && c.offsetParent !== null,
+             sw: !!sw, marcado: sw ? sw.checked : null };
+  });
+  af(stOk.ve, '🔴 con el premio aceptado el story no se ofrece');
+  af(stOk.sw, '🔴 falta el interruptor del @ de Instagram');
+
+  async function bajar(conIg) {
+    await pg.evaluate((v) => {
+      const sw = document.getElementById('st-ig');
+      if (sw) sw.checked = v;
+    }, conIg);
+    const esperando = pg.waitForEvent('download', { timeout: 25000 });
+    await pg.click('#st-bajar');
+    const d = await esperando;
+    const ruta = await d.path();
+    const buf = fs.readFileSync(ruta);
+    return { buf, nombre: d.suggestedFilename(),
+             msg: await pg.evaluate(() => (document.getElementById('st-msg') || {}).textContent) };
+  }
+
+  const conIg = await bajar(true);
+  const m1 = medidaPNG(conIg.buf);
+  console.log('   con @: ' + conIg.nombre + ' · ' + JSON.stringify(m1) + ' · '
+            + conIg.buf.length + ' bytes · «' + conIg.msg + '»');
+  af(!!m1, '🔴 lo que bajó no es un PNG legible');
+  af(m1 && m1.w === 1080 && m1.h === 1920,
+     '🔴 la story NO es 1080×1920: ' + JSON.stringify(m1));
+  af(conIg.buf.length > 20000,
+     '🔴 el PNG pesa ' + conIg.buf.length + ' bytes: está casi vacío, no se dibujó nada');
+  af(/\.png$/.test(conIg.nombre) && /ganador-/.test(conIg.nombre),
+     'el archivo se llama por el ganador: ' + conIg.nombre);
+  // 🔒 LA FOTO ENTRÓ POR `foto_datauri`, que es la puerta que evita el canvas
+  // contaminado. Si hubiera entrado por una url firmada, no habría archivo.
+  af(PEDIDOS_FOTO.length === 1 && PEDIDOS_FOTO[0] === GANADOR.id,
+     '🔴 la foto no se pidió por `foto_datauri` con el registro del ganador: '
+     + JSON.stringify(PEDIDOS_FOTO));
+
+  // 3 · EL INTERRUPTOR DEL @ CAMBIA EL ARCHIVO. Sin esto, el interruptor
+  // podría no estar conectado a nada y el careo no lo notaría.
+  const sinIgPng = await bajar(false);
+  const m2 = medidaPNG(sinIgPng.buf);
+  console.log('   sin @: ' + JSON.stringify(m2) + ' · ' + sinIgPng.buf.length + ' bytes');
+  af(m2 && m2.w === 1080 && m2.h === 1920, 'sin el @ también sale 1080×1920');
+  af(sinIgPng.buf.length !== conIg.buf.length,
+     '🔴 el interruptor del @ NO cambia el archivo: los dos PNG pesan '
+     + conIg.buf.length + ' bytes, así que no está conectado a nada');
+  af(errsH.length === 0, 'errores en H: ' + JSON.stringify(errsH.slice(0, 2)));
+  await pg.close();
+
+  // 4 · CONTROL POSITIVO: en BASE no hay story.
+  ARRANQUE = Date.now() - (marcaRev + 4000);
+  pg = await ctxD.newPage();
+  await pg.goto('http://127.0.0.1:' + pB + '/sorteo.html', { waitUntil: 'load' });
+  await pg.waitForTimeout(1200);
+  const stBase = await pg.evaluate(() => ({
+    story: !!document.getElementById('story'), bt: !!document.getElementById('st-bajar'),
+  }));
+  af(!stBase.story && !stBase.bt,
+     '🔒 CONTROL POSITIVO: en BASE no existe el story: ' + JSON.stringify(stBase));
+  await pg.close();
+  await ctxD.close();
+  RES = 'pendiente';
 
   await nav.close();
   sBase.close(); sHead.close();

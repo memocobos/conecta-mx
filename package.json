@@ -27,6 +27,7 @@
     "mide:sorteo-rondas": "node scripts/mide-sorteo-rondas.js",
     "mide:sorteo-maquina": "node scripts/mide-sorteo-maquina.js",
     "mide:ganador-b": "node scripts/mide-sorteo-ganador-b.js",
-    "mide:ganador-quieto": "node scripts/mide-ganador-quieto.js"
+    "mide:ganador-quieto": "node scripts/mide-ganador-quieto.js",
+    "mide:rol-mudo": "node scripts/mide-rol-monto-mudo.js"
   }
 }

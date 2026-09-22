@@ -2819,21 +2819,29 @@ function faltaDelSeparo(){
 //   · y por eso el regreso SÍ tiene que mover el paso con `setStep`.
 // Pero `setStep(3)` re-bloquea el 4 y el `change` de la fecha no vuelve a
 // abrirlo (medido: de los cuatro sitios que llaman `setStep(4)`, ninguno es
-// el de la fecha). Se anota a dónde volver y se vuelve SOLO cuando ya no falta
-// nada — así el cliente no queda atrapado en el paso 3.
-var _sepVolverA = null;
+// el de la fecha). Se anota a dónde volver, y CON QUÉ DATO.
+//
+// 🔴 EL REGRESO SE DISPARA CON EL DATO QUE FUE A BUSCAR, NO CON «YA NO FALTA
+// NADA». La primera versión esperaba a que la lista quedara vacía y eso
+// ATRAPABA al cliente en el caso del precio: llenaba la fecha, el precio
+// seguía sin resolverse, el paso 4 se quedaba cerrado —y en móvil, invisible—
+// y el aviso que le habría dicho «la razón está en el paso 2» se pintaba en un
+// paso que no se ve. Lo cazó el careo, no una lectura.
+var _sepVolverA = null;    // { paso: 4, k: 'fecha' }
 function pintarFaltaSeparo(){
   var caja = document.getElementById('sep-falta');
   var txt  = document.getElementById('sep-falta-txt');
   var bt   = document.getElementById('sep-falta-ir');
   if(!caja || !txt || !bt) return;
   var f = faltaDelSeparo();
-  if(!f.length){
-    caja.hidden = true; txt.innerHTML='';
-    // Ya no falta nada: si veníamos de un regreso, se reabre el paso 4.
-    if(_sepVolverA){ var v4=_sepVolverA; _sepVolverA=null; setStep(v4); }
-    return;
+  // El regreso: en cuanto el dato por el que se fue YA no falta, se vuelve —
+  // aunque quede otro pendiente, porque el aviso del que queda vive en el
+  // paso 4 y allá tiene que poder leerse.
+  if(_sepVolverA && !f.some(function(p){ return p.k === _sepVolverA.k; })){
+    var vv = _sepVolverA; _sepVolverA = null;
+    setStep(vv.paso);
   }
+  if(!f.length){ caja.hidden = true; txt.innerHTML=''; return; }
   txt.innerHTML = f.map(function(p){ return p.txt; }).join(' ');
   // El camino de regreso apunta al PRIMER faltante, y su rótulo lo dice.
   var d = f[0];
@@ -2841,7 +2849,7 @@ function pintarFaltaSeparo(){
   bt.onclick = function(){
     // Se MUEVE el paso (en móvil el destino está oculto si no) y se apunta el
     // regreso, que ocurre solo cuando ya no falte nada.
-    _sepVolverA = 4;
+    _sepVolverA = { paso: 4, k: d.k };
     setStep(d.paso);
     var sec = document.getElementById('step' + d.paso);
     if(sec && sec.scrollIntoView) { try { sec.scrollIntoView({behavior:'smooth', block:'start'}); } catch(e){ sec.scrollIntoView(true); } }

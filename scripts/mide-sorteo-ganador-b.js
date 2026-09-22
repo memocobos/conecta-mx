@@ -333,26 +333,51 @@ function servidor(raiz) {
   await pg.fill('#tok', 'tok-de-careo');
   await pg.press('#tok', 'Enter');
   await pg.waitForTimeout(2500);
+  // 🔒 EL BLOQUE SON LAS CINCO PIEZAS QUE ENUMERÓ MEMO: «la foto, y debajo
+  // nombre completo, ciudad, premio y el reloj de 10 minutos». Se mide de la
+  // tarjeta al RELOJ, que es donde acaba su lista.
+  //
+  // ⚠️ Lo que va DESPUÉS del reloj son HERRAMIENTAS —el teléfono, las dos
+  // puertas de contacto, los tres botones y «Ver de nuevo»— y se REPORTAN con
+  // su número, sin aserción: con token suman 315px y sí piden desplazarse.
+  // Se dice aquí, medido, para que la decisión sea de Memo y no un silencio.
   const caben = await pg.evaluate(() => {
     const vis = (e) => {
       if (!e || e.hidden || e.offsetParent === null) return false;
       const cs = getComputedStyle(e);
       return cs.visibility !== 'hidden' && Number(cs.opacity) > .05;
     };
-    const ps = [document.querySelector('.mos.gana'), document.getElementById('placa-ganador'),
-                document.getElementById('panel')].filter(vis);
+    const caja = (e) => (e ? e.getBoundingClientRect() : null);
+    const g = document.querySelector('.mos.gana');
+    const pl = document.getElementById('placa-ganador');
+    const rl = document.getElementById('reloj');
+    const pan = document.getElementById('panel');
+    const ps = [g, pl, rl].filter(vis);
     const rs = ps.map((e) => e.getBoundingClientRect());
+    const alto = (id) => { const e = document.getElementById(id);
+      return vis(e) ? Math.round(e.getBoundingClientRect().height) : 0; };
     return { hay: ps.length, vh: innerHeight, scrollY: Math.round(scrollY),
              top: rs.length ? Math.round(Math.min.apply(null, rs.map((r) => r.top))) : null,
              bot: rs.length ? Math.round(Math.max.apply(null, rs.map((r) => r.bottom))) : null,
+             panBot: vis(pan) ? Math.round(caja(pan).bottom) : null,
+             herramientas: { tel: alto('tel'), contacto: alto('contacto'),
+                             acciones: alto('acciones'), repetir: alto('repetir') },
              anchoDoc: document.documentElement.scrollWidth, anchoVista: innerWidth };
   });
-  console.log('   el bloque: y=' + caben.top + '..' + caben.bot + ' en ' + caben.vh
-            + 'px (scrollY ' + caben.scrollY + ')');
-  af(caben.hay === 3, '🔴 el bloque del ganador no está completo: ' + caben.hay + ' de 3');
+  const h = caben.herramientas;
+  console.log('   el bloque (foto → reloj): y=' + caben.top + '..' + caben.bot + ' en '
+            + caben.vh + 'px (scrollY ' + caben.scrollY + ')');
+  console.log('   y debajo, las herramientas de admin: tel ' + h.tel + ' · contacto '
+            + h.contacto + ' · botones ' + h.acciones + ' · repetir ' + h.repetir
+            + ' = ' + (h.tel + h.contacto + h.acciones + h.repetir) + 'px, hasta y=' + caben.panBot);
+  af(caben.hay === 3, '🔴 el bloque del ganador no está completo: ' + caben.hay + ' de 3 (foto, placa, reloj)');
   af(caben.top !== null && caben.top >= 0 && caben.bot <= caben.vh,
-     '🔴 con la imagen y el contacto el bloque ya NO cabe: y=' + caben.top + '..' + caben.bot
-     + ' en ' + caben.vh + 'px');
+     '🔴 con la imagen y el contacto las CINCO piezas ya NO caben: y=' + caben.top + '..'
+     + caben.bot + ' en ' + caben.vh + 'px');
+  // 🔒 Y el reloj tiene que estar DENTRO, que es la pieza que la #751 dejaba
+  // 155px bajo el pliegue: es el caso que hace útil esta aserción.
+  af(caben.bot <= caben.vh - 8,
+     '🔴 el reloj de 10 minutos queda pegado al borde o fuera: acaba en ' + caben.bot);
   af(caben.anchoDoc <= caben.anchoVista + 1,
      '🔴 la página desborda a lo ancho: ' + caben.anchoDoc + ' > ' + caben.anchoVista);
   await pg.close();

@@ -469,6 +469,35 @@ function lineupConcSeg(esfera) {
   return v ? ("lineup:'" + escStr(v) + "',") : '';
 }
 
+// ═══ [CARD-ITIN-1] EL ITINERARIO · el campo que gobierna al card ══════════
+// El itinerario de cada evento. Es un OVERRIDE, no el dato completo: cuando la
+// ficha no lo trae, el index pinta la PLANTILLA de la casa (Monterrey, o las
+// dos variantes de CDMX). Por eso su ausencia NO es una pérdida — es «usa la
+// plantilla»— y por eso lo que hay que vigilar es el caso contrario: que un
+// evento que SÍ tenía itinerario propio no lo pierda en silencio y se quede
+// con una plantilla que puede no corresponderle. Eso lo hace el candado de
+// más abajo con `itinerario_null` como salida explícita.
+//
+// ⚠️ Antes esto viajaba dentro de `extras.promoModal` en dos eventos
+// (pulsoquetaro y tecatecomuna): un campo genérico prestado. `promoModal` se
+// queda con lo suyo —dalemix, la promo de comida gratis— y el itinerario tiene
+// su columna. Un solo mecanismo.
+function itinerarioSeg(esfera) {
+  const v = (typeof esfera.itinerario === 'string') ? esfera.itinerario.trim() : '';
+  if (v) return "itinerario:'" + escStr(v) + "',";
+  // La salida explícita, igual que `mapa:null`: «este evento NO lleva
+  // itinerario propio» se DICE, no se deduce de un campo vacío.
+  return esfera.itinerario_null ? 'itinerario:null,' : '';
+}
+// La HORA del concierto. Existe porque la plantilla de CDMX la nombra y el
+// catálogo NO la tiene: medido, ninguna de las 49 llaves del EV es una hora.
+// Sin ella, el index NO PINTA la frase del concierto — antes que inventar las
+// 9:00 p. m. que traía el brief, un hueco.
+function horaShowSeg(esfera) {
+  const v = (typeof esfera.hora_show === 'string') ? esfera.hora_show.trim() : '';
+  return v ? ("horaShow:'" + escStr(v) + "',") : '';
+}
+
 // ═══ [ESF-CIERRE-FINAL] LOS CAMPOS QUE ESFERAS NO MODELA ══════════════════
 // El catálogo tiene campos escritos a mano que no valía la pena convertir en
 // columna con formulario: `promoModal` (un modal de itinerario con emojis y
@@ -999,7 +1028,7 @@ function generarObjFestival(esfera, fest, hoy) {
     "',ds:'" + escStr(dsFinal) +
     "',v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + incSeg + sepSeg + notaSeg +
+    "'," + itinerarioSeg(esfera) + horaShowSeg(esfera) + incSeg + sepSeg + notaSeg +
     bancoSeg + ',multifecha:[' + mfStr + '],' + topZonas + pagosSegmento() + '}';
 }
 
@@ -1202,6 +1231,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa + lineupConcSeg(esfera) + flashPromoSeg(esfera) + flagsSeg + extrasSegmento(esfera) +
+    itinerarioSeg(esfera) + horaShowSeg(esfera) +
     incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
     bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
@@ -1340,6 +1370,12 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk',
   // [ESF-CAMPOS-1] Se emiten, así que se declaran — la regla de ESF-FLAGS.
   'promo', 'promoCode', 'promoLabel', 'deporte', 'musicSearch',
+  // [CARD-ITIN-1] Se emiten, así que se declaran. Si `itinerario` no estuviera
+  // aquí, `fusionarConViejo` lo trataría como campo ajeno y lo RE-INSERTARÍA
+  // desde el objeto viejo: quitarle el itinerario propio a un evento desde
+  // Esferas no serviría de nada. Es la mordida de `noStay` y de las tres
+  // banderas de #580, ya pagada dos veces.
+  'itinerario', 'horaShow',
   // [ESF-FLASH-1] Se emite, se declara.
   // [ESF-CIERRE-LINEUP] `lineup` ya vivía aquí por el camino de festival; el
   // concierto solo aprendió a emitirlo. NO se toca la lista.
@@ -1452,7 +1488,14 @@ function _insertarAntesDeZonasNivel1(objText, texto) {
 // compilador lo emite SIEMPRE (del nombre del evento, salvo `img_omitir`), así
 // que vigilarlo casi nunca sonaría. Queda fuera porque no es un medio que
 // alguien cargue: es un derivado. Un medio es lo que se sube.
-const MEDIOS_VIGILADOS = ['mapa', 'staticImg', 'lineup'];
+// [CARD-ITIN-1] `itinerario` entra a ESTA lista y no a una segunda con el
+// mismo papel — dos listas iguales son dos listas que todavía no divergen. Ya
+// no son solo «medios»: lo que la lista vigila es el campo que el compilador
+// ADMINISTRA y cuya ausencia en la ficha NO significa «lo quitamos». Para el
+// itinerario la diferencia es visible: perderlo en silencio no deja el card
+// vacío, lo deja con la PLANTILLA — y un evento de Puebla con el itinerario de
+// Monterrey es peor que un card sin itinerario.
+const MEDIOS_VIGILADOS = ['mapa', 'staticImg', 'lineup', 'itinerario'];
 // La salida explícita: para borrar un medio de verdad, la ficha tiene que
 // DECIRLO. Así la intención queda escrita donde vive el dato, no en un clic que
 // nadie vuelve a ver.
@@ -1464,7 +1507,7 @@ const MEDIOS_VIGILADOS = ['mapa', 'staticImg', 'lineup'];
 // eso necesitan que la ficha lo diga (migraciones/MEDIA-GUARD-1.sql). Hasta que
 // esas columnas existan, `staticImg` y `lineup` se cuidan sin puerta —han
 // perdido cero medios en 80 commits, así que si suenan, es de veras.
-const MEDIO_APAGADO = { mapa: 'mapa_null', staticImg: 'static_img_null', lineup: 'lineup_null' };
+const MEDIO_APAGADO = { mapa: 'mapa_null', staticImg: 'static_img_null', lineup: 'lineup_null', itinerario: 'itinerario_null' };
 function _mediosEnRiesgo(viejo, nuevo, esfera, slug) {
   const out = [];
   for (const k of MEDIOS_VIGILADOS) {

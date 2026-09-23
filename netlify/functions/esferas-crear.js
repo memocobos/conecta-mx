@@ -45,6 +45,11 @@ const CAMPOS_PERMITIDOS = new Set([
   // casi siempre es false, pero se acepta para que la pantalla no mande un
   // campo que el servidor tira en silencio: los dos caminos dicen lo mismo.
   'mapa_null',
+  // [CARD-ITIN-1] El itinerario propio del evento, su apagador explícito y la
+  // hora del concierto. Los tres se ACEPTAN aquí porque si no, la pantalla
+  // mandaría campos que el servidor tira en silencio — y un campo tirado en
+  // silencio se ve igual que un campo guardado.
+  'itinerario', 'itinerario_null', 'hora_show',
   'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto',
   // [ESF-E1a] el precio del paquete RIDE y su separo
   'ride', 'sep_ride',
@@ -275,6 +280,25 @@ exports.handler = async (event) => {
     // `deporte:1` — cada uno con el suyo, que es como viven en el EV.
     if (k === 'promo' || k === 'deporte') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
     if (k === 'mapa_null') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
+    // [CARD-ITIN-1] El apagador, booleano como su hermano `mapa_null`.
+    if (k === 'itinerario_null') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
+    // El itinerario es TEXTO LARGO (los dos reales miden 400 y 417 bytes) y
+    // sale al catálogo público como string escapado por el compilador. Se
+    // recorta a 4000 para que un pegado accidental no infle el index, y el
+    // vacío se guarda como NULL: «no tiene» y «tiene una cadena vacía» son lo
+    // mismo para el sitio, y NULL es lo que el compilador lee como ausencia.
+    if (k === 'itinerario') {
+      const t = (typeof v === 'string') ? v.trim() : '';
+      sane[k] = t ? t.slice(0, 4000) : null;
+      continue;
+    }
+    // La hora es una etiqueta corta («9:00 p. m.»), no una hora que se calcule:
+    // el sitio la imprime tal cual dentro de la frase de la plantilla.
+    if (k === 'hora_show') {
+      const t = (typeof v === 'string') ? v.trim() : '';
+      sane[k] = t ? t.slice(0, 40) : null;
+      continue;
+    }
     // musicSearch es el texto con el que se busca la música cuando el nombre
     // del evento no da con ella. Se recorta: es una consulta, no un ensayo.
     // [ESF-PROMO-PAR] El código y la etiqueta del badge. Se recortan: los

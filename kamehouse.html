@@ -2767,6 +2767,24 @@
     </div>
     <button class="btn btn-primary" id="nube-guardar-btn" onclick="nubeGuardar()" style="margin-top:6px">Guardar cotización</button>
    </div>
+
+   <!-- [NUBE-3] EL HISTORIAL CONSULTABLE -->
+   <div class="card" style="padding:16px;margin-top:14px">
+    <div class="card-lbl">¿Qué cotización regía el día…?</div>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:10px">
+      Para cuando alguien diga <b style="color:var(--tp)">«a mí me dijeron $X»</b>: la respuesta se
+      <b style="color:var(--tp)">lee</b>, no se recuerda. Sale el precio de ese día, su vigencia completa y
+      <b>quién la subió</b>.
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+     <div class="form-group" style="margin:0">
+      <label>Día</label>
+      <input class="cot-input" id="nube-q-dia" type="date" style="width:170px">
+     </div>
+     <button class="btn btn-ghost" onclick="nubeConsultar()">Consultar</button>
+    </div>
+    <div id="nube-q-res" style="margin-top:12px"></div>
+   </div>
  </div>
 
  <div class="page" id="page-waitlist">
@@ -3222,6 +3240,12 @@
        </div>
        <button onclick="markAllAlertsRead()" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase">✓ Marcar todas como leídas</button>
      </div>
+     <!-- [NUBE-3] El renglón de «la nube está vencida». Va ARRIBA de la lista
+          y FUERA de ella a propósito: las alertas de abajo son filas
+          GUARDADAS (con su id, su «vista» y su destino), y ésta es un letrero
+          DERIVADO del estado de hoy. Meterla en la lista habría necesitado un
+          id falso y un «marcar como vista» que no significa nada. -->
+     <div id="rdr-nube-aviso" style="display:none;margin-bottom:14px"></div>
      <div class="rdr-alerts" id="ral-list">
        <div class="rdr-empty">Cargando alertas…</div>
      </div>

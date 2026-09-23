@@ -4,6 +4,8 @@
 // POST { accion } · roles maestro_roshi | bulma | milk.
 //   'listar'  → { ok, modos:{ bus:{vigente,ultimas[]}, avion:{…} }, ahora }
 //   'cotizar' → inserta UNA fila. { modo, precio_pp, vigente_hasta, vigente_desde?, nota? }
+//   'historial' → ¿qué regía el día X? { dia } → los dos modos con su estado
+//                 ROTULADO y quién la capturó. [NUBE-3]
 //
 // 🔒 INSERT-ONLY, Y NO SOLO POR EL TRIGGER. Aquí no existe ninguna acción que
 // actualice ni borre: para cambiar un precio se captura una fila nueva. El
@@ -24,12 +26,12 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { MODOS, vigentes, filasDe, interna, _cualCubre } = require('./_lib/nube');
+const { MODOS, vigentes, regiaEl, filasDe, interna, _cualCubre } = require('./_lib/nube');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
-const ACCIONES = ['listar', 'cotizar'];
+const ACCIONES = ['listar', 'cotizar', 'historial'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -80,6 +82,35 @@ exports.handler = async (event) => {
         };
       }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, modos, ahora }) };
+    }
+
+    // ── historial · ¿QUÉ REGÍA EL DÍA X? ──────────────────────────────────
+    // 🔒 LA PREGUNTA SE LE HACE AL DUEÑO (`regiaEl` de `_lib/nube`), no se
+    // re-implementa aquí. Es la misma razón por la que el lib existe: «qué
+    // precio regía» contestado en dos sitios acaba contestándose distinto, y
+    // este endpoint es justo el que va a resolver una disputa de dinero.
+    //
+    // 🔒 Y LOS TRES ESTADOS VIAJAN CON SU NOMBRE, sin aplastarse en un
+    // booleano: «vigente ese día», «vencida ese día» y «ANTERIOR AL
+    // NACIMIENTO» no son grados de lo mismo. Juntarlos en «no hay» es
+    // exactamente el error de Omar Courtz, que acabó contestando el precio de
+    // HOY para un separo pasado.
+    if (accion === 'historial') {
+      const crudo = (typeof body.dia === 'string') ? body.dia.trim() : '';
+      if (!crudo) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta el día que se consulta' }) };
+      // ⚠️ Una fecha suelta se lee como el MEDIODÍA de Reynosa, no como
+      // medianoche UTC: `Date.parse('2026-10-05')` es medianoche en Greenwich,
+      // o sea el día ANTERIOR acá — la mordida de `toISOString()` que esta
+      // casa ya pagó tres veces. El mediodía deja el día elegido dentro de sí
+      // mismo con cualquiera de los dos husos de Reynosa.
+      const soloFecha = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(crudo);
+      const dia = soloFecha ? Date.parse(crudo + 'T12:00:00-05:00') : Date.parse(crudo);
+      if (!Number.isFinite(dia)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Ese día no se entiende: ' + crudo }) };
+      }
+      const modos = {};
+      for (const modo of MODOS) modos[modo] = await regiaEl(pedir, modo, dia);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia: new Date(dia).toISOString(), modos }) };
     }
 
     // ── cotizar ────────────────────────────────────────────────────────────

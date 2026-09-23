@@ -9,7 +9,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = e595c63  NUBE-2 en main: la nube vende, pero no se puede consultar
-//     HEAD = df2d973  el historial y el renglón del Radar
+//     HEAD = 37fafc4  el historial y el renglón del Radar (commit del MERGE)
 //
 // 🔒 EL RELOJ SE CONGELA: todo aquí es una frontera de vigencia.
 //
@@ -41,7 +41,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'e595c63';
-const HEAD_SHA = process.env.HEAD_SHA || 'df2d973';
+const HEAD_SHA = process.env.HEAD_SHA || '37fafc4';
 
 // ── EL HISTORIAL SEMBRADO ─────────────────────────────────────────────────
 // Dos semanas de bus con un HUECO entre ellas, y el avión naciendo MÁS TARDE.

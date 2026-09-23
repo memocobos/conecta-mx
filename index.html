@@ -6184,6 +6184,14 @@ function enviarWaitlist(e){
 }
 
 // ═══ [CARD-ITIN-1] EL ITINERARIO · UN SOLO MECANISMO ═══════════════════════
+// 🔴 LAS PLANTILLAS SON FUNCIONES, NO CONSTANTES, Y NO ES ESTILO. El deep-link
+// de un evento —`/<slug>`, LA URL QUE SE COMPARTE— corre en un IIFE que está
+// ARRIBA de este bloque, o sea A MEDIA PARSEADA: un `var` de nivel superior ya
+// existe ahí (hoisting) pero todavía vale `undefined`. Con las plantillas en
+// `var`, entrar por la url dejaba el card ESCONDIDO y entrar por un clic lo
+// mostraba — el mismo evento, dos caras, según la puerta. Lo cazó el careo por
+// entrar por donde entra el cliente; leyendo el diff no se ve. Calculadas en
+// una función, el orden de parseo deja de importar.
 // Antes vivía DENTRO de `promoModal`, un campo genérico que dos eventos
 // (pulsoquetaro y tecatecomuna) tomaron prestado para su itinerario. Medido:
 // promoModal tiene TRES usuarios y solo dos son itinerarios — el tercero
@@ -6202,9 +6210,9 @@ function enviarWaitlist(e){
 // ni Monterrey ni CDMX. Por eso la clase se deriva del VENUE y hay un tercer
 // estado: SIN plantilla. Un evento sin itinerario propio y sin plantilla no
 // pinta nada — antes que un letrero que miente, ninguno.
-var ITIN_NOTA = '⚠️ **Nota importante**\nLos horarios de este itinerario son estimados y pueden cambiar sin previo aviso, dependiendo de ajustes realizados por el artista, el promotor o el venue.';
+function ITIN_NOTA(){ return '⚠️ **Nota importante**\nLos horarios de este itinerario son estimados y pueden cambiar sin previo aviso, dependiendo de ajustes realizados por el artista, el promotor o el venue.'; }
 // Palabra de Memo, 22-sep-2026. COPIADO, no parafraseado.
-var ITIN_MTY = '📍 **Salida desde Reynosa**\nNos reunimos en Soriana Hidalgo para salir a las 12:00 p. m. rumbo a Monterrey.\n\n🏨 **Llegada al hotel**\nAl llegar podrán hacer check-in, descansar, arreglarse y disfrutar de tiempo libre para comer antes del evento.\n\n🎤 **Traslado al concierto**\nSaldremos con suficiente anticipación para llegar aproximadamente 2 horas antes del inicio del concierto y disfrutar la experiencia sin prisas.\n\n😴 **Después del concierto**\nAl finalizar el evento regresaremos al hotel para descansar.\n\n🍳 **Día de regreso**\nEl desayuno está incluido y se sirve de 7:00 a. m. a 10:00 a. m.\n\n🚌 La salida de regreso a Reynosa será a las 12:00 p. m.\n\n' + ITIN_NOTA;
+function ITIN_MTY(){ return '📍 **Salida desde Reynosa**\nNos reunimos en Soriana Hidalgo para salir a las 12:00 p. m. rumbo a Monterrey.\n\n🏨 **Llegada al hotel**\nAl llegar podrán hacer check-in, descansar, arreglarse y disfrutar de tiempo libre para comer antes del evento.\n\n🎤 **Traslado al concierto**\nSaldremos con suficiente anticipación para llegar aproximadamente 2 horas antes del inicio del concierto y disfrutar la experiencia sin prisas.\n\n😴 **Después del concierto**\nAl finalizar el evento regresaremos al hotel para descansar.\n\n🍳 **Día de regreso**\nEl desayuno está incluido y se sirve de 7:00 a. m. a 10:00 a. m.\n\n🚌 La salida de regreso a Reynosa será a las 12:00 p. m.\n\n' + ITIN_NOTA(); }
 // 🔒 EL VENUE Y LA HORA NO SE TECLEAN. El brief los traía escritos («Estadio
 // GNP», «9:00 p. m.») y eso es del EVENTO, no de la plantilla: teclearlos
 // pondría un estadio ajeno en un evento del Palacio de los Deportes. El venue
@@ -6266,7 +6274,7 @@ function itinerarioDe(ev){
   var c=itinClase(ev);
   if(c==='propio')return String(ev.itinerario);
   if(c==='cdmx')return itinCdmx(ev);
-  if(c==='mty')return ITIN_MTY;
+  if(c==='mty')return ITIN_MTY();
   return '';
 }
 // El texto se escapa ANTES de tocar el markup — la lección que ya estaba

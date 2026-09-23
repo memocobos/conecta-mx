@@ -7,8 +7,8 @@
 // y el botón no la miraba. Preguntarle al dato habría dado verde en BASE.
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
-//     BASE = 1eb77e0  main: la bandera existe y el index la ignora
-//     HEAD = c5a1ec7  el index la obedece
+//     BASE = 19f8d16  main: la bandera existe y el index la ignora
+//     HEAD = d0b8e93  el index la obedece
 //
 // 🔒 LAS VARIANTES SE SIEMBRAN SOBRE EVENTOS REALES, mutando su objeto en la
 // página. `humbecdmx` es el que de verdad trae la bandera hoy, y a él se le
@@ -42,8 +42,8 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
-const BASE = process.env.BASE || '1eb77e0';
-const HEAD_SHA = process.env.HEAD_SHA || 'c5a1ec7';
+const BASE = process.env.BASE || '19f8d16';
+const HEAD_SHA = process.env.HEAD_SHA || 'd0b8e93';
 const EV_BANDERA = 'humbecdmx';      // el que trae `noCheap` de verdad
 const EV_LAS_DOS = 'coronacapital';  // trae noCheap Y cheapSoon (camino festival)
 const EV_NORMAL  = 'edc27';          // vende CHEAP sin banderas

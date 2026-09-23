@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 // =============================================================================
-// scripts/mide-cuadre-total.js — EL CAREO DE CUADRE-1a
+// scripts/mide-cuadre-total.js — EL CAREO DE CUADRE-1a Y CUADRE-5
+// =============================================================================
+// Se corre: npm run mide:cuadre-total   (sin red de verdad: no pide nada fuera)
+//
+// Bloques [1]..[8]: CUADRE-1a, el montón de totales de contrato.
+// Bloques [9]..[14]: CUADRE-5, la regla del «$0» tecleado (22-sep-2026) — las
+// cuatro clases con el CATÁLOGO REAL servido, el conteo por clase que Memo
+// pidió ver, el control positivo de apagarle el catálogo, la pantalla (chip y
+// conteos, probados MUTANDO el dato, no con un grep) y la puerta `para_careo`
+// careada contra la VENTA en un evento que sí está vendiendo.
 // =============================================================================
 // Entra por el HANDLER REAL de `admin-excel-careo` y simula UN SALTO MÁS
 // ADENTRO: el `fetch`. El mismo `global.fetch` falso atiende a los DOS de
@@ -61,7 +70,13 @@ const conPreludio = (cab, filas) => [
 // ── LA RED FALSA ─────────────────────────────────────────────────────────────
 // Atiende al Apps Script y a PostgREST. Todo lo que no sea GET contra PostgREST
 // queda anotado en `escrituras` — el medidor del candado de solo-lectura.
-function redFalsa({ pestanas, base, saboteado }) {
+// [CUADRE-5] El index REAL del repo, que es el catálogo de verdad: de ahí salen
+// `esCDMX` y los precios vivos por paquete+zona. No se fabrica un EV de
+// mentira — los ejemplos inventados comparten mis sesgos, y aquí el dato que
+// decide la clase de cada renglón ES el catálogo.
+const INDEX_REAL = require('fs').readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+
+function redFalsa({ pestanas, base, saboteado, catalogo }) {
   const escrituras = [];
   const SB = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
   // 🔒 EL `select` SE RESPETA. La primera versión devolvía la fila ENTERA
@@ -92,6 +107,14 @@ function redFalsa({ pestanas, base, saboteado }) {
   };
   const fetchFalso = async (url, opts) => {
     const met = (opts && opts.method) || 'GET';
+    // ── [CUADRE-5] el index SERVIDO (el catálogo) ──
+    // Con `catalogo:false` NO se sirve y se cae al `throw` de abajo: ése es el
+    // mundo del fail-soft conservador —catálogo ilegible, CDMX asumido, ningún
+    // $0 tapado—, y es el mundo en el que corren los bloques [1]..[8].
+    if (/\/index\.html$/.test(String(url))) {
+      if (!catalogo) throw new Error('la red falsa no sirve el catálogo en este escenario');
+      return { ok: true, status: 200, text: async () => INDEX_REAL, json: async () => ({}) };
+    }
     // ── el Apps Script del Excel ──
     if (String(url).startsWith('https://script.test')) {
       const cuerpo = JSON.parse(opts.body);
@@ -117,11 +140,16 @@ function redFalsa({ pestanas, base, saboteado }) {
   return { escrituras, fetchFalso };
 }
 
-async function correr({ eventoId, pestanas, base, saboteado }) {
-  const red = redFalsa({ pestanas, base, saboteado });
+async function correr({ eventoId, pestanas, base, saboteado, catalogo }) {
+  const red = redFalsa({ pestanas, base, saboteado, catalogo });
   process.env.EXCEL_SCRIPT_URL = 'https://script.test/exec';
   process.env.EXCEL_SCRIPT_TOKEN = 't';
   process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'k';
+  // [CUADRE-5] Fijo la base del sitio: `catalogo-index` la lee de `URL` /
+  // `DEPLOY_PRIME_URL`, y un valor heredado del shell haría que la red falsa no
+  // reconociera su propio destino.
+  process.env.URL = 'https://conectareynosa.mx';
+  delete process.env.DEPLOY_PRIME_URL;
   global.fetch = red.fetchFalso;
 
   // El PORTERO se ejercita, no se salta: doble UN SALTO MÁS ADENTRO.
@@ -131,7 +159,13 @@ async function correr({ eventoId, pestanas, base, saboteado }) {
     corsCheck: () => 'https://conectareynosa.mx',
     verifyAdminAuthLive: async (ev, roles) => { llamadasAuth++; return { valid: true, roles, user: { id: 'u1' } }; },
   } };
-  for (const f of ['admin-excel-careo.js', '_lib/excel-careo.js', '_lib/cosecha-excel.js']) {
+  // 🔒 [CUADRE-5] `catalogo-index` CACHEA el EV a nivel de módulo durante 10
+  // minutos, así que sin este borrado el primer escenario que sirviera el
+  // catálogo se lo REGALARÍA a los siguientes — incluidos los que miden el
+  // fail-soft de «catálogo ilegible». Borrándolo, cada escenario es
+  // independiente y el ORDEN en que corren deja de importar.
+  for (const f of ['admin-excel-careo.js', '_lib/excel-careo.js', '_lib/cosecha-excel.js',
+                   '_lib/excel-careo-correr.js', '_lib/catalogo-index.js', '_lib/precio-zona.js']) {
     delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))];
   }
   const mod = require(path.join(RAIZ, 'netlify/functions/admin-excel-careo.js'));
@@ -451,6 +485,317 @@ const CASO = () => ({
   af(/tecleado en la pestaña/.test(bloque), 'la pantalla no avisa de los «$0» tecleados');
   console.log('    HTML: ' + html.length + ' bytes · el bloque de totales: ' + bloque.length
     + ' · chip derivado ×' + chips);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // [9] CUADRE-5 · LAS CUATRO CLASES DEL «$0» TECLEADO
+  // ══════════════════════════════════════════════════════════════════════════
+  // La regla de Memo (22-sep): un $0 tecleado en la pestaña deja de ser
+  // diferencia cuando el index PUEDE saber el total completo — evento NO-CDMX,
+  // o paquete CHEAP en cualquier lado. Los $0 de CDMX en paquete con transporte
+  // quedan FUERA (el index no sabe el vuelo), y los exactos de libreta tampoco.
+  //
+  // 🔒 EL CATÁLOGO ES EL REAL. `cdmx` y los precios NO se fabrican: salen del
+  // `index.html` del repo servido por la red falsa, o sea de la misma fuente
+  // que el sitio. Un EV inventado habría clasificado los renglones con MI
+  // criterio en vez del del código — la forma exacta de «probar tu idea del
+  // dato en vez del dato que el código mira».
+  const C5_YM = () => ({
+    eventoId: 'youngmiko', catalogo: true,
+    pestanas: {
+      // La cabecera es la REAL de Young Miko (la de arriba, medida el 20-sep).
+      'Young Miko- 19 de Septiembre': conPreludio(CAB_YOUNGMIKO, [
+        // [1] DENTRO · el total del sistema ya existe → se queda el de la base.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Lupe Ozuna', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$500', 'Total': '$0', 'TALLA': 'M' }),
+        // [2] DENTRO · el sistema NO sabe el total (NULL) → se pisa con el
+        //     precio vivo del catálogo. Detrás de la tolerancia este caso era
+        //     INALCANZABLE: $0 contra null da diferencia cero.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Mara Tovar', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'S' }),
+        // [3] DENTRO · la otra cara del mismo caso: el sistema trae 0.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Noe Quiroz', 'Paquete': 'CHEAP', 'Boleto': 'Platino', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'L' }),
+        // [4] FUERA por LIBRETA · el total del sistema lo capturó un humano.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Olga Prado', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$500', 'Total': '$0', 'TALLA': 'M' }),
+        // [5] NO ES $0 · diferencia sobre un derivado: la regla no la toca.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Pepe Salas', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$500', 'Total': '$5,200', 'TALLA': 'XL' }),
+      ]),
+    },
+    base: {
+      excel_pestanas: [{ evento_id: 'youngmiko', pestana: 'Young Miko- 19 de Septiembre', regla_zona: null, activa: true, notas: null }],
+      viajeros_evento: [
+        { id: 'c5-1', evento_id: 'youngmiko', nombre: 'Lupe Ozuna', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4700, notas: 'TOTAL-1: contrato derivado del catálogo', zona_boleto: 'Cancha General', tipo_paquete: 'PLUS' },
+        { id: 'c5-2', evento_id: 'youngmiko', nombre: 'Mara Tovar', tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: null, notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Cancha General', tipo_paquete: 'CHEAP' },
+        { id: 'c5-3', evento_id: 'youngmiko', nombre: 'Noe Quiroz', tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: 0,    notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Platino', tipo_paquete: 'CHEAP' },
+        { id: 'c5-4', evento_id: 'youngmiko', nombre: 'Olga Prado', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4700, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'PLUS' },
+        { id: 'c5-5', evento_id: 'youngmiko', nombre: 'Pepe Salas', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4700, notas: 'TOTAL-1: contrato derivado del catálogo', zona_boleto: 'Cancha General', tipo_paquete: 'PLUS' },
+      ],
+      abonos_viajero: [],
+    },
+  });
+
+  console.log('\n[9] CUADRE-5 · el $0 tecleado, evento NO-CDMX (catálogo REAL servido)');
+  const { d: d9 } = await correr(C5_YM());
+  const c9 = d9.cuadre5 || {};
+  console.log('    cuadre5 = ' + JSON.stringify(c9));
+  // 🔒 LA PREMISA, PRIMERO: si el catálogo no se leyó, `cdmx` cae al
+  // conservador y las cinco clases de abajo se vuelven una sola. Sin esto, un
+  // verde no diría nada de la regla.
+  af(c9.cdmx === false, 'la premisa NO se sostiene: `cdmx` salió ' + JSON.stringify(c9.cdmx)
+     + ' y youngmiko es de Monterrey — el careo no está leyendo el catálogo real');
+  af(!c9.catalogo_error, 'el careo reportó catálogo ilegible: ' + c9.catalogo_error);
+  const R9 = d9.totales_cero_regla || [];
+  const T9 = d9.totales_contrato || [];
+  R9.forEach((x) => console.log(`    · en regla: ${x.nombre.padEnd(12)} ${String(x.paquete).padEnd(6)} sistema=${x.sistema_total} (${x.sistema_total_origen})${x.sistema_total_motivo ? ' motivo=' + x.sistema_total_motivo : ''}`));
+  T9.forEach((x) => console.log(`    · sigue siendo diferencia: ${x.nombre.padEnd(12)} excel=${x.excel_total} sistema=${x.sistema_total} dif=${x.diferencia}`));
+  // EL CONTEO POR CLASE, que es lo que Memo pidió VER.
+  af(c9.en_regla === 3, 'en_regla = ' + c9.en_regla + ', se esperaban 3 (Lupe · Mara · Noe)');
+  af(c9.fuera_libreta === 1, 'fuera_libreta = ' + c9.fuera_libreta + ', se esperaba 1 (Olga)');
+  af(c9.fuera_cdmx === 0, 'fuera_cdmx = ' + c9.fuera_cdmx + ', se esperaba 0: youngmiko no es de CDMX');
+  // Las tres clases PARTEN los $0 tecleados: 3 + 0 + 1 = los cuatro sembrados.
+  // Si no suman, algún renglón se está contando dos veces o ninguna.
+  af(c9.en_regla + c9.fuera_cdmx + c9.fuera_libreta === 4,
+     'las clases del $0 no suman los 4 sembrados: ' + JSON.stringify([c9.en_regla, c9.fuera_cdmx, c9.fuera_libreta]));
+  af(c9.fuera_otro === 0, '`fuera_otro` = ' + c9.fuera_otro + ' y debe ser 0: hay una clase de $0 sin nombre');
+  af(R9.length === c9.en_regla, 'el conteo dice ' + c9.en_regla + ' y el montón trae ' + R9.length
+     + ': el número y la lista tienen que salir del mismo sitio');
+  const enR = (n) => R9.find((x) => x.nombre === n);
+  const enT = (n) => T9.find((x) => x.nombre === n);
+  // Los tres cubiertos SALEN del montón de diferencias.
+  ['Lupe Ozuna', 'Mara Tovar', 'Noe Quiroz'].forEach((n) => {
+    af(!!enR(n), n + ' no entró al montón de la regla');
+    af(!enT(n), n + ' sigue contándose como diferencia además de estar en la regla: estaría en DOS montones');
+  });
+  // [4] el exacto de libreta se queda pidiendo ojo humano.
+  af(!enR('Olga Prado'), 'Olga (exacto de libreta) se colló en la regla: «los exactos de libreta no entran»');
+  af(!!enT('Olga Prado'), 'Olga desapareció de los dos montones: un renglón que nadie ve es un renglón que nadie revisa');
+  // [5] la regla NO se come las diferencias que no son $0.
+  const pepe = enT('Pepe Salas');
+  af(!!pepe && pepe.diferencia === 500,
+     'Pepe (Excel $5,200 vs sistema $4,700) dejó de ser diferencia: la regla solo cubre el $0 tecleado');
+  // EL TOTAL QUE MANDA · y de dónde salió.
+  const lupe = enR('Lupe Ozuna');
+  af(!!lupe && lupe.sistema_total === 4700 && lupe.sistema_total_origen === 'base',
+     'Lupe: el total del sistema ya existía ($4,700) y debía quedarse tal cual, no pisarse — salió '
+     + JSON.stringify(lupe && lupe.sistema_total) + ' (' + (lupe && lupe.sistema_total_origen) + ')');
+  // 🔒 EL PRECIO NO SE TECLEA AQUÍ: se le PREGUNTA AL DUEÑO DE LA ARITMÉTICA,
+  // el mismo `resolverPrecioVenta` que usa el runner. Escribir «3600» en el
+  // arnés lo volvería una foto que se podre el día que Memo suba el precio.
+  delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js'))];
+  delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/_lib/precio-zona.js'))];
+  const { resolverPrecioVenta } = require(path.join(RAIZ, 'netlify/functions/_lib/precio-zona.js'));
+  for (const [nombre, paquete, zona] of [['Mara Tovar', 'CHEAP', 'Cancha General'], ['Noe Quiroz', 'CHEAP', 'Platino']]) {
+    const fila = enR(nombre);
+    const dueno = await resolverPrecioVenta({ evento_id: 'youngmiko', paquete, zona, num_personas: 1, para_careo: true });
+    console.log('    · ' + nombre + ': el dueño de la aritmética dice ' + JSON.stringify(dueno.precio_unit)
+      + ' y el careo trae ' + JSON.stringify(fila && fila.sistema_total));
+    af(dueno.ok && Number(dueno.precio_unit) > 0,
+       'la premisa del precio no se sostiene: el catálogo no cotiza ' + paquete + '/' + zona + ' ('
+       + (dueno.motivo || 'sin motivo') + ') — sin eso, el caso del total pendiente no se puede medir');
+    af(!!fila && fila.sistema_total === Number(dueno.precio_unit),
+       nombre + ': el total pendiente NO se pisó con el precio vivo (careo '
+       + JSON.stringify(fila && fila.sistema_total) + ' vs dueño ' + JSON.stringify(dueno.precio_unit) + ')');
+    af(!!fila && fila.sistema_total_origen === 'catalogo',
+       nombre + ': el origen dice ' + JSON.stringify(fila && fila.sistema_total_origen)
+       + ' y debe decir «catalogo» — de dónde salió el número es parte del dato');
+  }
+  // Ningún renglón de la regla lleva una `diferencia` vieja al lado del total
+  // que el runner acaba de pisar.
+  const conDif = R9.find((x) => 'diferencia' in x);
+  af(!conDif, 'un renglón de la regla trae `diferencia` después de pisarse el total: ' + JSON.stringify(conDif));
+  // La fecha de la regla viaja en la respuesta y sale del LIB, no de un literal
+  // del endpoint ni de la pantalla.
+  const { CUADRE5_FECHA } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-careo.js'));
+  af(c9.fecha === CUADRE5_FECHA, 'la respuesta dice la fecha ' + JSON.stringify(c9.fecha)
+     + ' y el lib la tiene en ' + JSON.stringify(CUADRE5_FECHA));
+
+  // ── [10] EL EVENTO DE CDMX · la acotación de Memo ─────────────────────────
+  console.log('\n[10] CUADRE-5 · evento de CDMX (soad): el CHEAP entra, el PLUS no');
+  const C5_CDMX = () => ({
+    eventoId: 'soad', catalogo: true,
+    pestanas: {
+      // El NOMBRE de la pestaña es de fixture; la CABECERA es la real medida.
+      'SOAD - 28 de Mayo': conPreludio(CAB_YOUNGMIKO, [
+        // FUERA · PLUS en CDMX: el autobús son $2,500 pero el avión se cotiza a
+        // mano, así que el index no sabe el total completo.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Rita Bueno', 'Paquete': 'PLUS', 'Boleto': 'General A', 'Separo': '$500', '1': '$500', 'Total': '$0', 'TALLA': 'M' }),
+        // DENTRO · CHEAP es solo el boleto, y eso el index SÍ lo sabe.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Saul Nieto', 'Paquete': 'CHEAP', 'Boleto': 'General A', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'L' }),
+      ]),
+    },
+    base: {
+      excel_pestanas: [{ evento_id: 'soad', pestana: 'SOAD - 28 de Mayo', regla_zona: null, activa: true, notas: null }],
+      viajeros_evento: [
+        { id: 'c5-6', evento_id: 'soad', nombre: 'Rita Bueno', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 6800, notas: 'TOTAL-1: contrato derivado del catálogo', zona_boleto: 'General A', tipo_paquete: 'PLUS' },
+        { id: 'c5-7', evento_id: 'soad', nombre: 'Saul Nieto', tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: null, notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'General A', tipo_paquete: 'CHEAP' },
+      ],
+      abonos_viajero: [],
+    },
+  });
+  const { d: d10 } = await correr(C5_CDMX());
+  const c10 = d10.cuadre5 || {};
+  console.log('    cuadre5 = ' + JSON.stringify(c10));
+  af(c10.cdmx === true, 'la premisa NO se sostiene: `esCDMX` dice ' + JSON.stringify(c10.cdmx)
+     + ' de soad, que es del Palacio de los Deportes — sin CDMX, la acotación no se está midiendo');
+  af(c10.en_regla === 1, 'en_regla = ' + c10.en_regla + ', se esperaba 1 (solo el CHEAP)');
+  af(c10.fuera_cdmx === 1, 'fuera_cdmx = ' + c10.fuera_cdmx + ', se esperaba 1 (el PLUS con transporte)');
+  af(c10.fuera_libreta === 0, 'fuera_libreta = ' + c10.fuera_libreta + ', se esperaba 0');
+  af(c10.fuera_otro === 0, '`fuera_otro` = ' + c10.fuera_otro + ' y debe ser 0: hay una clase de $0 sin nombre');
+  const R10 = d10.totales_cero_regla || [];
+  af(R10.length === 1 && R10[0].nombre === 'Saul Nieto',
+     'el montón de la regla en CDMX trae ' + JSON.stringify(R10.map((x) => x.nombre)) + ' y debía traer solo a Saul (CHEAP)');
+  af(!!(d10.totales_contrato || []).find((x) => x.nombre === 'Rita Bueno'),
+     'Rita (PLUS en CDMX) dejó de pedir ojo humano: el index NO sabe el vuelo');
+
+  // ── [11] CONTROL POSITIVO · sin catálogo, la regla NO TAPA NADA ───────────
+  // El mismo fixture NO-CDMX, con el catálogo ilegible. Si las clases salieran
+  // iguales que en [9], querría decir que no dependen de lo medido — y el verde
+  // de arriba no probaría nada. Éste es el control que no puede caducar: no
+  // depende de ningún pasado, solo de apagarle la fuente al careo.
+  console.log('\n[11] CONTROL POSITIVO · el mismo caso con el catálogo ILEGIBLE');
+  const { d: d11 } = await correr({ ...C5_YM(), catalogo: false });
+  const c11 = d11.cuadre5 || {};
+  console.log('    cuadre5 = ' + JSON.stringify(c11));
+  // ⚠️ `cuadre5.cdmx` dice el valor que el careo USÓ, no el que midió: con el
+  // catálogo ilegible es `true` porque ante la duda se asume CDMX. Quien
+  // distingue «medido» de «asumido» es `catalogo_error`, y la pantalla lo
+  // pinta. Mi primera aserción pedía `null` — era mía, no del código.
+  af(c11.cdmx === true, '`cdmx` debía quedar en el conservador `true` y salió ' + JSON.stringify(c11.cdmx));
+  af(!!c11.catalogo_error, 'el careo NO dijo que no pudo leer el catálogo: un fail-soft mudo es peor que el error');
+  // 🔒 EL CONTRASTE ES LA MEDICIÓN: con el catálogo apagado el PLUS derivado
+  // sale de la regla (3 → 2) y pasa a la clase «fuera por CDMX» (0 → 1).
+  // ⚠️ Los dos CHEAP se quedan DENTRO, y está bien: el CHEAP es solo el boleto,
+  // así que la regla lo cubre EN CUALQUIER LADO — asumir CDMX no los toca.
+  // Esperaba `en_regla:0` y la aritmética era mía otra vez.
+  af(c11.en_regla === 2, 'con el catálogo ilegible la regla cubrió ' + c11.en_regla
+     + ' renglón(es) y debían ser 2 (los dos CHEAP, que la regla cubre en cualquier lado)');
+  af(c11.fuera_cdmx === 1 && c11.fuera_libreta === 1,
+     'las clases del control positivo salieron ' + JSON.stringify([c11.fuera_cdmx, c11.fuera_libreta])
+     + ' y debían ser [1, 1] — Lupe por CDMX asumido, Olga por libreta');
+  af(c11.fuera_otro === 0, '`fuera_otro` = ' + c11.fuera_otro + ' y debe ser 0 también con el catálogo apagado');
+  af(c9.en_regla !== c11.en_regla && c9.fuera_cdmx !== c11.fuera_cdmx,
+     'las clases salieron IGUALES con y sin catálogo (' + c9.en_regla + '/' + c9.fuera_cdmx + ' vs '
+     + c11.en_regla + '/' + c11.fuera_cdmx + '): entonces no dependen de lo medido y el verde de [9] no prueba nada');
+  af(!!(d11.totales_contrato || []).find((x) => x.nombre === 'Lupe Ozuna'),
+     'Lupe no volvió al montón de diferencias con el catálogo apagado: la clasificación no depende de lo medido');
+
+  // ── [12] LA PANTALLA DE CUADRE-5 · el chip y los conteos ──────────────────
+  console.log('\n[12] la pantalla de CUADRE-5');
+  const html9 = pintar(d9);
+  af(/data-chip="cuadre5"/.test(html9), 'la pantalla no pinta el chip de la regla');
+  af(html9.includes(CUADRE5_FECHA), 'el chip no dice la FECHA de la regla (' + CUADRE5_FECHA + ')');
+  ['Lupe Ozuna', 'Mara Tovar', 'Noe Quiroz'].forEach((n) =>
+    af(html9.includes(n), 'la pantalla no imprime a ' + n + ', que está en el montón de la regla'));
+  af(/del catálogo vivo/.test(html9), 'la pantalla no dice cuáles totales salieron del catálogo vivo');
+  af(/CDMX/.test(html9) && /libreta/.test(html9),
+     'la pantalla no nombra las dos clases que quedan FUERA: el conteo sin su razón no se puede leer');
+  // 🔒 EL LETRERO SE DERIVA, NO SE TECLEA — y se prueba MUTANDO el dato en vez
+  // de buscar la palabra en el fuente: se le cambia la fecha y los conteos a un
+  // testigo y se exige que la pantalla los diga. Un `grep` del literal se caza
+  // solo (mi propio comentario lo contiene).
+  const testigo = JSON.parse(JSON.stringify(d9));
+  testigo.cuadre5.fecha = 'FECHA-TESTIGO-777';
+  testigo.cuadre5.en_regla = 4242;
+  testigo.cuadre5.fuera_cdmx = 3131;
+  testigo.cuadre5.fuera_libreta = 2121;
+  const htmlT = pintar(testigo);
+  af(htmlT.includes('FECHA-TESTIGO-777'), 'la fecha del chip NO se deriva de la respuesta: está tecleada en la pantalla');
+  ['4242', '3131', '2121'].forEach((n) =>
+    af(htmlT.includes(n), 'el conteo ' + n + ' no llegó a la pantalla: la pantalla lo está recontando por su cuenta'));
+  console.log('    HTML con CUADRE-5: ' + html9.length + ' bytes');
+
+  // ── [13] LA PUERTA `para_careo` NO DEBILITA LA VENTA ──────────────────────
+  // La puerta abre cuatro candados de AUD-2 y la única forma de saber que no
+  // abrió de más es EJERCITAR LOS DOS LADOS con el mismo evento y la misma
+  // zona: por la puerta tiene que dar precio, y sin la puerta tiene que
+  // REHUSARSE. El caso se busca en el catálogo vivo —un evento A LA VENTA con
+  // una zona agotada que sí trae precio—, que es donde un candado debilitado
+  // costaría dinero de verdad; medirlo solo en un evento agotado habría dejado
+  // el caso peligroso sin tocar.
+  console.log('\n[13] la puerta `para_careo` contra la VENTA');
+  // ⚠️ El escenario de [11] dejó la red falsa SIN servir el catálogo, así que
+  // aquí se vuelve a poner —con el índice real— y se tira el módulo cacheado.
+  // Sin esto el bloque se cae al `null` de `fetchEventosRaw` y sus aserciones
+  // pasarían en vacío; el candado de cardinalidad lo cazó en la primera
+  // corrida, que es exactamente para lo que está.
+  global.fetch = async (url) => {
+    if (/\/index\.html$/.test(String(url))) return { ok: true, status: 200, text: async () => INDEX_REAL, json: async () => ({}) };
+    throw new Error('la red falsa del bloque [13] solo sirve el index: ' + url);
+  };
+  for (const f of ['_lib/catalogo-index.js', '_lib/precio-zona.js']) {
+    delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions', f))];
+  }
+  const { resolverPrecioVenta: resolverPrecioVenta13 } = require(path.join(RAIZ, 'netlify/functions/_lib/precio-zona.js'));
+  const { fetchEventosRaw } = require(path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js'));
+  const evCrudos = await fetchEventosRaw();
+  af(Array.isArray(evCrudos) && evCrudos.length > 50,
+     'el catálogo no se pudo leer para este bloque: llegó ' + JSON.stringify(evCrudos && evCrudos.length));
+  const HOY = '2026-09-23';
+  let caso = null;
+  for (const e of (evCrudos || [])) {
+    const st = String(e.st || '').toLowerCase();
+    if (['agotado', 'por-confirmar', 'proceso', 'proximamente', 'pronto'].includes(st)) continue;
+    if (!e.ds || e.ds <= HOY || (Array.isArray(e.multifecha) && e.multifecha.length)) continue;
+    const ag = (e.zonas || []).find((z) => z && z.ag && Number(z.p) > 0);
+    const libre = (e.zonas || []).find((z) => z && !z.ag && !z.prox && Number(z.p) > 0);
+    if (ag && libre) { caso = { e, ag, libre }; break; }
+  }
+  // CANDADO DE CARDINALIDAD: sin el caso, las cuatro aserciones de abajo
+  // pasarían en hueco y el verde no diría nada de la venta.
+  af(!!caso, 'no hay en el catálogo un evento A LA VENTA con una zona agotada CON precio: '
+     + 'sin ese caso este bloque pasa en vacío y no puede afirmar que la venta sigue cerrada');
+  if (caso) {
+    const pide = (zona, puerta) => resolverPrecioVenta13(Object.assign(
+      { evento_id: caso.e.id, paquete: 'PLUS', zona, num_personas: 1, hoyISO: HOY },
+      puerta ? { para_careo: true } : {}));
+    const vAg = await pide(caso.ag.n, false);
+    const cAg = await pide(caso.ag.n, true);
+    const vLibre = await pide(caso.libre.n, false);
+    const cFantasma = await pide('No Existe Esta Zona', true);
+    console.log('    caso: ' + caso.e.id + ' (st=' + JSON.stringify(caso.e.st) + ', ' + caso.e.ds + ')'
+      + ' · zona agotada «' + caso.ag.n + '» · zona libre «' + caso.libre.n + '»');
+    console.log('    venta de la agotada: ok=' + vAg.ok + ' (' + (vAg.motivo || '') + ')'
+      + ' · careo de la agotada: ok=' + cAg.ok + ' precio=' + cAg.precio_unit);
+    af(vAg.ok === false, 'LA VENTA SE DEBILITÓ: se pudo cotizar la zona agotada «' + caso.ag.n
+       + '» de ' + caso.e.id + ' SIN la puerta del careo — la puerta abrió de más');
+    af(cAg.ok === true && Number(cAg.precio_unit) > 0,
+       'la puerta del careo NO deja cotizar la zona agotada: ' + (cAg.motivo || 'sin motivo'));
+    af(vLibre.ok === true && Number(vLibre.precio_unit) > 0,
+       'la VENTA normal dejó de funcionar en una zona libre: ' + (vLibre.motivo || 'sin motivo'));
+    // 🔒 Y LO QUE LA PUERTA **NO** ABRE: una zona que no existe no tiene precio
+    // que decir, y el careo tampoco lo inventa. La puerta abre lo que no se
+    // vende, jamás lo que no se sabe.
+    af(cFantasma.ok === false, 'la puerta del careo cotizó una zona que NO EXISTE en el catálogo: '
+       + 'eso ya no es abrir un candado de venta, es inventar un dato');
+  }
+
+  // ── [14] LA PUERTA ES OPT-IN, Y SE CUENTA QUIÉN LA PASA ───────────────────
+  // Una puerta que apaga candados de venta solo es segura mientras tenga UN
+  // cliente. Aquí se cuentan los archivos que la nombran de verdad —con los
+  // comentarios QUITADOS, porque una aserción de ausencia por grep se caza sola
+  // (este mismo comentario dice `para_careo`)— y se exige que sean dos: su
+  // dueño y el careo. `resolverPrecioVenta` tiene SIETE llamadores; los otros
+  // cinco (el separo de Mercado Pago ×2, el alta del Portal, /rol y las
+  // cortesías) cotizan VENTA de verdad y no deben pasarla nunca.
+  console.log('\n[14] quién pasa la puerta');
+  const sinComentarios = (s) => String(s).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const fsx = require('fs');
+  const dirs = [path.join(RAIZ, 'netlify/functions'), path.join(RAIZ, 'netlify/functions/_lib')];
+  const conPuerta = [];
+  for (const dir of dirs) {
+    for (const f of fsx.readdirSync(dir)) {
+      if (!f.endsWith('.js')) continue;
+      const p = path.join(dir, f);
+      if (!fsx.statSync(p).isFile()) continue;
+      if (/para_careo/.test(sinComentarios(fsx.readFileSync(p, 'utf8')))) conPuerta.push(f);
+    }
+  }
+  conPuerta.sort();
+  console.log('    la nombran (sin comentarios): ' + JSON.stringify(conPuerta));
+  af(conPuerta.length === 2 && conPuerta.includes('precio-zona.js') && conPuerta.includes('excel-careo-correr.js'),
+     'la puerta `para_careo` la pasa alguien más: ' + JSON.stringify(conPuerta)
+     + ' — debe ser solo su dueño (precio-zona.js) y el careo (excel-careo-correr.js)');
+  // CONTROL DEL INSTRUMENTO: si el buscador no encuentra la puerta ni en su
+  // propio dueño, su lista vacía no significaría «nadie la pasa».
+  af(conPuerta.includes('precio-zona.js'),
+     'el buscador no ve la puerta ni en precio-zona.js: su lista no dice nada');
 
   console.log('\n──────────────────────────────────────────────');
   console.log((mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' aserciones en verde, ' + mal + ' en rojo');

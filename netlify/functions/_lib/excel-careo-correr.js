@@ -18,6 +18,10 @@
 const { cosechar } = require('./cosecha-excel');
 const { parsearPestana, carear } = require('./excel-careo');
 const { mapearLibro, fundirNumerologia, parsearLibro, PESTANA_LIBRO } = require('./numerologia');
+// [CUADRE-5] El catálogo, para saber si el evento es de CDMX y para el precio
+// vivo por paquete+zona. Los dos salen del MISMO dueño que usa el index.
+const { fetchEventosRaw } = require('./catalogo-index');
+const { esCDMX, resolverPrecioVenta } = require('./precio-zona');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -179,8 +183,55 @@ async function correrCareo(eventoId) {
   const base = await leerBase(eventoId, sb);
   if (base.error) return { error: { status: 502, mensaje: base.error } };
 
+  // ── [CUADRE-5] ¿EL EVENTO ES DE CDMX? ────────────────────────────────────
+  // La regla del $0 tecleado depende de si el index puede saber el total
+  // completo, y eso depende del venue: en CDMX el avión se cotiza a mano.
+  // 🔒 Se le PREGUNTA a `esCDMX` del lib de precios —la misma prueba que el
+  // index y el Portal—, no se mira el nombre del evento.
+  // 🔒 FAIL-SOFT CONSERVADOR: si el catálogo no se puede leer, `cdmx` va en
+  // `null` y `carear` asume CDMX, o sea que NO tapa ningún $0. Ante la duda, la
+  // diferencia se sigue viendo.
+  let cdmx = null, catalogoError = null;
+  try {
+    const crudos = await fetchEventosRaw();
+    const slug = String(eventoId).split('#')[0];
+    const e = Array.isArray(crudos) ? crudos.find((x) => x && x.id === slug) : null;
+    if (e) cdmx = esCDMX(e);
+    else catalogoError = `"${slug}" no está en el catálogo`;
+  } catch (err) { catalogoError = err.message; }
+
   // 4. Los montones.
-  const montones = carear(personasLado, base.viajeros);
+  const montones = carear(personasLado, base.viajeros, { cdmx });
+
+  // ── [CUADRE-5] EL TOTAL PENDIENTE SE PISA CON EL PRECIO VIVO ─────────────
+  // Los renglones que cayeron en la regla y traen el total del sistema en NULL
+  // o en 0 se rellenan con el precio del catálogo por PAQUETE + ZONA.
+  //
+  // 🔒 SE LE PIDE AL DUEÑO DE LA ARITMÉTICA (`resolverPrecioVenta`), con la
+  // puerta `para_careo`. Leer `ev.zonas` aquí habría sido la segunda fórmula de
+  // «cuánto cuesta un paquete», y esta casa ya pagó once de ésas.
+  // ⚠️ La puerta hace falta porque los dos candados de venta de AUD-2 —el `st`
+  // no vendible y «la fecha ya pasó»— se disparan justo en los eventos que se
+  // cuadran: medido, `resolverPrecioVenta` rehusaba los cuatro casos probados.
+  // 🔒 Y FAIL-SOFT: si no se puede resolver, el renglón se queda `pendiente`
+  // con su motivo. Nunca se inventa un número.
+  for (const fila of (montones.totales_cero_regla || [])) {
+    if (fila.sistema_total_origen !== 'pendiente') continue;
+    try {
+      const r = await resolverPrecioVenta({
+        evento_id: eventoId, paquete: fila.paquete, zona: fila.zona,
+        num_personas: 1, para_careo: true,
+      });
+      if (r && r.ok && Number.isFinite(Number(r.precio_unit))) {
+        fila.sistema_total = Number(r.precio_unit);
+        fila.sistema_total_origen = 'catalogo';
+      } else {
+        fila.sistema_total_motivo = (r && r.motivo) || 'el catálogo no dio precio';
+      }
+    } catch (err) { fila.sistema_total_motivo = err.message; }
+  }
+  if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
+
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
            viajeros: base.viajeros, montones, numerologia,
            chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };

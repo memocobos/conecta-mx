@@ -266,7 +266,42 @@ function esDerivado(notas) {
   return normalizarNombre(notas).includes('derivado');
 }
 
-function carear(personasExcel, viajerosBase) {
+// ── [CUADRE-5] LA REGLA DEL $0 TECLEADO ────────────────────────────────────
+// Regla firmada por Memo el 22-sep-2026, y ACOTADA por su propio ojo.
+//
+// Un `$0` TECLEADO en la pestaña deja de marcarse como diferencia —el total del
+// sistema, derivado del catálogo, es el bueno POR DECRETO— pero SOLO cuando el
+// index puede saber el total COMPLETO:
+//
+//   · eventos NO-CDMX (el paquete se arma con lo que el catálogo ya sabe), o
+//   · paquete CHEAP en cualquier lado (es solo el boleto).
+//
+// ⚠️ LOS $0 DE EVENTOS CDMX EN PAQUETES CON TRANSPORTE QUEDAN FUERA, y no es un
+// olvido: el autobús son $2,500 pero el AVIÓN se cotiza a mano, así que el
+// index NO SABE el vuelo y su total estaría incompleto. Esos siguen pidiendo
+// ojo humano. La acotación es de Memo, no mía.
+//
+// ⚠️ Y LOS «EXACTOS DE LIBRETA» TAMPOCO ENTRAN: el decreto dice que el bueno es
+// el total DERIVADO del catálogo. Si alguien capturó el contrato real a mano,
+// un $0 enfrente es un cambio que hay que mirar, no ruido que tapar.
+//
+// 🔒 `excel_total === 0` es el $0 TECLEADO. El `null` —la columna que no existe
+// o la celda vacía— ya se salta antes y NUNCA fue una diferencia: son dos cosas
+// distintas y confundirlas taparía el hueco además del cero.
+const CUADRE5_FECHA = '22-sep-2026';
+function reglaCeroTecleado(fila, cdmx) {
+  if (Number(fila.excel_total) !== 0) return { aplica: false, motivo: null };
+  if (!fila.derivado) return { aplica: false, motivo: 'libreta' };
+  const paq = String(fila.paquete || '').trim().toLowerCase();
+  if (cdmx && paq !== 'cheap') return { aplica: false, motivo: 'cdmx' };
+  return { aplica: true, motivo: null };
+}
+
+function carear(personasExcel, viajerosBase, opciones) {
+  // `cdmx` lo sabe quien conoce el evento (el runner, contra el catálogo). Si
+  // no llega, se asume CDMX: es el lado CONSERVADOR — deja los $0 en el montón
+  // de diferencias en vez de taparlos con una regla que quizá no aplica.
+  const cdmx = !opciones || opciones.cdmx == null ? true : !!opciones.cdmx;
   const enBase = agruparBase(viajerosBase);
   const enExcel = new Map((personasExcel || []).map((p) => [p.clave, p]));
 
@@ -358,6 +393,11 @@ function carear(personasExcel, viajerosBase) {
   // hotel ni upgrades, y la pestaña gana—; sobre un exacto de la libreta es un
   // cambio real que hay que mirar. Es la señal que separa el ruido del hallazgo.
   const totalesContrato = [];
+  // [CUADRE-5] Los dos montones nuevos: los $0 que la regla cubre, y la CUENTA
+  // de los que se quedan fuera y por qué. 🔒 El conteo viaja en la respuesta
+  // —no en un log— porque el encargo es que Memo VEA el tamaño de cada montón.
+  const ceroRegla = [];
+  const ceroFuera = {};
   for (const p of enExcel.values()) {
     if (p.total == null) continue;
     const mismos = enBase.get(p.clave) || [];
@@ -369,21 +409,73 @@ function carear(personasExcel, viajerosBase) {
     // pendiente SALE en el montón en vez de quedarse invisible otro mes.
     const sis = (v.total_contrato == null || v.total_contrato === '') ? null : Number(v.total_contrato);
     const dif = Math.round((p.total - (sis == null ? 0 : sis)) * 100) / 100;
-    if (Math.abs(dif) <= TOLERANCIA_MXN) continue;
-    totalesContrato.push({
+    const fila = {
       nombre: p.nombre, viajero_id: v.id, excel_total: p.total, sistema_total: sis,
       diferencia: dif, derivado: esDerivado(v.notas), filas: p.filas,
       zona: p.zona, paquete: p.paquete,
-    });
+    };
+    // [CUADRE-5] El $0 tecleado que cae en la regla sale del montón de
+    // diferencias y va al suyo. NO se borra: Memo tiene que poder ver cuántos
+    // son y quiénes. Un renglón que desaparece es un renglón que nadie revisa.
+    //
+    // 🔒 LA REGLA SE PREGUNTA **ANTES** DE LA TOLERANCIA, Y NO ES UN DETALLE DE
+    // ORDEN: un «$0» tecleado contra un total del sistema en NULL o en 0 da
+    // diferencia CERO, así que la tolerancia lo saltaría — y el caso que Memo
+    // nombró por su nombre, «si algún renglón de la regla trae el total del
+    // sistema en NULL/0, se pisa con el precio vivo del catálogo», NO PODRÍA
+    // OCURRIR JAMÁS. Sería una guarda inalcanzable, la forma que esta casa ya
+    // pagó tres veces. Detrás de la tolerancia el montón solo habría podido
+    // traer los `origen:'base'`.
+    const r = reglaCeroTecleado(fila, cdmx);
+    // Los tres conteos PARTEN el total de los $0 tecleados (de personas con un
+    // solo homónimo en el sistema): en la regla, fuera por CDMX, fuera por
+    // libreta. Se cuentan aquí arriba —antes de la tolerancia— para que las
+    // tres clases sumen; `totales_contrato_en_cero`, que la pantalla ya
+    // pintaba, es OTRO número: el subconjunto de los que además DIFIEREN.
+    if (Number(fila.excel_total) === 0 && !r.aplica) {
+      ceroFuera[r.motivo || 'otro'] = (ceroFuera[r.motivo || 'otro'] || 0) + 1;
+    }
+    if (r.aplica) {
+      // ⚠️ SIN `diferencia`, y a propósito: el runner está por PISAR
+      // `sistema_total` con el precio vivo, así que la resta de aquí quedaría
+      // vieja — y un número que nadie recalculó al lado de uno que sí es la
+      // manera de que alguien lea el equivocado.
+      const enRegla = Object.assign({}, fila, {
+        // `sistema_total` puede venir NULL o 0: el runner lo pisa con el precio
+        // vivo del catálogo por paquete+zona, y dice de dónde salió.
+        sistema_total_origen: (sis == null || sis === 0) ? 'pendiente' : 'base',
+      });
+      delete enRegla.diferencia;
+      ceroRegla.push(enRegla);
+      continue;
+    }
+    if (Math.abs(dif) <= TOLERANCIA_MXN) continue;
+    totalesContrato.push(fila);
   }
 
   const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
   return { nuevos: nuevos.sort(porNombre), pagos: pagos.sort(porNombre),
            bajas: bajas.sort(porNombre), iguales: iguales.sort(porNombre),
            apartados: apartados.sort(porNombre), ambiguos: ambiguos.sort(porNombre),
-           totales_contrato: totalesContrato.sort(porNombre) };
+           totales_contrato: totalesContrato.sort(porNombre),
+           // [CUADRE-5]
+           totales_cero_regla: ceroRegla.sort(porNombre),
+           cuadre5: {
+             fecha: CUADRE5_FECHA,
+             cdmx,
+             en_regla: ceroRegla.length,
+             fuera_cdmx: ceroFuera.cdmx || 0,
+             fuera_libreta: ceroFuera.libreta || 0,
+             // Tiene que ser SIEMPRE 0: `reglaCeroTecleado` solo puede decir
+             // «libreta» o «cdmx» cuando se rehúsa. Viaja de todos modos —en
+             // vez de dejar el `|| 'otro'` como un default calladito— porque si
+             // algún día no es cero significa que hay una clase de $0 que nadie
+             // nombró, y un montón sin nombre es un montón que nadie revisa.
+             fuera_otro: ceroFuera.otro || 0,
+           } };
 }
 
 module.exports = { normalizarNombre, esChatarra, leerDinero, mapearColumnas,
                    parsearPestana, carear, agruparBase, esDerivado,
+                   reglaCeroTecleado, CUADRE5_FECHA,
                    CHATARRA, TOLERANCIA_MXN };

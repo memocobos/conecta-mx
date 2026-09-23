@@ -600,6 +600,11 @@ function _evtMxn(n) {
 // nombre corto ya estaba ocupado por esta línea de aquí abajo.
 function _excelCareoHtml(d) {
   const t = d.totales || {};
+  // [CUADRE-5] Los conteos por clase del $0 tecleado. 🔒 NO se recuentan aquí:
+  // se leen del objeto que arma el lib que APLICA la regla. Contar de este lado
+  // sería la segunda fórmula de «cuántos caen en la regla», y la que divergiera
+  // pintaría un montón de un tamaño que nadie calculó.
+  const c5 = d.cuadre5 || {};
   const cab = (titulo, n, color) =>
     `<div style="display:flex;align-items:baseline;gap:8px;margin:14px 0 6px">
        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${color}">${titulo}</span>
@@ -679,9 +684,42 @@ function _excelCareoHtml(d) {
       ésos son un PISO y que difieran es lo ESPERADO. Los otros
       <b style="color:var(--orange)">${t.totales_contrato - t.totales_contrato_derivados}</b> salen de la libreta de Memo — ahí una diferencia es un cambio real que hay que mirar.` : ''}
       Quien no trae total en la pestaña NO sale aquí: un hueco no es una diferencia de dinero.
-      ${t.totales_contrato_en_cero ? `<br><b style="color:var(--orange)">${t.totales_contrato_en_cero}</b> de ellos traen <b>$0</b> tecleado en la pestaña — casi siempre una fórmula sin llenar, no un contrato de cero pesos.` : ''}
+      ${t.totales_contrato_en_cero ? `<br><b style="color:var(--orange)">${t.totales_contrato_en_cero}</b> de ellos traen <b>$0</b> tecleado en la pestaña — casi siempre una fórmula sin llenar, no un contrato de cero pesos.
+      ⚠️ Desde CUADRE-5 <b style="color:var(--tp)">éstos son los que la regla del $0 NO cubre</b>: los cubiertos ya salieron de este montón y se cuentan abajo.` : ''}
       <b style="color:var(--tp)">Esta fase SOLO LEE</b>: no corrige ningún total.
     </div>
+
+    <div style="font-size:11px;color:var(--ts);margin-top:10px;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">
+      <span data-chip="cuadre5"
+            title="Un $0 tecleado en la columna Total deja de ser diferencia cuando el index PUEDE saber el total completo: evento fuera de CDMX, o paquete CHEAP en cualquier lado. El total del sistema, derivado del catálogo, es el bueno."
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow,#e8ff4c);border:1px solid currentColor;border-radius:3px;padding:0 4px">regla del $0 · ${_evtEsc(c5.fecha || 'sin fecha')}</span>
+      <br><b style="color:var(--tp)">El total del sistema es el bueno por decreto</b> cuando el index PUEDE saberlo
+      completo: evento <b>fuera de CDMX</b>, o paquete <b>CHEAP</b> en cualquier lado. Esos $0 salen del montón
+      de arriba y se cuentan aquí — <b style="color:var(--tp)">no se borran</b>, y no traen botón de «aplicar»:
+      aplicarlos escribiría el $0 encima de un total bueno.
+      <br><b style="color:var(--tp)">${c5.en_regla || 0}</b> caen en la regla ·
+      <b style="color:var(--orange)">${c5.fuera_cdmx || 0}</b> quedan FUERA por ser <b>CDMX en paquete con
+      transporte</b> — el autobús son $2,500 pero el avión se cotiza a mano, así que el index no sabe el vuelo ·
+      <b style="color:var(--orange)">${c5.fuera_libreta || 0}</b> son <b>exactos de libreta</b> y tampoco entran:
+      ahí un $0 enfrente es un cambio real.
+      ${c5.catalogo_error ? `<br><b style="color:var(--red)">El catálogo no se pudo leer (${_evtEsc(c5.catalogo_error)})</b>,
+      así que el careo asumió CDMX y NO tapó ningún $0: ante la duda, la diferencia se sigue viendo.` : ''}
+    </div>
+    <details style="margin-top:8px">
+      <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">$0 cubiertos por la regla · ${c5.en_regla || 0}</summary>
+      <div style="padding-top:8px">${lista(d.totales_cero_regla || [], x => fila(
+        `${_evtEsc(x.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(x.zona || 'sin zona')} ${_evtEsc(x.paquete || '')}${x.filas > 1 ? ` · ${x.filas} filas` : ''}</span>`,
+        // El total que MANDA es el del sistema, así que se pinta él y se dice de
+        // dónde salió: de la base, del catálogo vivo (porque venía NULL o en 0)
+        // o de ningún lado, y entonces se dice el motivo en vez de un número.
+        (x.sistema_total == null
+          ? `<span style="color:var(--orange)">sin total — ${_evtEsc(x.sistema_total_motivo || 'el catálogo no dio precio')}</span>`
+          // Si el total cubre VARIOS boletos, la pantalla lo dice: un número
+          // cuatro veces más grande sin esa palabra se lee como un error.
+          : `${_evtMxn(x.sistema_total)} <span style="color:var(--ts);font-size:11px">${x.sistema_total_origen === 'catalogo'
+                ? `del catálogo vivo${x.sistema_total_boletos > 1 ? ` · ${x.sistema_total_boletos} boletos` : ''}`
+                : 'de la base'}</span>`)))}</div>
+    </details>
 
     <details style="margin-top:14px">
       <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">iguales · ${t.iguales}</summary>

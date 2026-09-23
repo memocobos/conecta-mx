@@ -109,6 +109,35 @@ function _calcularPrecio(ev, opts) {
   const hoyISO = (opts && opts.hoyISO) || hoyMx();
   const cdmx = esCDMX(ev);
 
+  // ── 🔴 [CUADRE-5] LA PUERTA DEL CAREO ─────────────────────────────────────
+  // `para_careo` apaga los candados de AUD-2 que dicen «ESTO NO SE PUEDE
+  // COMPRAR» y **ninguno** de los que dicen «NO HAY PRECIO». Son cuatro:
+  //   · el `st` del evento no vendible      · la fecha del evento ya pasó
+  //   · la zona marcada agotada (`ag`)      · la zona `prox` (aún no sale)
+  // 🔒 SIGUEN EN PIE, y tienen que seguir: `p > 0` (sin precio no hay número
+  // que decir, y el careo lo reporta como «sin total» con su motivo), la zona
+  // que no existe en el catálogo, el paquete inválido y el `fecha_idx` fuera de
+  // rango. La regla que los separa es esa: **la puerta abre lo que no se vende,
+  // jamás lo que no se sabe.**
+  //
+  // Por qué hace falta: todos son candados de VENTA y son correctos para
+  // vender. Pero el careo del Excel se corre sobre eventos que casi siempre
+  // están AGOTADOS o ya PASARON —cuadrar es lo que se hace después—, así que
+  // `resolverPrecioVenta` se rehusaba justo cuando el careo lo necesita.
+  // 🔒 Y LOS DOS DE LA ZONA SE ABRIERON CONTANDO, no suponiendo: medido sobre
+  // el catálogo del 23-sep, **957 de las 1,667 zonas están marcadas agotadas y
+  // 666 de ésas TRAEN PRECIO**; en los 40 eventos agotados o pasados —los que
+  // de verdad se cuadran— son **364 de 468 zonas**. Con solo los dos candados
+  // del evento abiertos, el careo se habría quedado sin pisar el total en la
+  // mayoría de los renglones reales, y el «sin total» habría parecido un dato
+  // que falta en vez de un candado de venta. Lo cazó el careo, no una lectura.
+  //
+  // 🔒 NO SE DEBILITA LA VENTA: la puerta es OPT-IN y el único que la pasa es
+  // el careo (`excel-careo-correr`). Y se abre AQUÍ, en el dueño de la
+  // aritmética, en vez de que el careo lea `ev.zonas` por su cuenta: eso habría
+  // sido la segunda fórmula de «cuánto cuesta un paquete».
+  const paraCareo = !!(opts && opts.para_careo);
+
   // 🔒 AUD-2 — fecha_idx fuera de rango. Antes, un slug#99 caía a las listas
   // top-level del evento y VENDÍA a un precio que no corresponde a ninguna fecha.
   if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
@@ -121,14 +150,14 @@ function _calcularPrecio(ev, opts) {
 
   // 🔒 AUD-2 — el catálogo manda: no se vende lo que no está a la venta.
   const st = String(ev.st || '').toLowerCase();
-  if (ST_NO_VENDIBLE.includes(st)) {
+  if (!paraCareo && ST_NO_VENDIBLE.includes(st)) {
     return { ok: false, motivo: `el evento está "${st}" en el catálogo — no se vende` };
   }
 
   // 🔒 AUD-2 — evento ya pasado (de la fecha elegida si es multifecha).
   const dsEvento = _fechaEvento(ev, fechaIdx);
   const diasAlEvento = _diasEvento(dsEvento, hoyISO);
-  if (diasAlEvento != null && diasAlEvento < 0) {
+  if (!paraCareo && diasAlEvento != null && diasAlEvento < 0) {
     return { ok: false, motivo: 'la fecha del evento ya pasó' };
   }
 
@@ -144,8 +173,8 @@ function _calcularPrecio(ev, opts) {
     // 🔒 AUD-2: las banderas del catálogo mandan. `ag` = agotada, `prox` = aún no
     // sale a la venta. Antes solo se miraba el precio, así que una zona marcada
     // agotada pero con precio se podía vender.
-    if (selZ.ag) return { ok: false, motivo: 'zona agotada' };
-    if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' };
+    if (!paraCareo && selZ.ag) return { ok: false, motivo: 'zona agotada' };
+    if (!paraCareo && selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' };
     if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio (p=0)' };
   }
 
@@ -313,6 +342,7 @@ async function resolverPrecioVenta(opts) {
     transporte_cost: opts.transporte_cost,
     fecha_idx: fechaIdx,
     hoyISO: opts.hoyISO || hoyMx(),
+    para_careo: !!opts.para_careo,
   });
 }
 

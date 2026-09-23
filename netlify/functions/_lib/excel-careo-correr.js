@@ -18,6 +18,10 @@
 const { cosechar } = require('./cosecha-excel');
 const { parsearPestana, carear } = require('./excel-careo');
 const { mapearLibro, fundirNumerologia, parsearLibro, PESTANA_LIBRO } = require('./numerologia');
+// [CUADRE-5] El catálogo, para saber si el evento es de CDMX y para el precio
+// vivo por paquete+zona. Los dos salen del MISMO dueño que usa el index.
+const { fetchEventosRaw } = require('./catalogo-index');
+const { esCDMX, resolverPrecioVenta } = require('./precio-zona');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -179,8 +183,82 @@ async function correrCareo(eventoId) {
   const base = await leerBase(eventoId, sb);
   if (base.error) return { error: { status: 502, mensaje: base.error } };
 
+  // ── [CUADRE-5] ¿EL EVENTO ES DE CDMX? ────────────────────────────────────
+  // La regla del $0 tecleado depende de si el index puede saber el total
+  // completo, y eso depende del venue: en CDMX el avión se cotiza a mano.
+  // 🔒 Se le PREGUNTA a `esCDMX` del lib de precios —la misma prueba que el
+  // index y el Portal—, no se mira el nombre del evento.
+  // 🔒 FAIL-SOFT CONSERVADOR: si el catálogo no se puede leer, `cdmx` va en
+  // `null` y `carear` asume CDMX, o sea que NO tapa ningún $0. Ante la duda, la
+  // diferencia se sigue viendo.
+  let cdmx = null, catalogoError = null;
+  try {
+    const crudos = await fetchEventosRaw();
+    const slug = String(eventoId).split('#')[0];
+    const e = Array.isArray(crudos) ? crudos.find((x) => x && x.id === slug) : null;
+    if (e) cdmx = esCDMX(e);
+    else catalogoError = `"${slug}" no está en el catálogo`;
+  } catch (err) { catalogoError = err.message; }
+
   // 4. Los montones.
-  const montones = carear(personasLado, base.viajeros);
+  const montones = carear(personasLado, base.viajeros, { cdmx });
+
+  // ── [CUADRE-5] EL TOTAL PENDIENTE SE PISA CON EL PRECIO VIVO ─────────────
+  // Los renglones que cayeron en la regla y traen el total del sistema en NULL
+  // o en 0 se rellenan con el precio del catálogo por PAQUETE + ZONA.
+  //
+  // 🔒 SE LE PIDE AL DUEÑO DE LA ARITMÉTICA (`resolverPrecioVenta`), con la
+  // puerta `para_careo`. Leer `ev.zonas` aquí habría sido la segunda fórmula de
+  // «cuánto cuesta un paquete», y esta casa ya pagó once de ésas.
+  // ⚠️ La puerta hace falta porque los dos candados de venta de AUD-2 —el `st`
+  // no vendible y «la fecha ya pasó»— se disparan justo en los eventos que se
+  // cuadran: medido, `resolverPrecioVenta` rehusaba los cuatro casos probados.
+  // 🔒 Y FAIL-SOFT: si no se puede resolver, el renglón se queda `pendiente`
+  // con su motivo. Nunca se inventa un número.
+  // 🔴 EL CONTEO DE BOLETOS NO ES OPCIONAL (hallazgo de Jane, 23-sep). La
+  // pestaña lleva UNA FILA POR BOLETO y el total de la persona es la SUMA de
+  // sus filas, así que pisar con el precio de UNA persona pintaría 1/N del
+  // total real — rotulado «del catálogo vivo», que es peor que dejarlo vacío.
+  // 🔒 Y EL TOTAL DEL GRUPO SE LE PIDE AL DUEÑO (`num_personas: filas` y su
+  // `total`), NO se multiplica aquí: medido hoy los cuatro casos dan lineal,
+  // pero eso es un hecho de hoy —el hotel por persona cambia con el tipo de
+  // cuarto— y `unit × filas` sería mi propia aritmética al lado de la suya.
+  // ⚠️ SOLO SE PISA SI TODOS LOS BOLETOS SON DE UNA MISMA ZONA y están todos
+  // contados ahí. Con boletos repartidos —o con filas sin zona— el renglón se
+  // queda PENDIENTE diciendo por qué: repartirlos entre zonas sin fila que lo
+  // diga sería inventar, y ya mordió con Angel.
+  for (const fila of (montones.totales_cero_regla || [])) {
+    if (fila.sistema_total_origen !== 'pendiente') continue;
+    const filas = Math.max(1, Number(fila.filas) || 1);
+    const porZona = fila.zonas || {};
+    const zonas = Object.keys(porZona);
+    const zonaUnica = zonas.length === 1 ? zonas[0] : null;
+    const enLaZona = zonaUnica ? Number(porZona[zonaUnica]) || 0 : 0;
+    if (filas > 1 && !(zonaUnica && enLaZona === filas)) {
+      fila.sistema_total_motivo = zonas.length > 1
+        ? `${filas} boletos en ${zonas.length} zonas — se confirma a ojo`
+        : `${filas} boletos y ${enLaZona} con zona — se confirma a ojo`;
+      continue;
+    }
+    try {
+      const r = await resolverPrecioVenta({
+        evento_id: eventoId, paquete: fila.paquete, zona: fila.zona,
+        num_personas: filas, para_careo: true,
+      });
+      if (r && r.ok && Number.isFinite(Number(r.total))) {
+        fila.sistema_total = Number(r.total);
+        fila.sistema_total_origen = 'catalogo';
+        // Cuántos boletos entraron en ese número. La pantalla LO DICE: un total
+        // cuatro veces más grande sin decir que son cuatro boletos se lee como
+        // un error de la cuenta.
+        fila.sistema_total_boletos = filas;
+      } else {
+        fila.sistema_total_motivo = (r && r.motivo) || 'el catálogo no dio precio';
+      }
+    } catch (err) { fila.sistema_total_motivo = err.message; }
+  }
+  if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
+
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
            viajeros: base.viajeros, montones, numerologia,
            chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };

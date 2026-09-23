@@ -83,10 +83,18 @@ function cualCubre(filas, ahoraMs) {
 // medir en la frontera de una vigencia.
 async function vigentes(pedir, ahoraMs) {
   const t = Number.isFinite(ahoraMs) ? ahoraMs : Date.now();
+  // 🔴 NO SE TRAGA EL ERROR, y esto lo cazó el careo. La primera versión
+  // envolvía cada lectura en un `try/catch` que caía a `[]`, así que un 5xx de
+  // la base salía como «no hay cotización vigente» con `ok:true` — y eso
+  // BORRA la diferencia entre «no hay fila» y «NO PUDE LEER». Las dos se ven
+  // igual desde el sitio (los dos modos en null → WhatsApp), pero para el
+  // endpoint no son lo mismo: el tropiezo tiene que salir con `ok:false` y
+  // `no-store`, o el CDN congela diez minutos de «no hay precio» por una
+  // caída de un segundo. Un cero es una afirmación; un cero que en realidad
+  // es «no sé» es una afirmación falsa.
   const out = {};
   for (const modo of MODOS) {
-    let filas = [];
-    try { filas = await filasDe(pedir, modo, 20); } catch (_) { filas = []; }
+    const filas = await filasDe(pedir, modo, 20);
     out[modo] = publica(cualCubre(filas, t));
   }
   return out;

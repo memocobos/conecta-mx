@@ -103,14 +103,20 @@ exports.handler = async (event) => {
     if (!Number.isFinite(desde)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'La fecha de arranque no se entiende' }) };
     }
-    if (hasta <= desde) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'La vigencia está al revés: termina antes de empezar' }) };
-    }
-    // ⚠️ Y SE REHÚSA UNA COTIZACIÓN QUE NACE VENCIDA. No es un detalle: una
-    // fila así no rige nunca, así que el sitio seguiría en WhatsApp y la
-    // pantalla diría «ya capturé» — el «éxito vacío» que esta casa ya pagó.
+    // ⚠️ SE REHÚSA UNA COTIZACIÓN QUE NACE VENCIDA. No es un detalle: una fila
+    // así no rige nunca, así que el sitio seguiría en WhatsApp y la pantalla
+    // diría «ya capturé» — el «éxito vacío» que esta casa ya pagó.
+    //
+    // 🔴 Y VA **ANTES** DE LA GUARDA DEL «AL REVÉS», que es lo que cazó el
+    // careo: con `vigente_desde` ausente el arranque es AHORA, así que una
+    // vigencia pasada dispara primero «termina antes de empezar» — cierto,
+    // pero le dice a quien captura el problema equivocado. El mensaje tiene
+    // que nombrar la causa que el humano puede corregir.
     if (hasta <= Date.now()) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Esa vigencia ya pasó: la cotización nacería vencida y no regiría nunca' }) };
+    }
+    if (hasta <= desde) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'La vigencia está al revés: termina antes de empezar' }) };
     }
     const nota = typeof body.nota === 'string' && body.nota.trim() ? body.nota.trim().slice(0, 400) : null;
     // Del TOKEN, no del body.

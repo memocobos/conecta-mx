@@ -6219,7 +6219,17 @@ var POLITICAS = [
     { t: 'x', txt: 'Con <b>3 o más</b> quincenas vencidas tu lugar queda <b>en proceso de baja</b>. Una vez dado de baja, el lugar se libera y los abonos no son reembolsables, salvo cancelación del evento.' },
   ] },
   { tema: 'Si el evento se cancela', items: [
-    { t: 'v', txt: 'Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no ese cargo, porque nunca fue nuestro.' },
+    { t: 'v', txt: 'Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no el cargo de tarjeta u OXXO, porque nunca fue nuestro.' },
+    // 🔴 «pero no ESE cargo» perdió su antecedente AL AGRUPAR, y el defecto lo
+    // introdujo esta tuerca: en la lista plana de antes el cargo de tarjeta
+    // estaba dos renglones arriba, y al repartir por temas se fue a «Cargos al
+    // pagar» — el pronombre quedó apuntando a nada. Lo vio Jane leyendo.
+    // Se nombra en su sitio, y es el ÚNICO cambio al texto de Memo: el careo
+    // lo prueba aplicando esa sola sustitución al original y exigiendo
+    // igualdad, así ninguna otra palabra puede colarse.
+    // 🔒 LA LEY: agrupar un texto ROMPE sus referencias internas. Un «ese», un
+    // «lo anterior», un «el mismo» que cruzaban dos renglones dejan de cruzar
+    // nada cuando los renglones caen en cajas distintas.
   ] },
   { tema: 'Cambios y transferencias', items: [
     { t: 'x', txt: 'No se puede cambiar de paquete ni de tour una vez reservado' },

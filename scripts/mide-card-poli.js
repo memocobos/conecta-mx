@@ -49,12 +49,17 @@ const EVENTO = 'frontera';   // un evento vivo cualquiera: las políticas no dep
 // LOS SEIS TEXTOS VIGENTES, copiados del BASE letra por letra. Son palabra de
 // Memo y esta tuerca solo los MUEVE: si alguno cambiara una coma al pasar a
 // datos, el careo lo dice.
+// El renglón de la cancelación oficial va APARTE: es el único cuyo texto esta
+// tuerca cambia, y el cambio es de UNA pieza — el pronombre «ese cargo» por su
+// antecedente nombrado. Se guarda el ORIGINAL y la sustitución se aplica en la
+// aserción, así se prueba que no se colaron otras palabras.
+const CANCELA_BASE = 'Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no ese cargo, porque nunca fue nuestro.';
+const CANCELA_HEAD = CANCELA_BASE.replace('pero no ese cargo', 'pero no el cargo de tarjeta u OXXO');
 const SEIS = [
   'Sin reembolsos por cancelación del cliente o incumplimiento de pagos',
   'No se puede cambiar de paquete ni de tour una vez reservado',
   'Lugares transferibles a otra persona sin costo hasta 6 días antes del evento. Del día 5 en adelante aplica un cargo por servicio de $350.',
   'El cargo por pagar con tarjeta u OXXO no es reembolsable. Cuando pagas en línea se suma 4% con débito u OXXO y 5% con crédito: ese cobro es de la empresa que procesa el pago, no de Conecta, y no regresa en ningún caso.',
-  'Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no ese cargo, porque nunca fue nuestro.',
   'Error en depósito genera cargo de $350',
 ];
 
@@ -183,6 +188,30 @@ async function abrirEvento(page, base, id) {
     // reescribirlo sin querer.
     SEIS.forEach((t, i) => af(d.txt.indexOf(t) >= 0,
       'la política vigente #' + (i + 1) + ' no aparece IGUAL en el modal: ' + JSON.stringify(t.slice(0, 60))));
+    // ── 🔴 EL ANTECEDENTE HUÉRFANO (lo vio Jane) ──────────────────────────
+    // «pero no ESE cargo» perdió su antecedente AL AGRUPAR: en la lista plana
+    // el cargo de tarjeta estaba dos renglones arriba, y al repartir por temas
+    // se fue a otra caja. El defecto lo introdujo esta tuerca.
+    // 🔒 Se prueba que el ÚNICO cambio al texto de Memo es la sustitución del
+    // pronombre: se toma el original, se aplica esa sola pieza y se exige
+    // igualdad. Cualquier otra palabra que se colara pondría esto en rojo.
+    af(d.txt.indexOf(CANCELA_HEAD) >= 0,
+       'el renglón de la cancelación oficial no es el original con SOLO el antecedente nombrado. '
+       + 'Se esperaba: ' + JSON.stringify(CANCELA_HEAD.slice(-70)));
+    af(d.txt.indexOf('pero no ese cargo') < 0,
+       '🔴 el renglón sigue diciendo «pero no ESE cargo» y su antecedente vive en OTRO grupo: '
+       + 'el pronombre no apunta a nada para quien lee la vista por temas');
+    af(/cargo de tarjeta u OXXO/.test(d.txt),
+       'el renglón no nombra el cargo de tarjeta u OXXO en su propio sitio');
+    // Y el antecedente sigue existiendo en su grupo: nombrarlo aquí no lo
+    // duplica ni lo sustituye.
+    af((d.txt.match(/cargo por pagar con tarjeta u OXXO no es reembolsable/g) || []).length === 1,
+       'la política del cargo de tarjeta se perdió o se duplicó al nombrar el antecedente');
+    // 🔒 Y EL CAREO CONTRA BASE: el original SÍ decía «ese cargo». Sin esto, la
+    // aserción de arriba no distingue «lo arreglé» de «nunca estuvo».
+    af(/pero no ese cargo/.test(fs.readFileSync(path.join(b.dir, 'index.html'), 'utf8')),
+       'la premisa del ANTES no se sostiene: BASE no decía «pero no ese cargo», así que no había '
+       + 'antecedente huérfano que arreglar');
     // La séptima, copiada del brief.
     af(/Los boletos del paquete\s+CHEAP\s+se entregan en la\s+semana previa\s+al evento\./.test(d.txt.replace(/\s+/g, ' ')),
        'falta la política 7 (los boletos CHEAP se entregan en la semana previa) o cambió de palabras');

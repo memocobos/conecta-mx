@@ -134,9 +134,20 @@ select 'trigger', (select count(*)::text from pg_trigger
 -- detrás de su propia red.
 --
 -- VERIFICADO POR JANE, punto por punto:
---   · tabla creada                                                        ✓
---   · 2 triggers (update + delete)                                        ✓
+--   · tabla creada · 8 columnas · 3 CHECK (modo, precio>0, vigencia)      ✓
+--   · el trigger de inmutabilidad, cubriendo UPDATE **y** DELETE           ✓
+--     ⚠️ OJO AL NÚMERO, para que quien re-verifique no crea que falta algo:
+--     `pg_trigger` cuenta **1**, no 2. Es UN trigger (`before update or
+--     delete`) con DOS eventos, y así lo dice la base — medido el 23-sep:
+--     nube_cotizaciones_inmutables_trg · before · for each row ·
+--     update ✓ delete ✓ **insert ✗** (los INSERT tienen que pasar: la tabla
+--     es INSERT-only, no read-only).
+--     El reporte hablaba de «2 triggers» leyendo los dos eventos; el dato de
+--     la base es 1 objeto. Se deja el número REAL porque un acta que no
+--     reproduce lo que la consulta contesta manda a buscar un hueco que no
+--     existe.
 --   · RLS = true con 0 políticas (deny-all de verdad, no prometido)       ✓
+--   · 0 filas y 0 capturas con «prueba» en `capturado_por`                ✓
 --   · la prueba del trigger se DISPARÓ en transacción: mordió con su
 --     mensaje exacto, y el rollback dejó la tabla en 0 filas —
 --     SIN NACIMIENTO FALSO                                                ✓

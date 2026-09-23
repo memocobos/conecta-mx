@@ -5345,6 +5345,13 @@ function updatePkgCards(){
   if(rideBtn){rideBtn.classList.remove('disabled');rideBtn.disabled=false;}
   if(stayBtn){stayBtn.classList.remove('disabled');stayBtn.disabled=false;}
   if(cheapBtn){cheapBtn.classList.remove('disabled');cheapBtn.disabled=false;}
+  // [NOCHEAP-1] Y LA VISIBILIDAD TAMBIÉN SE REENCIENDE, por la MISMA razón que
+  // está escrita arriba: los botones son GLOBALES y la pantalla se reusa entre
+  // eventos. `noCheap` ESCONDE el botón, así que sin esta línea el primer
+  // evento sin CHEAP se lo borraría a todos los que el cliente mirara después,
+  // en la misma visita y sin un aviso — exactamente el bug que este bloque
+  // documenta para `disabled`, con otra propiedad.
+  if(cheapBtn){cheapBtn.style.display='';}
 
   if(cur.rideOnly){
     // RIDE only (con cheapAlsoOk:true también permite CHEAP)
@@ -5405,6 +5412,51 @@ function updatePkgCards(){
     $$('pi-cheap').textContent='Solo boleto · Kit Conecta';
     $$('pp-cheap').innerHTML='<span class="pkg-prox-badge">PRÓXIMAMENTE</span>';
     if(cheapBtn){cheapBtn.classList.add('disabled');cheapBtn.disabled=true;}
+    return;
+  }
+  // ═══ [NOCHEAP-1] `noCheap` OCULTA EL PAQUETE ════════════════════════════
+  // Decisión de Memo (23-sep-2026), tomada con los tres botones RENDERIZADOS
+  // delante. TRES LETREROS PARA TRES HECHOS DISTINTOS:
+  //   · OCULTO           → este evento NO vende CHEAP (esta rama)
+  //   · «No disponible»  → sí vende, pero ahora no hay lugares/precio
+  //   · «PRÓXIMAMENTE»   → va a haber (`cheapSoon`, la rama de abajo)
+  //
+  // 🔴 LA BANDERA LLEVABA MESES CONECTADA A NADA. Medido: `no_cheap` se captura
+  // en Esferas («Sin CHEAP»), el compilador lo emite (`noCheap:true`) y el
+  // index NO LO LEÍA EN NINGUNA PARTE — cero lecturas; las dos apariciones del
+  // archivo eran DATO. Familia de la guarda inalcanzable: un interruptor que
+  // se puede prender y no apaga nada.
+  //
+  // 🔴 Y NO ERA INOCUO. `humbecdmx` está VIVO con la bandera puesta y se veía
+  // «No disponible» POR ACCIDENTE: lo salvaba no tener `cheapZonas`. Medido
+  // sembrando la variante peligrosa —bandera puesta CON precios cheap—: el
+  // botón salía «DESDE $3,200» y CLICKABLE. O sea que el sitio VENDÍA justo lo
+  // que la casilla decía no vender.
+  //
+  // ⚠️ La otra mitad del hoyo estaba en el compilador y sigue ahí a propósito:
+  // el camino de FESTIVAL emite `noCheap:true,cheapSoon:true` juntas (por eso
+  // coronacapital se veía bien) y el de CONCIERTO emite solo `noCheap`. Esa
+  // asimetría deja de importar en cuanto el index obedece la bandera, que es
+  // lo que hace esta rama.
+  // 🔴 Y VA **DESPUÉS** DE `cheapSoon`, QUE GANA. Lo cazó medir la cuarta
+  // variante: `coronacapital` trae **las dos banderas** —el camino de festival
+  // emite `noCheap:true,cheapSoon:true` juntas— y con el orden al revés mi
+  // cambio le ESCONDÍA su «PRÓXIMAMENTE», que es lo que el cliente ya veía y
+  // lo que su equipo puso ahí. «Va a haber» es una afirmación MÁS ESPECÍFICA
+  // que «no vendemos»: gana la que dice más.
+  // ⚠️ Así este cambio deja a coronacapital EXACTAMENTE como estaba y solo
+  // toca lo que estaba roto — que era el concierto con la bandera sola.
+  if(cur.noCheap&&!cur.cheapOnly){
+    // Escondido **Y** apagado. Lo cazó el careo: solo con `display:none` el
+    // botón quedaba invisible pero HABILITADO, y eso es un estado a medias —
+    // `selPaquete` seguía siendo alcanzable y, el día que alguien vuelva a
+    // mostrarlo por cualquier razón, sería comprable sin que nadie lo decidiera.
+    // Las dos propiedades se reencienden juntas arriba, así que no hay fuga.
+    if(cheapBtn){
+      cheapBtn.style.display='none';
+      cheapBtn.classList.add('disabled');
+      cheapBtn.disabled=true;
+    }
     return;
   }
   // [CAT-AGOT-1] `rideOnly` APAGABA CHEAP Y ESTE BLOQUE LO VOLVÍA A ENCENDER.

@@ -35,6 +35,7 @@
     "mide:card-guia": "node scripts/mide-card-guia.js",
     "mide:nube-1": "node scripts/mide-nube-1.js",
     "mide:nube-2": "node scripts/mide-nube-2.js",
-    "mide:nube-3": "node scripts/mide-nube-3.js"
+    "mide:nube-3": "node scripts/mide-nube-3.js",
+    "mide:nocheap-1": "node scripts/mide-nocheap-1.js"
   }
 }

@@ -8,7 +8,7 @@
 // 🔒 LOS DOS LADOS SON COMMITS: cada árbol sale con `git archive` a su
 // directorio y SE SIRVE de ahí, así que el careo no caduca al mergear.
 //     BASE = 53bb769  el main sin itinerario
-//     HEAD = dcb16fd  el itinerario con sus tres estados
+//     HEAD = bbb9921  el itinerario con sus tres estados (el commit del MERGE)
 //
 // 🔒 «EXISTE» NO ES «SE VE»: cada pieza se mide por su CADENA de visibilidad
 // —`display`, `visibility`, `opacity`, `offsetParent` y su caja—, no por estar
@@ -52,7 +52,7 @@ const BASE = process.env.BASE || '53bb769';
 // cambien. Y la otra cara, pagada tres veces en #756: **commitear exige
 // re-anclar** — si con `HEAD_SHA=<sha>` a mano sale verde y a secas sale rojo,
 // el ancla está vieja, no el código.
-const HEAD_SHA = process.env.HEAD_SHA || 'dcb16fd';
+const HEAD_SHA = process.env.HEAD_SHA || 'bbb9921';
 
 // ── LOS CUATRO EVENTOS, uno por clase ────────────────────────────────────
 const CASOS = {

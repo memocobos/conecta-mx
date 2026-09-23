@@ -10,7 +10,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 5af2da1  NUBE-1 en main: la nube existe, el index NO la bebe
-//     HEAD = 05d9981  los dos modos venden
+//     HEAD = e595c63  los dos modos venden (el commit del MERGE)
 //
 // 🔒 SE ENTRA POR LA URL DEL CLIENTE y se aprietan los BOTONES del wizard: el
 // total tiene que salir del camino de verdad, no de llamar a `calcular()`.
@@ -43,7 +43,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5af2da1';
-const HEAD_SHA = process.env.HEAD_SHA || '05d9981';
+const HEAD_SHA = process.env.HEAD_SHA || 'e595c63';
 
 // ── EL RELOJ CONGELADO · DOS INSTANTES, Y CADA UNO MEDIDO ────────────────
 // 🔴 NO EXISTE UN SOLO INSTANTE que sirva para los tres casos, y salió de medir

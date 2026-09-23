@@ -938,6 +938,12 @@ async function crearEsferaEvento() {
     sep_ride: _esfGetSepRide(),
     ...(_esfGetPaquetes()),
     nota: _esfGetNota(),
+    // [CARD-ITIN-1] Los tres van en LOS DOS payloads —crear y editar—: un
+    // campo que solo viaja al crear se vuelve imposible de corregir, y editar
+    // sería la puerta trasera que lo borra en silencio.
+    itinerario: _esfGetItin(),
+    itinerario_null: _esfGetItinNull(),
+    hora_show: _esfGetHoraShow(),
     festival: _esfGetFestival(),
   };
   const alertEl = document.getElementById('esf-alert');
@@ -1065,6 +1071,11 @@ function _esfCityChanged() {
     const v = notaEl.value.trim();
     if (v === '' || v === _ESF_NOTA_CDMX) notaEl.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
   }
+  // [CARD-ITIN-1] El letrero de qué plantilla le toca cambia con la ciudad y
+  // con el venue, así que se repinta aquí: es el único sitio por el que pasan
+  // los dos. Un letrero que no se repinta es un letrero que miente en cuanto
+  // alguien corrige el venue.
+  if (typeof _esfItinAyuda === 'function') _esfItinAyuda();
 }
 function _esfGetSep() {
   const v = document.getElementById('esf-sep')?.value;
@@ -1111,6 +1122,45 @@ function _esfGetSepRide() {
   return (Number.isFinite(n) && n >= 0) ? n : null;
 }
 function _esfGetNota() { return (document.getElementById('esf-nota')?.value || '').trim(); }
+// ═══ [CARD-ITIN-1] EL ITINERARIO ═══════════════════════════════════════════
+function _esfGetItin() { const t=(document.getElementById('esf-itin')?.value||'').trim(); return t || null; }
+function _esfGetItinNull() { return !!document.getElementById('esf-itin-null')?.checked; }
+function _esfGetHoraShow() { const t=(document.getElementById('esf-hora-show')?.value||'').trim(); return t || null; }
+// 🔒 EL LETRERO SE DERIVA, NO SE TECLEA — y con la MISMA regla que el sitio:
+// CDMX por la unión de ciudad+venue (`_esfIsCDMX`, que ya existía y ya mira
+// las dos), Monterrey por el venue, y un TERCER estado para los eventos que no
+// son ninguno de los dos. Ahí la pantalla no promete una plantilla que no
+// existe: pide el itinerario, porque ninguna plantilla le sirve.
+// Medido en la base el 23-sep: cinco eventos caen en ese tercer estado y
+// `ciudad` los contradice en tres (Puebla y Querétaro marcados «MTY»).
+function _esfItinClase() {
+  if (_esfIsCDMX()) return 'cdmx';
+  const v = (document.getElementById('esf-venue')?.value || '');
+  return /\b(mty|monterrey|nuevo le[oó]n|n\.?\s?l\.?\b|guadalupe|showcenter|san nicol|fundidora|apodaca|santa catarina)/i.test(v) ? 'mty' : '';
+}
+function _esfItinAyuda() {
+  const el = document.getElementById('esf-itin-ayuda');
+  if (!el) return;
+  const propio = !!_esfGetItin(), apagado = _esfGetItinNull();
+  const c = _esfItinClase();
+  if (apagado && !propio) {
+    el.innerHTML = '<b style="color:var(--orange)">Apagado a prop\u00f3sito:</b> el card NO pinta itinerario para este evento.';
+  } else if (propio) {
+    el.innerHTML = '<b style="color:var(--tp)">Itinerario propio.</b> El sitio pinta ESTE texto y no la plantilla.';
+  } else if (c === 'cdmx') {
+    el.innerHTML = 'Vac\u00edo \u2192 el sitio pinta la <b style="color:var(--tp)">plantilla de CDMX</b>, con sus <b>dos variantes</b> (bus y avi\u00f3n). El recinto sale del venue; la hora, del campo de abajo.';
+  } else if (c === 'mty') {
+    el.innerHTML = 'Vac\u00edo \u2192 el sitio pinta la <b style="color:var(--tp)">plantilla de Monterrey</b> (Soriana Hidalgo, 12:00 p. m.).';
+  } else {
+    el.innerHTML = '<b style="color:var(--orange)">Este evento no es de Monterrey ni de CDMX</b>, as\u00ed que <b>ninguna plantilla le sirve</b>: si lo dejas vac\u00edo, el card no pinta itinerario. Escr\u00edbelo aqu\u00ed.';
+  }
+}
+function _esfItinPopulate(row) {
+  const t = document.getElementById('esf-itin'); if (t) t.value = (row && row.itinerario) || '';
+  const n = document.getElementById('esf-itin-null'); if (n) n.checked = !!(row && row.itinerario_null);
+  const h = document.getElementById('esf-hora-show'); if (h) h.value = (row && row.hora_show) || '';
+  _esfItinAyuda();
+}
 // Modo festival: interruptor + box. Apagado → _esfGetFestival()=null → concierto,
 // flujo idéntico a hoy. 2b: switches de módulos; 2c/2d agregan portada/lineup/paquetes.
 function _esfToggleFestival() {
@@ -3357,6 +3407,7 @@ function editarEsfera(slug) {
   _esfFotoPopulate(row.foto);
   // Qué incluye + separo + nota: re-poblar desde la fila.
   _esfIncSepNotaPopulate(row);
+  _esfItinPopulate(row);          // [CARD-ITIN-1]
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   // Modo festival: encender el interruptor si el evento tiene `festival` no-null,
@@ -3466,6 +3517,12 @@ async function guardarCambiosEsfera() {
     sep_ride: _esfGetSepRide(),
     ...(_esfGetPaquetes()),
     nota: _esfGetNota(),
+    // [CARD-ITIN-1] Los tres van en LOS DOS payloads —crear y editar—: un
+    // campo que solo viaja al crear se vuelve imposible de corregir, y editar
+    // sería la puerta trasera que lo borra en silencio.
+    itinerario: _esfGetItin(),
+    itinerario_null: _esfGetItinNull(),
+    hora_show: _esfGetHoraShow(),
     festival: _esfGetFestival(),
   };
   const alertEl = document.getElementById('esf-alert');

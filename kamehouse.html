@@ -2048,6 +2048,27 @@
      <input class="cot-input" id="esf-nota" placeholder="ej. NO incluye transporte a CDMX." style="width:100%">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional. En CDMX se pre-llena con "NO incluye transporte a CDMX." (editable).</div>
     </div>
+    <!-- [CARD-ITIN-1] EL ITINERARIO -->
+    <div class="form-group" data-esf="vende">
+     <label>Itinerario del viaje</label>
+     <div style="font-size:11px;color:var(--ts);margin-bottom:6px" id="esf-itin-ayuda"></div>
+     <textarea class="cot-input" id="esf-itin" rows="8" oninput="_esfItinAyuda()" placeholder="Vacío = se usa la plantilla de la casa. Escribe aquí solo si este evento tiene su propio itinerario (Pulso, Comuna...)." style="width:100%;font-family:Montserrat,sans-serif;line-height:1.6"></textarea>
+     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer">
+       <input type="checkbox" id="esf-itin-null" onchange="_esfItinAyuda()"> Este evento NO lleva itinerario
+      </label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px">
+       Hora del concierto
+       <input class="cot-input" id="esf-hora-show" placeholder="9:00 p. m." style="width:110px">
+      </label>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">
+      Déjalo <b>vacío</b> y el sitio pinta la plantilla que le toca por su venue.
+      <b>Negritas</b> con <code>**así**</code>; los saltos de línea se respetan.
+      La <b>hora</b> solo se usa en la plantilla de CDMX: vacía, esa frase no se pinta
+      — nunca se inventa una hora.
+     </div>
+    </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="_esfCancelarYCerrar()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>

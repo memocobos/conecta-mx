@@ -581,6 +581,8 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
   .fbtn-top10{flex:0 0 auto;margin-bottom:0}
   #filter-btns.topmode .fbtn-exit-top10{flex:0 0 auto}
 }
+.btn-itin{width:100%;background:rgba(232,255,76,.1);border:2px solid rgba(232,255,76,.45);color:#e8ff4c;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:13px 20px;cursor:pointer;font-family:Montserrat,sans-serif;transition:all .15s}
+.btn-itin:hover{background:rgba(232,255,76,.2);border-color:#e8ff4c}
 .share-btn{width:100%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:13px 20px;cursor:pointer;font-family:Montserrat,sans-serif;margin-top:8px;transition:all .15s}
 .share-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff}
 
@@ -1366,6 +1368,13 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <div class="wiz-card" id="w-transport-card" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-transport-n">5</span>¿Te gustaría agregar transporte a CDMX?</div>
     <div class="zona-grid" id="d-transport"></div>
+  </div>
+
+  <!-- [CARD-ITIN-1] ITINERARIO -->
+  <div class="card" id="d-itin-card" style="display:none">
+    <div class="card-lbl">Itinerario</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px" id="d-itin-hint">Así se vive el viaje, paso por paso.</div>
+    <button class="btn-itin" id="d-itin-btn" onclick="abrirItinerario()">🗺️ Ver itinerario</button>
   </div>
 
   <!-- INCLUYE -->
@@ -3014,7 +3023,7 @@ var EV=[
   {id:'neighbourhood',added:'2026-08-25',c:'azul',img:'The Neighbourhood',a:'The Neighbourhood en Monterrey',f:'23 sep 2026',ds:'2026-09-23',v:'Auditorio Citibanamex, Mty',st:'agotado',mapa:'neighbourhood',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:500,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'Beyond',p:5000,vip:1,ag:1},{n:'Platino A',p:6000,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1},{n:'Perfiles B',p:4100},{n:'Perfiles C',p:3700}],cheapZonas:[{n:'Beyond',p:3500,vip:1,ag:1},{n:'Platino A',p:4300,ag:1},{n:'Perfiles B',p:2500},{n:'Perfiles C',p:2000},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}]},
   {id:'eslabon',added:'2026-05-29',music:'2193681047',c:'rojo',img:'Eslabón Armado',a:'Eslabón Armado',f:'3 oct 2026',ds:'2026-10-03',v:'Escenario GNP, MTY',st:'',mapa:'armado',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:200,sepCheap:200,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'GNP A',p:7000,ag:1},{n:'GNP B',p:5700},{n:'Preferente A',p:5300},{n:'Preferente B',p:5200},{n:'Preferente C',p:4600},{n:'Preferente D',p:4400},{n:'Luneta A',p:3900},{n:'Luneta B',p:3650},{n:'Platea A',p:3900,ag:1},{n:'Platea B',p:3900,ag:1},{n:'Platea C',p:3200}],cheapZonas:[{n:'GNP A',p:5300,ag:1},{n:'GNP B',p:4000},{n:'Preferente A',p:3700},{n:'Preferente B',p:3500},{n:'Preferente C',p:2900},{n:'Preferente D',p:2500},{n:'Luneta A',p:2200},{n:'Luneta B',p:2000},{n:'Platea A',p:2200,ag:1},{n:'Platea B',p:2200,ag:1},{n:'Platea C',p:1600}],hotel:[]},
   {id:'ironmaiden',promo:true,added:'2026-08-25',c:'rojo',img:'Iron Maiden',a:'Iron Maiden - Run For Your Lives Tour',f:'2 oct 2026',ds:'2026-10-02',v:'Foro Sol, CDMX',st:'agotado',cdmx:true,mapa:'ironmaiden',inc:['Boleto General A','Traslados CDMX','Hospedaje compartido','Kit Conecta'],sep:800,sepCheap:1000,ride:2900,nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,zonas:[{n:'General A',p:5200},{n:'General B',p:0,ag:1},{n:'Verde A',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'GNP',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:3500},{n:'General B',p:0,ag:1},{n:'Verde A',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'GNP',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}]},
-  {id:'pulsoquetaro',added:'2026-08-26',music:'3138729',c:'azul',staticImg:'pulsognp',img:'Pulso GNP',a:'Pulso GNP',f:'10 oct 2026',ds:'2026-10-10',v:'Autodromo Querétaro',st:'',lineup:'pulsolineup',promoModal:{emoji:'🗺️',title:'Tu itinerario de viaje',desc:'📅 9 DE OCTUBRE\n🚌 6:30 AM — Salida desde Reynosa\n🏨 3:00 PM — Llegada a Querétaro\n✨ Día libre para conocer la ciudad\n\n📅 10 DE OCTUBRE\n🎵 12:00 PM — Autódromo de Querétaro\n🎶 ¡Disfruta el Pulso GNP!\n\n📅 11 DE OCTUBRE\n🏨 Regreso al hotel después del evento\n🗺️ 12:00 PM — Actividad turística (por confirmar)\n🚌 8:00 PM — Salida de regreso a Reynosa\n\n📅 12 DE OCTUBRE\n🏠 5:00 AM — Llegada a Reynosa',colors:['#0a0a1a','#111'],btn:'¡Ya quiero ir! 🎉'},inc:['Boleto zona elegida','Transporte Reynosa-Querétaro','Hospedaje 2 noches','Día libre para conocer Querétaro (9 oct)','Kit Conecta'],sep:800,sepCheap:500,ride:4350,banco:BANCO_DEFAULT,zonas:[{n:'General',p:6650},{n:'VIP',p:8750,vip:1}],cheapZonas:[{n:'General',p:3300},{n:'VIP',p:5400,vip:1}],hotelOverride:true,hotelPP:true,hotel:[{n:'Compartida',e:0},{n:'Triple',e:485},{n:'Doble',e:1450},{n:'Individual',e:4350}]},
+  {id:'pulsoquetaro',added:'2026-08-26',music:'3138729',c:'azul',staticImg:'pulsognp',img:'Pulso GNP',a:'Pulso GNP',f:'10 oct 2026',ds:'2026-10-10',v:'Autodromo Querétaro',st:'',lineup:'pulsolineup',itinerario:'📅 9 DE OCTUBRE\n🚌 6:30 AM — Salida desde Reynosa\n🏨 3:00 PM — Llegada a Querétaro\n✨ Día libre para conocer la ciudad\n\n📅 10 DE OCTUBRE\n🎵 12:00 PM — Autódromo de Querétaro\n🎶 ¡Disfruta el Pulso GNP!\n\n📅 11 DE OCTUBRE\n🏨 Regreso al hotel después del evento\n🗺️ 12:00 PM — Actividad turística (por confirmar)\n🚌 8:00 PM — Salida de regreso a Reynosa\n\n📅 12 DE OCTUBRE\n🏠 5:00 AM — Llegada a Reynosa',inc:['Boleto zona elegida','Transporte Reynosa-Querétaro','Hospedaje 2 noches','Día libre para conocer Querétaro (9 oct)','Kit Conecta'],sep:800,sepCheap:500,ride:4350,banco:BANCO_DEFAULT,zonas:[{n:'General',p:6650},{n:'VIP',p:8750,vip:1}],cheapZonas:[{n:'General',p:3300},{n:'VIP',p:5400,vip:1}],hotelOverride:true,hotelPP:true,hotel:[{n:'Compartida',e:0},{n:'Triple',e:485},{n:'Doble',e:1450},{n:'Individual',e:4350}]},
   {id:'alejandrosanz',added:'2026-05-09',c:'azul',img:'Alejandro Sanz',a:'Alejandro Sanz en Monterrey',f:'17 oct 2026',ds:'2026-10-17',v:'Estadio Borregos, Mty',st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:800,sepCheap:500,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'Cancha GNP',p:9500},{n:'Cancha A',p:8900},{n:'Cancha B',p:8300},{n:'Cancha C',p:7600},{n:'Cancha D',p:6900},{n:'Cancha General',p:4000},{n:'Platino',p:6000},{n:'Oro',p:5400},{n:'Plata',p:4700}],cheapZonas:[{n:'Cancha GNP',p:7700},{n:'Cancha A',p:7200},{n:'Cancha B',p:6550},{n:'Cancha C',p:5900},{n:'Cancha D',p:5250},{n:'Cancha General',p:2350},{n:'Platino',p:4300},{n:'Oro',p:3650},{n:'Plata',p:3000}],hotel:[]},
   {id:'vaiven',added:'2026-05-15',music:'3065110361',c:'azul',img:'Festival Vaiven',a:'Festival Vaiven',f:'17 oct 2026',ds:'2026-10-17',v:'Jardines de México, CDMX',st:'',cdmx:true,lineup:'vaiven',noBus:true,inc:['Boleto zona elegida','Traslados Hotel-Evento CDMX','Hospedaje compartido','Kit Conecta'],sep:800,ride:3100,nota:'NO incluye transporte a CDMX. Cotiza vuelo o llega por tu cuenta.',banco:BANCO_DEFAULT,zonas:[{n:'General',p:6200},{n:'Comfort',p:7800,ag:1},{n:'VIP',p:9300,vip:1,ag:1}],hotel:[]},
   {id:'soyluna',added:'2026-08-25',music:'143175682',c:'rosa',staticImg:'soyluna',img:false,a:'Soy Luna - El Último Show',f:'21 oct 2026',ds:'2026-10-21',v:'Arena Monterrey, Mty',st:'',mapa:'soyluna',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:300,sepCheap:300,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'VIP',p:7200,vip:1},{n:'Platino',p:6600,vip:1},{n:'Coke Studio',p:6200,ag:1},{n:'Doritos',p:6200},{n:'Plata',p:6200},{n:'Superpalco',p:6200,ag:1},{n:'McCormick',p:5700,ag:1},{n:'Oro',p:5700,ag:1},{n:'Osel',p:5700,ag:1},{n:'Banco Azteca',p:5200,ag:1},{n:'Barrera',p:5200},{n:'Megacable',p:5200},{n:'Butaca',p:4900,ag:1},{n:'Plus Ultra',p:4500,ag:1},{n:'Pref. Especial',p:4500,ag:1},{n:'Preferente',p:4200,ag:1},{n:'Luneta',p:3900},{n:'Balcón',p:3600}],cheapZonas:[{n:'VIP',p:5500,vip:1},{n:'Platino',p:4900,vip:1},{n:'Coke Studio',p:4500,ag:1},{n:'Doritos',p:4500},{n:'Plata',p:4500},{n:'Superpalco',p:4500,ag:1},{n:'McCormick',p:4000,ag:1},{n:'Oro',p:4000,ag:1},{n:'Osel',p:4000,ag:1},{n:'Banco Azteca',p:3500,ag:1},{n:'Barrera',p:3500},{n:'Megacable',p:3500},{n:'Butaca',p:3200,ag:1},{n:'Plus Ultra',p:2800,ag:1},{n:'Pref. Especial',p:2800,ag:1},{n:'Preferente',p:2500,ag:1},{n:'Luneta',p:2200},{n:'Balcón',p:1900}],hotel:[]},
@@ -3045,7 +3054,7 @@ var EV=[
   // foráneo con hotel propio e itinerario en promoModal), con dos diferencias
   // que NO vienen de Pulso: `noStay` (Pulso sí vende STAY) y `musicList` (Pulso
   // lleva un solo track). El evento llavea al 28 aunque el camión salga el 26.
-  {id:'tecatecomuna',added:'2026-05-15',musicList:['2657834','13272449','2309096','10247032','134951614'],c:'rojo',img:'Tecate Comuna',a:'Tecate Comuna',f:'28 nov 2026',ds:'2026-11-28',v:'Foro Cholula, Puebla',st:'',lineup:'comuna',noStay:true,promoModal:{emoji:'🗺️',title:'Tu itinerario de viaje',desc:'📅 26 DE NOVIEMBRE\n🚌 9:00 PM — Salida desde Reynosa\n\n📅 27 DE NOVIEMBRE\n🏙️ 12:00 PM — Llegada a Puebla\n🏨 12:30 PM — Llegada al hotel\n✨ 12:30-3:00 PM — Tiempo libre\n🔑 3:00-5:00 PM — Entrega de habitaciones\n✨ Resto del día libre\n\n📅 28 DE NOVIEMBRE\n🎵 12:00 PM — Foro Cholula\n🎶 ¡Disfruta el Festival Tecate Comuna!\n\n📅 29 DE NOVIEMBRE\n🚌 2:00-3:00 AM — Reunión, abordaje y salida\n🏠 3:00 PM — Llegada a Reynosa',colors:['#1a0a0d','#111'],btn:'¡YA QUIERO IR! 🎉'},inc:['Boleto zona elegida','Transporte redondo Reynosa-Puebla','Hospedaje (1 noche)','Kit Conecta','Día libre para conocer Puebla'],sep:300,sepCheap:300,sepRide:300,ride:4000,banco:BANCO_DEFAULT,zonas:[{n:'General',p:5700},{n:'VIP',p:7100,vip:1}],cheapZonas:[{n:'General',p:2700},{n:'VIP',p:4100,vip:1}],hotelOverride:true,hotelPP:true,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:725,pp:725,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2175,pp:2175,viaj:[1],desc:'Cuarto solo para ti'}]},
+  {id:'tecatecomuna',added:'2026-05-15',musicList:['2657834','13272449','2309096','10247032','134951614'],c:'rojo',img:'Tecate Comuna',a:'Tecate Comuna',f:'28 nov 2026',ds:'2026-11-28',v:'Foro Cholula, Puebla',st:'',lineup:'comuna',noStay:true,itinerario:'📅 26 DE NOVIEMBRE\n🚌 9:00 PM — Salida desde Reynosa\n\n📅 27 DE NOVIEMBRE\n🏙️ 12:00 PM — Llegada a Puebla\n🏨 12:30 PM — Llegada al hotel\n✨ 12:30-3:00 PM — Tiempo libre\n🔑 3:00-5:00 PM — Entrega de habitaciones\n✨ Resto del día libre\n\n📅 28 DE NOVIEMBRE\n🎵 12:00 PM — Foro Cholula\n🎶 ¡Disfruta el Festival Tecate Comuna!\n\n📅 29 DE NOVIEMBRE\n🚌 2:00-3:00 AM — Reunión, abordaje y salida\n🏠 3:00 PM — Llegada a Reynosa',inc:['Boleto zona elegida','Transporte redondo Reynosa-Puebla','Hospedaje (1 noche)','Kit Conecta','Día libre para conocer Puebla'],sep:300,sepCheap:300,sepRide:300,ride:4000,banco:BANCO_DEFAULT,zonas:[{n:'General',p:5700},{n:'VIP',p:7100,vip:1}],cheapZonas:[{n:'General',p:2700},{n:'VIP',p:4100,vip:1}],hotelOverride:true,hotelPP:true,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:725,pp:725,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2175,pp:2175,viaj:[1],desc:'Cuarto solo para ti'}]},
   {id:'badbunny',added:'2026-05-15',music:'1741494317',c:'azul',img:'Bad Bunny',a:'Bad Bunny',f:'Por confirmar',ds:'',v:'Estadio BBVA, Mty',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[]},
   {id:'wwemexico',deporte:1,added:'2026-06-02',music:'94366080',c:'rojo',img:'WWE Mexico Live Tour',a:'WWE Mexico Live Tour',f:'10 sep 2026',ds:'2026-09-10',v:'Arena Monterrey, Mty',st:'',cheapOnly:true,inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:500,sepCheap:1000,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'VIP 1 - WWE Ultimate',p:32600,ag:1},{n:'VIP 2 - WWE 360 Superstar',p:27800,ag:1},{n:'VIP 3 - WWE Rampwalk',p:17500,ag:1},{n:'Platino',p:15400,ag:1},{n:'VIP 4 - WWE Superfan',p:14700,ag:1},{n:'VIP 5 - WWE Premium',p:12600,ag:1},{n:'Ring Side',p:11300,ag:1},{n:'Cancha',p:9900,ag:1},{n:'Retráctil Platino',p:8500,ag:1},{n:'Retráctil Oro',p:7800,ag:1},{n:'Barrera',p:7100,ag:1},{n:'Coke Studio',p:7100,ag:1},{n:'Doritos',p:7100,ag:1},{n:'McCormick',p:7100,ag:1},{n:'Osel',p:7100,ag:1},{n:'Superpalco',p:6400,ag:1},{n:'Banco Azteca',p:5700},{n:'Butaca',p:5700,ag:1},{n:'Megacable',p:5700,ag:1},{n:'Plus Ultra',p:5700,ag:1},{n:'Preferente',p:5000,ag:1},{n:'Luneta',p:4300},{n:'Balcón',p:3900,ag:1}],cheapZonas:[{n:'VIP 1 - WWE Ultimate',p:30800,ag:1},{n:'VIP 2 - WWE 360 Superstar',p:26000,ag:1},{n:'VIP 3 - WWE Rampwalk',p:15700,ag:1},{n:'Platino',p:13600,ag:1},{n:'VIP 4 - WWE Superfan',p:12900,ag:1},{n:'VIP 5 - WWE Premium',p:10800,ag:1},{n:'Ring Side',p:9500,ag:1},{n:'Cancha',p:8100,ag:1},{n:'Retráctil Platino',p:6700,ag:1},{n:'Retráctil Oro',p:6000,ag:1},{n:'Barrera',p:5300,ag:1},{n:'Coke Studio',p:5300,ag:1},{n:'Doritos',p:5300,ag:1},{n:'McCormick',p:5300,ag:1},{n:'Osel',p:5300,ag:1},{n:'Superpalco',p:4600,ag:1},{n:'Banco Azteca',p:3900},{n:'Butaca',p:3900,ag:1},{n:'Megacable',p:3900,ag:1},{n:'Plus Ultra',p:3900,ag:1},{n:'Preferente',p:3200,ag:1},{n:'Luneta',p:2500},{n:'Balcón',p:2100,ag:1}],hotel:[]},
   {id:'alvarodiaz',added:'2026-06-08',music:'4036825081',c:'rosa',img:'Álvaro Díaz',a:'Álvaro Díaz - Omakase Tour',f:'3 y 4 oct 2026',ds:'2026-10-03',dsList:['2026-10-03','2026-10-04'],v:'Auditorio Banamex, Mty',st:'',mapa:'alvarodiaz',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:500,sepCheap:500,ride:2700,multifecha:[{lbl:'3 Octubre',zonas:[{n:'Platinum',p:5100,vip:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4700},{n:'Perfiles',p:4000},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:3400,vip:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:2500},{n:'Perfiles',p:2300},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}]},{lbl:'4 Octubre',zonas:[{n:'Platinum',p:5700,vip:1,ag:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4700},{n:'Perfiles',p:4600,ag:1},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:4000,vip:1,ag:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:2500},{n:'Perfiles',p:2900,ag:1},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}]}],banco:BANCO_DEFAULT,zonas:[{n:'Platinum',p:5100,vip:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4700},{n:'Perfiles',p:4000},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:3400,vip:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:2500},{n:'Perfiles',p:2300},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}],hotel:[]},
@@ -5034,11 +5043,31 @@ function showDetail(id, _skipHistory){
       }
     }catch(e){}
   }
+  // [CARD-ITIN-1] El card del itinerario. Se PINTA cuando hay itinerario que
+  // pintar —propio o de plantilla— y se esconde cuando no hay ninguno: los
+  // cinco eventos que no son ni Monterrey ni CDMX no reciben una plantilla que
+  // mentiría, y su ficha es la que tiene que decirlo.
+  try{
+    var _itinCard=document.getElementById('d-itin-card');
+    if(_itinCard) _itinCard.style.display = itinerarioDe(cur) ? '' : 'none';
+  }catch(e){}
   // Popup "¿Cómo reservar tu lugar?" — PRIMERA vez por evento (por dispositivo).
   // No se muestra si este evento dispara su propio promoModal (evita modales apilados).
+  //
+  // [CARD-ITIN-1] ⚠️ EL AUTO-ABRIR NO SE EXTIENDE A TODOS LOS EVENTOS, Y ES A
+  // PROPÓSITO. Hoy solo los dos especiales abren su itinerario solos, y esta
+  // guarda usa ESO para no apilar modales: si el itinerario se abriera solo en
+  // los 66 eventos vivos, el onboarding «¿Cómo reservar tu lugar?» dejaría de
+  // verse EN TODO EL SITIO. El itinerario de plantilla llega por su BOTÓN, que
+  // es lo que lo hace alcanzable en todos los eventos sin quitarle la pantalla
+  // a nadie.
   try{
+    var _itinSolo=(itinClase(cur)==='propio'&&!sessionStorage.getItem('itin_'+cur.id));
     var _promoVa=(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id));
-    if(!_promoVa){ setTimeout(function(){showOnboarding(cur);},300); }
+    if(!_promoVa&&!_itinSolo){ setTimeout(function(){showOnboarding(cur);},300); }
+    // El promo manda si los dos quieren abrir: es «una vez por sesión» y el
+    // itinerario siempre se puede reabrir con su botón.
+    if(_itinSolo&&!_promoVa){ setTimeout(function(){abrirItinerario();},300); }
   }catch(e){}
   // Promo modal per event (once per session)
   if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
@@ -6154,6 +6183,114 @@ function enviarWaitlist(e){
   return false;
 }
 
+// ═══ [CARD-ITIN-1] EL ITINERARIO · UN SOLO MECANISMO ═══════════════════════
+// Antes vivía DENTRO de `promoModal`, un campo genérico que dos eventos
+// (pulsoquetaro y tecatecomuna) tomaron prestado para su itinerario. Medido:
+// promoModal tiene TRES usuarios y solo dos son itinerarios — el tercero
+// (dalemix) es una promo de verdad, «¡ESTE EVENTO INCLUYE COMIDA GRATIS!».
+// Así que promoModal NO era el mecanismo del itinerario: era un préstamo.
+// Hoy el itinerario tiene su campo (`itinerario`), su modal y su botón, y
+// promoModal se queda con lo suyo. Un solo camino, como pidió Memo.
+//
+// 🔒 TRES ESTADOS, NO DOS — y esto salió de MEDIR, no de suponer. La orden
+// decía «sin bandera cdmx → plantilla Monterrey», y aplicado a la letra le
+// habría puesto «nos reunimos en Soriana Hidalgo rumbo a Monterrey» a eventos
+// que no van a Monterrey. En la base: `ciudad` tiene CINCO valores (MTY 82 ·
+// CDMX 31 · null 2 · Morelos 1 · Saltillo 1) y CONTRADICE al venue en tres
+// filas — tecatecomuna (Puebla) y pulsoquetaro (Querétaro) están marcados
+// «MTY», y bahidora2027 (Las Estacas, Morelos) también. Cinco eventos no son
+// ni Monterrey ni CDMX. Por eso la clase se deriva del VENUE y hay un tercer
+// estado: SIN plantilla. Un evento sin itinerario propio y sin plantilla no
+// pinta nada — antes que un letrero que miente, ninguno.
+var ITIN_NOTA = '⚠️ **Nota importante**\nLos horarios de este itinerario son estimados y pueden cambiar sin previo aviso, dependiendo de ajustes realizados por el artista, el promotor o el venue.';
+// Palabra de Memo, 22-sep-2026. COPIADO, no parafraseado.
+var ITIN_MTY = '📍 **Salida desde Reynosa**\nNos reunimos en Soriana Hidalgo para salir a las 12:00 p. m. rumbo a Monterrey.\n\n🏨 **Llegada al hotel**\nAl llegar podrán hacer check-in, descansar, arreglarse y disfrutar de tiempo libre para comer antes del evento.\n\n🎤 **Traslado al concierto**\nSaldremos con suficiente anticipación para llegar aproximadamente 2 horas antes del inicio del concierto y disfrutar la experiencia sin prisas.\n\n😴 **Después del concierto**\nAl finalizar el evento regresaremos al hotel para descansar.\n\n🍳 **Día de regreso**\nEl desayuno está incluido y se sirve de 7:00 a. m. a 10:00 a. m.\n\n🚌 La salida de regreso a Reynosa será a las 12:00 p. m.\n\n' + ITIN_NOTA;
+// 🔒 EL VENUE Y LA HORA NO SE TECLEAN. El brief los traía escritos («Estadio
+// GNP», «9:00 p. m.») y eso es del EVENTO, no de la plantilla: teclearlos
+// pondría un estadio ajeno en un evento del Palacio de los Deportes. El venue
+// se deriva de la ficha; la hora es un HUECO (`horaShow`) y, si no está, la
+// frase del concierto NO SE PINTA. Medido: en las 49 llaves del catálogo NO
+// existe ninguna de hora, así que inventar las 9:00 p. m. era la única
+// alternativa a dejar el hueco.
+function itinVenueCorto(ev){
+  var v=String((ev&&ev.v)||'').trim();
+  return v.replace(/,\s*(CDMX|Ciudad de M[eé]xico)\s*$/i,'').trim();
+}
+function itinCdmxTramo(ev,quien){
+  var venue=itinVenueCorto(ev);
+  var hora=String((ev&&ev.horaShow)||'').trim();
+  var destino=venue?('para llegar al '+venue+' alrededor de las 7:00 p. m.'):'para llegar al recinto alrededor de las 7:00 p. m.';
+  var frase='🎤 **Traslado al concierto**\nSaldremos del hotel a las 6:00 p. m. '+destino+(hora?(' El concierto comienza a las '+hora+'.'):'');
+  var reunion=(quien==='avion')
+    ? '📍 **Punto de reunión**\nNos reuniremos en el Aeropuerto de CDMX (AICM) entre 10:00 y 10:30 a. m. A las 11:00 a. m. saldremos rumbo al hotel.'
+    : '📍 **Punto de reunión**\nNos reuniremos en la Central de Autobuses del Norte de CDMX entre 9:00 y 10:30 a. m. A las 11:00 a. m. saldremos rumbo al hotel.';
+  var regreso=(quien==='avion')
+    ? '✈️ **Regreso**\nSaldremos del hotel hacia el aeropuerto a las 4:00 a. m.'
+    : '🚌 **Regreso**\nSaldremos del hotel hacia la Central de Autobuses del Norte a las 12:00 p. m.';
+  return (quien==='avion'?'✈️ Itinerario | Viaje en avión':'🚌 Itinerario | Viaje en bus')+'\n\n'+reunion
+    +'\n\n🏨 **Llegada al hotel**\nLlegaremos aproximadamente a las 11:40 a. m. La entrega de habitaciones será entre 1:00 y 3:00 p. m. Tendrán tiempo libre para comer, descansar y prepararse.'
+    +'\n\n'+frase
+    +'\n\n😴 **Después del concierto**\nLa salida está prevista a las 11:30 p. m. Nos reuniremos y abordaremos el transporte entre 11:30 p. m. y 12:30 a. m. para regresar al hotel.'
+    +'\n\n'+regreso;
+}
+// Las DOS variantes juntas, como pidió Memo: el cliente de CDMX puede llegar
+// en bus o en avión y las ve las dos.
+function itinCdmx(ev){
+  return itinCdmxTramo(ev,'bus')+'\n\n'+itinCdmxTramo(ev,'avion')
+    +'\n\n⚠️ **Nota importante**\nLos horarios son estimados y pueden cambiar por ajustes del artista, el promotor o el recinto. Sigan las indicaciones de su coordinador durante el viaje.';
+}
+// 🔒 CDMX se decide por la UNIÓN de la bandera y el venue, no por una sola.
+// Medido: 8 eventos del catálogo las tienen en desacuerdo — `txt` y `jisoo`
+// traen `cdmx:true` con el venue vacío o «Por Confirmar», y SEIS eventos de
+// CDMX (avengedsevenfold, kanyewest, mcr, dojacat, edc2026, acdc) NO traen la
+// bandera. Hoy los seis están pasados o en «próximamente», así que preguntar
+// solo por la bandera no mentiría HOY — pero el día que uno vuelva a la venta
+// sí, y la unión no cuesta nada.
+function itinEsCdmx(ev){
+  if(!ev)return false;
+  if(ev.cdmx)return true;
+  return /CDMX|CIUDAD DE MEXICO|CIUDAD DE MÉXICO/i.test(String(ev.v||''));
+}
+function itinEsMty(ev){
+  return /\b(mty|monterrey|nuevo le[oó]n|n\.?\s?l\.?\b|guadalupe|showcenter|san nicol|fundidora|apodaca|santa catarina)/i.test(String((ev&&ev.v)||''));
+}
+// 'propio' | 'cdmx' | 'mty' | '' (sin itinerario: no se pinta nada)
+function itinClase(ev){
+  if(!ev)return '';
+  if(typeof ev.itinerario==='string'&&ev.itinerario.trim())return 'propio';
+  if(itinEsCdmx(ev))return 'cdmx';
+  if(itinEsMty(ev))return 'mty';
+  return '';
+}
+function itinerarioDe(ev){
+  var c=itinClase(ev);
+  if(c==='propio')return String(ev.itinerario);
+  if(c==='cdmx')return itinCdmx(ev);
+  if(c==='mty')return ITIN_MTY;
+  return '';
+}
+// El texto se escapa ANTES de tocar el markup — la lección que ya estaba
+// escrita en el render del promo modal— y solo después se convierten los
+// **negritas** y los saltos de línea.
+function itinHtml(txt){
+  return escHtml(String(txt||'')).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+}
+function abrirItinerario(){
+  var t=itinerarioDe(cur);
+  if(!t)return;
+  var box=document.getElementById('itin-modal-desc');
+  if(!box)return;
+  box.innerHTML=itinHtml(t);
+  document.getElementById('itin-modal-bg').style.display='flex';
+}
+function cerrarItinerario(){
+  var b=document.getElementById('itin-modal-bg');
+  if(b)b.style.display='none';
+  // ⚠️ NO estampa `sessionStorage`: el itinerario se reabre A PLACER, que es
+  // justo lo que pidió Memo. El estampado es del promo modal —«una vez por
+  // sesión»— y compartir su cerrador le habría apagado la promo de dalemix.
+  try{ if(cur&&itinClase(cur)==='propio')sessionStorage.setItem('itin_'+cur.id,'1'); }catch(e){}
+}
 function cerrarPromoModal(){
   document.getElementById('promo-modal-bg').style.display='none';
   if(cur)sessionStorage.setItem('promo_'+cur.id,'1');
@@ -6185,7 +6322,7 @@ function abrirLineup(id,nombre){
 function cerrarLineup(){
   document.getElementById('lineup-modal').style.display='none';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();cerrarWaitlistModal();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();cerrarWaitlistModal();cerrarItinerario();}});
 
 var _lastQuincenas=[],_lastPagoQ=0;
 
@@ -6923,6 +7060,19 @@ function getQuincenas(from, until, max, diasAntes){
     <div class="promo-modal-emoji" id="promo-modal-emoji">🍔</div>
     <div class="promo-modal-title" id="promo-modal-title"></div>
     <div class="promo-modal-desc" id="promo-modal-desc"></div>
+  </div>
+</div>
+<!-- [CARD-ITIN-1] Modal propio del itinerario. Reusa las clases del promo
+     modal (mismo look) pero NO su nodo ni su cerrador: `cerrarPromoModal()`
+     estampa `sessionStorage` para no repetir la promo, y el itinerario se
+     reabre a placer. Dos propósitos en un cerrador le habrían apagado la
+     promo de comida gratis de dalemix. -->
+<div class="promo-modal-bg" id="itin-modal-bg" onclick="cerrarItinerario()">
+  <div class="promo-modal-box" id="itin-modal-box" onclick="event.stopPropagation()" style="background:linear-gradient(145deg,#0a0a1a,#111)">
+    <button class="promo-modal-close" onclick="cerrarItinerario()">✕</button>
+    <div class="promo-modal-emoji" id="itin-modal-emoji">🗺️</div>
+    <div class="promo-modal-title">Tu itinerario de viaje</div>
+    <div class="promo-modal-desc" id="itin-modal-desc" style="text-align:left;font-size:12px;line-height:1.7"></div>
   </div>
 </div>
 <div class="nf-modal-bg" id="nf-modal-bg" onclick="cerrarNfModal()">

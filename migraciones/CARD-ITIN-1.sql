@@ -80,3 +80,27 @@ select slug, ciudad, venue, status,
  where coalesce(venue,'') !~* '(mty|monterrey|nuevo le|n\.l|guadalupe|showcenter|san nicol|fundidora|apodaca|santa catarina|cdmx|ciudad de m)'
    and coalesce(ciudad,'') <> 'CDMX'
  order by fecha_inicio nulls last;
+
+-- ═══ CIERRE · CORRIDO POR JANE (23-sep-2026, tras el deploy de #759) ═════════
+-- Coreografía respetada: merge → deploy → SQL. Correrlo ANTES del deploy abría
+-- la ventana donde un publish con el compilador viejo borraba el itinerario de
+-- los dos en silencio; después, la única ventana era el 409 con nombre.
+-- (Una publicación de 77 eventos de Memo cayó EN MEDIO del merge — antes de
+-- este SQL — y no rompió nada: CC careó el index auto-fusionado byte a byte.)
+--
+-- · Premisa leída ANTES de tocar: los dos traían `promoModal.desc` (385 y 401
+--   caracteres) y las tres columnas NO existían (cols_ya = 0).
+-- · Transacción única con DO de candados, los dos verdes: exactamente 2 filas
+--   movidas limpias (itinerario lleno + extras sin promoModal) y CERO filas
+--   ajenas con itinerario.
+-- · Leído de vuelta: pulsoquetaro 385 · tecatecomuna 401, mismos arranques que
+--   la premisa, `extras` en NULL en los dos — dalemix no se tocó (el WHERE
+--   solo nombra a los dos, y su promo no es un itinerario).
+-- · La foto del paso 4, HOY: 8 filas (la premisa decía 5 porque contaba solo
+--   fichas con venue; hoy salen también 3 `proximamente` SIN venue — muse,
+--   luismiguel, sabrina — que caen aquí porque un venue vacío no es ni MTY ni
+--   CDMX, y se resuelven solos al capturarles el venue). LES FALTA itinerario
+--   propio: julionrodep (Expo Coahuila, EN VENTA — el único urgente),
+--   bahidora y bahidora2027 (Las Estacas, proximamente).
+--
+-- Desde aquí, publicar desde Esferas es libre: la ficha ya emite `itinerario`.

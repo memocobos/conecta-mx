@@ -418,6 +418,15 @@ function servidor(raiz) {
   console.log('\n── D · TODO el bloque del admin cabe en 390×844 ──');
   ARRANQUE = Date.now() - (marcaRev + 4000);
   pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
+  // 🔴 CON LAS TIPOGRAFÍAS BLOQUEADAS, Y ES A PROPÓSITO. Jane midió 871 donde yo
+  // medí 835 con el MISMO commit, y el `contacto` le dio 76 contra mis 34: en su
+  // entorno las fuentes de Google no cargan, así que la de respaldo es más
+  // ancha, los botones envuelven y todo crece. Dos razones para bloquearlas
+  // aquí: (a) quita la dependencia de la RED —el careo daba distinto según
+  // quién lo corriera—, y (b) es el PEOR CASO REAL, porque el cliente con red
+  // mala o con el CDN bloqueado ve exactamente eso. Si cabe así, cabe siempre.
+  await pg.route('**://fonts.googleapis.com/**', (r) => r.abort());
+  await pg.route('**://fonts.gstatic.com/**', (r) => r.abort());
   await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
   await pg.waitForTimeout(1500);
   await pg.evaluate(() => { const p = document.getElementById('puerta'); if (p) p.style.display = 'block'; });

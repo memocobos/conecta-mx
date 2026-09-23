@@ -106,14 +106,13 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '9820489';
-// 🔒 HEAD ANCLADO A UN COMMIT FIJO, no a `HEAD`. Con `HEAD` el careo mediría
-// SIEMPRE el árbol de hoy, así que dentro de tres tuercas estaría midiendo
-// código ajeno y culpando a esta PR de lo que otros cambien. `6abbf1f` es el
-// commit que trae las cuatro piezas.
-//   · careo CONGELADO (el default): reproducible, no caduca.
-//   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:ganador-b`, que remide el
-//     árbol de hoy contra el MISMO BASE — útil el día que alguien toque esto.
-const HEAD_SHA = process.env.HEAD_SHA || '6abbf1f';
+// 🔒 HEAD ANCLADO A UN COMMIT FIJO. Era `6abbf1f` —el árbol de la PR B— y se
+// MUEVE a `7e0fe75` por GANADOR-PODA-1: ese árbol todavía traía la muestra de 30 s y
+// la imagen en la tarjeta, así que las aserciones nuevas (que NO se pidan)
+// habrían salido rojas contra él. **Un arnés cuya tuerca siguiente retiró lo
+// que medía se actualiza a la verdad nueva, con su razón escrita — no se
+// silencia ni se deja tronando.** Los retiros están marcados con ⚰️ arriba.
+const HEAD_SHA = process.env.HEAD_SHA || '7e0fe75';
 let base = null, head = null;
 try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sacar BASE: ' + e.message); }
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }

@@ -1,28 +1,49 @@
 #!/usr/bin/env node
 // =============================================================================
-// CAREO · ROL-HIST-PADRE-1 — la rampa al padre, contra los DOS sitios servidos
+// VIGÍA VIVO · /rol y los precios · `precios-vigentes` en los DOS sitios
 // =============================================================================
 // Entra por donde entra /rol: POST al endpoint `precios-vigentes` DESPLEGADO.
 // No requiere el lib, no simula la base y no arma estado a mano — los dos lados
-// son commits desplegados y los dos leen las filas reales de `precios_historial`.
+// leen las filas reales de `precios_historial`.
 //
-//   BASE = producción            (el commit anterior al merge)
-//   HEAD = deploy preview de la PR
+//   BASE = producción                 (lo que el cliente ve HOY)
+//   HEAD = el sitio candidato          (el deploy preview de la PR)
+//
+// ⚰️ ESTO ERA UN CAREO BASE↔HEAD DE ROL-HIST-PADRE-1, Y CADUCÓ ENTERO.
+//
+// Su forma vieja exigía que BASE estuviera ROTO: el bloque [B] pedía
+// `sin_historial:true` en las llaves huérfanas y el [C] que BASE cotizara el
+// precio de HOY, porque cuando se escribió la rampa al padre sólo vivía en el
+// preview. **El día que #732 se mergeó, ese «antes» desapareció** y el vigía
+// empezó a dar 348 rojos que no eran del código: 252 comparaciones diferían
+// POR CONSTRUCCIÓN (quitaba `LLAVES_NUEVAS` de un solo lado) y el control
+// positivo de [B] ya no podía pasar nunca más.
+//
+// 🔒 LA LEY QUE DEJÓ: un careo BASE↔HEAD donde BASE es «producción» tiene fecha
+// de caducidad EL DÍA DE SU PROPIO MERGE. Con dos commits el par se congela;
+// con un sitio vivo, el «antes» se va en cuanto la tuerca sale.
+//
+// Decisión de Memo (22-sep): revive como VIGILANTE VIVO, guardia permanente.
+// No hay lado «roto»: los dos sitios tienen que contestar **IGUAL**, y las
+// `LLAVES_NUEVAS` entran al CONTRATO de comparación en vez de quitarse.
+//
+// CUATRO BLOQUES:
+//   [I] validación del instrumento — un caso que SE SABE que existe. Si esto no
+//       contesta lo esperado, todo lo de abajo miente y el vigía se detiene.
+//   [S] control positivo por SABOTAJE LOCAL — se muta una respuesta REAL y se
+//       exige que el comparador lo CACE. Es el único control positivo honesto
+//       aquí: el de antes era un pasado que ya no existe.
+//   [V] IGUALDAD VIVA — las 344 llaves del universo tienen que contestar
+//       byte a byte igual en los dos sitios, TODAS las claves incluidas.
+//   [L] LA LÍNEA BASE — la FORMA de la respuesta (su juego de claves) y los
+//       valores de dos testigos firmados. Sólo se mueve cuando un cambio de
+//       precio o de forma se APRUEBA, y el vigía lo dice con esas palabras.
 //
 // El universo NO se inventa: `vigia-rol-hist-padre.universo.json` se generó
 // desde la tabla real y fija QUÉ se pregunta. Las RESPUESTAS las recomputan los
 // dos lados en cada corrida — el fixture es el catálogo, no la foto.
 //
-// TRES BLOQUES:
-//   [I] validación del instrumento — un caso que SE SABE que existe. Si esto no
-//       contesta lo esperado, todo lo de abajo miente y el arnés se detiene.
-//   [A] control en el sentido «no pisar»: 252 llaves que SÍ saben hablar de su
-//       fecha tienen que contestar IGUAL que en BASE, campo por campo.
-//   [B] control en el sentido «ahora heredan»: 92 llaves huérfanas donde BASE
-//       cae al catálogo y HEAD contesta con el historial del padre.
-//   [C] el caso de Jane, el que se midió en el navegador: omar 28-ago.
-//
-// Las dos cuentas las IMPRIME el arnés. Ninguna se recuerda.
+// Se corre:  HEAD_URL=<preview> npm run vigia:rol-vivo
 // =============================================================================
 
 const fs = require('fs');
@@ -35,9 +56,13 @@ if (HEAD === BASE) { console.error('BASE y HEAD son el mismo sitio: no hay careo
 
 const universo = JSON.parse(fs.readFileSync(path.join(__dirname, 'vigia-rol-hist-padre.universo.json'), 'utf8'));
 
-// Las llaves que HEAD añade y BASE no puede tener. Se quitan ANTES de comparar:
-// exigir que estén en BASE sería exigir que BASE ya tuviera la tuerca.
-const LLAVES_NUEVAS = ['heredado', 'llave_usada', 'filas_historial_padre', 'padre_error'];
+// 🔒 EL CONTRATO DE LA FORMA. Estas cuatro llaves las estrenó ROL-HIST-PADRE-1
+// y el vigía viejo las QUITABA de un lado para comparar; hoy están en los DOS
+// sitios y entran al contrato: si una falta o sobra, la forma cambió y eso pide
+// aprobación, no un parche.
+const CONTRATO = ['ok', 'evento_id', 'ambito', 'zona', 'fecha', 'tz', 'heredado',
+  'llave_usada', 'sin_historial', 'anterior_al_historial', 'al_abrir', 'cambios',
+  'dia', 'filas_historial', 'filas_historial_padre', 'padre_error', 'catalogo_error'];
 
 let ok = 0, mal = 0;
 const fallos = [];
@@ -55,17 +80,42 @@ async function preguntar(sitio, p) {
   return { status: r.status, cuerpo: await r.json() };
 }
 
-// Comparación estable: mismas llaves, mismo orden, mismo contenido.
-const estable = (o) => JSON.stringify(o, Object.keys(o).sort());
-function sinLlavesNuevas(o) {
-  const c = Object.assign({}, o);
-  LLAVES_NUEVAS.forEach((k) => delete c[k]);
-  return c;
+// ═══ 🔴 COMPARACIÓN ESTABLE, Y AHORA DE VERDAD ══════════════════════════════
+//
+// 🔒 NO SE QUITA NINGUNA CLAVE. El vigía viejo quitaba `LLAVES_NUEVAS` de HEAD
+// y no de BASE, y ése era el origen de los 252 «distintas»: la comparación
+// mentía por construcción.
+//
+// 🔴 Y TENÍA UN SEGUNDO DEFECTO, PEOR, QUE NADIE HABÍA VISTO: era
+// `JSON.stringify(o, Object.keys(o).sort())`, y un ARRAY como segundo argumento
+// de `JSON.stringify` **no es un orden: es una lista blanca de claves que se
+// aplica a TODOS los niveles**. Como sólo listaba las claves de nivel 1, todo
+// lo anidado se serializaba VACÍO:
+//
+//     {ok:true, al_abrir:{precio:3400}}  →  {"al_abrir":{},"ok":true}
+//
+// O sea que el «byte a byte» del vigía **nunca comparó un precio**, ni una
+// hora, ni `cerrada`, ni `aplicable`. Habría dado 344 de 344 idénticas con
+// producción cotizando $9,999.
+//
+// 🔒 LO CAZÓ EL CONTROL POSITIVO POR SABOTAJE, en su primera guardia y antes de
+// que este vigía dijera un solo verde útil. Es la razón de existir de ese
+// bloque: un comparador que no puede ver una diferencia no está comparando.
+function ordenar(v) {
+  if (Array.isArray(v)) return v.map(ordenar);
+  if (v && typeof v === 'object') {
+    const out = {};
+    Object.keys(v).sort().forEach((k) => { out[k] = ordenar(v[k]); });
+    return out;
+  }
+  return v;
 }
+const estable = (o) => JSON.stringify(ordenar(o));
+const llaves = (o) => Object.keys(o || {}).sort();
 const opciones = (j) => (j.al_abrir ? 1 : 0) + (j.cambios || []).length;
 
 (async () => {
-  console.log('CAREO ROL-HIST-PADRE-1');
+  console.log('VIGÍA VIVO · /rol y los precios  (era el careo de ROL-HIST-PADRE-1)');
   console.log('  BASE:', BASE);
   console.log('  HEAD:', HEAD);
   console.log('');
@@ -87,78 +137,131 @@ const opciones = (j) => (j.al_abrir ? 1 : 0) + (j.cambios || []).length;
   }
   if (mal) { console.log('\n  ⛔ el instrumento no pasa su propia prueba. Se detiene.'); process.exit(1); }
 
-  // ── [A] LA RAMPA NO PISA A QUIEN SÍ SABE HABLAR ────────────────────────────
-  console.log('\n[A] llaves CON historial propio · contestan igual que en BASE');
-  let a_iguales = 0, a_distintas = 0, a_heredadas = 0;
-  for (const p of universo.A) {
+  // ── [S] CONTROL POSITIVO POR SABOTAJE LOCAL ────────────────────────────────
+  // 🔒 ANTES DE CREERLE UNA IGUALDAD, EL COMPARADOR TIENE QUE PODER VER UNA
+  // DIFERENCIA. El control positivo viejo era «BASE está roto», y eso dejó de
+  // existir el día del merge; éste no puede caducar porque no depende de
+  // ningún pasado: se toma una respuesta REAL, se le muta un campo aquí mismo,
+  // y se exige que el comparador lo cace. Si no lo caza, los 344 verdes de
+  // abajo no dicen nada.
+  console.log('\n[S] control positivo · el comparador ve un sabotaje local');
+  {
+    const real = (await preguntar(HEAD, universo.A[0])).cuerpo;
+    afirmar(estable(real) === estable(real), 'S·una respuesta es igual a sí misma');
+    const sab1 = JSON.parse(JSON.stringify(real));
+    if (sab1.al_abrir) sab1.al_abrir.precio = (sab1.al_abrir.precio || 0) + 1;
+    afirmar(estable(sab1) !== estable(real), 'S·caza un PRECIO cambiado en un peso');
+    const sab2 = JSON.parse(JSON.stringify(real));
+    delete sab2.heredado;
+    afirmar(estable(sab2) !== estable(real),
+      'S·caza una CLAVE que falta (era lo que el vigía viejo se quitaba solo)');
+    const sab3 = JSON.parse(JSON.stringify(real));
+    sab3.cambios = (sab3.cambios || []).concat([{ precio: 1, cerrada: false, aplicable: true, hora: '00:00' }]);
+    afirmar(estable(sab3) !== estable(real), 'S·caza un cambio de precio AÑADIDO');
+    const sab4 = JSON.parse(JSON.stringify(real));
+    sab4.tz = 'America/Cancun';
+    afirmar(estable(sab4) !== estable(real), 'S·caza el HUSO cambiado');
+    // 🔒 Y EL QUE CAZÓ EL DEFECTO DEL COMPARADOR, explícito: un cambio ANIDADO
+    // dos niveles adentro. Con el `estable` viejo esto pasaba desapercibido, y
+    // con él todos los precios y todas las horas.
+    const sab5 = JSON.parse(JSON.stringify(real));
+    if ((sab5.cambios || []).length) sab5.cambios[0].hora = '23:59';
+    else if (sab5.al_abrir) sab5.al_abrir.cerrada = !sab5.al_abrir.cerrada;
+    afirmar(estable(sab5) !== estable(real),
+      'S·caza un cambio ANIDADO (una hora, dos niveles adentro)');
+    console.log('    cinco sabotajes, cinco cazados');
+  }
+
+  // ── [V] IGUALDAD VIVA · LOS DOS SITIOS CONTESTAN LO MISMO ──────────────────
+  //
+  // 🔒 UN SOLO UNIVERSO. Antes eran dos bloques —[A] «las que saben hablar» y
+  // [B] «las huérfanas»— porque cada uno esperaba algo DISTINTO de cada lado.
+  // Sin lado roto esa división no significa nada: las 344 llaves tienen que
+  // contestar IGUAL, y punto. El bloque [B] se retira con su razón escrita en
+  // la cabecera; su universo sigue aquí, dentro de este.
+  console.log('\n[V] igualdad viva · las dos sitios contestan byte a byte igual');
+  const TODAS = universo.A.concat(universo.B);
+  let iguales = 0, distintas = 0;
+  const ejemplos = [];
+  for (const p of TODAS) {
     const [b, h] = await Promise.all([preguntar(BASE, p), preguntar(HEAD, p)]);
     const etq = p.evento_id + '/' + p.ambito + '/' + p.zona + '/' + p.fecha;
-    // Premisa del caso: si BASE no pudo hablar de esa fecha, este probe no
-    // pertenece al bloque A y afirmarlo aquí sería medir el caso equivocado.
-    if (!afirmar(b.cuerpo.ok === true && !b.cuerpo.sin_historial && !b.cuerpo.anterior_al_historial,
-      'A·premisa no se alcanza', etq)) continue;
-    if (estable(sinLlavesNuevas(h.cuerpo)) === estable(b.cuerpo)) a_iguales++;
-    else { a_distintas++; afirmar(false, 'A·HEAD cambió una respuesta que BASE sabía dar', etq); }
-    if (h.cuerpo.heredado === true) { a_heredadas++; afirmar(false, 'A·heredó una llave que sabe hablar', etq); }
+    // Premisa: los dos lados tienen que HABER CONTESTADO. Un 500 en los dos da
+    // cuerpos «iguales» y eso no es una igualdad, es un apagón.
+    if (!afirmar(b.status === 200 && h.status === 200 && b.cuerpo.ok === true && h.cuerpo.ok === true,
+      'V·premisa: alguno de los dos no contestó', etq + ' base=' + b.status + ' head=' + h.status)) continue;
+    if (estable(h.cuerpo) === estable(b.cuerpo)) iguales++;
+    else {
+      distintas++;
+      // Se dice EN QUÉ difieren, no solo que difieren: sin eso, quien lea el
+      // rojo no sabe si fue un precio, una clave o el huso.
+      const dif = [...new Set(llaves(b.cuerpo).concat(llaves(h.cuerpo)))]
+        .filter((k) => JSON.stringify(b.cuerpo[k]) !== JSON.stringify(h.cuerpo[k]));
+      if (ejemplos.length < 6) ejemplos.push(etq + ' → ' + dif.join(','));
+      afirmar(false, 'V·los dos sitios NO contestan igual', etq + ' · difieren en: ' + dif.join(','));
+    }
+    // 🔒 Y LA FORMA, llave por llave: una clave nueva o ausente cambia el
+    // contrato aunque los valores cuadren.
+    const faltanB = CONTRATO.filter((k) => !(k in b.cuerpo));
+    const sobranH = llaves(h.cuerpo).filter((k) => CONTRATO.indexOf(k) === -1);
+    afirmar(faltanB.length === 0,
+      'V·producción no trae claves del contrato', etq + ' faltan: ' + faltanB.join(','));
+    afirmar(sobranH.length === 0,
+      'V·el candidato trae claves FUERA del contrato — la forma cambió y eso se APRUEBA, no se parchea',
+      etq + ' sobran: ' + sobranH.join(','));
   }
-  afirmar(universo.A.length > 0, 'A·cardinalidad: el universo no puede estar vacío');
-  afirmar(a_iguales === universo.A.length, 'A·todas byte-iguales', a_iguales + '/' + universo.A.length);
-  console.log('    ' + a_iguales + ' de ' + universo.A.length + ' idénticas a BASE · ' +
-              a_distintas + ' distintas · ' + a_heredadas + ' heredadas (debe ser 0)');
+  afirmar(TODAS.length > 0, 'V·cardinalidad: el universo no puede estar vacío');
+  afirmar(iguales === TODAS.length, 'V·todas iguales', iguales + '/' + TODAS.length);
+  console.log('    ' + iguales + ' de ' + TODAS.length + ' idénticas · ' + distintas + ' distintas');
+  if (ejemplos.length) ejemplos.forEach((e) => console.log('      ✗ ' + e));
 
-  // ── [B] LAS HUÉRFANAS AHORA HEREDAN ────────────────────────────────────────
-  // CONTROL POSITIVO: no basta con que HEAD herede — se exige que BASE SÍ falle.
-  // Una aserción «HEAD lo arregla» sin la que prueba que BASE estaba roto pasa
-  // en el vacío.
-  console.log('\n[B] llaves HUÉRFANAS · BASE cae al catálogo, HEAD hereda del padre');
-  let b_base_catalogo = 0, b_head_hereda = 0, b_mejora_precio = 0;
-  for (const p of universo.B) {
-    const [b, h] = await Promise.all([preguntar(BASE, p), preguntar(HEAD, p)]);
-    const etq = p.evento_id + '/' + p.ambito + '/' + p.zona + '/' + p.fecha;
-    if (b.cuerpo.sin_historial === true) b_base_catalogo++;
-    else afirmar(false, 'B·control positivo: BASE NO estaba roto aquí', etq);
-    if (h.cuerpo.heredado === true) b_head_hereda++;
-    else afirmar(false, 'B·HEAD no heredó', etq);
-    afirmar(h.cuerpo.sin_historial === false, 'B·HEAD sigue diciendo sin_historial', etq);
-    const fb = b.cuerpo.al_abrir && b.cuerpo.al_abrir.fuente;
-    const fh = h.cuerpo.al_abrir && h.cuerpo.al_abrir.fuente;
-    afirmar(fh !== 'catalogo', 'B·HEAD sigue contestando desde el catálogo', etq);
-    if (fb === 'catalogo' && fh !== 'catalogo') b_mejora_precio++;
+  // ── [L] LA LÍNEA BASE · DOS TESTIGOS FIRMADOS ──────────────────────────────
+  //
+  // ⚰️ AQUÍ VIVÍA EL BLOQUE [C], y la mitad que se retira es la que exigía que
+  // BASE estuviera ROTO: «BASE contestaba el precio de HOY» y «BASE cotizaba
+  // $3,700». Las dos eran ciertas antes de que #732 se mergeara y hoy son
+  // FALSAS POR CONSTRUCCIÓN, porque producción ya trae la rampa. Retirarlas en
+  // silencio habría dejado a alguien «arreglándolas» hasta deshacer la tuerca.
+  //
+  // Lo que sobrevive es la otra mitad, que sigue siendo verdad y ahora es la
+  // LÍNEA BASE: los dos testigos que Jane midió en el navegador. Se exigen en
+  // LOS DOS SITIOS —ya son iguales por [V], así que esto fija los VALORES, no
+  // la igualdad— y 🔒 SOLO SE MUEVEN CUANDO UN CAMBIO DE PRECIO SE APRUEBA. Si
+  // esto se pone rojo, la pregunta no es «cómo lo callo» sino «¿quién aprobó
+  // que ese precio cambiara?».
+  console.log('\n[L] línea base · los dos testigos de Jane, en los dos sitios');
+  const TESTIGOS = [
+    {
+      etq: 'omar#0 · Beyond Pit · 28-ago · tres precios con sus horas de Reynosa',
+      p: { evento_id: 'omar#0', ambito: 'cheapZonas', zona: 'Beyond Pit', fecha: '2026-08-28' },
+      esperado: (j) => j.heredado === true && opciones(j) === 3
+        && j.al_abrir && j.al_abrir.precio === 3400
+        && (j.cambios || []).map((c) => c.precio + '@' + c.hora).join(' · ') === '3800@12:50 · 4350@16:07',
+      leer: (j) => 'heredado=' + j.heredado + ' opciones=' + opciones(j)
+        + ' al_abrir=' + (j.al_abrir && j.al_abrir.precio)
+        + ' cambios=' + (j.cambios || []).map((c) => c.precio + '@' + c.hora).join(' · '),
+    },
+    {
+      etq: 'omar#0 · Platino B · 28-ago · ZONA CERRADA, no se cotiza',
+      p: { evento_id: 'omar#0', ambito: 'cheapZonas', zona: 'Platino B', fecha: '2026-08-28' },
+      esperado: (j) => j.heredado === true && j.al_abrir && j.al_abrir.precio === 0
+        && j.al_abrir.cerrada === true && j.al_abrir.aplicable === false,
+      leer: (j) => 'heredado=' + j.heredado + ' precio=' + (j.al_abrir && j.al_abrir.precio)
+        + ' cerrada=' + (j.al_abrir && j.al_abrir.cerrada)
+        + ' aplicable=' + (j.al_abrir && j.al_abrir.aplicable),
+    },
+  ];
+  for (const t of TESTIGOS) {
+    for (const [nombre, sitio] of [['producción', BASE], ['candidato', HEAD]]) {
+      const j = (await preguntar(sitio, t.p)).cuerpo;
+      afirmar(t.esperado(j),
+        'L·' + nombre + ' se salió de la línea base — ¿quién aprobó ese cambio de precio?',
+        t.etq + ' → ' + t.leer(j));
+    }
+    const j = (await preguntar(HEAD, t.p)).cuerpo;
+    console.log('    ' + (t.esperado(j) ? '✓' : '✗') + ' ' + t.etq);
+    console.log('        ' + t.leer(j));
   }
-  afirmar(universo.B.length > 0, 'B·cardinalidad: el universo no puede estar vacío');
-  afirmar(b_base_catalogo === universo.B.length, 'B·BASE roto en todas', b_base_catalogo + '/' + universo.B.length);
-  afirmar(b_head_hereda === universo.B.length, 'B·HEAD hereda en todas', b_head_hereda + '/' + universo.B.length);
-  console.log('    BASE cayó al catálogo en ' + b_base_catalogo + ' de ' + universo.B.length);
-  console.log('    HEAD heredó del padre en ' + b_head_hereda + ' de ' + universo.B.length +
-              ' · dejó de contestar «precio de hoy» en ' + b_mejora_precio);
-
-  // ── [C] EL CASO DE JANE ────────────────────────────────────────────────────
-  console.log('\n[C] el caso medido en el navegador · omar 6-Nov CHEAP, separo 28-ago');
-  const pit = { evento_id: 'omar#0', ambito: 'cheapZonas', zona: 'Beyond Pit', fecha: '2026-08-28' };
-  const [cb, ch] = await Promise.all([preguntar(BASE, pit), preguntar(HEAD, pit)]);
-  afirmar(cb.cuerpo.sin_historial === true && cb.cuerpo.al_abrir.precio === 3800 && cb.cuerpo.al_abrir.fuente === 'catalogo',
-    'C·control positivo: BASE contestaba el precio de HOY',
-    'sin_historial=' + cb.cuerpo.sin_historial + ' precio=' + (cb.cuerpo.al_abrir && cb.cuerpo.al_abrir.precio));
-  const hh = (ch.cuerpo.cambios || []).map((c) => c.precio + '@' + c.hora).join(' · ');
-  afirmar(ch.cuerpo.heredado === true && opciones(ch.cuerpo) === 3 &&
-          ch.cuerpo.al_abrir.precio === 3400 && hh === '3800@12:50 · 4350@16:07',
-    'C·HEAD da los tres precios con sus horas de Reynosa',
-    'opciones=' + opciones(ch.cuerpo) + ' al_abrir=' + (ch.cuerpo.al_abrir && ch.cuerpo.al_abrir.precio) + ' cambios=' + hh);
-  console.log('    BASE: ' + opciones(cb.cuerpo) + ' precio(s) · ' + cb.cuerpo.al_abrir.precio + ' (fuente ' + cb.cuerpo.al_abrir.fuente + ')');
-  console.log('    HEAD: ' + opciones(ch.cuerpo) + ' precios · al abrir ' + ch.cuerpo.al_abrir.precio + ' · ' + hh);
-
-  // La segunda cara: un precio que NO existía ese día.
-  const plb = { evento_id: 'omar#0', ambito: 'cheapZonas', zona: 'Platino B', fecha: '2026-08-28' };
-  const [db, dh] = await Promise.all([preguntar(BASE, plb), preguntar(HEAD, plb)]);
-  afirmar(db.cuerpo.anterior_al_historial === true && db.cuerpo.al_abrir.precio === 3700,
-    'C·control positivo: BASE cotizaba $3,700 (fila nacida el 29-ago)',
-    'precio=' + (db.cuerpo.al_abrir && db.cuerpo.al_abrir.precio));
-  afirmar(dh.cuerpo.heredado === true && dh.cuerpo.al_abrir.precio === 0 &&
-          dh.cuerpo.al_abrir.cerrada === true && dh.cuerpo.al_abrir.aplicable === false,
-    'C·HEAD dice ZONA CERRADA y no cotiza',
-    'precio=' + (dh.cuerpo.al_abrir && dh.cuerpo.al_abrir.precio) + ' aplicable=' + (dh.cuerpo.al_abrir && dh.cuerpo.al_abrir.aplicable));
-  console.log('    Platino B · BASE: $' + db.cuerpo.al_abrir.precio + ' («lo más viejo que sabemos»)');
-  console.log('    Platino B · HEAD: ' + (dh.cuerpo.al_abrir.cerrada ? 'CERRADA (precio 0), no se cotiza' : '$' + dh.cuerpo.al_abrir.precio));
 
   console.log('\n──────────────────────────────────────────────');
   console.log((mal === 0 ? '✅ VERDE' : '❌ ROJO') + ' · ' + ok + ' aserciones en verde, ' + mal + ' en rojo');

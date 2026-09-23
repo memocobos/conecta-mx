@@ -5054,6 +5054,14 @@ function showDetail(id, _skipHistory){
     var _itinCard=document.getElementById('d-itin-card');
     if(_itinCard) _itinCard.style.display = itinerarioDe(cur) ? '' : 'none';
   }catch(e){}
+  // [NUBE-2] Se pide la cotización viva AL ABRIR EL CARD, no al llegar al paso
+  // del transporte: entre una cosa y otra hay cuatro clics (viajeros, paquete,
+  // zona, habitación), así que llega con tiempo. Y si no llega, el paso se
+  // construye como HOY —WhatsApp— y se repinta solo cuando la respuesta caiga.
+  // ⚠️ `nubePedir` es una DECLARACIÓN de función, así que está disponible
+  // aunque esto corra a media parseada por el deep-link; y su estado no vive en
+  // un `var` de nivel superior, justo por eso.
+  try{ if(typeof nubePedir==='function') nubePedir(); }catch(e){}
   // [CARD-GUIA-1] El letrero vuelve a su frase de arranque al abrir un card.
   // Sin esto se queda PEGADO el del evento anterior: abrir otro evento diría
   // «Ahora elige tu habitación» antes de que el cliente eligiera nada. Un
@@ -5990,23 +5998,132 @@ function selHotel(btn,e,n){
   }
 }
 
+// ═══ [NUBE-2] EL INDEX BEBE DE LA NUBE ════════════════════════════════════
+// El `2500` tecleado del bus y el «Cotiza por WhatsApp» del avión se cambian
+// por la cotización VIVA que Bulma y Milk suben cada lunes (`nube-vigente`).
+// Decisión firmada de Memo (23-sep-2026): **los dos modos venden directo**.
+// ⚰️ La versión anterior del encargo —«el avión solo informa»— quedó superada;
+// se deja dicho para que nadie la revida leyendo un borrador viejo.
+//
+// 🔒 UN SOLO MECANISMO. El avión no estrena camino: pinta su precio y su clic
+// pasa por el MISMO `selTransporteBtn` que el bus, así que el total sale de la
+// MISMA multiplicación (`total += transportCost * selViaj` en `calcular()`,
+// un solo sitio y agnóstica al modo). Aquí no nace aritmética.
+//
+// 🔒 EL ESTADO NO VIVE EN UN `var` DE NIVEL SUPERIOR, y es la ley de la serie
+// CARDS: el deep-link `/<slug>` llama a `showDetail()` A MEDIA PARSEADA, donde
+// un `var` de arriba ya existe por hoisting pero vale `undefined`. Vive colgado
+// de `window` dentro de una función, así que el orden de parseo deja de
+// importar — y de paso nadie puede leerlo sin pasar por su puerta.
+function nubeEstado(){
+  if(!window.__nube) window.__nube={pedida:false,ok:false,bus:null,avion:null};
+  return window.__nube;
+}
+// La cotización de un modo, o null. `null` significa UNA cosa: no hay precio
+// que vender — vencida, sin fila, o la red se cayó. Los tres casos caen al
+// mismo lado, que es el comportamiento de HOY.
+function nubeDe(modo){
+  var e=nubeEstado();
+  var v=e[modo];
+  if(!v || !(Number(v.precio)>0)) return null;
+  // 🔴 LA VIGENCIA SE VUELVE A MIRAR **AQUÍ**, y no es paranoia: el endpoint ya
+  // filtra lo vencido en la fuente, pero su respuesta va por CDN con
+  // `s-maxage=600` y `stale-while-revalidate=3600` — o sea que el navegador
+  // puede recibir una respuesta de hasta UNA HORA de antigüedad. Una
+  // cotización que vence el domingo a las 23:59 podría llegar como «vigente»
+  // el lunes a las 00:30 desde la caché, y ese modo VENDERÍA un precio
+  // vencido: la mentira de NATA con dinero, entrando por la puerta de nuestra
+  // propia caché.
+  // 🔒 Lo cazó el careo mandando a propósito una cotización vencida: el
+  // navegador la vendía porque confiaba en que el servidor ya había filtrado.
+  // Quien pinta el precio es el último que puede comprobarlo, así que lo
+  // comprueba.
+  var hasta=Date.parse(v.vigente_hasta);
+  if(!Number.isFinite(hasta) || hasta<=Date.now()) return null;
+  return v;
+}
+// Se pide UNA vez por carga. El endpoint trae caché de CDN (10 min), así que
+// esto no pega a la base por visita.
+// ⚠️ FAIL-SOFT DURO Y CALLADO: cualquier tropiezo deja los dos modos en null y
+// el sitio se comporta EXACTAMENTE como antes de esta tuerca. El camino viejo
+// es el respaldo y no se borró.
+function nubePedir(){
+  var e=nubeEstado();
+  if(e.pedida) return;
+  e.pedida=true;
+  try{
+    fetch('/.netlify/functions/nube-vigente',{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d || d.ok!==true) return;
+        e.ok=true;
+        e.bus=(d.bus && Number(d.bus.precio)>0) ? d.bus : null;
+        e.avion=(d.avion && Number(d.avion.precio)>0) ? d.avion : null;
+        // Si el cliente YA está en el paso del transporte y no ha elegido
+        // nada, se repinta para que vea el precio en vez del WhatsApp.
+        // ⚠️ Y SOLO SI NO HA ELEGIDO: repintar borraría su selección y su
+        // total, que es peor que enseñarle el camino viejo.
+        try{
+          var caja=document.getElementById('w-transport-card');
+          if(caja && getComputedStyle(caja).display!=='none' && !selTransporte
+             && typeof buildTransporteButtons==='function' && cur) buildTransporteButtons();
+        }catch(_){}
+      })
+      .catch(function(){});
+  }catch(_){}
+}
+// 🔒 EL PAQUETE QUE YA INCLUYE EL VUELO NO SE TOCA — y la regla se DERIVA del
+// «qué incluye», no del id. El código traía `cur.id==='arre'` cableado, y un id
+// a mano es un letrero que se pudre: el día que entre otro evento con vuelo
+// incluido, nadie se acuerda de agregarlo y el sitio le VENDE el vuelo dos
+// veces (una en el paquete y otra en el transporte).
+// Medido sobre los 116 eventos del catálogo: la regla derivada devuelve
+// EXACTAMENTE `['arre']`, evento por evento, igual que el cableado. Así que
+// esto no cambia nada hoy y cierra el hoyo de mañana.
+function nubeVueloIncluido(ev){
+  var inc=(ev&&ev.inc)||[];
+  for(var i=0;i<inc.length;i++){ if(/\bavi[oó]n\b|\bvuelo\b/i.test(String(inc[i]))) return true; }
+  return false;
+}
+
 function buildTransporteButtons(){
   var stepN=parseInt($$('w-hotel-n').textContent)+1;
   $$('w-transport-n').textContent=stepN;
   // AUD-2: misma frontera de 15 dias que el separo (fechas puras, hora MX).
   var diasRestantes=_diasEventoMx(cur.ds);
   if(diasRestantes==null)diasRestantes=999;
-  // Eventos con noBus:true o 'arre' ocultan el autobús: sólo Avión + Sin transporte.
-  var hideBus=(cur&&(cur.noBus||cur.id==='arre'));
-  var h='';
-  if(!hideBus){
-    if(diasRestantes>15){
-      h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name"><svg class="ic"><use href="#ic-bus"/></svg> Autobús</div><div class="z-price">$2,500</div></button>';
-    } else {
-      h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">🚌 Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  // [NUBE-2] `noBus` y el paquete que YA incluye el vuelo ocultan el autobús:
+  // sólo Avión + Sin transporte. ⚠️ El `cur.id==='arre'` cableado se cambió por
+  // la regla DERIVADA del «qué incluye» — medido, devuelve el mismo `['arre']`
+  // en los 116 eventos, así que hoy no cambia nada y mañana no se olvida.
+  var vueloIncluido=nubeVueloIncluido(cur);
+  var hideBus=(cur&&(cur.noBus||vueloIncluido));
+  // 🔒 LA FRONTERA DE LOS 15 DÍAS APLICA A LOS DOS MODOS, y es la MISMA regla
+  // firmada que hoy protege al bus, extendida a su hermano nuevo: cerca del
+  // evento el precio del lunes ya no aguanta y cotiza un humano.
+  var lejos=(diasRestantes>15);
+  var waBus='https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')');
+  var waAvion='https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')');
+  // Un modo se VENDE cuando está lejos del evento Y la nube trae su precio
+  // vigente. Si no, cae a SU WhatsApp — exactamente como antes de la nube.
+  // 🔒 Y ES POR MODO: bus vigente con avión vencido vende el bus y manda el
+  // avión al WhatsApp. Un solo `if` para los dos habría atado el destino de
+  // uno a la suerte del otro.
+  function _tBoton(modo, etq, ico, wa, precio){
+    if(precio){
+      return '<button class="z-btn" data-t="'+modo+'" data-cost="'+precio+'" onclick="selTransporteBtn(this,'+precio+',\''+etq+'\')">'
+        + '<div class="z-name">'+ico+' '+etq+'</div>'
+        + '<div class="z-price">'+fmt(precio)+'</div></button>';
     }
+    return '<button class="z-btn" data-t="'+modo+'" onclick="window.open(\''+wa+'\',\'_blank\')">'
+      + '<div class="z-name">'+ico+' '+etq+'</div>'
+      + '<div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
   }
-  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  var cotBus=lejos?nubeDe('bus'):null;
+  var cotAvion=(lejos&&!vueloIncluido)?nubeDe('avion'):null;
+  var h='';
+  if(!hideBus) h+=_tBoton('bus','Autobús','🚌',waBus,cotBus?Math.round(Number(cotBus.precio)):0);
+  h+=_tBoton('avion','Avión','✈️',waAvion,cotAvion?Math.round(Number(cotAvion.precio)):0);
   h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')" style="display:flex;align-items:center;justify-content:center"><div class="z-name" style="margin:0">Sin transporte</div></button>';
   $$('d-transport').innerHTML=h;
   $$('d-placeholder').style.display='block';

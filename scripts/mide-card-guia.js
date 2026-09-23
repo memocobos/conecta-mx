@@ -10,7 +10,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = d3ca76c  el letrero mudo: la misma frase para los cinco pasos
-//     HEAD = 60056a0  cada paso dice el suyo
+//     HEAD = f6620d6  cada paso dice el suyo
 //
 // ⚠️ LA PREMISA DEL ENCARGO NO SE SOSTUVO y el careo la deja medida: el FAB de
 // ayuda NO EXISTE en el árbol. Se afirma aquí para que nadie vuelva a
@@ -44,7 +44,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'd3ca76c';
-const HEAD_SHA = process.env.HEAD_SHA || '60056a0';
+const HEAD_SHA = process.env.HEAD_SHA || 'f6620d6';
 // `frontera` es de Monterrey y vende PLUS con zona y hotel: recorre los tres
 // pasos del encargo. El de CDMX se mide aparte porque tiene un paso más.
 const EV_MTY = 'frontera';

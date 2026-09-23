@@ -167,6 +167,56 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **VIGIA-ROL-VIVO-1 EN PROD (23-sep-2026, #757): el vigía de `/rol` revive
+  como GUARDIA PERMANENTE.** `HEAD_URL=<preview> npm run vigia:rol-vivo`
+  (el nombre viejo `vigia:rol-hist-padre` sigue como **alias**). Cero SQL, y no
+  toca el sitio: solo el vigía.
+
+  🔒 **LA LEY QUE LO MATÓ, Y VALE PARA CUALQUIER ARNÉS: un careo BASE↔HEAD
+  donde BASE es «producción» tiene fecha de caducidad EL DÍA DE SU PROPIO
+  MERGE.** Con dos commits el par se congela; con un **sitio vivo**, el «antes»
+  se va en cuanto la tuerca sale. Este exigía que BASE estuviera **roto** —el
+  bloque [B] pedía `sin_historial:true` en las 92 huérfanas y el [C] que
+  cotizara «el precio de HOY»— y el [A] quitaba `LLAVES_NUEVAS` **de un solo
+  lado**. Con ROL-HIST-PADRE-1 (#732) en producción, eso daba **348 rojos que
+  no eran del código**.
+  ⚠️ **Y NO SE MEDIO-ARREGLÓ:** arreglar solo el [A] era una línea y lo habría
+  puesto **en verde** dejando el [B] estructuralmente muerto — un verde
+  engañoso sobre un arnés que ya no mide nada.
+
+  **La forma nueva:** los dos sitios tienen que contestar **IGUAL**, sin lado
+  roto. **[I]** valida el instrumento con un testigo conocido y **se detiene**
+  si falla · **[S]** control positivo por **sabotaje LOCAL** · **[V]** igualdad
+  viva de las **344** llaves del universo, byte a byte, **con todas las
+  claves**, diciendo **en qué** difieren · **[L]** la **línea base**: los dos
+  testigos de Jane, exigidos en los dos sitios, que **solo se mueve cuando un
+  cambio de precio se APRUEBA**. Más el **contrato de la forma**: una clave que
+  falte en producción o sobre en el candidato es rojo con esas palabras.
+  🔒 **El control positivo nuevo NO PUEDE CADUCAR** porque no depende de ningún
+  pasado: muta una respuesta real de hoy y exige que el comparador la cace. El
+  anterior era «BASE está roto», o sea un pasado — y por eso se murió.
+  🔒 **Y [V] afirma su premisa antes de contar:** los dos lados tienen que
+  contestar `200` con `ok:true`, porque **un 500 en los dos da cuerpos
+  «iguales» y eso es un apagón, no una igualdad**.
+
+  🔴 **EN SU PRIMERA GUARDIA EL SABOTAJE CAZÓ UN DEFECTO DEL PROPIO
+  COMPARADOR**, que llevaba ahí desde que el vigía se escribió:
+  `JSON.stringify(o, Object.keys(o).sort())` — **un ARRAY como segundo
+  argumento no ORDENA: es una LISTA BLANCA de claves, y se aplica a TODOS los
+  niveles.** Como solo listaba el nivel 1, todo lo anidado se serializaba
+  **vacío**: `{ok:true, al_abrir:{precio:3400}}` → `{"al_abrir":{},"ok":true}`.
+  O sea que el «byte a byte» **nunca comparó un precio**, ni una hora, ni
+  `cerrada`, ni `aplicable`: **habría dado 344 de 344 idénticas con producción
+  cotizando $9,999.** Hoy hay serialización **profunda** y un **sabotaje
+  anidado permanente** entre sus controles.
+  **Corolario:** si se quiere orden estable se ordena el OBJETO y se serializa
+  **sin replacer**; el replacer-array es para filtrar, no para ordenar. Y todo
+  comparador de objetos lleva su sabotaje **anidado** entre sus controles.
+
+  **Primera guardia:** 1 046 aserciones · 344 de 344 idénticas · cinco
+  sabotajes cazados · los dos testigos en pie.
+
+
 - 🏆 **GANADOR-PODA-1 EN PROD (23-sep-2026, #756): la tarjeta del ganador se
   simplifica.** Cuatro cambios firmados por Memo. `npm run mide:ganador-b`
   (**53**, eran 78), cero SQL.

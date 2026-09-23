@@ -8,7 +8,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 19f8d16  main: la bandera existe y el index la ignora
-//     HEAD = d0b8e93  el index la obedece
+//     HEAD = 85cf1ad  el index la obedece (el commit del MERGE)
 //
 // 🔒 LAS VARIANTES SE SIEMBRAN SOBRE EVENTOS REALES, mutando su objeto en la
 // página. `humbecdmx` es el que de verdad trae la bandera hoy, y a él se le
@@ -43,7 +43,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '19f8d16';
-const HEAD_SHA = process.env.HEAD_SHA || 'd0b8e93';
+const HEAD_SHA = process.env.HEAD_SHA || '85cf1ad';
 const EV_BANDERA = 'humbecdmx';      // el que trae `noCheap` de verdad
 const EV_LAS_DOS = 'coronacapital';  // trae noCheap Y cheapSoon (camino festival)
 const EV_NORMAL  = 'edc27';          // vende CHEAP sin banderas

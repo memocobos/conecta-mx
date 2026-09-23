@@ -714,7 +714,11 @@ function _excelCareoHtml(d) {
         // o de ningún lado, y entonces se dice el motivo en vez de un número.
         (x.sistema_total == null
           ? `<span style="color:var(--orange)">sin total — ${_evtEsc(x.sistema_total_motivo || 'el catálogo no dio precio')}</span>`
-          : `${_evtMxn(x.sistema_total)} <span style="color:var(--ts);font-size:11px">${x.sistema_total_origen === 'catalogo' ? 'del catálogo vivo' : 'de la base'}</span>`)))}</div>
+          // Si el total cubre VARIOS boletos, la pantalla lo dice: un número
+          // cuatro veces más grande sin esa palabra se lee como un error.
+          : `${_evtMxn(x.sistema_total)} <span style="color:var(--ts);font-size:11px">${x.sistema_total_origen === 'catalogo'
+                ? `del catálogo vivo${x.sistema_total_boletos > 1 ? ` · ${x.sistema_total_boletos} boletos` : ''}`
+                : 'de la base'}</span>`)))}</div>
     </details>
 
     <details style="margin-top:14px">

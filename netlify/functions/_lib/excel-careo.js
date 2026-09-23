@@ -444,6 +444,13 @@ function carear(personasExcel, viajerosBase, opciones) {
         // `sistema_total` puede venir NULL o 0: el runner lo pisa con el precio
         // vivo del catálogo por paquete+zona, y dice de dónde salió.
         sistema_total_origen: (sis == null || sis === 0) ? 'pendiente' : 'base',
+        // [CUADRE-5 · hallazgo de Jane] EL MAPA DE BOLETOS POR ZONA VIAJA CON
+        // EL RENGLÓN. La pestaña lleva UNA FILA POR BOLETO y los totales se
+        // SUMAN, así que un renglón con `filas > 1` necesita el total del
+        // GRUPO, no el de una persona — y para pedirlo hay que saber si los
+        // boletos son todos de la misma zona. Sin el mapa, el runner tendría
+        // que repartirlos, que es justo lo que no se puede inventar.
+        zonas: Object.assign({}, p.zonas || {}),
       });
       delete enRegla.diferencia;
       ceroRegla.push(enRegla);

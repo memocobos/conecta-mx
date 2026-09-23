@@ -516,6 +516,26 @@ const CASO = () => ({
         filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Olga Prado', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$500', 'Total': '$0', 'TALLA': 'M' }),
         // [5] NO ES $0 · diferencia sobre un derivado: la regla no la toca.
         filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Pepe Salas', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$500', 'Total': '$5,200', 'TALLA': 'XL' }),
+        // [6] DENTRO · CUATRO BOLETOS DE LA MISMA ZONA (hallazgo de Jane): la
+        //     pestaña lleva una fila por boleto y los totales se SUMAN, así que
+        //     el total del sistema tiene que ser el del GRUPO. Pisarlo con el
+        //     de una persona pintaría 1/4 del total real.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Quique Rios', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Quique Rios', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Quique Rios', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Quique Rios', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        // [7] DENTRO pero SE REHÚSA · boletos REPARTIDOS en dos zonas. Cada
+        //     zona tiene su precio y repartirlos sin fila que lo diga sería
+        //     inventar (la lección de Angel). Se queda pendiente, con motivo.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Tere Ancira', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'S' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Tere Ancira', 'Paquete': 'CHEAP', 'Boleto': 'Platino', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'S' }),
+        // [8] DENTRO pero SE REHÚSA · la otra cara de lo mismo: TRES boletos y
+        //     solo DOS con zona. La zona es única, así que un `zonas.length===1`
+        //     a secas lo habría pisado con el total de 3 dando por hecho que el
+        //     tercero es de esa zona. No se sabe, así que no se pisa.
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Ulises Vega', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Ulises Vega', 'Paquete': 'CHEAP', 'Boleto': 'Cancha General', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
+        filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Ulises Vega', 'Paquete': 'CHEAP', 'Separo': '$1,000', '1': '$1,000', 'Total': '$0', 'TALLA': 'M' }),
       ]),
     },
     base: {
@@ -526,6 +546,9 @@ const CASO = () => ({
         { id: 'c5-3', evento_id: 'youngmiko', nombre: 'Noe Quiroz', tipo_viajero: 'cliente', abonado_previo: 1000, total_contrato: 0,    notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Platino', tipo_paquete: 'CHEAP' },
         { id: 'c5-4', evento_id: 'youngmiko', nombre: 'Olga Prado', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4700, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'PLUS' },
         { id: 'c5-5', evento_id: 'youngmiko', nombre: 'Pepe Salas', tipo_viajero: 'cliente', abonado_previo: 500,  total_contrato: 4700, notas: 'TOTAL-1: contrato derivado del catálogo', zona_boleto: 'Cancha General', tipo_paquete: 'PLUS' },
+        { id: 'c5-8', evento_id: 'youngmiko', nombre: 'Quique Rios', tipo_viajero: 'cliente', abonado_previo: 4000, total_contrato: null, notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Cancha General', tipo_paquete: 'CHEAP' },
+        { id: 'c5-10', evento_id: 'youngmiko', nombre: 'Ulises Vega', tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: null, notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Cancha General', tipo_paquete: 'CHEAP' },
+        { id: 'c5-9', evento_id: 'youngmiko', nombre: 'Tere Ancira', tipo_viajero: 'cliente', abonado_previo: 2000, total_contrato: null, notas: 'TOTAL-1: contrato derivado del catálogo · ⚠ total pendiente', zona_boleto: 'Cancha General', tipo_paquete: 'CHEAP' },
       ],
       abonos_viajero: [],
     },
@@ -546,20 +569,20 @@ const CASO = () => ({
   R9.forEach((x) => console.log(`    · en regla: ${x.nombre.padEnd(12)} ${String(x.paquete).padEnd(6)} sistema=${x.sistema_total} (${x.sistema_total_origen})${x.sistema_total_motivo ? ' motivo=' + x.sistema_total_motivo : ''}`));
   T9.forEach((x) => console.log(`    · sigue siendo diferencia: ${x.nombre.padEnd(12)} excel=${x.excel_total} sistema=${x.sistema_total} dif=${x.diferencia}`));
   // EL CONTEO POR CLASE, que es lo que Memo pidió VER.
-  af(c9.en_regla === 3, 'en_regla = ' + c9.en_regla + ', se esperaban 3 (Lupe · Mara · Noe)');
+  af(c9.en_regla === 6, 'en_regla = ' + c9.en_regla + ', se esperaban 6 (Lupe · Mara · Noe · Quique de 4 boletos · Tere repartida · Ulises con una fila sin zona)');
   af(c9.fuera_libreta === 1, 'fuera_libreta = ' + c9.fuera_libreta + ', se esperaba 1 (Olga)');
   af(c9.fuera_cdmx === 0, 'fuera_cdmx = ' + c9.fuera_cdmx + ', se esperaba 0: youngmiko no es de CDMX');
   // Las tres clases PARTEN los $0 tecleados: 3 + 0 + 1 = los cuatro sembrados.
   // Si no suman, algún renglón se está contando dos veces o ninguna.
-  af(c9.en_regla + c9.fuera_cdmx + c9.fuera_libreta === 4,
-     'las clases del $0 no suman los 4 sembrados: ' + JSON.stringify([c9.en_regla, c9.fuera_cdmx, c9.fuera_libreta]));
+  af(c9.en_regla + c9.fuera_cdmx + c9.fuera_libreta === 7,
+     'las clases del $0 no suman los 7 sembrados: ' + JSON.stringify([c9.en_regla, c9.fuera_cdmx, c9.fuera_libreta]));
   af(c9.fuera_otro === 0, '`fuera_otro` = ' + c9.fuera_otro + ' y debe ser 0: hay una clase de $0 sin nombre');
   af(R9.length === c9.en_regla, 'el conteo dice ' + c9.en_regla + ' y el montón trae ' + R9.length
      + ': el número y la lista tienen que salir del mismo sitio');
   const enR = (n) => R9.find((x) => x.nombre === n);
   const enT = (n) => T9.find((x) => x.nombre === n);
   // Los tres cubiertos SALEN del montón de diferencias.
-  ['Lupe Ozuna', 'Mara Tovar', 'Noe Quiroz'].forEach((n) => {
+  ['Lupe Ozuna', 'Mara Tovar', 'Noe Quiroz', 'Quique Rios', 'Tere Ancira', 'Ulises Vega'].forEach((n) => {
     af(!!enR(n), n + ' no entró al montón de la regla');
     af(!enT(n), n + ' sigue contándose como diferencia además de estar en la regla: estaría en DOS montones');
   });
@@ -596,6 +619,50 @@ const CASO = () => ({
        nombre + ': el origen dice ' + JSON.stringify(fila && fila.sistema_total_origen)
        + ' y debe decir «catalogo» — de dónde salió el número es parte del dato');
   }
+  // ── EL CONTEO DE BOLETOS (hallazgo de Jane) ──────────────────────────────
+  // 🔒 EL NÚMERO NO SE TECLEA NI SE MULTIPLICA AQUÍ: se le pide al DUEÑO el
+  // total del GRUPO (`num_personas: 4`) y se carea contra eso. Multiplicar
+  // `unit × 4` en el arnés sería repetir la aritmética del runner y los dos
+  // podrían estar igual de equivocados.
+  const quique = enR('Quique Rios');
+  const grupo4 = await resolverPrecioVenta({ evento_id: 'youngmiko', paquete: 'CHEAP', zona: 'Cancha General', num_personas: 4, para_careo: true });
+  const unoSolo = await resolverPrecioVenta({ evento_id: 'youngmiko', paquete: 'CHEAP', zona: 'Cancha General', num_personas: 1, para_careo: true });
+  console.log('    · Quique Rios: 4 boletos de una zona · el dueño cotiza el grupo en ' + JSON.stringify(grupo4.total)
+    + ' (una persona: ' + JSON.stringify(unoSolo.precio_unit) + ') y el careo trae ' + JSON.stringify(quique && quique.sistema_total));
+  af(grupo4.ok && Number(grupo4.total) > Number(unoSolo.precio_unit),
+     'la premisa no se sostiene: el total de 4 boletos no es mayor que el de uno, así que este caso no puede distinguir nada');
+  af(!!quique && quique.filas === 4, 'Quique: el careo contó ' + JSON.stringify(quique && quique.filas) + ' filas y son 4 boletos');
+  af(!!quique && quique.sistema_total === Number(grupo4.total),
+     'Quique: el total pisado es ' + JSON.stringify(quique && quique.sistema_total) + ' y el del GRUPO es '
+     + JSON.stringify(grupo4.total) + ' — pisar con el de una persona pinta 1/4 del total real');
+  af(!!quique && quique.sistema_total !== Number(unoSolo.precio_unit),
+     'Quique: se pisó con el precio de UNA persona teniendo 4 boletos — es el defecto que Jane cazó');
+  af(!!quique && quique.sistema_total_boletos === 4,
+     'Quique: el renglón no dice cuántos boletos entraron en el total: un número 4 veces mayor sin esa palabra se lee como un error');
+  // Y el repartido SE REHÚSA, diciendo por qué.
+  const tere = enR('Tere Ancira');
+  console.log('    · Tere Ancira: 2 boletos en 2 zonas · origen=' + (tere && tere.sistema_total_origen)
+    + ' motivo=' + JSON.stringify(tere && tere.sistema_total_motivo));
+  af(!!tere && tere.sistema_total_origen === 'pendiente',
+     'Tere: se pisó un total con los boletos REPARTIDOS en dos zonas — cada zona tiene su precio y repartirlos sería inventar');
+  af(!!tere && /2 boletos en 2 zonas/.test(String(tere.sistema_total_motivo || '')),
+     'Tere: el renglón no DICE por qué se quedó pendiente, y un pendiente mudo no se puede revisar: '
+     + JSON.stringify(tere && tere.sistema_total_motivo));
+  af(!!tere && tere.sistema_total == null,
+     'Tere: quedó con un número (' + JSON.stringify(tere && tere.sistema_total) + ') aunque se rehusó a cotizarlo');
+  // Y la cara fina: zona ÚNICA pero no la de todos los boletos.
+  const ulises = enR('Ulises Vega');
+  console.log('    · Ulises Vega: 3 boletos, 2 con zona · origen=' + (ulises && ulises.sistema_total_origen)
+    + ' motivo=' + JSON.stringify(ulises && ulises.sistema_total_motivo));
+  af(!!ulises && ulises.filas === 3, 'Ulises: el careo contó ' + JSON.stringify(ulises && ulises.filas) + ' filas y son 3');
+  af(!!ulises && Object.keys(ulises.zonas || {}).length === 1,
+     'la premisa del caso fino no se sostiene: Ulises debía tener UNA zona en el mapa y tiene '
+     + JSON.stringify(Object.keys((ulises || {}).zonas || {})) + ' — así no prueba nada sobre `zonas.length===1`');
+  af(!!ulises && ulises.sistema_total_origen === 'pendiente',
+     'Ulises: se pisó el total dando por hecho que la fila SIN zona es de la única zona que se ve — eso no se sabe');
+  af(!!ulises && /3 boletos y 2 con zona/.test(String(ulises.sistema_total_motivo || '')),
+     'Ulises: el motivo no dice que falta una zona: ' + JSON.stringify(ulises && ulises.sistema_total_motivo));
+
   // Ningún renglón de la regla lleva una `diferencia` vieja al lado del total
   // que el runner acaba de pisar.
   const conDif = R9.find((x) => 'diferencia' in x);
@@ -664,8 +731,8 @@ const CASO = () => ({
   // ⚠️ Los dos CHEAP se quedan DENTRO, y está bien: el CHEAP es solo el boleto,
   // así que la regla lo cubre EN CUALQUIER LADO — asumir CDMX no los toca.
   // Esperaba `en_regla:0` y la aritmética era mía otra vez.
-  af(c11.en_regla === 2, 'con el catálogo ilegible la regla cubrió ' + c11.en_regla
-     + ' renglón(es) y debían ser 2 (los dos CHEAP, que la regla cubre en cualquier lado)');
+  af(c11.en_regla === 5, 'con el catálogo ilegible la regla cubrió ' + c11.en_regla
+     + ' renglón(es) y debían ser 5 (los CHEAP, que la regla cubre en cualquier lado)');
   af(c11.fuera_cdmx === 1 && c11.fuera_libreta === 1,
      'las clases del control positivo salieron ' + JSON.stringify([c11.fuera_cdmx, c11.fuera_libreta])
      + ' y debían ser [1, 1] — Lupe por CDMX asumido, Olga por libreta');
@@ -684,6 +751,10 @@ const CASO = () => ({
   ['Lupe Ozuna', 'Mara Tovar', 'Noe Quiroz'].forEach((n) =>
     af(html9.includes(n), 'la pantalla no imprime a ' + n + ', que está en el montón de la regla'));
   af(/del catálogo vivo/.test(html9), 'la pantalla no dice cuáles totales salieron del catálogo vivo');
+  af(/4 boletos/.test(html9),
+     'la pantalla no dice que el total de Quique cubre 4 boletos: $14,400 sin esa palabra se lee como un error de la cuenta');
+  af(/2 boletos en 2 zonas/.test(html9),
+     'la pantalla no pinta el motivo del renglón que se rehusó: un pendiente mudo no se puede revisar');
   af(/CDMX/.test(html9) && /libreta/.test(html9),
      'la pantalla no nombra las dos clases que quedan FUERA: el conteo sin su razón no se puede leer');
   // 🔒 EL LETRERO SE DERIVA, NO SE TECLEA — y se prueba MUTANDO el dato en vez

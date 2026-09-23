@@ -215,16 +215,43 @@ async function correrCareo(eventoId) {
   // cuadran: medido, `resolverPrecioVenta` rehusaba los cuatro casos probados.
   // 🔒 Y FAIL-SOFT: si no se puede resolver, el renglón se queda `pendiente`
   // con su motivo. Nunca se inventa un número.
+  // 🔴 EL CONTEO DE BOLETOS NO ES OPCIONAL (hallazgo de Jane, 23-sep). La
+  // pestaña lleva UNA FILA POR BOLETO y el total de la persona es la SUMA de
+  // sus filas, así que pisar con el precio de UNA persona pintaría 1/N del
+  // total real — rotulado «del catálogo vivo», que es peor que dejarlo vacío.
+  // 🔒 Y EL TOTAL DEL GRUPO SE LE PIDE AL DUEÑO (`num_personas: filas` y su
+  // `total`), NO se multiplica aquí: medido hoy los cuatro casos dan lineal,
+  // pero eso es un hecho de hoy —el hotel por persona cambia con el tipo de
+  // cuarto— y `unit × filas` sería mi propia aritmética al lado de la suya.
+  // ⚠️ SOLO SE PISA SI TODOS LOS BOLETOS SON DE UNA MISMA ZONA y están todos
+  // contados ahí. Con boletos repartidos —o con filas sin zona— el renglón se
+  // queda PENDIENTE diciendo por qué: repartirlos entre zonas sin fila que lo
+  // diga sería inventar, y ya mordió con Angel.
   for (const fila of (montones.totales_cero_regla || [])) {
     if (fila.sistema_total_origen !== 'pendiente') continue;
+    const filas = Math.max(1, Number(fila.filas) || 1);
+    const porZona = fila.zonas || {};
+    const zonas = Object.keys(porZona);
+    const zonaUnica = zonas.length === 1 ? zonas[0] : null;
+    const enLaZona = zonaUnica ? Number(porZona[zonaUnica]) || 0 : 0;
+    if (filas > 1 && !(zonaUnica && enLaZona === filas)) {
+      fila.sistema_total_motivo = zonas.length > 1
+        ? `${filas} boletos en ${zonas.length} zonas — se confirma a ojo`
+        : `${filas} boletos y ${enLaZona} con zona — se confirma a ojo`;
+      continue;
+    }
     try {
       const r = await resolverPrecioVenta({
         evento_id: eventoId, paquete: fila.paquete, zona: fila.zona,
-        num_personas: 1, para_careo: true,
+        num_personas: filas, para_careo: true,
       });
-      if (r && r.ok && Number.isFinite(Number(r.precio_unit))) {
-        fila.sistema_total = Number(r.precio_unit);
+      if (r && r.ok && Number.isFinite(Number(r.total))) {
+        fila.sistema_total = Number(r.total);
         fila.sistema_total_origen = 'catalogo';
+        // Cuántos boletos entraron en ese número. La pantalla LO DICE: un total
+        // cuatro veces más grande sin decir que son cuatro boletos se lee como
+        // un error de la cuenta.
+        fila.sistema_total_boletos = filas;
       } else {
         fila.sistema_total_motivo = (r && r.motivo) || 'el catálogo no dio precio';
       }

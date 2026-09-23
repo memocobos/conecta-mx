@@ -167,6 +167,111 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **CUADRE-5 EN PROD (23-sep-2026, #758): el «$0» tecleado deja de ser
+  diferencia donde el index SÍ puede saber el total.** Regla firmada por Memo
+  (22-sep) y **acotada por su propio ojo**: el total del sistema —derivado del
+  catálogo— es el bueno **por decreto**, pero **solo** en eventos **NO-CDMX** o
+  en paquete **CHEAP en cualquier lado**. `npm run mide:cuadre-total` (**150**,
+  eran 71), **cero SQL**, la fase sigue **SOLO LEYENDO**.
+
+  **Lo que queda FUERA, y no es olvido:** los `$0` de **CDMX en paquetes con
+  transporte** (el autobús son $2,500 pero el avión se cotiza a mano, así que
+  el index no sabe el vuelo) y los **exactos de libreta** (ahí un `$0` enfrente
+  es un cambio real). El chip dice **la regla y su fecha**, derivadas de la
+  respuesta; el careo **reporta el conteo por clase** para que Memo vea el
+  tamaño de cada montón. Las tres clases **parten** los `$0` tecleados, y viaja
+  un cuarto contador (`fuera_otro`) que **debe ser siempre 0**: si algún día no
+  lo es, hay una clase de `$0` que nadie nombró.
+  ⚠️ **El montón cubierto NO trae botón de «aplicar»**, y eso es capacidad que
+  se va: aplicarlo escribiría el `$0` encima de un total bueno.
+
+  🔴 **EL CASO QUE EL ENCARGO NOMBRABA ERA INALCANZABLE.** La orden decía «si
+  algún renglón de la regla trae el total del sistema en NULL/0, se pisa con el
+  precio vivo del catálogo». Puesta detrás de la guarda de tolerancia, eso **no
+  podía ocurrir jamás**: un `$0` tecleado contra un total en NULL o en 0 da
+  diferencia **cero**, así que la tolerancia lo saltaba y el montón solo habría
+  podido traer los que ya tenían total. Hoy la regla se pregunta **antes** de la
+  tolerancia.
+  🔒 **LEY: cuando un encargo enumera casos, cada caso nombrado es una aserción
+  pendiente** — se siembra en el careo y se ve llegar. Y al meter una regla
+  nueva en un camino que ya tiene guardas, la pregunta es **qué guarda corre
+  antes**: una regla detrás de una guarda que la excluye se lee igual que una
+  regla que funciona. Es la tercera cara de la **guarda inalcanzable**.
+
+  🔴 **LA PUERTA `para_careo` ABRE CUATRO CANDADOS, NO DOS, Y SE DECIDIÓ
+  CONTANDO.** El total pendiente se pisa pidiéndoselo al **dueño de la
+  aritmética** (`resolverPrecioVenta`), no leyendo `ev.zonas` por nuestra cuenta
+  —eso habría sido la segunda fórmula de «cuánto cuesta un paquete»—. Los
+  candados de venta de AUD-2 se disparan justo en los eventos que se cuadran,
+  así que la puerta apaga los cuatro que dicen «esto no se puede **COMPRAR**»:
+  el `st` no vendible, la fecha pasada, la zona `ag` y la zona `prox`.
+  **Medido sobre el catálogo del 23-sep: 957 de las 1,667 zonas están marcadas
+  agotadas y 666 de ésas TRAEN PRECIO**; en los **40 eventos agotados o
+  pasados** —los que de verdad se cuadran— son **364 de 468**. Con solo los dos
+  candados del evento abiertos, el careo se habría quedado sin pisar el total en
+  la mayoría de los renglones reales, y el «sin total» habría parecido un dato
+  que falta en vez de un candado de venta.
+  🔒 **LA REGLA QUE LOS SEPARA: la puerta abre lo que NO SE VENDE, jamás lo que
+  NO SE SABE.** Siguen en pie, y tienen que seguir: `p > 0`, la zona que no
+  existe en el catálogo, el paquete inválido y el `fecha_idx` fuera de rango.
+  La puerta es **opt-in** y el careo **cuenta quién la pasa**: dos archivos, su
+  dueño y `excel-careo-correr`. Los otros **cinco** llamadores de
+  `resolverPrecioVenta` (separo de Mercado Pago ×2, alta del Portal, /rol,
+  cortesías) cotizan venta de verdad y no deben pasarla nunca.
+
+  🔴 **EL HALLAZGO DE JANE: EL TOTAL ES DEL GRUPO, NO DE UNA PERSONA.** La
+  pestaña lleva **UNA FILA POR BOLETO** y los totales se **SUMAN**, así que
+  pisar con el precio de una persona pintaba **1/N del total real** rotulado
+  «del catálogo vivo» — peor que dejarlo vacío. Hoy el **mapa de boletos por
+  zona de BOLETOS-1 viaja con el renglón** y solo se pisa cuando **todos** los
+  boletos son de **una misma zona**; el renglón dice cuántos («del catálogo vivo
+  · 4 boletos»), porque un número cuatro veces mayor sin esa palabra se lee como
+  un error de la cuenta. Con los boletos **repartidos** se queda **pendiente con
+  su motivo** («2 boletos en 2 zonas — se confirma a ojo»): cada zona tiene su
+  precio y repartirlos sin fila que lo diga sería inventar.
+  ⚠️ **Y una cara fina que salió al sembrarla:** zona **única** pero que **no
+  contiene todos los boletos** (una fila sin zona). Un `zonas.length === 1` a
+  secas lo habría pisado dando por hecho que el que falta es de esa zona — no se
+  sabe, así que tampoco se pisa («3 boletos y 2 con zona»).
+  🔒 **Y EL TOTAL DEL GRUPO SE LE PIDE AL DUEÑO** (`num_personas: filas` y su
+  `total`), **no se multiplica**: medido, los cuatro casos de hoy dan lineal,
+  pero eso es un **hecho de hoy** —el hotel por persona cambia con el tipo de
+  cuarto— y `unit × filas` habría sido mi aritmética al lado de la suya. **El
+  arnés tampoco multiplica**: carea contra lo que contesta el dueño preguntado
+  por separado, porque si el arnés repite la cuenta del runner los dos pueden
+  estar igual de equivocados.
+
+  **EL CAREO, por el handler REAL:** el **catálogo es el REAL** (el `index.html`
+  del repo servido por la red falsa), así que `esCDMX` y los precios salen de la
+  misma fuente que el sitio — un EV inventado habría clasificado los renglones
+  con **mi** criterio. Las clases se miden con **eventos reales** (youngmiko de
+  Monterrey, soad del Palacio) y **la premisa se afirma antes de contar**: si
+  `cdmx` no sale del catálogo, las clases se vuelven una sola.
+  🔒 **CONTROL POSITIVO QUE NO PUEDE CADUCAR:** el mismo caso con el catálogo
+  **ILEGIBLE**. Las clases cambian (6 → 5 en regla, 0 → 1 por CDMX) y el PLUS
+  derivado **vuelve** al montón de diferencias. No depende de ningún pasado,
+  solo de apagarle la fuente al careo.
+  🔒 **LA PANTALLA SE PRUEBA MUTANDO EL DATO**, no buscando la palabra: se le
+  cambia la fecha y los tres conteos a un testigo y se exige que los diga. Un
+  `grep` del literal **se caza solo** —el propio comentario contiene la fecha—.
+  🔒 **Y LA VENTA SE CAREA EN UN EVENTO QUE SÍ ESTÁ VENDIENDO** (`payasonicos`,
+  29-nov): la zona agotada **se rehúsa** sin la puerta y **cotiza** con ella; la
+  zona que no existe se rehúsa por los dos caminos. Con **candado de
+  cardinalidad** — y en la primera corrida **se puso rojo** y cazó que el
+  bloque estaba midiendo en vacío (el escenario anterior había dejado la red
+  falsa sin servir el catálogo).
+  ⚠️ **El módulo `catalogo-index` cachea el EV 10 minutos**, así que el careo
+  **tira el require cache** en cada escenario: sin eso, el primero que sirviera
+  el catálogo se lo **regalaría** a los que miden el fail-soft de «catálogo
+  ilegible», y el orden de las corridas decidiría el resultado.
+
+  ⚠️ **`vigia:color` sigue 🔴 y NO se le movió la base**: de sus +84, **71 son
+  anteriores a esta tuerca y siguen sin triar**; los **13 nuevos son de la
+  pantalla de CUADRE-5 y los 13 son `var(--token)`, cero literales** — medidos
+  archivo contra archivo entre `9cd5543` y el merge. `vigia:color-literal`, que
+  es **el medidor de la serie COLOR**, está 🟢 sin crecimiento. Mover la base
+  habría bendecido los 71 de otro.
+
 - 🏆🔴 **VIGIA-ROL-VIVO-1 EN PROD (23-sep-2026, #757): el vigía de `/rol` revive
   como GUARDIA PERMANENTE.** `HEAD_URL=<preview> npm run vigia:rol-vivo`
   (el nombre viejo `vigia:rol-hist-padre` sigue como **alias**). Cero SQL, y no

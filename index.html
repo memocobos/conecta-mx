@@ -324,6 +324,8 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .bank-link{font-weight:900;font-size:12px;color:#e8ff4c;text-decoration:none}
 .pol-row{display:flex;gap:10px;font-size:11px;color:rgba(255,255,255,.6);padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.06);line-height:1.55;font-weight:600;text-transform:uppercase}
 .pol-row:last-child{border-bottom:none}
+.pol-tema{font-family:Montserrat,sans-serif;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#e8ff4c;margin:16px 0 4px}
+.pol-tema:first-child{margin-top:0}
 .pol-ico{flex-shrink:0;width:16px;font-weight:900;font-size:12px}
 
 
@@ -1425,14 +1427,14 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
 
   <div class="card" id="d-bank-card" style="display:none"><div class="card-lbl">Datos de pago</div><div id="d-bank"></div></div>
-  <div class="card">
+  <!-- [CARD-POLI-1] Las políticas salen del fondo del card a su botón. El card
+       es ESTÁTICO a propósito: no lee `POLITICAS` al abrirse, así que no le
+       pasa lo del itinerario (un `var` leído a media parseada por el
+       deep-link vale `undefined`). Aquí nada corre hasta que alguien aprieta. -->
+  <div class="card" id="d-pol-card">
     <div class="card-lbl">Políticas</div>
-    <div class="pol-row"><span class="pol-ico" style="color:#ff283b">X</span><span>Sin reembolsos por cancelación del cliente o incumplimiento de pagos</span></div>
-    <div class="pol-row"><span class="pol-ico" style="color:#ff283b">X</span><span>No se puede cambiar de paquete ni de tour una vez reservado</span></div>
-    <div class="pol-row"><span class="pol-ico" style="color:#88ea4e">V</span><span>Lugares transferibles a otra persona sin costo hasta 6 días antes del evento. Del día 5 en adelante aplica un cargo por servicio de $350.</span></div>
-    <div class="pol-row"><span class="pol-ico" style="color:#e8ff4c">!</span><span>El cargo por pagar con tarjeta u OXXO no es reembolsable. Cuando pagas en línea se suma 4% con débito u OXXO y 5% con crédito: ese cobro es de la empresa que procesa el pago, no de Conecta, y no regresa en ningún caso.</span></div>
-    <div class="pol-row"><span class="pol-ico" style="color:#88ea4e">V</span><span>Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no ese cargo, porque nunca fue nuestro.</span></div>
-    <div class="pol-row"><span class="pol-ico" style="color:#e8ff4c">!</span><span>Error en depósito genera cargo de $350</span></div>
+    <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px">Lo que aplica si cancelas, si cambias de lugar o si el evento se cancela.</div>
+    <button class="btn-itin" id="d-pol-btn" onclick="abrirPoliticas()">📋 Políticas</button>
   </div>
 
 </div>
@@ -6183,6 +6185,89 @@ function enviarWaitlist(e){
   return false;
 }
 
+// ═══ [CARD-POLI-1] LAS POLÍTICAS · UNA SOLA FUENTE, AGRUPADAS POR TEMA ═════
+// Antes eran SEIS renglones tecleados al fondo del card, uno por `<div>`. Hoy
+// son DATOS y el letrero se deriva: así agregar la séptima es una línea de
+// lista y no una línea de markup, y el orden de los temas se ve de un golpe.
+//
+// ⚠️ `pagos.html` LLEVA SU PROPIA LISTA y NO se toca aquí (su candado —«las
+// políticas nunca se pliegan»— es de Memo y sigue intacto). Pero que sean dos
+// listas es un hecho, no un detalle: **ya divergieron**. La de pagos dice
+// «...incumplimiento de pagos O CAMBIOS DE FECHA» y ésta nunca lo dijo. El
+// careo de esta tuerca las carea y NOMBRA lo que no coincide, con la
+// divergencia vieja clavada como testigo: así la siguiente no puede entrar en
+// silencio. Unificarlas de verdad es decisión de Memo — son dos superficies
+// distintas (el cotizador y la página de pagos, que además separa CHEAP).
+//
+// 🔒 LA 8 NO ES LA QUE TRAÍA EL BRIEF, Y ESO ESTÁ FIRMADO. El brief pedía «con
+// 2 o más pagos no registrados, tu viaje es dado de baja automáticamente».
+// Medido el 23-sep, el sistema hace otra cosa en tres puntos: (1) NADA es
+// automático — el único escritor de `estado:'baja'` es `admin-lugar-baja` y su
+// único llamador es un humano en el Palacio, ningún cron; (2) el umbral de la
+// BAJA no es 2 — el cron de morosidad manda «congelado y en riesgo de baja» a
+// las 2 vencidas y «en proceso de baja» a las 3+, y su propio encabezado dice
+// «Solo NOTIFICA — no da de baja ni congela nada (eso lo hace un humano)»;
+// (3) cuenta quincenas VENCIDAS, no «pagos no registrados», que se lee como
+// «pagué y no lo reportaron». Con la medición enfrente, **Memo eligió que el
+// texto se ajuste al hecho** — así que estos dos renglones dicen palabra por
+// palabra lo que el cliente ya recibe por correo. Cambiarlos obliga a cambiar
+// `portal-morosidad-diario`, y al revés.
+var POLITICAS = [
+  { tema: 'Si cancelas o dejas de pagar', items: [
+    { t: 'x', txt: 'Sin reembolsos por cancelación del cliente o incumplimiento de pagos' },
+    { t: '!', txt: 'Con <b>2 quincenas vencidas</b> tu lugar queda <b>congelado y en riesgo de baja</b>. Regulariza cuanto antes.' },
+    { t: 'x', txt: 'Con <b>3 o más</b> quincenas vencidas tu lugar queda <b>en proceso de baja</b>. Una vez dado de baja, el lugar se libera y los abonos no son reembolsables, salvo cancelación del evento.' },
+  ] },
+  { tema: 'Si el evento se cancela', items: [
+    { t: 'v', txt: 'Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no el cargo de tarjeta u OXXO, porque nunca fue nuestro.' },
+    // 🔴 «pero no ESE cargo» perdió su antecedente AL AGRUPAR, y el defecto lo
+    // introdujo esta tuerca: en la lista plana de antes el cargo de tarjeta
+    // estaba dos renglones arriba, y al repartir por temas se fue a «Cargos al
+    // pagar» — el pronombre quedó apuntando a nada. Lo vio Jane leyendo.
+    // Se nombra en su sitio, y es el ÚNICO cambio al texto de Memo: el careo
+    // lo prueba aplicando esa sola sustitución al original y exigiendo
+    // igualdad, así ninguna otra palabra puede colarse.
+    // 🔒 LA LEY: agrupar un texto ROMPE sus referencias internas. Un «ese», un
+    // «lo anterior», un «el mismo» que cruzaban dos renglones dejan de cruzar
+    // nada cuando los renglones caen en cajas distintas.
+  ] },
+  { tema: 'Cambios y transferencias', items: [
+    { t: 'x', txt: 'No se puede cambiar de paquete ni de tour una vez reservado' },
+    { t: 'v', txt: 'Lugares transferibles a otra persona sin costo hasta 6 días antes del evento. Del día 5 en adelante aplica un cargo por servicio de $350.' },
+  ] },
+  { tema: 'Cargos al pagar', items: [
+    { t: '!', txt: 'El cargo por pagar con tarjeta u OXXO no es reembolsable. Cuando pagas en línea se suma 4% con débito u OXXO y 5% con crédito: ese cobro es de la empresa que procesa el pago, no de Conecta, y no regresa en ningún caso.' },
+    { t: '!', txt: 'Error en depósito genera cargo de $350' },
+  ] },
+  { tema: 'Tu boleto', items: [
+    { t: '!', txt: 'Los boletos del paquete <b>CHEAP</b> se entregan en la <b>semana previa</b> al evento.' },
+  ] },
+];
+// El color del icono sale del TIPO, no se teclea por renglón: tres tipos, tres
+// colores, y los mismos que llevaban los seis de antes.
+var POL_ICO = { x: { s: 'X', c: '#ff283b' }, v: { s: 'V', c: '#88ea4e' }, '!': { s: '!', c: '#e8ff4c' } };
+function polHtml(){
+  return POLITICAS.map(function(g){
+    var filas = g.items.map(function(it){
+      var i = POL_ICO[it.t] || POL_ICO['!'];
+      // ⚠️ El texto trae <b> a propósito (es de la casa, no del cliente), así
+      // que NO se escapa: no hay ni un dato de nadie en esta lista. Si algún
+      // día una política saliera de la base, esto cambia.
+      return '<div class="pol-row"><span class="pol-ico" style="color:' + i.c + '">' + i.s + '</span><span>' + it.txt + '</span></div>';
+    }).join('');
+    return '<div class="pol-tema">' + escHtml(g.tema) + '</div>' + filas;
+  }).join('');
+}
+function abrirPoliticas(){
+  var box = document.getElementById('pol-modal-body');
+  if(!box) return;
+  box.innerHTML = polHtml();
+  document.getElementById('pol-modal-bg').style.display='flex';
+}
+function cerrarPoliticas(){
+  var b = document.getElementById('pol-modal-bg');
+  if(b) b.style.display='none';
+}
 // ═══ [CARD-ITIN-1] EL ITINERARIO · UN SOLO MECANISMO ═══════════════════════
 // 🔴 LAS PLANTILLAS SON FUNCIONES, NO CONSTANTES, Y NO ES ESTILO. El deep-link
 // de un evento —`/<slug>`, LA URL QUE SE COMPARTE— corre en un IIFE que está
@@ -6330,7 +6415,7 @@ function abrirLineup(id,nombre){
 function cerrarLineup(){
   document.getElementById('lineup-modal').style.display='none';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();cerrarWaitlistModal();cerrarItinerario();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();cerrarWaitlistModal();cerrarItinerario();cerrarPoliticas();}});
 
 var _lastQuincenas=[],_lastPagoQ=0;
 
@@ -7081,6 +7166,17 @@ function getQuincenas(from, until, max, diasAntes){
     <div class="promo-modal-emoji" id="itin-modal-emoji">🗺️</div>
     <div class="promo-modal-title">Tu itinerario de viaje</div>
     <div class="promo-modal-desc" id="itin-modal-desc" style="text-align:left;font-size:12px;line-height:1.7"></div>
+  </div>
+</div>
+<!-- [CARD-POLI-1] Modal de políticas, agrupadas por tema. Nodo propio: no
+     comparte cerrador con el promo (que estampa sessionStorage) ni con el
+     itinerario. Se abre y se cierra a placer. -->
+<div class="promo-modal-bg" id="pol-modal-bg" onclick="cerrarPoliticas()">
+  <div class="promo-modal-box" id="pol-modal-box" onclick="event.stopPropagation()" style="background:linear-gradient(145deg,#0a0a1a,#111)">
+    <button class="promo-modal-close" onclick="cerrarPoliticas()">✕</button>
+    <div class="promo-modal-emoji">📋</div>
+    <div class="promo-modal-title">Políticas</div>
+    <div class="promo-modal-desc" id="pol-modal-body" style="text-align:left"></div>
   </div>
 </div>
 <div class="nf-modal-bg" id="nf-modal-bg" onclick="cerrarNfModal()">

@@ -2478,6 +2478,52 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
     env.style.setProperty('--amp', amp + 'px');
     env.style.setProperty('--tmb', vel + 's');
   }
+  // ═══ 🔴 [GANADOR-QUIETO-2] CERRAR EL SHOW SE DECIDE POR EL HECHO ═══════
+  //
+  // Jane reprodujo el temblor en el ensayo REAL con el código de #753 servido:
+  // a la revelación, `body.gano` puesto, la placa encendida y los letreros
+  // bien —«Ganador», «1 de 24 · al azar»—, y la ficha ganadora con
+  // `mos vive finalista`: **SIN `.gana` y SIN `data-quieta`**, con
+  // `tiembla` corriendo y `--amp:9.0px` CONGELADO en su valor máximo.
+  //
+  // Los letreros y `body.gano` se escriben en UN SOLO SITIO: el callback de
+  // `tRev`. O sea que el callback SÍ corrió, y lo que se saltó fue
+  // `if (eg) { quietar(eg); ... }`: **`fichaDe(folioG)` devolvió null**.
+  //
+  // 🔴 LA LECCIÓN NO ES POR QUÉ FALLÓ ESA BÚSQUEDA. Es que la quietud del
+  // ganador NO PUEDE DEPENDER DE ENCONTRAR UNA FICHA. El hecho es «hay ganador
+  // revelado»; de ese hecho se sigue que NADA tiembla. Colgarlo de un
+  // `querySelector` que puede fallar por cualquier razón —y falló por una que
+  // todavía no sé— es la misma forma de #753: un candado que existe y no se
+  // alcanza. Y como el temblor es una animación `infinite`, no alcanzarlo una
+  // vez deja el temblor PUESTO PARA SIEMPRE.
+  //
+  // Así que aquí se CALLA TODO lo que haya en la rejilla, se marque o no a
+  // alguien. Marcar es cosmética; callar es la promesa.
+  function cerrarShow(folioG){
+    // 1 · EL HECHO: hay ganador. Nada tiembla. No se busca a nadie.
+    fichas().forEach(quietar);
+    pararTemblor();
+    // 2 · La cosmética: el marco de campeón va sobre la ficha del folio que
+    //     dijo el SERVIDOR.
+    var eg = (folioG != null) ? fichaDe(folioG) : null;
+    if (!eg) {
+      // ⚠️ RESPALDO MEDIDO, y se DICE en voz alta. Después del `dos` la rejilla
+      // queda con las dos finalistas y una se está muriendo, así que «la única
+      // que no muere» ES la ganadora por construcción de la escalera. Se usa
+      // solo si la búsqueda por folio falló — y se grita, para que el próximo
+      // ensayo nos diga por qué falló en vez de taparlo.
+      var vivas = fichas().filter(function(el){ return !el.classList.contains('muere'); });
+      console.error('[sorteo] la ficha del folio ' + folioG + ' no está en la rejilla'
+        + ' (hay ' + fichas().length + ', vivas ' + vivas.length + ': '
+        + fichas().map(function(el){ return el.getAttribute('data-folio'); }).join(',')
+        + '). Se marca la única viva.');
+      if (vivas.length === 1) eg = vivas[0];
+    }
+    if (eg) eg.classList.add('gana');
+    return eg;
+  }
+
   // Callar una ficha PARA SIEMPRE. Idempotente a propósito: se puede llamar
   // dos veces sin consecuencia.
   function quietar(el){
@@ -2609,15 +2655,10 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
               if (eo){ eo.classList.add('muere'); }
               setTimeout(function(){ if (eo && eo.parentNode) eo.parentNode.removeChild(eo); }, 600);
             }
-            var eg = fichaDe(folioG);
-            if (eg){
-              // 🔒 QUIETA DE VERDAD, Y PARA SIEMPRE: `quietar` la MARCA, así
-              // que ningún reloj la puede volver a mover. Quitarle la clase a
-              // mano —lo que hacía antes— dejaba la ficha indistinguible de
-              // una que nunca ha temblado, y el siguiente tic la resucitaba.
-              quietar(eg);
-              eg.classList.add('gana');
-            }
+            // 🔒 UN SOLO PUNTO, Y NO DEPENDE DE ENCONTRAR NADA: `cerrarShow`
+            // calla TODA la rejilla por el HECHO de que hay ganador, y luego
+            // marca por folio (con respaldo que se grita). Ver su cabecera.
+            var eg = cerrarShow(folioG);
             setTimeout(function(){
               var rej = $('mosaico');
               if (rej) rej.style.setProperty('--cols', 1);
@@ -2630,7 +2671,9 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
               // antes que mentir con la ronda anterior.
               var n = (estado && estado.ultimo && estado.ultimo.de_cuantos) || 0;
               $('mos-de').textContent = n ? ('1 de ' + n + ' · al azar') : '';
-              quietar(eg);
+              // 🔒 Y OTRA VEZ AQUÍ, donde se pone `body.gano`: es el instante
+              // que TODOS los caminos comparten. Idempotente a propósito.
+              cerrarShow(folioG);
               // 🔴 EL BLOQUE DEL GANADOR, COMPLETO Y A LA VISTA. Se recoge lo
               // que ya no dice nada (ver `body.gano`) y se lleva la tarjeta al
               // borde de arriba: la placa y el reloj de 10 min caen debajo, en

@@ -122,6 +122,10 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'f816e5b';
+// 🔒 UN SEGUNDO BASE PARA EL ESCENARIO D. El de arriba es anterior a #753, así
+// que sirve para el huérfano; pero GANADOR-QUIETO-2 hay que carearlo contra el
+// main que YA TRAE #753 —si no, el verde no distingue este arreglo del anterior.
+const BASE2 = process.env.BASE2 || '3ac566e';
 // 🔒 HEAD ANCLADO A UN COMMIT FIJO, no a `HEAD`. Con `HEAD` el careo mediría
 // SIEMPRE el árbol de hoy, así que dentro de tres tuercas estaría midiendo
 // código ajeno y culpándole a esta tuerca lo que otros cambien. `036e5df` es el
@@ -129,7 +133,7 @@ const BASE = process.env.BASE || 'f816e5b';
 //   · careo CONGELADO (el default): reproducible, no caduca.
 //   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:ganador-quieto`, que remide el
 //     árbol de hoy contra el MISMO BASE — útil el día que alguien toque esto.
-const HEAD_SHA = process.env.HEAD_SHA || '036e5df';
+const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';   // se ancla antes del merge
 let base = null, head = null;
 try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sacar BASE: ' + e.message); }
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }
@@ -157,6 +161,8 @@ let GIRO = 'g1';
 // `ultimo` — y es ESE `ultimo: null` el que hace `SHOW = null` en la página.
 // (Mi primera versión llamaba a un `window.__sorteoReset()` que no existe.)
 let SIN_GIRO = false;
+let VIEJO_MS = 0;      // >0 envejece el giro: el show llega como REPETICIÓN
+let FOLIO_FALSO = 0;   // >0: `ultimo.folio` NO está en la rejilla
 // 🔴 EL PADRON ES CONMUTABLE, y es lo que hace DETERMINISTA la carrera.
 // Los dos giros comparten `SHOW.t0` una vez reemplazado, pero NO comparten
 // `cuando`: con 40 participantes la revelacion cae en el segundo 76 y con 5
@@ -200,11 +206,16 @@ function estado() {
   return { ok: true, total: CUANTOS, ahora: new Date().toISOString(), registro_cerrado: true,
     sorteo: '2026-10-01T21:00:00-05:00', modo: 'real',
     ultimo: { id: GIRO, intento: (GIRO === 'g1' ? 1 : 2), resultado: RES,
-      nombre: rev ? G0.nombre : null, folio: rev ? G0.folio : null,
+      nombre: rev ? G0.nombre : null,
+      // 🔴 EL MECANISMO DE LA CAPTURA DE JANE, hecho determinista: el servidor
+      // dice un folio que NO está en la rejilla, así que `fichaDe(folioG)`
+      // devuelve null — exactamente lo que le pasó en el ensayo real. Da igual
+      // POR QUÉ falló allá: lo que se mide es que la quietud no dependa de eso.
+      folio: rev ? (FOLIO_FALSO || G0.folio) : null,
       premio: rev ? G.PREMIOS[G.premioPorCiudad(
         (D.lista.find((x) => x.id === G0.id) || {}).ciudad)] : null,
       ciudad: rev ? (D.lista.find((x) => x.id === G0.id) || {}).ciudad : null,
-      total_participantes: CUANTOS, creado_at: new Date(ARRANQUE).toISOString(),
+      total_participantes: CUANTOS, creado_at: new Date(ARRANQUE - VIEJO_MS).toISOString(),
       de_cuantos: CUANTOS,
       escalones: D.esc, escalon: null, es_regiro: false,
       rondas: proy.rondas, rondas_totales: proy.rondas_totales,
@@ -671,6 +682,115 @@ function servidor(raiz) {
     await pg3.close();
   }
   CUANTOS = 40;
+
+  // ── D · 🔴 GANADOR-QUIETO-2: LA CAPTURA DE JANE ─────────────────────────
+  //
+  // El caso REAL: la página está ABIERTA, se prende el ensayo, y el giro
+  // pendiente llega POR LATIDO — no por un `goto` fresco. A la revelación los
+  // letreros y `body.gano` se pintaron BIEN, pero la ficha ganadora se quedó
+  // con `mos vive finalista` —sin `.gana`, sin `data-quieta`— y `tiembla`
+  // corriendo con `--amp:9.0px` congelado.
+  //
+  // Los letreros y `body.gano` se escriben en UN SOLO SITIO, así que el
+  // callback corrió y lo que se saltó fue `if (eg)`: `fichaDe(folioG)` dio
+  // null. Aquí eso se fuerza con un folio que NO está en la rejilla — el
+  // mecanismo, no la causa remota— y se exige que la quietud NO DEPENDA de
+  // encontrar la ficha.
+  console.log('\n── D · GANADOR-QUIETO-2 · el folio del ganador no está en la rejilla ──');
+  const base2 = sacar(BASE2, 'gq2-base');
+  const s2 = servidor(base2.dir);
+  await new Promise((ok) => s2.listen(0, '127.0.0.1', ok));
+  const p2 = s2.address().port;
+  console.log('   BASE2 = ' + base2.sha.slice(0, 9) + '  (el main con #753, que todavía tiembla)');
+  af(base2.sha !== head.sha, '🔴 BASE2 y HEAD son el mismo commit');
+
+  for (const [etq, puerto, esHead] of [['HEAD', pH, true], ['BASE2', p2, false]]) {
+    CUANTOS = 24; GIRO = 'g1'; RES = 'pendiente';
+    SIN_GIRO = true; VIEJO_MS = 0; FOLIO_FALSO = 0;
+    const totalD = TI.duracionTotal(TI.escalonesPara(24));
+    const pgD = await ctx.newPage();
+    const errsD = []; pgD.on('pageerror', (e) => errsD.push(e.message));
+    const avisos = []; pgD.on('console', (m) => { if (m.type() === 'error') avisos.push(m.text()); });
+    await pgD.goto('http://127.0.0.1:' + puerto + '/sorteo.html', { waitUntil: 'load' });
+    await pgD.waitForTimeout(2200);
+    af(await pgD.evaluate(() => (window.__sorteoShow ? window.__sorteoShow() : null) === null),
+       '🔒 PREMISA: la página arranca ABIERTA y sin show (' + etq + ')');
+    // Y ahora llega el giro, VIEJO (repetición) y con el folio que no cuadra.
+    ARRANQUE = Date.now();
+    VIEJO_MS = totalD + 30000;
+    FOLIO_FALSO = 999;
+    SIN_GIRO = false;
+    let sh = null, tD = Date.now();
+    while (!sh && Date.now() - tD < 20000) {
+      await pgD.waitForTimeout(400);
+      sh = await pgD.evaluate(() => window.__sorteoShow && window.__sorteoShow());
+    }
+    af(!!sh && sh.sincronizado === false,
+       '🔒 PREMISA: el show llegó POR LATIDO y como REPETICIÓN, no por un goto: '
+       + JSON.stringify(sh && { sinc: sh.sincronizado, t: sh.t }));
+    // Se deja correr la repetición completa hasta que se pinta el cierre.
+    let cerro = false; tD = Date.now();
+    while (!cerro && Date.now() - tD < totalD + 45000) {
+      await pgD.waitForTimeout(700);
+      cerro = await pgD.evaluate(() => document.body.classList.contains('gano'));
+    }
+    af(cerro, '🔴 ' + etq + ': nunca se pintó el cierre del show (body.gano)');
+    if (cerro) {
+      await esperarEntrada(pgD);
+      await pgD.waitForTimeout(300);
+      const vD = veredicto(await vigilarQuietud(pgD, 3600, 150));
+      const extra = await pgD.evaluate(() => {
+        const g = document.querySelector('.mos.gana');
+        return { gana: !!g,
+                 quieta: g ? g.getAttribute('data-quieta') : null,
+                 tiembla: document.querySelectorAll('.mosaico-caja .mos-tiembla').length,
+                 fichas: [].slice.call(document.querySelectorAll('#mosaico .mos'))
+                   .map((e) => e.getAttribute('data-folio') + ':' + String(e.className)),
+                 quedan: (document.getElementById('mos-quedan') || {}).textContent,
+                 de: (document.getElementById('mos-de') || {}).textContent,
+                 placa: !!document.querySelector('#placa-ganador.on') };
+      });
+      console.log('   ' + etq + ': .mos.gana=' + extra.gana + ' quieta=' + extra.quieta
+        + ' tiembla=' + extra.tiembla + ' · letreros «' + extra.quedan + '» / «' + extra.de
+        + '» · placa=' + extra.placa);
+      console.log('   ' + etq + ': fichas ' + JSON.stringify(extra.fichas)
+        + ' · muestras con temblor ' + vD.conTemblor + '/' + vD.n
+        + ' · anim ' + JSON.stringify(vD.anims));
+      // La PREMISA del caso, igual en los dos lados: los letreros SÍ se pintan.
+      af(/Ganador/.test(extra.quedan || '') && /1 de 24/.test(extra.de || ''),
+         '🔒 PREMISA: los letreros del cierre se pintaron en ' + etq + ': «'
+         + extra.quedan + '» / «' + extra.de + '»');
+      if (esHead) {
+        af(vD.conTemblor === 0 && extra.tiembla === 0,
+           '🔴 HEAD: la ganadora quedó temblando aunque su folio no estuviera en la rejilla ('
+           + extra.tiembla + ' con `.mos-tiembla`, ' + vD.conTemblor + '/' + vD.n + ' muestras)');
+        af(vD.anims.every((a) => a.indexOf('tiembla') === -1),
+           '🔴 HEAD: la animación `tiembla` sigue viva: ' + JSON.stringify(vD.anims));
+        af(vD.posiciones === 1,
+           '🔴 HEAD: la ganadora se mueve: ' + vD.posiciones + ' posiciones en ' + vD.n);
+        // Y el respaldo: marca la única viva, y LO GRITA.
+        af(extra.gana, '🔴 HEAD: nadie quedó marcado como ganador');
+        af(extra.quieta === '1', 'y la marcada está callada, dio ' + extra.quieta);
+        af(avisos.some((t) => /no está en la rejilla/.test(t)),
+           '🔴 HEAD: el respaldo se usó EN SILENCIO; tiene que gritarlo: '
+           + JSON.stringify(avisos.slice(0, 2)));
+        console.log('   HEAD avisó: «' + (avisos.find((t) => /no está en la rejilla/.test(t)) || '—')
+          .slice(0, 110) + '»');
+      } else {
+        // 🔒 EL PAR: BASE2 —el main con #753— tiene que REPRODUCIR la captura.
+        const falla = (extra.tiembla > 0 || vD.conTemblor > 0) && !extra.gana;
+        af(falla,
+           '🔒 CONTROL POSITIVO EN ROJO: en BASE2 la ganadora no quedó temblando y sin '
+           + 'marcar, así que este careo NO reproduce la captura de Jane. Dio tiembla='
+           + extra.tiembla + ' gana=' + extra.gana);
+        if (falla) console.log('   🔴 BASE2: temblando y SIN `.gana` — la captura de Jane, reproducida');
+      }
+    }
+    af(errsD.length === 0, etq + ': errores en D: ' + JSON.stringify(errsD.slice(0, 2)));
+    await pgD.close();
+  }
+  FOLIO_FALSO = 0; VIEJO_MS = 0; SIN_GIRO = false; CUANTOS = 40;
+  s2.close();
 
   await nav.close();
   sBase.close(); sHead.close();

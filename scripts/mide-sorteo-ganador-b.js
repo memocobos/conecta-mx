@@ -408,7 +408,10 @@ function servidor(raiz) {
   af(!sinIg.igHref, '🔴 sin Instagram el enlace sigue apuntando a algo: ' + sinIg.igHref);
   af(sinIg.igOff === 'true', 'y queda apagado con aria-disabled, dio ' + sinIg.igOff);
   af(/sin Instagram/.test(sinIg.igTxt || ''), 'y lo dice: ' + sinIg.igTxt);
-  IG = 'karla.m';
+  // 🔒 SE RESTAURA AL PEOR CASO, no al literal viejo: el escenario D mide
+  // después de éste, y dejarlo en un @ corto le quitaba el peor caso sin que
+  // nada avisara. Lo cazó el candado de la premisa de D.
+  IG = PEOR.instagram;
   await pg.close();
 
   // ── D · EL BLOQUE DEL GANADOR SIGUE CABIENDO ────────────────────────────

@@ -8,7 +8,7 @@
 // 🔒 LOS DOS LADOS SON COMMITS: cada árbol sale con `git archive` a su
 // directorio y SE SIRVE de ahí, así que el careo no caduca al mergear.
 //     BASE = 53bb769  el main sin itinerario
-//     HEAD = 154a348  el itinerario con sus tres estados
+//     HEAD = dcb16fd  el itinerario con sus tres estados
 //
 // 🔒 «EXISTE» NO ES «SE VE»: cada pieza se mide por su CADENA de visibilidad
 // —`display`, `visibility`, `opacity`, `offsetParent` y su caja—, no por estar
@@ -52,7 +52,7 @@ const BASE = process.env.BASE || '53bb769';
 // cambien. Y la otra cara, pagada tres veces en #756: **commitear exige
 // re-anclar** — si con `HEAD_SHA=<sha>` a mano sale verde y a secas sale rojo,
 // el ancla está vieja, no el código.
-const HEAD_SHA = process.env.HEAD_SHA || '154a348';
+const HEAD_SHA = process.env.HEAD_SHA || 'dcb16fd';
 
 // ── LOS CUATRO EVENTOS, uno por clase ────────────────────────────────────
 const CASOS = {
@@ -111,9 +111,27 @@ const MIRA = `(function(sel){
            txt:(e.innerText||'').trim(), html:e.innerHTML };
 })`;
 
+// ⚠️ EL ONBOARDING TAPA EL CARD, y eso es la realidad del cliente: el popup
+// «¿Cómo reservar tu lugar?» se abre 300 ms después y cubre la pantalla, así
+// que para apretar «Ver itinerario» hay que cerrarlo primero — igual que lo
+// hace una persona. La primera versión de este careo clickeaba a ciegas y
+// Playwright se quedaba 30 s esperando: el clic era interceptado. Medirlo así
+// también AFIRMA que el onboarding sigue vivo, que es la regresión que más
+// miedo daba.
 async function abrirEvento(page, base, id) {
   await page.goto(base + '/' + id, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(900);   // el card se arma y el onboarding tarda 300ms
+  const onb = await page.evaluate(() => {
+    const e = document.getElementById('onboard-bg');
+    if (!e) return { hay: false, ve: false };
+    const cs = getComputedStyle(e), r = e.getBoundingClientRect();
+    return { hay: true, ve: cs.display !== 'none' && cs.visibility !== 'hidden' && r.height > 0 };
+  });
+  if (onb.ve) {
+    await page.evaluate(() => { if (typeof skipOnboarding === 'function') skipOnboarding(); });
+    await page.waitForTimeout(250);
+  }
+  return onb;
 }
 
 (async () => {
@@ -273,15 +291,14 @@ async function abrirEvento(page, base, id) {
     // (b) 🔴 EL ONBOARDING SIGUE VIVO. Si el itinerario se abriera solo en
     // todos los eventos, este popup dejaría de verse EN TODO EL SITIO — y eso
     // no lo habría cazado ninguna aserción sobre el itinerario.
-    await abrirEvento(page, uH, CASOS.mty.id);
-    const onb = await page.evaluate(() => {
-      const ids = ['onboarding-bg', 'onb-modal-bg', 'onboarding-modal-bg'];
-      for (const i of ids) { const e = document.getElementById(i); if (e) return { id: i, ve: getComputedStyle(e).display !== 'none' }; }
-      // Sin id conocido: se busca el nodo que contenga el texto del popup.
-      const t = document.body.innerText || '';
-      return { id: null, ve: /C[oó]mo reservar tu lugar/i.test(t) };
-    });
-    console.log('    onboarding: ' + JSON.stringify(onb));
+    // Sesión NUEVA: el onboarding es «una vez por evento por dispositivo», y
+    // los pasos anteriores ya lo cerraron para este evento. Sin contexto nuevo
+    // esta aserción mediría el sessionStorage, no el código.
+    const ctx2 = await nav.newContext({ viewport: { width: 390, height: 844 } });
+    const page2 = await ctx2.newPage();
+    const onb = await abrirEvento(page2, uH, CASOS.mty.id);
+    await ctx2.close();
+    console.log('    onboarding en sesión nueva: ' + JSON.stringify(onb));
     af(onb.ve, '🔴 el popup «¿Cómo reservar tu lugar?» ya NO se ve en un evento normal: '
        + 'el itinerario le está robando la pantalla');
     // (c) Ni un error de JavaScript en toda la corrida.

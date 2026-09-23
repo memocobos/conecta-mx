@@ -335,7 +335,14 @@ function servidor(raiz) {
     const t0 = Date.now();
     while (Date.now() - t0 < ms) {
       muestras.push(await pg.evaluate(() => {
-        const g = document.querySelector('.mos.gana');
+        // 🔴 SI NO HAY `.mos.gana`, SE MIDE LA FICHA QUE QUEDA VIVA. Buscar solo
+        // `.mos.gana` dejaba el medidor CIEGO justo en el árbol roto —donde esa
+        // clase no se pone—: daba «0 de 0 muestras», y un cero sobre el conjunto
+        // vacío no es una medición. Es el defecto que este mismo careo vino a
+        // cazar, en el instrumento.
+        const g = document.querySelector('.mos.gana')
+          || [].slice.call(document.querySelectorAll('#mosaico .mos'))
+               .filter((e) => !e.classList.contains('muere'))[0];
         if (!g) return { hay: false };
         const env = g.firstElementChild || g;
         const r = env.getBoundingClientRect();
@@ -493,8 +500,8 @@ function servidor(raiz) {
       console.log('   ' + etiqueta + ': ' + v.n + ' muestras · posiciones distintas: '
         + v.posiciones + ' · muestras con temblor: ' + v.conTemblor
         + ' · envoltorios: ' + v.nidos + ' · animaciones: ' + JSON.stringify(v.anims));
+      af(v.n > 20, 'CARDINALIDAD: se tomaron suficientes muestras (' + v.n + ')');
       if (esperaQuieta) {
-        af(v.n > 20, 'se tomaron suficientes muestras: ' + v.n);
         af(v.posiciones === 1,
            '🔴 LA GANADORA SE MUEVE tras anunciarse: ' + v.posiciones
            + ' posiciones distintas en ' + v.n + ' muestras de 4.2 s');
@@ -739,6 +746,8 @@ function servidor(raiz) {
       await esperarEntrada(pgD);
       await pgD.waitForTimeout(300);
       const vD = veredicto(await vigilarQuietud(pgD, 3600, 150));
+      af(vD.n > 20,
+         '🔒 CARDINALIDAD: sin muestras, un cero no dice nada. Se tomaron ' + vD.n);
       const extra = await pgD.evaluate(() => {
         const g = document.querySelector('.mos.gana');
         return { gana: !!g,
@@ -778,6 +787,7 @@ function servidor(raiz) {
           .slice(0, 110) + '»');
       } else {
         // 🔒 EL PAR: BASE2 —el main con #753— tiene que REPRODUCIR la captura.
+        // Con el medidor ya no ciego, el temblor SOSTENIDO también se ve en BASE2.
         const falla = (extra.tiembla > 0 || vD.conTemblor > 0) && !extra.gana;
         af(falla,
            '🔒 CONTROL POSITIVO EN ROJO: en BASE2 la ganadora no quedó temblando y sin '

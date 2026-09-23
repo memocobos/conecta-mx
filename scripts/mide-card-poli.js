@@ -6,7 +6,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 6b1c789  las seis tecleadas al fondo del card
-//     HEAD = d3ca76c  las ocho por temas, detrás de su botón
+//     HEAD = e79dbd8  las ocho por temas, detrás de su botón (el commit del MERGE)
 //
 // 🔒 LO QUE HACE ESPECIAL A ESTE CAREO: no solo mira que el texto esté. Carea
 // el LETRERO contra el HECHO —las dos políticas de morosidad contra lo que
@@ -43,7 +43,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '6b1c789';
-const HEAD_SHA = process.env.HEAD_SHA || '7cfebbd';
+const HEAD_SHA = process.env.HEAD_SHA || 'e79dbd8';
 const EVENTO = 'frontera';   // un evento vivo cualquiera: las políticas no dependen del evento
 
 // LOS SEIS TEXTOS VIGENTES, copiados del BASE letra por letra. Son palabra de

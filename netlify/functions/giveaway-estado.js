@@ -258,33 +258,18 @@ exports.handler = async (event) => {
   const nombresRodillo   = [...new Set(partidos.map(p => p.nombre).filter(Boolean))].sort();
   const apellidosRodillo = [...new Set(partidos.map(p => p.apellido).filter(Boolean))].sort();
 
-  // ═══ [GANADOR-B3] EL ARTISTA, DERIVADO DEL CATÁLOGO ════════════════════
+  // ⚰️ [GANADOR-PODA-1] AQUÍ SE DERIVABA EL ARTISTA del catálogo, para la
+  // muestra de 30 s de la tarjeta del ganador. La muestra se fue (orden de
+  // Memo: «si la gente le tiene que dar play no le veo caso»), y con ella su
+  // ÚNICO lector: medido antes de podar, `ultimo.artista` se leía en UN solo
+  // sitio (`pintarMuestra` de sorteo.html) y en ninguno más.
   //
-  // 🔒 NO SE TECLEA. Lo pide la muestra de 30 s del ganador, y un «Karol G»
-  // escrito aquí sería la tercera copia del nombre del artista en esta página
-  // —las otras dos ya se pudrieron dos veces, de melanie a Natanael a Karol G—.
-  // Sale de `catalogo[EVENTO_CATALOGO].artista`, que es el mismo campo con el
-  // que el sitio le busca la foto.
-  //
-  // ⚠️ SOLO SE PIDE CON EL GANADOR YA REVELADO. `giveaway-estado` es la ruta
-  // caliente —la página late cada 4 s durante todo el show— y traer el catálogo
-  // en cada latido sería pagar una lectura de más 20 veces por espectador.
-  // Después de la revelación, el TTL de 10 min de `fetchCatalogo` lo vuelve una
-  // sola lectura por instancia.
-  //
-  // 🔒 FAIL-SOFT DURO: cualquier tropiezo deja `artista` en null y la pieza de
-  // música NO SE PINTA. El show no se cae por una canción.
-  let artista = null;
-  if (revelado) {
-    try {
-      const { fetchCatalogo } = require('./_lib/catalogo-index');
-      const cat = await fetchCatalogo();
-      const ev = cat && cat[G.EVENTO_CATALOGO];
-      artista = (ev && ev.artista) ? String(ev.artista) : null;
-    } catch (e) {
-      console.error('[giveaway-estado] artista del catálogo:', e.message);
-    }
-  }
+  // 🔒 Y SE PODA EL DATO, no solo el lector: un campo servido que ya nadie lee
+  // es un letrero esperando pudrirse — y éste además costaba una lectura del
+  // catálogo en la ruta caliente. Se fue también `EVENTO_CATALOGO` y la
+  // proyección `artista` de `_lib/catalogo-index`, por lo mismo.
+  // ⚠️ La function `deezer` NO se tocó: tiene diez llamadores vivos (index,
+  // portal y esferas). La poda se decidió CONTANDO.
 
   const ultimo = ultimoCrudo ? Object.assign(pub(ultimoCrudo), {
     // Para el renglón «24 de N»: los dos números DERIVADOS, nunca tecleados.
@@ -308,9 +293,6 @@ exports.handler = async (event) => {
     // 7:43 reales para contactar al ganador. Viene del SERVIDOR para que el
     // gateo y el reloj salgan del MISMO número.
     revelacion_en_ms: momentos.length ? momentos[momentos.length - 1] : 0,
-    // Para la muestra de 30 s. Null hasta la revelación, y null si el catálogo
-    // no se pudo leer: la pieza vive o no vive, nunca a medias.
-    artista,
   }) : null;
 
   return G.json(200, headers, {

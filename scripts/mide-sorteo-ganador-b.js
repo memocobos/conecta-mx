@@ -26,42 +26,13 @@ process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KE
 const G = require(RAIZ + '/netlify/functions/_lib/giveaway.js');
 
 const VESTIDO = '/imgs/giveaways/karol-g.jpg';
-const CAT = require(RAIZ + '/netlify/functions/_lib/catalogo-index.js');
-// 🔒 EL ARTISTA NO SE TECLEA NI EN EL CAREO. Se saca del catálogo del ÁRBOL
-// MEDIDO con el mismo parser y la misma llave que usa producción, así que la
-// aserción compara «lo que la página pidió» contra «lo que el catálogo dice»,
-// no contra un literal mío que podría estar de acuerdo con mi propio bug.
-function artistaDelArbol(dir) {
-  try {
-    const ev = CAT._parseEV(fs.readFileSync(path.join(dir, 'index.html'), 'utf8'));
-    const e = (ev || []).find((x) => x && x.id === G.EVENTO_CATALOGO);
-    return (e && e.img) ? String(e.img) : null;
-  } catch (e) { return null; }
-}
-const PEDIDOS_DEEZER = [];
+// ⚰️ [GANADOR-PODA-1] Aquí vivía `artistaDelArbol`, que sacaba el artista del
+// catálogo del árbol medido para carear la petición a Deezer. Se fue con la
+// muestra de 30 s, y con ella la proyección `artista` del catálogo.
 const PEDIDOS_FOTO = [];
-// 🔴 UN AUDIO DE VERDAD, GENERADO. Para probar que el botón ALTERNA hace falta
-// que `play()` no se rechace, y una url inventada de `dzcdn.net` no resuelve en
-// el navegador del careo: el audio se queda pausado y el icono no cambia —el
-// rojo era del arnés, no del botón—. Así que el careo sirve medio segundo de
-// silencio en WAV y mide el botón contra ESO, y deja la url con forma de
-// producción para medir la tubería. Dos preguntas, dos fuentes.
-function wavSilencio(ms) {
-  const hz = 8000, n = Math.round(hz * ms / 1000);
-  const b = Buffer.alloc(44 + n);
-  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVE', 8);
-  b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20);
-  b.writeUInt16LE(1, 22); b.writeUInt32LE(hz, 24); b.writeUInt32LE(hz, 28);
-  b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
-  b.write('data', 36); b.writeUInt32LE(n, 40);
-  b.fill(128, 44);
-  return b;
-}
-// ⚠️ CUATRO SEGUNDOS, no medio: con 600 ms el clip YA HABÍA TERMINADO para el
-// tercer clic, así que `paused` era true por haber acabado —no por un defecto—
-// y la aserción del interruptor se puso roja midiendo mi fixture. La premisa de
-// un caso («todavía está sonando») tiene que ALCANZARSE para que el caso mida.
-const WAV = wavSilencio(4000);
+// ⚰️ [GANADOR-PODA-1] Aquí vivía `wavSilencio`, medio segundo de silencio en
+// WAV para probar que el botón de play alternaba de verdad. Se fue con la
+// muestra.
 // Un PNG de verdad para `foto_datauri`: 4×4 rojo, construido con zlib. Un
 // literal de 1×1 copiado de internet también serviría, pero construirlo deja
 // claro qué bytes son y permite cambiarlo si un día hace falta otro tamaño.
@@ -86,11 +57,30 @@ function pngRojo(n) {
     trozo('IHDR', ihdr), trozo('IDAT', zlib.deflateSync(cruda)), trozo('IEND', Buffer.alloc(0))]);
 }
 const FOTO_DATAURI = 'data:image/png;base64,' + pngRojo(4).toString('base64');
-// Lee el IHDR de un PNG: es la ÚNICA prueba de que la story salió 1080×1920.
-// Creerle al mensaje de la pantalla sería creerle al que la escribió.
-function medidaPNG(buf) {
-  if (buf.length < 24 || buf.readUInt32BE(12) !== 0x49484452) return null;
-  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+// 🔒 LA MEDIDA SE LEE DE LOS BYTES DEL ARCHIVO, que es la única prueba de que
+// la story salió 1080×1920: creerle al mensaje de la pantalla sería creerle al
+// que lo escribió.
+//
+// ⚰️ [GANADOR-PODA-1] Antes esto leía el IHDR de un PNG. La story pasó a JPEG
+// al 92 % —el PNG pesaba 2.28 MB medidos y en JPEG son ~300 KB—, así que ahora
+// se camina el flujo JPEG hasta su SOF y se leen alto y ancho de ahí. La
+// aserción del formato entra al contrato: un PNG con extensión .jpg pasaría
+// desapercibido en la galería y reventaría el peso otra vez.
+function medidaJPG(buf) {
+  if (buf.length < 4 || buf[0] !== 0xFF || buf[1] !== 0xD8) return null;   // SOI
+  let i = 2;
+  while (i < buf.length - 9) {
+    if (buf[i] !== 0xFF) { i++; continue; }
+    const m = buf[i + 1];
+    if (m === 0xD8 || m === 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
+    const len = buf.readUInt16BE(i + 2);
+    // SOF0/1/2/3, 5-7, 9-11, 13-15: los que llevan las dimensiones.
+    if ((m >= 0xC0 && m <= 0xCF) && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+      return { w: buf.readUInt16BE(i + 7), h: buf.readUInt16BE(i + 5) };
+    }
+    i += 2 + len;
+  }
+  return null;
 }
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
@@ -142,9 +132,6 @@ const GANADOR = rondas.orden[0];
 let ARRANQUE = Date.now();
 let RES = 'pendiente';
 let WA = '8990000001';            // 10 dígitos, como los guarda el registro
-let ARTISTA = null;               // se llena del catálogo del árbol medido
-let DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
-               title: 'Provenza', artist: 'KAROL G' };
 let IG = 'karla.m';
 const PEDIDOS = [];               // toda url pedida, con su instante
 
@@ -168,9 +155,7 @@ function estado() {
       dos: proy.dos || null,
       momento_dos_en_ms: TI.momentoDosMs(escalones),
       momento_finalistas_en_ms: TI.momentoFinalistasMs(escalones),
-      // Como en producción: derivado del catálogo y SOLO con el ganador ya
-      // revelado (la ruta es caliente y el catálogo no se pide en cada latido).
-      artista: rev ? ARTISTA : null },
+      },
     giros: [] };
 }
 // 🔒 `premio_texto` se DERIVA de `_lib`, igual que en producción: si el careo
@@ -210,15 +195,9 @@ function servidor(raiz) {
         return r.end(JSON.stringify({ ok: true }));
       });
     }
-    if (u === '/careo-30s.wav') {
-      r.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': WAV.length });
-      return r.end(WAV);
-    }
-    if (/\.netlify\/functions\/deezer/.test(u)) {
-      PEDIDOS_DEEZER.push(q.url);
-      r.writeHead(200, { 'Content-Type': 'application/json' });
-      return r.end(JSON.stringify(DEEZER || {}));
-    }
+    // ⚰️ Aquí se servían el WAV del careo y la respuesta de la function
+    // `deezer`. Se fueron con la muestra: hoy `/sorteo` no debe pedir ninguna
+    // de las dos, y el escenario A lo exige.
     if (/\.netlify\/functions\//.test(u)) {
       r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end('{"ok":false}');
     }
@@ -249,72 +228,54 @@ function servidor(raiz) {
   const pB = sBase.address().port, pH = sHead.address().port;
   const nav = await chromium.launch();
 
-  // ── UNA CORRIDA COMPLETA DEL SHOW, mirando CUÁNDO se pide la imagen ─────
-  // 🔴 NO se mide «se ve la imagen»: se mide EN QUÉ SEGUNDO la pide el
-  // navegador. «Entra al revelarse, no durante el show» es una afirmación
-  // sobre el TIEMPO, y una captura del final no la puede contestar.
-  console.log('\n── A · la imagen entra al FINAL, no durante el show ──');
-  const marcaFinal = TI.momentoFinalistasMs(escalones);
-  const marcaRev = momentos[momentos.length - 1];
-  for (const [etiqueta, puerto, esperado] of [['HEAD', pH, true], ['BASE', pB, false]]) {
+  // ── A · ⚰️ RETIRADO + GUARDIA VIVA: LA IMAGEN YA NO VISTE LA TARJETA ────
+  //
+  // Aquí se medía EN QUÉ SEGUNDO pedía el navegador `karol-g.jpg` (0 antes del
+  // final, la primera en el ms 63 006) y que el mueble quedara vestido. Todo
+  // eso se RETIRA por GANADOR-PODA-1: Memo la quitó de la tarjeta y de la story
+  // —«genera mucho caos en el diseño de web, mobile y story»—, así que esas
+  // aserciones exigirían hoy deshacer una decisión suya. Se retiran CON SU
+  // RAZÓN, no en silencio: alguien que las «arregle» para que pasen estaría
+  // revirtiendo la poda sin enterarse.
+  //
+  // ⚰️ Y con ellas se va su PAR: BASE (9820489) tampoco pedía la imagen —la
+  // trajo la propia PR B—, así que ya no hay dos lados que comparar. Lo que
+  // queda es una GUARDIA VIVA: `/sorteo` no debe pedir esa imagen NUNCA.
+  // ⚠️ La imagen sigue viva en `/giveaway` y ESO NO SE MIDE AQUÍ: esta guardia
+  // es de `/sorteo`.
+  console.log('\n── A · guardia: /sorteo no pide karol-g.jpg en todo el show ──');
+  {
     PEDIDOS.length = 0;
     ARRANQUE = Date.now(); RES = 'pendiente';
-    const pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
-    const errs = [];
-    pg.on('pageerror', (e) => errs.push(e.message));
-    const img = [];
+    const pg = await ctx.newPage();
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    const img = [], deez = [];
     pg.on('request', (req) => {
-      if (req.url().indexOf('karol-g.jpg') !== -1) img.push(Date.now() - ARRANQUE);
+      const u = req.url();
+      if (u.indexOf('karol-g.jpg') !== -1) img.push(Date.now() - ARRANQUE);
+      if (u.indexOf('functions/deezer') !== -1) deez.push(u);
     });
-    await pg.goto('http://127.0.0.1:' + puerto + '/sorteo.html', { waitUntil: 'load' });
-    // Se espera hasta justo ANTES de que arranque el final.
-    while (Date.now() - ARRANQUE < marcaFinal - 900) await pg.waitForTimeout(150);
-    const antes = img.slice();
-    // Y hasta pasada la revelación.
-    while (Date.now() - ARRANQUE < marcaRev + 2500) await pg.waitForTimeout(200);
-    const despues = img.slice();
-    console.log('   ' + etiqueta + ': pedida ' + despues.length + ' vez/veces'
-      + (despues.length ? ' (en ms: ' + despues.join(', ') + ')' : '')
-      + ' · antes del final: ' + antes.length);
-    af(antes.length === 0,
-       '🔴 ' + etiqueta + ': la imagen se pidió DURANTE el show, en ms ' + JSON.stringify(antes)
-       + ' — compite con las fotos del padrón');
-    if (esperado) {
-      af(despues.length >= 1,
-         '🔴 HEAD: la imagen NUNCA se pidió, así que el mueble no se vistió');
-      af(despues.length >= 1 && despues[0] >= marcaFinal - 1200,
-         '🔴 HEAD: se pidió en el ms ' + despues[0] + ', antes de que arranque el final ('
-         + marcaFinal + ')');
-      af(despues.length >= 1 && despues[0] <= marcaRev,
-         '🔴 HEAD: se pidió en el ms ' + despues[0] + ', DESPUÉS de la revelación ('
-         + marcaRev + '): llegaría tarde al destello');
-      // 🔒 UNA SOLA DESCARGA: el precargado del JS y la regla del CSS tienen
-      // que apuntar a la MISMA url, o son dos peticiones del mismo archivo.
-      af(new Set(despues).size <= 2 && despues.length <= 2,
-         '🔴 la imagen se pidió ' + despues.length + ' veces: el precargado del JS y el'
-         + ' CSS no están apuntando a la misma url');
-      // Y el mueble, vestido de verdad: el fondo COMPUTADO lo trae.
-      const vest = await pg.evaluate(() => {
-        const c = document.querySelector('.mosaico-caja');
-        if (!c) return null;
-        const cs = getComputedStyle(c), pre = getComputedStyle(c, '::before');
-        return { img: cs.backgroundImage, tam: cs.backgroundSize,
-                 velo: pre.backgroundImage, gano: document.body.classList.contains('gano') };
-      });
-      af(vest && vest.gano, 'la página está en estado «gano»');
-      af(vest && vest.img.indexOf('karol-g.jpg') !== -1,
-         '🔴 el mueble NO quedó vestido: background-image = ' + JSON.stringify((vest || {}).img));
-      af(vest && vest.tam === 'cover', 'y la imagen cubre el mueble, dio ' + (vest || {}).tam);
-      af(vest && /gradient/.test(vest.velo),
-         '🔴 falta el velo: la foto y los letreros del ganador no se leerían encima');
-    } else {
-      af(despues.length === 0,
-         '🔒 CONTROL POSITIVO: en BASE la imagen NO EXISTE en la pantalla, y se pidió '
-         + despues.length + ' veces. Si se pidiera, este careo no distingue la tuerca');
-      const hayB = await pg.evaluate(() => !!document.getElementById('contacto'));
-      af(!hayB, '🔒 CONTROL POSITIVO: en BASE tampoco existe el bloque de contacto');
-    }
-    af(errs.length === 0, etiqueta + ': errores de página: ' + JSON.stringify(errs.slice(0, 2)));
+    await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
+    while (Date.now() - ARRANQUE < marcaRev + 3000) await pg.waitForTimeout(250);
+    console.log('   el show completo: karol-g.jpg pedida ' + img.length + ' vez/veces'
+      + ' · la function deezer, ' + deez.length);
+    af(img.length === 0,
+       '🔴 `/sorteo` volvió a pedir karol-g.jpg (en ms ' + JSON.stringify(img) + '): la poda'
+       + ' de GANADOR-PODA-1 la saca de la tarjeta y de la story');
+    // ⚰️ Y la otra mitad de la poda: la muestra de 30 s. Medido antes de
+    // podar, la function `deezer` tiene DIEZ llamadores vivos (index ×2,
+    // portal ×6, esferas ×2), así que la function NO se tocó — lo que se
+    // exige aquí es que `/sorteo` no la llame.
+    af(deez.length === 0,
+       '🔴 `/sorteo` volvió a pedirle la canción a la function deezer: '
+       + JSON.stringify(deez.slice(0, 2)));
+    const vest = await pg.evaluate(() => {
+      const c = document.querySelector('.mosaico-caja');
+      return c ? getComputedStyle(c).backgroundImage : null;
+    });
+    af(!/karol-g/.test(String(vest)),
+       '🔴 el mueble volvió a quedar vestido: background-image = ' + vest);
+    af(errs.length === 0, 'errores en A: ' + JSON.stringify(errs.slice(0, 2)));
     await pg.close();
   }
 
@@ -414,7 +375,7 @@ function servidor(raiz) {
   // 🔴 El mueble vestido cambió su `padding`, y el contacto AGREGA dos botones
   // al panel. Las dos cosas empujan, así que la medida de la #751 hay que
   // volver a tomarla: «cabía» no es una propiedad permanente.
-  console.log('\n── D · con la imagen y el contacto, sigue cabiendo ──');
+  console.log('\n── D · TODO el bloque del admin cabe en 390×844 ──');
   ARRANQUE = Date.now() - (marcaRev + 4000);
   pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
   await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
@@ -465,151 +426,59 @@ function servidor(raiz) {
             + ' = ' + (h.tel + h.contacto + h.acciones + h.repetir) + 'px, hasta y=' + caben.panBot);
   af(caben.hay === 3, '🔴 el bloque del ganador no está completo: ' + caben.hay + ' de 3 (foto, placa, reloj)');
   af(caben.top !== null && caben.top >= 0 && caben.bot <= caben.vh,
-     '🔴 con la imagen y el contacto las CINCO piezas ya NO caben: y=' + caben.top + '..'
-     + caben.bot + ' en ' + caben.vh + 'px');
-  // 🔒 Y el reloj tiene que estar DENTRO, que es la pieza que la #751 dejaba
-  // 155px bajo el pliegue: es el caso que hace útil esta aserción.
+     '🔴 las CINCO piezas ya NO caben: y=' + caben.top + '..' + caben.bot + ' en ' + caben.vh + 'px');
   af(caben.bot <= caben.vh - 8,
      '🔴 el reloj de 10 minutos queda pegado al borde o fuera: acaba en ' + caben.bot);
+  // ── 🔴 [GANADOR-PODA-1] Y AHORA **TODO**, herramientas incluidas ─────────
+  // Antes esto se REPORTABA sin aserción: las herramientas sumaban 315px bajo
+  // el pliegue y se dijo en voz alta en vez de callarlo. Memo lo convirtió en
+  // orden: los tres botones a dos columnas «que quepan sin scroll con el
+  // bloque del ganador en 390×844». Así que ahora se EXIGE.
+  af(h.acciones > 0 && h.acciones < 130,
+     '🔴 los tres botones miden ' + h.acciones + 'px: en dos columnas tienen que bajar de'
+     + ' 130 (apilados median 206)');
+  af(caben.panBot !== null && caben.panBot <= caben.vh,
+     '🔴 el panel del admin acaba en y=' + caben.panBot + ' y el viewport mide ' + caben.vh
+     + ': todavía hay que hacer scroll para llegar a los botones');
+  // Y el ORDEN de las dos columnas: «Aceptó» a lo ancho, los dos descartes
+  // compartiendo renglón. Se mide por geometría, no por el CSS.
+  const cols = await pg.evaluate(() => {
+    const r = (id) => { const e = document.getElementById(id); if (!e) return null;
+      const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top),
+        w: Math.round(b.width) }; };
+    return { si: r('si'), no: r('no'), nc: r('nocumple'), ancho: innerWidth };
+  });
+  console.log('   los botones: si ' + JSON.stringify(cols.si) + ' · no ' + JSON.stringify(cols.no)
+            + ' · nocumple ' + JSON.stringify(cols.nc));
+  af(cols.si && cols.no && cols.nc, '🔴 falta alguno de los tres botones');
+  if (cols.si && cols.no && cols.nc) {
+    af(cols.si.w > cols.no.w,
+       '🔴 «Aceptó el premio» no va a lo ancho: ' + cols.si.w + ' contra ' + cols.no.w);
+    af(cols.no.y === cols.nc.y,
+       '🔴 los dos descartes no comparten renglón: y=' + cols.no.y + ' y ' + cols.nc.y);
+    af(cols.no.x !== cols.nc.x, 'y van en columnas distintas');
+  }
   af(caben.anchoDoc <= caben.anchoVista + 1,
      '🔴 la página desborda a lo ancho: ' + caben.anchoDoc + ' > ' + caben.anchoVista);
   await pg.close();
 
-  // ── E · LA MUESTRA DE 30 s ──────────────────────────────────────────────
-  console.log('\n── E · la muestra de 30 s, con botón de play ──');
-  ARTISTA = artistaDelArbol(head.dir);
-  af(!!ARTISTA, '🔴 no se pudo derivar el artista del catálogo del árbol medido');
-  console.log('   el artista, DERIVADO del catálogo de HEAD: ' + JSON.stringify(ARTISTA));
-  PEDIDOS_DEEZER.length = 0;
-  ARRANQUE = Date.now() - (marcaRev + 4000);
-  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
-  const errsE = []; pg.on('pageerror', (e) => errsE.push(e.message));
-  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(2600);
-  const mu = await pg.evaluate(() => {
-    const c = document.getElementById('muestra'), au = document.getElementById('m-audio');
-    const bt = document.getElementById('m-play'), ic = document.getElementById('m-icono');
-    const ve = (e) => !!e && !e.hidden && e.offsetParent !== null;
-    return { ve: ve(c), tit: (document.getElementById('m-tit') || {}).textContent,
-             src: au ? (au.getAttribute('src') || '') : null,
-             pausado: au ? au.paused : null, icono: ic ? ic.getAttribute('href') : null,
-             hayBoton: ve(bt), iframes: document.querySelectorAll('iframe').length };
-  });
-  console.log('   la pieza: ' + JSON.stringify({ ve: mu.ve, tit: mu.tit, icono: mu.icono }));
-  console.log('   se le pidió a la function: ' + JSON.stringify(PEDIDOS_DEEZER));
-  af(mu.ve, '🔴 la muestra no se ve tras la revelación');
-  af(mu.hayBoton, '🔴 no hay botón de play');
-  // 🔒 LA PETICIÓN LLEVA EL ARTISTA DEL CATÁLOGO, no un nombre tecleado.
-  af(PEDIDOS_DEEZER.length === 1,
-     '🔴 la function se pidió ' + PEDIDOS_DEEZER.length + ' veces (las urls de Deezer'
-     + ' caducan: se pide UNA, al armar la tarjeta)');
-  af(PEDIDOS_DEEZER.length === 1
-     && PEDIDOS_DEEZER[0].indexOf('q=' + encodeURIComponent(ARTISTA)) !== -1,
-     '🔴 la petición no lleva el artista DERIVADO («' + ARTISTA + '»): ' + PEDIDOS_DEEZER[0]);
-  af(PEDIDOS_DEEZER.length === 1 && /type=track/.test(PEDIDOS_DEEZER[0]),
-     'y pide el tipo `track`, que es el que trae el preview');
-  af(mu.src === DEEZER.preview,
-     '🔴 el `<audio>` no quedó con la url del preview: ' + mu.src);
-  af(/dzcdn\.net/.test(String(mu.src)),
-     '🔒 y el audio sale de `*.dzcdn.net`, que es lo que el CSP permite en `media-src`');
-  af(String(mu.tit).indexOf(DEEZER.title) !== -1,
-     '🔴 el título no es el que dijo la function: ' + mu.tit);
-  af(mu.pausado === true, '🔒 NADA suena solo: el audio nace pausado');
-  af(mu.icono === '#ic-play', 'y el botón muestra el play, dio ' + mu.icono);
-  // 🔒 NI UN IFRAME: el reproductor OFICIAL no cabe en el CSP y no se metió.
-  af(mu.iframes === 0,
-     '🔴 apareció un iframe en la página: el CSP dice frame-src \'self\' y un'
-     + ' reproductor incrustado de terceros no cargaría');
-  af(errsE.length === 0, 'errores en E: ' + JSON.stringify(errsE.slice(0, 2)));
-  await pg.close();
-
-  // ── E2 · EL BOTÓN ALTERNA DE VERDAD, con un audio que sí se puede oír ───
-  console.log('\n── E2 · el botón: play → pausa → play ──');
-  DEEZER = { preview: '/careo-30s.wav', title: 'Silencio', artist: 'Careo' };
-  ARRANQUE = Date.now() - (marcaRev + 4000);
-  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
-  await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(2600);
-  const leer = () => pg.evaluate(() => {
-    const au = document.getElementById('m-audio'), ic = document.getElementById('m-icono');
-    return { pausado: au ? au.paused : null, icono: ic ? ic.getAttribute('href') : null,
-             etiqueta: (document.getElementById('m-play') || {}).ariaLabel || null };
-  });
-  const e0 = await leer();
-  af(e0.pausado === true && e0.icono === '#ic-play',
-     '🔒 nace pausado y con el play: ' + JSON.stringify(e0));
-  await pg.click('#m-play');
-  await pg.waitForTimeout(500);
-  const e1 = await leer();
-  console.log('   tras el primer clic: ' + JSON.stringify(e1));
-  af(e1.pausado === false, '🔴 el botón no arrancó la muestra: ' + JSON.stringify(e1));
-  af(e1.icono === '#ic-pausa', '🔴 el icono no cambió a pausa: ' + e1.icono);
-  await pg.click('#m-play');
-  await pg.waitForTimeout(400);
-  const e2 = await leer();
-  console.log('   tras el segundo: ' + JSON.stringify(e2));
-  af(e2.pausado === true, '🔴 el segundo clic no pausó: ' + JSON.stringify(e2));
-  af(e2.icono === '#ic-play', '🔴 el icono no volvió al play: ' + e2.icono);
-  // 🔒 Y APAGAR EL SONIDO CALLA LA CANCIÓN: si el interruptor no la callara,
-  // el letrero «Activar sonido» estaría mintiendo.
-  await pg.click('#m-play');
-  await pg.waitForTimeout(400);
-  const e3 = await leer();
-  af(e3.pausado === false,
-     '🔒 PREMISA del caso: tiene que estar SONANDO para poder medir que el '
-     + 'interruptor la calla. Dio ' + JSON.stringify(e3));
-  await pg.click('#son');            // lo ENCIENDE
-  await pg.waitForTimeout(250);
-  await pg.click('#son');            // y lo APAGA
-  await pg.waitForTimeout(400);
-  const e4 = await leer();
-  console.log('   tras apagar el sonido: ' + JSON.stringify(e4));
-  af(e4.pausado === true,
-     '🔴 apagar el sonido no calló la canción: ' + JSON.stringify(e4));
-  await pg.close();
-
-  // ── F · SIN CANCIÓN, NO HAY PIEZA (fail-soft) ───────────────────────────
-  console.log('\n── F · sin canción, la pieza no existe ──');
-  for (const [caso, resp] of [['la function contesta sin preview', { title: 'x' }],
-                              ['la function contesta vacío', {}]]) {
-    DEEZER = resp;
-    PEDIDOS_DEEZER.length = 0;
-    ARRANQUE = Date.now() - (marcaRev + 4000);
-    pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
-    const errsF = []; pg.on('pageerror', (e) => errsF.push(e.message));
-    await pg.goto('http://127.0.0.1:' + pH + '/sorteo.html', { waitUntil: 'load' });
-    await pg.waitForTimeout(2600);
-    const f = await pg.evaluate(() => {
-      const c = document.getElementById('muestra');
-      return { ve: !!c && !c.hidden && c.offsetParent !== null,
-               gana: document.querySelectorAll('.mos.gana').length };
-    });
-    console.log('   ' + caso + ' → pieza visible: ' + f.ve + ' · ganador en pie: ' + f.gana);
-    af(!f.ve, '🔴 ' + caso + ': la pieza se pintó con un botón que no suena');
-    af(f.gana === 1, '🔒 y el ganador sigue en pie: el show no se cae por una canción');
-    af(errsF.length === 0, caso + ': errores: ' + JSON.stringify(errsF.slice(0, 2)));
-    await pg.close();
-  }
-  DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
-             title: 'Provenza', artist: 'KAROL G' };
-
-  // ── G · CONTROL POSITIVO: en BASE no hay muestra ni se le pide nada ─────
-  console.log('\n── G · en BASE no existe la muestra ──');
-  PEDIDOS_DEEZER.length = 0;
-  ARRANQUE = Date.now() - (marcaRev + 4000);
-  pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
-  await pg.goto('http://127.0.0.1:' + pB + '/sorteo.html', { waitUntil: 'load' });
-  await pg.waitForTimeout(2600);
-  const gB = await pg.evaluate(() => ({
-    muestra: !!document.getElementById('muestra'),
-    play: !!document.getElementById('m-play'),
-  }));
-  af(!gB.muestra && !gB.play,
-     '🔒 CONTROL POSITIVO: en BASE no existe la pieza de música: ' + JSON.stringify(gB));
-  af(PEDIDOS_DEEZER.length === 0,
-     '🔒 CONTROL POSITIVO: BASE no le pide nada a la function de Deezer, pidió '
-     + PEDIDOS_DEEZER.length);
-  await pg.close();
+  // ── E, E2, F, G · ⚰️ RETIRADOS: LA MUESTRA DE 30 s YA NO EXISTE ─────────
+  //
+  // Aquí vivían cuatro escenarios de la muestra de música: que la pieza saliera
+  // con el artista DERIVADO del catálogo, que el botón alternara play→pausa→play
+  // (con su WAV generado), que sin `preview` la pieza NO se pintara (fail-soft),
+  // y el control positivo de que en BASE no existía.
+  //
+  // ⚰️ TODO RETIRADO por GANADOR-PODA-1. Palabra de Memo: «si la gente le tiene
+  // que dar play no le veo caso — elimínala». Sus aserciones exigirían hoy que
+  // la pieza VOLVIERA, o sea deshacer su decisión; y el control positivo de G
+  // («en BASE no existe») pasó a ser cierto en los DOS lados, que es justo la
+  // forma de control positivo que caduca.
+  //
+  // Lo que sobrevive de todo eso es UNA guardia viva, arriba en el escenario A:
+  // `/sorteo` no le pide nada a la function `deezer`. La function sigue en pie
+  // con sus DIEZ llamadores (index ×2, portal ×6, esferas ×2) — medido antes de
+  // podar, porque la poda se decide contando.
 
   // ── H · EL STORY 1080×1920, PROBADO CON UNA EXPORTACIÓN REAL ───────────
   // 🔒 NO se mide «el botón existe» ni se le cree al mensaje de la pantalla:
@@ -673,16 +542,26 @@ function servidor(raiz) {
   }
 
   const conIg = await bajar(true);
-  const m1 = medidaPNG(conIg.buf);
+  const m1 = medidaJPG(conIg.buf);
   console.log('   con @: ' + conIg.nombre + ' · ' + JSON.stringify(m1) + ' · '
             + conIg.buf.length + ' bytes · «' + conIg.msg + '»');
-  af(!!m1, '🔴 lo que bajó no es un PNG legible');
+  af(!!m1, '🔴 lo que bajó no es un JPEG legible');
   af(m1 && m1.w === 1080 && m1.h === 1920,
      '🔴 la story NO es 1080×1920: ' + JSON.stringify(m1));
   af(conIg.buf.length > 20000,
-     '🔴 el PNG pesa ' + conIg.buf.length + ' bytes: está casi vacío, no se dibujó nada');
-  af(/\.png$/.test(conIg.nombre) && /ganador-/.test(conIg.nombre),
-     'el archivo se llama por el ganador: ' + conIg.nombre);
+     '🔴 el archivo pesa ' + conIg.buf.length + ' bytes: está casi vacío, no se dibujó nada');
+  // 🔴 Y EL PESO ES LA MITAD DE LA TUERCA: el PNG medía 2.28 MB y por eso se
+  // cambió el formato. Un techo de 900 KB deja aire de sobra sobre los ~300 KB
+  // esperados y caza una vuelta al PNG sin tener que adivinar el número.
+  console.log('   pesa ' + Math.round(conIg.buf.length / 1024) + ' KB (el PNG pesaba 2231 KB)');
+  af(conIg.buf.length < 900 * 1024,
+     '🔴 la story pesa ' + Math.round(conIg.buf.length / 1024) + ' KB: se volvió al PNG'
+     + ' o el JPEG no se está comprimiendo');
+  af(/\.jpg$/.test(conIg.nombre) && /ganador-/.test(conIg.nombre),
+     '🔴 el archivo no se llama .jpg por el ganador: ' + conIg.nombre);
+  // 🔒 Y la extensión no basta: se comprueba que los BYTES sean JPEG.
+  af(conIg.buf[0] === 0xFF && conIg.buf[1] === 0xD8,
+     '🔴 la extensión dice .jpg pero los bytes no son JPEG');
   // 🔒 LA FOTO ENTRÓ POR `foto_datauri`, que es la puerta que evita el canvas
   // contaminado. Si hubiera entrado por una url firmada, no habría archivo.
   af(PEDIDOS_FOTO.length === 1 && PEDIDOS_FOTO[0] === GANADOR.id,
@@ -692,7 +571,7 @@ function servidor(raiz) {
   // 3 · EL INTERRUPTOR DEL @ CAMBIA EL ARCHIVO. Sin esto, el interruptor
   // podría no estar conectado a nada y el careo no lo notaría.
   const sinIgPng = await bajar(false);
-  const m2 = medidaPNG(sinIgPng.buf);
+  const m2 = medidaJPG(sinIgPng.buf);
   console.log('   sin @: ' + JSON.stringify(m2) + ' · ' + sinIgPng.buf.length + ' bytes');
   af(m2 && m2.w === 1080 && m2.h === 1920, 'sin el @ también sale 1080×1920');
   af(sinIgPng.buf.length !== conIg.buf.length,

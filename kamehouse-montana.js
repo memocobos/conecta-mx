@@ -38,8 +38,16 @@ function aplicarPermisosUI() {
   // El desplegable de Herramientas obedece la MISMA fuente: se ve si al rol le
   // queda al menos una herramienta. Antes llevaba su propia lista de roles a
   // mano, que es la tercera copia del mismo permiso.
-  const HERRAMIENTAS = ['recibos','contratos','waitlist','diseno'];
+  // [NUBE-1] LA LISTA SE DERIVA DEL DOM, como la de arriba. Era una CUARTA copia
+  // del mismo permiso escrita a mano —`['recibos','contratos','waitlist',
+  // 'diseno']`— y al nacer la quinta herramienta se habría quedado corta: a un
+  // rol cuya ÚNICA herramienta fuera la nueva, el desplegable se le esconde y
+  // la pantalla se vuelve inalcanzable aunque tenga el permiso. Es la misma
+  // forma que este bloque ya arregló para los tabs (18 contra 23).
   const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
+  const HERRAMIENTAS = dropdownHerr
+    ? [...dropdownHerr.querySelectorAll('.nav-dropdown-item[id^="nav-"]')].map(b => b.id.slice(4))
+    : [];
   if (dropdownHerr) dropdownHerr.style.display = HERRAMIENTAS.some(h => tabsPermitidos.includes(h)) ? '' : 'none';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';

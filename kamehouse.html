@@ -167,6 +167,11 @@
    <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')"><svg class="nav-ic"><use href="#ic-contratos"/></svg><span>Contratos</span></button>
    <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Lista de espera</span></button>
    <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')"><svg class="nav-ic"><use href="#ic-diseno"/></svg><span>Diseño</span></button>
+   <!-- [NUBE-1] Entra como HERRAMIENTA y no como tab nueva: bulma y milk ya
+        ven «herramientas», así que no se estrena permiso ni se toca el menú
+        principal. `aplicarPermisosUI` deriva la lista del DOM, así que nace
+        CERRADA hasta que PERMISOS_TABS la nombre — el lado correcto para fallar. -->
+   <button class="nav-dropdown-item" id="nav-nube" onclick="showHerramienta('nube')"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Nube voladora</span></button>
   </div>
  </nav>
 
@@ -2713,6 +2718,57 @@
  </div>
 
  <!-- ─── LISTA DE ESPERA ─── -->
+ <!-- [NUBE-1] LA NUBE VOLADORA · la cotización semanal del transporte a CDMX -->
+ <div class="page" id="page-nube">
+   <div class="page-hero">
+    <div>
+     <div class="page-title">NUBE VOLADORA</div>
+     <div class="page-sub">// cuánto cuesta llegar a CDMX esta semana</div>
+    </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <button class="btn btn-ghost btn-sm" onclick="loadNube()">↻ Refrescar</button>
+     </div>
+   </div>
+
+   <div id="nube-cuerpo"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+
+   <div class="card" style="padding:16px;margin-top:14px">
+    <div class="card-lbl">Subir la cotización de esta semana</div>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:10px">
+      El precio es <b style="color:var(--tp)">por persona</b>. Una captura nueva NO corrige la anterior:
+      <b style="color:var(--tp)">agrega una fila</b> — la tabla es el historial.
+    </div>
+    <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+     <div class="form-group">
+      <label>Modo</label>
+      <select class="cot-input" id="nube-modo" style="width:100%">
+       <option value="">— elige —</option>
+       <option value="bus">🚌 Autobús</option>
+       <option value="avion">✈️ Avión</option>
+      </select>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">Nace vacío a propósito: elegir solo pondría el precio en el modo equivocado.</div>
+     </div>
+     <div class="form-group">
+      <label>Precio por persona</label>
+      <input class="cot-input" id="nube-precio" type="number" min="1" step="1" placeholder="ej. 2500" style="width:100%">
+     </div>
+     <div class="form-group">
+      <label>Rige hasta <span style="color:var(--ts);font-weight:400">(por default, el domingo 23:59)</span></label>
+      <div style="display:flex;gap:6px">
+       <input class="cot-input" id="nube-hasta-fecha" type="date" style="flex:1" oninput="_nubePreviaVigencia()">
+       <input class="cot-input" id="nube-hasta-hora" type="time" value="23:59" style="width:100px" oninput="_nubePreviaVigencia()">
+      </div>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px" id="nube-previa"></div>
+     </div>
+     <div class="form-group">
+      <label>Nota <span style="color:var(--ts);font-weight:400">(opcional)</span></label>
+      <input class="cot-input" id="nube-nota" placeholder="ej. vuelo con escala, sale más barato" style="width:100%">
+     </div>
+    </div>
+    <button class="btn btn-primary" id="nube-guardar-btn" onclick="nubeGuardar()" style="margin-top:6px">Guardar cotización</button>
+   </div>
+ </div>
+
  <div class="page" id="page-waitlist">
    <!-- [FLUJO-UX-5] Al patrón de la casa, por lo mismo que Contratos. -->
    <div class="page-hero">
@@ -3950,5 +4006,6 @@
 <!-- [MONO-16] Antes del tronco, regla del sentido único (ver MONO-2). -->
 <script src="kamehouse-operacion.js"></script>
 <!-- [MONO-17] Antes del tronco, regla del sentido único (ver MONO-2). -->
+<script src="kamehouse-nube.js"></script>
 <script src="kamehouse-resumen.js"></script>
 <script src="kamehouse.js"></script>

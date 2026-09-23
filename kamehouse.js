@@ -79,15 +79,18 @@ let disenoLoaded = false;
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno'],
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube'],
+  // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
+  // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
+  // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas']
+  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -4555,6 +4558,12 @@ function showHerramienta(name) {
   }
   if (name === 'waitlist') {
     loadWaitlist();
+  }
+  // [NUBE-1] Sin esto la pantalla abre VACÍA y parece rota: es la pérdida
+  // silenciosa de «quitar del menú no es quitar un botón», al revés — poner el
+  // botón no es poner la pantalla.
+  if (name === 'nube') {
+    loadNube();
   }
   // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
   // Si el admin sale de cualquier herramienta, paramos los timers del Radar.

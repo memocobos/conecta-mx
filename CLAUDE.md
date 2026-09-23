@@ -167,6 +167,56 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **GANADOR-QUIETO-2 EN PROD (22-sep-2026, #755): la quietud del ganador se
+  decide por el HECHO, no por encontrar una ficha.** Jane reprodujo el temblor
+  en el ensayo REAL con el código de #753 **servido**.
+  `npm run mide:ganador-quieto` (**65**, eran 44), cero SQL.
+
+  **El dato:** a la revelación, `body.gano` puesto, la placa encendida y los
+  letreros BIEN —«Ganador», «1 de 24 · al azar»—, y la ficha ganadora con
+  `mos vive finalista`: **sin `.gana`, sin `data-quieta`**, con `tiembla`
+  corriendo y `--amp:9.0px` **congelado** en su valor máximo.
+  Esos letreros se escriben en **UN SOLO SITIO**, así que el callback de `tRev`
+  sí corrió y lo único que se saltó fue `if (eg) { quietar(eg); … }`:
+  **`fichaDe(folioG)` devolvió null.**
+
+  🔒 **LA LEY, Y ES MÁS GRANDE QUE ESTA PANTALLA: una promesa no puede depender
+  de encontrar un nodo.** El hecho es «hay ganador revelado» y de ese hecho se
+  sigue que **nada tiembla**. Colgarlo de un `querySelector` que puede fallar
+  por cualquier razón —y falló por una que **todavía no se sabe**— es la misma
+  forma de la guarda inalcanzable: **#753 movió el candado y lo dejó colgando
+  del mismo hilo.** Y como el temblor es una animación `infinite`, no alcanzar
+  ese `if` UNA vez lo deja puesto **para siempre**.
+  `cerrarShow(folioG)` vive en el punto único que todos los caminos comparten:
+  (1) **calla TODA la rejilla** + `pararTemblor()`, sin buscar a nadie — ésa es
+  la promesa; (2) marca por folio — eso es cosmética; (3) si el folio no está,
+  usa la única VIVA (por construcción de la escalera es la ganadora) **y lo
+  GRITA por consola**.
+
+  ⚠️ **UN PUNTO CIEGO DEL PROPIO CAREO, y es la misma lección otra vez:**
+  `vigilarQuietud` buscaba **solo** `.mos.gana` — la clase que el árbol roto NO
+  pone—, así que en BASE2 daba **«0 de 0 muestras»**: un cero sobre el conjunto
+  vacío, que no es una medición. Hoy cae a la ficha viva y hay **candado de
+  cardinalidad en los dos brazos**. Pasó de 0/0 a **24/24**.
+
+  **El careo usa DOS BASES**: `f816e5b` para el huérfano de #753 y **`3ac566e`
+  para ésta** —el main que ya trae #753 y sigue temblando—; contra el BASE viejo
+  no se habría distinguido un arreglo del otro. El escenario D reproduce la
+  captura **determinista**: página ABIERTA, el giro llega **por latido** y como
+  **repetición**, y el servidor dice un folio que **no está en la rejilla**.
+  🔒 Y la **premisa** se afirma en los dos lados: los letreros se pintan igual.
+  Eso es lo que hacía este defecto tan difícil de ver.
+
+  ⏳ **ABIERTO: por qué `fichaDe(folioG)` devolvió null en el ensayo real.** Se
+  descartaron **con datos** el ancho de escritorio (1350 idéntico a 390), otro
+  nodo de la cadena (tras revelar no corre **ninguna** animación), «Aceptó»,
+  «Ver de nuevo», el redoble sostenido con su latido de 800 ms, y la repetición
+  por latido. Ninguno lo reproduce solo. **El arreglo ya no depende de esa
+  causa**, pero no se sabe — y la trampa está armada: el `console.error` dice
+  cuántas fichas había y con qué folios. Si sale en un ensayo, **se guarda ese
+  texto**: cierra el caso.
+
+
 - 🏆 **ROL-MONTO-MUDO-1 EN PROD (22-sep-2026, #754): el paso 4 de `/rol` dice
   qué le falta, en vez de quedarse mudo.** Reporte real de **Ximena, con
   captura**: dos clientes no podían capturar el monto del separo — veían el

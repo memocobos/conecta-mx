@@ -228,6 +228,13 @@ function servidor(raiz) {
   const pB = sBase.address().port, pH = sHead.address().port;
   const nav = await chromium.launch();
 
+  // Los dos instantes que usan varios escenarios de abajo. ⚠️ Vivían en el
+  // preámbulo del escenario A viejo, y al retirarlo se fueron con él: el arnés
+  // se cayó con `marcaRev is not defined`. Un recorte por bloques se lleva
+  // también lo que el bloque DEFINÍA para otros.
+  const marcaFinal = TI.momentoFinalistasMs(escalones);
+  const marcaRev = momentos[momentos.length - 1];
+
   // ── A · ⚰️ RETIRADO + GUARDIA VIVA: LA IMAGEN YA NO VISTE LA TARJETA ────
   //
   // Aquí se medía EN QUÉ SEGUNDO pedía el navegador `karol-g.jpg` (0 antes del
@@ -247,7 +254,9 @@ function servidor(raiz) {
   {
     PEDIDOS.length = 0;
     ARRANQUE = Date.now(); RES = 'pendiente';
-    const pg = await ctx.newPage();
+    // ⚠️ Este arnés no tiene contexto compartido: la página se abre con su
+    // viewport, como los demás escenarios de aquí.
+    const pg = await nav.newPage({ viewport: { width: 390, height: 844 } });
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     const img = [], deez = [];
     pg.on('request', (req) => {
@@ -418,6 +427,20 @@ function servidor(raiz) {
                              acciones: alto('acciones'), repetir: alto('repetir') },
              anchoDoc: document.documentElement.scrollWidth, anchoVista: innerWidth };
   });
+  // 🔒 EL DESGLOSE LO IMPRIME EL ARNÉS, no se recuerda: es lo que permite
+  // decidir de DÓNDE se recortan los píxeles cuando algo no cabe.
+  const desglose = await pg.evaluate(() => {
+    const out = {};
+    ['mosaico-caja', 'placa-ganador', 'p-cuando', 'reloj', 'tel', 'contacto',
+     'acciones', 'repetir', 'panel'].forEach((id) => {
+      const e = document.getElementById(id);
+      if (!e || e.offsetParent === null) { out[id] = 0; return; }
+      const b = e.getBoundingClientRect();
+      out[id] = Math.round(b.height);
+    });
+    return out;
+  });
+  console.log('   desglose: ' + Object.keys(desglose).map((k) => k + ' ' + desglose[k]).join(' · '));
   const h = caben.herramientas;
   console.log('   el bloque (foto → reloj): y=' + caben.top + '..' + caben.bot + ' en '
             + caben.vh + 'px (scrollY ' + caben.scrollY + ')');

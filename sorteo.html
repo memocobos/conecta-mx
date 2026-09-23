@@ -446,9 +446,24 @@ body.gano #reloj-ganador{display:none}
 /* Y la tarjeta del ganador deja de ir a todo lo ancho: con `--cols:1` medía
    388px de alto y se comia el espacio de la placa. */
 body.gano .mosaico{justify-content:center}
-/* ⚠️ 200px y no 236: con el panel del admin completo —teléfono, contacto y los
-   tres botones— el bloque se pasaba del pliegue. Medido, no estimado. */
-body.gano .mos.gana{width:min(52vw,200px);margin-left:auto;margin-right:auto}
+/* ⚠️ 182px y no 236: con el panel del admin completo —teléfono, contacto y los
+   tres botones— el bloque se pasaba del pliegue. Medido, no estimado; el
+   desglose lo imprime el careo. */
+body.gano .mos.gana{width:min(48vw,182px);margin-left:auto;margin-right:auto}
+
+/* 🔴 [GANADOR-PODA-1] EL APRETADO VIVE EN `body.gano`, NO EN LAS REGLAS
+   GENERALES. La orden de Memo es que todo quepa en 390×844 CON el panel del
+   admin, y eso pedía 62px que salieron de aquí. Tocando `.panel` o `.reloj` a
+   secas se habrían apretado también la pantalla de espera, la del re-giro y la
+   de la repetición, que no tienen ese problema — y nadie lo habría medido.
+   Desglose antes: caja 242 · placa 138 · cuando 40 · reloj 89 · tel 43 ·
+   contacto 34 · botones 109 · repetir 28 = hasta y=916 en 844. */
+body.gano .panel{padding:16px 14px;margin-bottom:12px}
+body.gano .reloj{margin-top:10px;padding-top:10px}
+body.gano .reloj-n{font-size:clamp(44px,10vw,74px)}
+body.gano .cuando-giro{font-size:11.5px;line-height:1.4}
+body.gano .placa-ganador{margin-top:10px;padding:11px 12px}
+body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;line-height:1.3}
 
 /* La placa de abajo: el nombre COMPLETO, para que quede claro que es una
    persona y no la suma de tres rodillos. */

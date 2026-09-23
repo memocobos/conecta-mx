@@ -167,6 +167,76 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **GANADOR-PODA-1 EN PROD (23-sep-2026, #756): la tarjeta del ganador se
+  simplifica.** Cuatro cambios firmados por Memo. `npm run mide:ganador-b`
+  (**53**, eran 78), cero SQL.
+
+  🔒 **LA PODA SE DECIDIÓ CONTANDO, no suponiendo** —y por eso NO se podó la
+  mitad de lo que parecía sobrar:
+  · la function **`deezer` tiene DIEZ llamadores** (index ×2, portal ×6,
+    esferas ×2), así que **no se toca**: solo se fue la llamada de `/sorteo`;
+  · **`ultimo.artista` tenía UN lector** (`pintarMuestra`) → se podó el campo,
+    su derivación, `EVENTO_CATALOGO` y la proyección `artista` del catálogo;
+  · **`karol-g.jpg` sigue viva en `/giveaway`** (og:image y la foto del hero):
+    la orden era la tarjeta y la story, **no el registro**;
+  · `#ic-play`/`#ic-pausa` eran solo de la muestra (los de index y portal son
+    `.rcp-ic-play`, del radio).
+
+  **Lo que entró:** fuera la muestra de 30 s con toda su cadena · fuera la
+  imagen de la tarjeta y de la story (queda el fondo de marca con su
+  degradado) · los tres botones a **dos columnas** («Aceptó» a lo ancho, los
+  dos descartes compartiendo renglón: son la excepción, no la regla) · la
+  story en **JPEG al 92 %**, de **2 231 KB a ~100 KB** — se puede porque sin
+  foto de fondo el lienzo tiene fondo propio y opaco.
+
+  🔴 **Y EL VERDE ERA SUERTE. Lo cazó Jane:** su corrida dio **y=871** donde la
+  mía dio **y=835 con el MISMO commit**, porque la ALTURA del bloque depende de
+  **a quién le tocó ganar** (lo que mide el nombre, la ciudad, el @ y el texto
+  del premio). Es la lección de «el rojo que dependía del ganador», ahora en
+  píxeles.
+  🔴 **Y al medirlo salió una segunda causa que ninguno había visto:** su
+  `contacto` medía **76** y el mío **34** — eso no depende del ganador, depende
+  de **si cargan las tipografías de Google**. Con la de respaldo, más ancha,
+  los botones envuelven. **Una altura que depende de un CDN no se puede hacer
+  caber**, así que hoy el contacto va en **un renglón fijo** (el @ se recorta
+  en pantalla y viaja completo en `title`, `aria-label` y `href`).
+
+  🔒 **HOY EL CAREO MIDE EL PEOR CASO DEL PADRÓN REAL**, no el que le toque:
+  nombre **37** con partícula, ciudad **18** que dice «Reynosa» —para que el
+  premio sea el PLUS, 93 caracteres—, @ de **17**. Los máximos se leyeron de la
+  base **como longitudes, nunca como datos de nadie** (101 filas). El ganador
+  se **fuerza** intercambiándolo con `orden[0]`, así la escalera sigue siendo
+  prefijos; y **las tipografías se bloquean**, que quita la dependencia de la
+  red y además es el peor caso real. Tres corridas dan **y=824 exacto**.
+  🔒 **Candado de la premisa:** se exige nombre ≥37, premio ≥90, @ ≥17 y **cero
+  tipografías cargadas**. Sin eso, un rojo futuro se «arregla» acortando el
+  nombre de prueba — y cazó algo al primer intento: un escenario anterior
+  restauraba el @ al literal viejo y le quitaba el peor caso al que medía.
+
+  ⚠️ **EL APRETADO VIVE EN `body.gano`**, no en las reglas generales: tocando
+  `.panel` o `.reloj` a secas se habrían apretado también la pantalla de
+  espera, la del re-giro y la de la repetición, que no tienen ese problema.
+
+  🔴 **Y LA LEY DEL ANCLA, EN SUS TRES CARAS** —las tres pagadas en esta
+  tuerca—: con un careo de árboles archivados **(1) medir exige commitear**
+  (una corrida midió el commit anterior y dio números idénticos, que se leen
+  como «el cambio no sirvió»), **(2) commitear exige RE-ANCLAR** (el ancla de
+  fábrica se quedó en el commit previo al apretón y `npm run mide:ganador-b` a
+  secas daba y=905: **le costó dos corridas rojas a Jane**), y (3) un arnés
+  cuya tuerca siguiente retiró lo que medía **se actualiza a la verdad nueva**,
+  con cada retiro razonado — nunca en silencio.
+  **La señal:** si con `HEAD_SHA=<sha>` a mano sale verde y a secas sale rojo,
+  **el ancla está vieja; no es el código.**
+
+  ⚰️ **Retirados con su razón escrita:** el escenario de la imagen (hoy
+  exigiría deshacer la decisión de Memo, y su par desapareció porque BASE
+  tampoco la pedía) y los cuatro de la muestra —el control positivo de uno de
+  ellos **caducó al volverse cierto en los dos lados**—. En su lugar quedan dos
+  **guardias vivas**: `/sorteo` no pide esa imagen ni le pide nada a `deezer`.
+  Y la story se exige **JPEG por extensión Y por bytes**: un PNG con nombre
+  `.jpg` reventaría el peso otra vez sin que se notara.
+
+
 - 🏆🔴 **GANADOR-QUIETO-2 EN PROD (22-sep-2026, #755): la quietud del ganador se
   decide por el HECHO, no por encontrar una ficha.** Jane reprodujo el temblor
   en el ensayo REAL con el código de #753 **servido**.

@@ -118,20 +118,52 @@ try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sac
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }
 
 // ── EL ESTADO FALSO, con el show YA ACABADO o corriendo ───────────────────
+//
+// 🔴 EL PEOR CASO ESTÁ EN EL PADRÓN, Y NO ES UN INVENTO MÍO. Jane corrió este
+// mismo careo sobre el mismo commit y le dio y=871 donde a mí me dio y=835: la
+// ALTURA del bloque depende de A QUIÉN LE TOCÓ GANAR —lo que mide el nombre en
+// la placa, la ciudad, el @ y el texto del premio—, así que un verde aquí era
+// suerte. Es la misma lección que la aserción cuyo rojo dependía del ganador,
+// ahora sobre píxeles.
+//
+// Los máximos salen del PADRÓN REAL (101 filas, leídas como longitudes, nunca
+// como datos de nadie): nombre 37 · ciudad 18 · instagram 17, y la palabra más
+// larga dentro de un nombre, 11. El premio más largo es el PLUS, que sale de
+// una ciudad que diga «Reynosa» — así que el peor caso los junta TODOS.
+const PEOR = {
+  // 37 caracteres EXACTOS —el máximo del padrón real— con palabras de 11, que
+  // es la más larga que hay. Y con partícula «de», que además ejercita la forma
+  // dura que `partirNombre` ya tenía documentada.
+  nombre: 'Guillermina Monteverde de Villalpando',
+  ciudad: 'Reynosa Tamaulipas',                   // 18, el máximo, y da PLUS
+  instagram: 'guillermina.mtzvz',                 // 17, el máximo
+};
 const CIUDADES = ['Reynosa', 'Monterrey', 'San Nicolás de los Garza', 'Río Bravo'];
 const padron = [];
 for (let i = 1; i <= 40; i++) padron.push({ id: 'r' + i, nombre: 'Nombre' + i + ' Apellido' + i,
                                             folio: i, ciudad: CIUDADES[i % CIUDADES.length] });
+// La ficha 1 ES el peor caso, y se la pone de GANADORA a propósito.
+padron[0].nombre = PEOR.nombre;
+padron[0].ciudad = PEOR.ciudad;
 const ciudadDe = (id) => (padron.find((x) => x.id === id) || {}).ciudad || null;
 const escalones = TI.escalonesPara(40);
 const rondas = ESC.construirEscalera(padron, escalones);
+// 🔒 SE FUERZA EL GANADOR, sin romper la escalera: se INTERCAMBIA la entrada
+// del peor caso con `orden[0]`. Las rondas siguen siendo prefijos de la misma
+// lista —que es lo que da las tres propiedades gratis— y el ganador ya no
+// depende del azar. Un careo de altura no puede depender de a quién le toque.
+(function ponerElPeorPrimero() {
+  const k = rondas.orden.findIndex((x) => String(x.id) === String(padron[0].id));
+  if (k > 0) { const t = rondas.orden[0]; rondas.orden[0] = rondas.orden[k]; rondas.orden[k] = t; }
+  else if (k < 0) { rondas.orden[0] = { id: padron[0].id, nombre: padron[0].nombre, folio: padron[0].folio }; }
+})();
 const momentos = TI.momentos(escalones);
 const GANADOR = rondas.orden[0];
 
 let ARRANQUE = Date.now();
 let RES = 'pendiente';
 let WA = '8990000001';            // 10 dígitos, como los guarda el registro
-let IG = 'karla.m';
+let IG = PEOR.instagram;          // el @ más largo del padrón real
 const PEDIDOS = [];               // toda url pedida, con su instante
 
 function estado() {

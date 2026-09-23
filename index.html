@@ -1309,19 +1309,19 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
 
   <!-- PASO 2: DÍA (solo diaFirst, antes de paquete) -->
-  <div class="wiz-card" id="w-dia-card" style="display:none">
+  <div class="wiz-card" id="w-dia-card" data-guia="dia" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge">2</span><span>Elige tu día</span></div>
     <div class="fecha-sel" id="d-dias"></div>
   </div>
 
   <!-- PASO 3: TIPO DE BOLETO (solo diaFirst) -->
-  <div class="wiz-card" id="w-boleto-card" style="display:none">
+  <div class="wiz-card" id="w-boleto-card" data-guia="boleto" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge">3</span>Tipo de boleto</div>
     <div class="fecha-sel" id="d-boletos"></div>
   </div>
 
   <!-- PASO 2/3/4: PAQUETE -->
-  <div class="wiz-card" id="w-pkg-card" style="display:none">
+  <div class="wiz-card" id="w-pkg-card" data-guia="paquete" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-pkg-n">2</span>Elige tu paquete</div>
     <div class="wiz-pkg-wrap" id="w-paquetes">
       <button class="wiz-btn wiz-pkg-btn" onclick="selPaquete(this,'plus')">
@@ -1354,20 +1354,20 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
 
   <!-- PASO 3/4: ZONA -->
-  <div class="wiz-card" id="w-zona-card" style="display:none">
+  <div class="wiz-card" id="w-zona-card" data-guia="zona" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-zona-n">3</span>Elige tu zona</div>
     <button class="mapa-btn" id="w-mapa-btn" style="display:none" onclick="abrirMapa()">Ver mapa del venue</button>
     <div class="zona-grid" id="d-zonas"></div>
   </div>
 
   <!-- PASO 4/5: HABITACIÓN -->
-  <div class="wiz-card" id="w-hotel-card" style="display:none">
+  <div class="wiz-card" id="w-hotel-card" data-guia="hotel" data-guia-confirma="Confirma tu habitación para seguir." style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-hotel-n">4</span>Tipo de habitación</div>
     <div class="hotel-grid" id="d-hotel"></div>
   </div>
 
   <!-- PASO: TRANSPORTE (solo CDMX) -->
-  <div class="wiz-card" id="w-transport-card" style="display:none">
+  <div class="wiz-card" id="w-transport-card" data-guia="transporte" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-transport-n">5</span>¿Te gustaría agregar transporte a CDMX?</div>
     <div class="zona-grid" id="d-transport"></div>
   </div>
@@ -5053,6 +5053,21 @@ function showDetail(id, _skipHistory){
     var _itinCard=document.getElementById('d-itin-card');
     if(_itinCard) _itinCard.style.display = itinerarioDe(cur) ? '' : 'none';
   }catch(e){}
+  // [CARD-GUIA-1] El letrero vuelve a su frase de arranque al abrir un card.
+  // Sin esto se queda PEGADO el del evento anterior: abrir otro evento diría
+  // «Ahora elige tu habitación» antes de que el cliente eligiera nada. Un
+  // letrero viejo es peor que uno genérico, porque el genérico no miente.
+  try{
+    // 🔒 `typeof` ANTES DE USARLO, y por TERCERA vez en esta serie: este
+    // `showDetail` lo corre el IIFE del deep-link A MEDIA PARSEADA, donde
+    // `var GUIA_ARRANQUE` ya existe por hoisting pero vale `undefined`. Sin la
+    // guarda, el letrero del cotizador diría literalmente «undefined» al
+    // entrar por la url que se comparte — y NO tiraría error, así que nadie lo
+    // vería en la consola. Si no está lista, no se toca: el markup ya trae la
+    // frase buena.
+    var _ph=document.getElementById('d-placeholder');
+    if(_ph && typeof GUIA_ARRANQUE === 'string') _ph.textContent = GUIA_ARRANQUE;
+  }catch(e){}
   // Popup "¿Cómo reservar tu lugar?" — PRIMERA vez por evento (por dispositivo).
   // No se muestra si este evento dispara su propio promoModal (evita modales apilados).
   //
@@ -5242,12 +5257,12 @@ function selViajeros(btn,n){
   if(cur&&cur.diaFirst){
     // diaFirst: step 2 = Dia (uses w-dia-card above paquete)
     buildDiaButtons();
-    $$('w-dia-card').style.display='block';
+    $$('w-dia-card').style.display='block';guiaPintar();
   } else {
     // Normal: step 2 = Paquete
     $$('w-pkg-n').textContent='2';
     updatePkgCards();
-    $$('w-pkg-card').style.display='block';
+    $$('w-pkg-card').style.display='block';guiaPintar();
   }
   scrollToStep(cur&&cur.diaFirst?'w-dia-card':'w-pkg-card');
 }
@@ -5471,14 +5486,14 @@ function selPaquete(btn,pkg){
     if(hasHotel){
       $$('w-hotel-n').textContent='5';
       buildHotelButtons();
-      $$('w-hotel-card').style.display='block';
+      $$('w-hotel-card').style.display='block';guiaPintar();
     } else {
       $$('w-hotel-card').style.display='none';
       selH={n:'Sin hospedaje',e:0};
       // CHEAP CDMX: show transport, else calculate
       if(isCDMX(cur)){
         buildTransporteButtons();
-        $$('w-transport-card').style.display='block';
+        $$('w-transport-card').style.display='block';guiaPintar();
       } else {
         calcular();
         scrollToTotal();
@@ -5498,12 +5513,12 @@ function selPaquete(btn,pkg){
       $$('w-zona-n').textContent=stepN; stepN++;
       if(hasFecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].prox){
         $$('d-zonas').innerHTML='<div style="text-align:center;padding:20px;color:rgba(255,255,255,.4);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Próximamente — costos disponibles muy pronto</div>';
-        $$('w-zona-card').style.display='block';
+        $$('w-zona-card').style.display='block';guiaPintar();
       } else {
       var zonasToShow=currentZonasToShow();
       buildZonaButtons(zonasToShow);
       actualizarMapaBtn();
-      $$('w-zona-card').style.display='block';
+      $$('w-zona-card').style.display='block';guiaPintar();
       }
     } else {
       $$('w-zona-card').style.display='none';
@@ -5511,7 +5526,7 @@ function selPaquete(btn,pkg){
     if(hasHotel){
       $$('w-hotel-n').textContent=stepN;
       buildHotelButtons();
-      $$('w-hotel-card').style.display='block';
+      $$('w-hotel-card').style.display='block';guiaPintar();
     } else {
       $$('w-hotel-card').style.display='none';
     }
@@ -5587,7 +5602,7 @@ function selBoletoBtn(btn,id){
   // Show paquete as step 4
   $$('w-pkg-n').textContent='4';
   updatePkgCards();
-  $$('w-pkg-card').style.display='block';
+  $$('w-pkg-card').style.display='block';guiaPintar();
   // Reset downstream
   $$('w-hotel-card').style.display='none';
   $$('w-inc-card').style.display='none';
@@ -5625,7 +5640,7 @@ function selDia(btn,idx){
   }
   // Show boleto as step 3
   buildBoletoButtons();
-  $$('w-boleto-card').style.display='block';
+  $$('w-boleto-card').style.display='block';guiaPintar();
   // Reset downstream
   $$('w-pkg-card').style.display='none';
   $$('w-zona-card').style.display='none';
@@ -5965,7 +5980,7 @@ function selHotel(btn,e,n){
   try{ trackMainEvent('main_habitacion_elegida', { habitacion: n, paso_wizard: 'hotel' }); }catch(e2){}
   if(isCDMX(cur)){
     buildTransporteButtons();
-    $$('w-transport-card').style.display='block';
+    $$('w-transport-card').style.display='block';guiaPintar();
     scrollToStep('w-transport-card');  // Fix 3: HABITACIÓN → TRANSPORTE (CDMX)
   } else {
     $$('w-transport-card').style.display='none';
@@ -6183,6 +6198,105 @@ function enviarWaitlist(e){
   })
   .catch(function(){setMsg('err','Error de conexión. Intenta de nuevo.');btn.disabled=false;btn.textContent='Avísame cuando esté listo';});
   return false;
+}
+
+// ═══ [CARD-GUIA-1] EL COTIZADOR QUE ACOMPAÑA ══════════════════════════════
+// Mensajes de apoyo POR PASO, con las palabras de Memo: «ahora elige tu
+// paquete» → «tu zona» → «tu habitación».
+//
+// ⚠️ EL ENCARGO DECÍA «montados sobre los hints sutiles existentes del FAB», y
+// eso NO SE SOSTUVO al medirlo: el FAB de ayuda **no existe**. El único
+// flotante del sitio es el de WhatsApp (`.wa-float`), y el propio index trae
+// un bloque que BORRA las llaves `wiz-hint-visto`, `hints-vistos` y
+// `help-fab-shown` con el comentario «sistema de ayuda ya eliminado». La línea
+// de CLAUDE.md que promete «FAB "?" flotante + hints sutiles por paso» quedó
+// vieja. No hay nada sobre lo que montarse.
+//
+// 🔒 ASÍ QUE LA GUÍA NO ESTRENA SUPERFICIE: se monta donde YA HAY UN LETRERO, y
+// ese letrero estaba MUDO. `#d-placeholder` decía «Elige tus opciones para ver
+// tu cotización» —lo mismo para los cinco pasos— en las NUEVE veces que se
+// enciende. Es la forma de ROL-MONTO-MUDO-1 en el cotizador: el paso no estaba
+// vacío, estaba callado.
+//
+// 🔒 Y EL ORDEN NO SE INVENTA: se le PREGUNTA a `calcular()`, que ya sabe qué
+// falta porque se sale temprano por cada cosa. Escribir aquí una segunda lista
+// de «qué se pide primero» sería la lista gemela que acaba divergiendo — y el
+// orden importa: nombrar la zona cuando falta el paquete manda al cliente a un
+// paso que todavía no existe (la lección de la fecha y el precio en /rol).
+// La frase con la que nace el letrero, copiada del markup: no se re-redacta,
+// porque es la que el cliente ve antes de tocar nada.
+var GUIA_ARRANQUE = 'Elige tus opciones para ver tu cotización';
+var GUIA = {
+  // ⚠️ `dia` y `boleto` NO estaban en el encargo, y están aquí por una razón
+  // medida: en un evento `diaFirst` el paso que el sitio ABRE después de los
+  // viajeros es el DÍA, no el paquete. Sin su frase, esos eventos se quedaban
+  // con el letrero mudo — y poner ahí «ahora elige tu paquete» habría mandado
+  // al cliente a un paso que todavía no está abierto, que es exactamente el
+  // defecto de /rol que esta casa ya pagó.
+  dia:        'Ahora elige tu día.',
+  boleto:     'Ahora elige tu tipo de boleto.',
+  paquete:    'Ahora elige tu paquete.',
+  zona:       'Ahora elige tu zona.',
+  hotel:      'Ahora elige tu habitación.',
+  transporte: 'Ahora elige cómo llegas.',
+  compartida: 'Con más de 4 viajeros el cuarto va compartido: elígelo para ver tu cotización.',
+};
+// 🔴 EL ORDEN LO DICE EL DOCUMENTO, NO UNA LISTA MÍA. La primera versión de
+// esto escribía el letrero en cada REVELADO, y el careo la puso en rojo:
+// `selPaquete` abre la zona Y la habitación en la misma pasada, así que ganaba
+// el ÚLTIMO revelado y el letrero pedía la habitación cuando lo que faltaba
+// era la zona. Mandar al cliente a un paso que todavía no toca es el defecto
+// de /rol otra vez.
+//
+// Así que no hay lista de orden: cada paso lleva su llave en `data-guia` y
+// esta función recorre los pasos EN ORDEN DE DOCUMENTO —que es el orden en que
+// el cliente los lee— y nombra el PRIMERO que está a la vista y sin contestar.
+// «Contestado» se le pregunta al sitio: `.active` es el marcador que usan los
+// seis pasos para su botón elegido.
+//
+// 🔒 Y TODO CON GUARDA DE `typeof`: es la lección de CARD-ITIN-1 aplicada antes
+// de que muerda. `var GUIA` vive más abajo que el IIFE del deep-link, así que
+// si algún camino llamara a esto a media parseada, tocar `GUIA` directo
+// tiraría «Cannot read properties of undefined» — un crash, no un letrero que
+// falta. Lo peor que puede pasar es que el letrero se quede como estaba.
+function guiaPintar(respaldo){
+  var el = document.getElementById('d-placeholder');
+  if (!el || typeof GUIA === 'undefined' || !GUIA) return;
+  var pasos = document.querySelectorAll('[data-guia]');
+  var ultimo = null;
+  for (var i = 0; i < pasos.length; i++) {
+    var c = pasos[i];
+    if (getComputedStyle(c).display === 'none') continue;   // ese paso no aplica
+    ultimo = c;
+    if (c.querySelector('.active')) continue;               // ya está contestado
+    var txt = GUIA[c.getAttribute('data-guia')];
+    if (txt) { el.textContent = txt; return; }
+  }
+  // 🔴 TODOS LOS PASOS A LA VISTA ESTÁN CONTESTADOS Y AUN ASÍ NO HAY
+  // COTIZACIÓN. Medido en CDMX: tras elegir la zona, la habitación viene
+  // PRE-MARCADA («Compartida»), el paso del transporte todavía está oculto y
+  // el total no aparece — el cliente tiene que APRETAR la opción que ya estaba
+  // marcada para que el flujo siga. Ahí el letrero decía «Elige tus opciones
+  // para ver tu cotización», que es justo el silencio que esta tuerca viene a
+  // quitar: no le dice QUÉ apretar.
+  // ⚠️ El callejón es PRE-EXISTENTE y no se arregla aquí (un paso preseleccionado
+  // que aun así exige el clic es tuerca propia, con su decisión). Lo que se
+  // arregla es el silencio.
+  var listo = false;
+  try {
+    var res = document.getElementById('d-result');
+    listo = !!res && getComputedStyle(res).display !== 'none';
+  } catch (e) {}
+  if (!listo && ultimo) {
+    var conf = ultimo.getAttribute('data-guia-confirma');
+    if (conf) { el.textContent = conf; return; }
+  }
+  // Y si quien llamó SABE qué le falta —`calcular()` lo sabe, por eso se sale
+  // temprano—, se dice eso antes que la frase genérica.
+  if (!listo && respaldo && GUIA[respaldo]) { el.textContent = GUIA[respaldo]; return; }
+  // Nada que pedir: vuelve a la frase de arranque. Un letrero de un paso ya
+  // contestado es un letrero viejo, y un letrero viejo miente.
+  if (typeof GUIA_ARRANQUE === 'string') el.textContent = GUIA_ARRANQUE;
 }
 
 // ═══ [CARD-POLI-1] LAS POLÍTICAS · UNA SOLA FUENTE, AGRUPADAS POR TEMA ═════
@@ -6589,18 +6703,21 @@ function _diasEventoMx(evISO,hoyISO){
   return Math.round((Date.UTC(+m1[1],+m1[2]-1,+m1[3])-Date.UTC(+m2[1],+m2[2]-1,+m2[3]))/86400000);
 }
 function calcular(){
-  if(!cur||!selPkg)return;
+  if(!cur)return;
+  // [CARD-GUIA-1] Cada salida temprana DICE qué falta. El letrero sale de aquí
+  // —del dueño del orden— y no de una lista aparte.
+  if(!selPkg)return guiaPintar('paquete');
   var hasZona=(selPkg==='plus'||selPkg==='stay'||selPkg==='cheap')||(selPkg==='ride'&&cur.forceZona);
   var hasHotel=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay')&&!cur.noHotel;
-  if(hasZona&&!selZ)return;
-  if(hasHotel&&!selH)return;
+  if(hasZona&&!selZ)return guiaPintar('zona');
+  if(hasHotel&&!selH)return guiaPintar('hotel');
   // Grupo grande (N>4): solo habitación compartida (la UI ya solo la ofrece; este
   // guard es el espejo de la regla en _lib/precio-zona y _vtaCalc — paridad 3 copias).
-  if(hasHotel&&selViaj>4&&selH&&!(selH.k==='compartida'||/^compartida/i.test(selH.n||'')))return;
+  if(hasHotel&&selViaj>4&&selH&&!(selH.k==='compartida'||/^compartida/i.test(selH.n||'')))return guiaPintar('compartida');
   var cdmx=isCDMX(cur);
   // CDMX events need transport selection before calculating — CHEAP no pasa por hotel, no tiene paso de transporte: default "Sin transporte"
   if(cdmx&&selPkg==='cheap'&&!selTransporte)selTransporte={n:'Sin transporte',cost:0};
-  if(cdmx&&!selTransporte&&selPkg!=='cheap')return;
+  if(cdmx&&!selTransporte&&selPkg!=='cheap')return guiaPintar('transporte');
   var zonaP=selZ?selZ.p:0;
   var hotelRaw=selH?selH.e:0;
   // hotelPP: e is per-person cost; otherwise e is total group cost

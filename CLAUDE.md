@@ -271,7 +271,7 @@ está caduco antes de escribirse.
   vive, la exclusión «CDMX con transporte» de **CUADRE-5** podría **encogerse**
   —el index ya sabe el vuelo—. Es tuerca propia y no se cuela.
 
-- 🔴 **NOCHEAP-1 · LA BANDERA QUE NO APAGABA NADA (23-sep-2026, en PR): el
+- 🏆🔴 **NOCHEAP-1 EN PROD (23-sep-2026, #765): la bandera que no apagaba nada — el
   index aprende `noCheap` y OCULTA el paquete.** Decisión de Memo con los
   botones RENDERIZADOS delante. `npm run mide:nocheap-1` (**25**), cero SQL.
   **TRES LETREROS PARA TRES HECHOS:** OCULTO = «este evento no vende CHEAP» ·
@@ -305,6 +305,29 @@ está caduco antes de escribirse.
   ⏳ **La asimetría del compilador NO se arregló** y queda clavada como testigo:
   deja de importar en cuanto el index obedece la bandera. Uniformarla es tuerca
   propia.
+
+- ⏳ **NUM-BUS-1 EN PR (#766): el bus cotiza al 8132321405, no al de reservas.**
+  Regla firmada de Memo (23-sep). `npm run mide:num-bus-1` (**27**), cero SQL,
+  **cambia exactamente un número**. ⚠️ **No lo introdujo NUBE-2: lo HEREDÓ** —
+  esa línea traía el de reservas desde antes de que la nube existiera, y queda
+  dicho para que nadie lea el `git blame` y culpe a la tuerca equivocada. El del
+  avión ya estaba bien, así que ahora **los dos hermanos cotizan por el mismo
+  número**.
+  🔒 **EL CENSO ES EL CONTROL QUE ESTA CLASE DE TUERCA NECESITA MÁS QUE EL
+  CAMBIO:** un barrido de números arregla uno y **se lleva cinco por el
+  camino**. Se cuentan los **74 `wa.me`** del árbol por archivo y por número y
+  se exige la cuenta exacta — `index.html` reservas 9→8 · viajes 2→3 · total
+  48=48 · los otros 17 archivos **idénticos**—, más el candado por renglón (se
+  mueven DOS) y ocho páginas careadas enlace por enlace.
+  ⚠️ **Los `wa.me/52`+dígitos de `sorteo.html` y `kamehouse.js` NO son nuestros
+  números**: abren el chat **del cliente** (el teléfono del ganador, el de un
+  viajero). Contarlos habría vuelto el control ruido.
+  ⏳ **Y un DUDOSO que espera palabra de Memo:** `radio/index.html` tiene
+  etiqueta «Cotizar por WhatsApp» y mensaje «info de los tours» — la etiqueta
+  apunta a viajes y el mensaje a reservas. Se dejó en reservas y el careo lo
+  deja **clavado**: si alguien lo cambia sin su palabra, ese renglón se pone
+  rojo y pregunta. **La frontera entre «cotizar» y «reservar» es su palabra, no
+  un grep.**
 
 - 🏆🔴 **SERIE CARDS COMPLETA EN PROD (23-sep-2026, #759 · #760 · #761): el card
   del cotizador acompaña, gobierna su itinerario y dice sus políticas.**

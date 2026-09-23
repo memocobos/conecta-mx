@@ -167,6 +167,145 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **SERIE NUBE VOLADORA COMPLETA EN PROD (23-sep-2026, #762 · #763 · #764):
+  el transporte a CDMX se cotiza cada lunes y el sitio lo BEBE.** El `2500`
+  tecleado del bus murió y el avión pasó de link de WhatsApp a paquete
+  **vendible**. `npm run mide:nube-1` (**91**) · `nube-2` (**47**) · `nube-3`
+  (**46**). **SQL corrido por Jane ANTES del merge** — el endpoint jamás pisó
+  producción sin su tabla, porque su fail-soft («no hay precio») se ve
+  EXACTAMENTE igual que «nadie cotizó esta semana»: el hueco se habría
+  escondido detrás de su propia red.
+
+  **La forma del dato:** `nube_cotizaciones` es **INSERT-ONLY con trigger** (el
+  molde de `giveaway_rondas_inmutables`) y **la tabla ES el historial**: una
+  captura nueva es una fila nueva, jamás un UPDATE — y el trigger prohíbe
+  también el DELETE. RLS deny-all. ⚠️ **El acta dice el número que la base
+  contesta:** `pg_trigger` cuenta **1**, no 2 — es UN trigger con DOS eventos
+  (update y delete) y **no cubre INSERT**, porque la tabla es insert-only, no
+  read-only. Un acta que no reproduce lo que la consulta contesta manda a
+  buscar un hueco que no existe.
+
+  🔒 **`_lib/nube` ES EL DUEÑO de dos preguntas** —«cuál rige ahora» y «cuál
+  regía el día X»— y ninguna se re-implementa: «qué precio rige» contestado en
+  dos sitios acaba contestándose distinto, y aquí el que pregunta es el que
+  resuelve una disputa de dinero. Sus funciones **reciben el instante** en vez
+  de llamar a `Date.now()`, justo para poder medirse en la frontera de una
+  vigencia.
+
+  🔒 **LA CICATRIZ DE OMAR COURTZ, CERRADA POR DELANTE.** `regiaEl` distingue
+  TRES estados —vigente ese día · vencida ese día · **ANTERIOR AL NACIMIENTO**—
+  y el nacimiento es la **vigencia más antigua**, no la fila más vieja por
+  `creado_en`: alguien puede capturar hoy una vigencia que arrancó la semana
+  pasada, y leerlo mal dejaría ese día «antes de nacer». La pantalla lo ROTULA
+  con palabras: «no es que no cambiara de precio — es que no había ninguno».
+
+  🔴 **TRES DEFECTOS QUE CAZÓ EL CAREO, ninguno visible leyendo:**
+  - **La CACHÉ podía vender lo vencido.** El navegador confiaba en que el
+    endpoint filtra, y la respuesta va por CDN con **`stale-while-revalidate=3600`**:
+    puede llegar **hasta una hora vieja**. Una cotización que vence el domingo
+    23:59 llegaría como vigente el lunes a las 00:30 **desde nuestra propia
+    caché** y se venderÍa. 🔒 **Quien pinta el precio es el último que puede
+    comprobarlo, así que lo comprueba** — y el filtro de la fuente se queda:
+    son dos candados sobre el mismo hecho y ninguno sobra, porque el de la
+    fuente no ve el reloj del cliente ni la edad de la caché.
+  - **`vigentes()` se tragaba el error**: un 5xx salía como «no hay cotización»
+    con `ok:true`, borrando la diferencia entre «no hay fila» y «NO PUDE LEER».
+    Hoy sube, y el endpoint contesta `ok:false` con `no-store`.
+  - **`capturado_por` leía campos inventados** (`nombre || email`) cuando el
+    payload de `verify-admin` trae **`correo`**: habría caído al uuid EN
+    SILENCIO, justo en el campo que existe para saber quién capturó.
+
+  🔴 **EL HUSO SE DERIVA, NO SE TECLEA — y la cadencia SEMANAL es la que lo
+  obliga.** `ESF_FLASH_TZ` es un `-05:00` a mano, y medido: el domingo
+  **1-nov-2026** Reynosa ya va en **−06:00**, así que la cotización capturada el
+  lunes 26-oct habría vencido **UNA HORA ANTES** de lo que dice la pantalla, y
+  así todos los domingos del invierno. La hora de pared se resuelve
+  **preguntándole al huso**: se prueban los dos y se queda el que REPRODUCE la
+  pared pedida.
+
+  🔴 **Y EL `cur.id==='arre'` CABLEADO SE FUE.** Un id a mano es un letrero que
+  se pudre: el día que entre otro evento con vuelo incluido, el sitio le
+  **vende el vuelo DOS VECES** (una en el paquete y otra en el transporte).
+  Hoy la regla se DERIVA del «qué incluye» y —medido sobre los 116 eventos—
+  devuelve **exactamente `['arre']`, evento por evento**: no cambia nada hoy y
+  cierra el hoyo de mañana.
+
+  **Lo demás que vive en prod:** la frontera de los **15 días aplica a los DOS
+  modos** (bus al 8119771072, avión al 8132321405) · **fail-soft POR MODO** —bus
+  vigente con avión vencido vende el bus— · la pantalla de Bulma y Milk como
+  **herramienta** (no se estrenó tab ni permiso) con DEFAULTS-1 y su excepción
+  escrita (el modo nace vacío porque es una ATRIBUCIÓN; la vigencia trae default
+  porque es una FORMA y va **anunciada**) · y el **renglón del Radar** que se
+  deriva, **se calla cuando los dos modos están vigentes** —un aviso permanente
+  se vuelve parte del mueble y deja de avisar— y dice la CONSECUENCIA.
+  🔒 Ese renglón vive **fuera** de la lista de alertas: ésas son filas
+  GUARDADAS con su id y su «vista», y darle un id falso habría sido peor que no
+  tenerlo.
+
+  🔒 **LEY NUEVA, Y ES LA MÁS FINA DE LA SERIE: LA FORMA FÁCIL DE ROMPER
+  «PREGÚNTALE AL DUEÑO» NO ES RE-IMPLEMENTAR LA PREGUNTA — ES CAMBIARLE LA
+  RESPUESTA AL DUEÑO** para que encaje con la pantalla nueva. Eso deja a la
+  pantalla contenta y a quien ya bebía del mismo lib contestando otra cosa. El
+  careo de NUBE-3 lo vuelve candado: exige que **`_lib/nube.js` sea BYTE A BYTE
+  el de BASE**. Vale para cualquier tuerca que «le pregunte» a un lib existente.
+
+  🔒 **Y DOS COSAS DEL MÉTODO que se pagaron en esta serie:**
+  - **El reloj se congela DENTRO del navegador**, y no basta `Date.now`: el
+    sitio hace `new Date()`. Va un proxy que sigue siendo `Date` para todo lo
+    demás (`parse`, `UTC`, los constructores con argumentos).
+  - **No siempre existe UN instante donde todos los casos sean reales.** Medido:
+    los eventos de CDMX con `noBus` son de octubre y noviembre, y los que quedan
+    a ≤15 días caen en diciembre — cuando uno está cerca, el otro ya pasó. El
+    careo usa **dos relojes**, cada uno con su razón escrita y **su premisa
+    afirmada**. (Mi primera versión eligió el evento «de cerca» a ojo y estaba a
+    **191 días**.)
+  ⚠️ Y un recordatorio caro: **el «antes» de una Δ tiene que ser el estado que
+  aísla el término que se mide.** Leí el total antes de elegir cualquier
+  transporte y valía **0** —`calcular()` se sale temprano—, así que la Δ era el
+  total ENTERO. El «antes» bueno es «Sin transporte».
+  ⚠️ Y **una aserción que no puede fallar no es una aserción**: puse un
+  `af(true, 'ancla')` que además inflaba la cuenta de verdes. El control de la
+  vencida se mide **en par**, exigiendo que los dos brazos difieran.
+
+  ⏳ **ANOTADO SIN HACER, con palabra de Memo pendiente:** ahora que la nube
+  vive, la exclusión «CDMX con transporte» de **CUADRE-5** podría **encogerse**
+  —el index ya sabe el vuelo—. Es tuerca propia y no se cuela.
+
+- 🔴 **NOCHEAP-1 · LA BANDERA QUE NO APAGABA NADA (23-sep-2026, en PR): el
+  index aprende `noCheap` y OCULTA el paquete.** Decisión de Memo con los
+  botones RENDERIZADOS delante. `npm run mide:nocheap-1` (**25**), cero SQL.
+  **TRES LETREROS PARA TRES HECHOS:** OCULTO = «este evento no vende CHEAP» ·
+  «No disponible» = sí vende, pero no hay lugares · «PRÓXIMAMENTE» = va a haber.
+
+  **Medido:** la casilla «Sin CHEAP» de Esferas escribe `no_cheap`, el
+  compilador emite `noCheap:true` y el index **NO LO LEÍA EN NINGUNA PARTE** —
+  cero lecturas; las dos apariciones del archivo eran DATO. Familia de la
+  guarda inalcanzable: un interruptor que se prende y no apaga nada.
+  🔴 **Y no era inocuo.** `humbecdmx` está VIVO con la bandera puesta y se veía
+  «No disponible» **POR ACCIDENTE**: lo salvaba no tener `cheapZonas`. Sembrando
+  la variante peligrosa —bandera puesta CON precios— el botón salía **«DESDE
+  $3,200» y CLICKABLE**: el sitio vendía justo lo que la casilla dice no vender.
+
+  🔴 **DOS TRAMPAS QUE CAZÓ MEDIR, NO LEER:**
+  1. **`cheapSoon` GANA, y va antes.** `coronacapital` trae **las dos**
+     banderas —el camino de FESTIVAL emite `noCheap:true,cheapSoon:true` juntas
+     (L964) y el de CONCIERTO solo `noCheap` (L1214)— y con el orden al revés mi
+     cambio le **escondía su «PRÓXIMAMENTE»**. «Va a haber» es más específico que
+     «no vendemos»: **gana la que dice más**, y el careo lo carea byte a byte
+     contra BASE para que esta tuerca solo toque lo que estaba roto.
+  2. **La VISIBILIDAD también se reenciende.** Los botones son GLOBALES y la
+     pantalla se reusa entre eventos: sin esa línea, el primer evento sin CHEAP
+     se lo borraba a **todos** los siguientes, en la misma visita y sin aviso —
+     el bug que ese bloque ya documentaba para `disabled` (cheapOnly apagando
+     RIDE para los 5 eventos siguientes), con otra propiedad.
+  ⚠️ Y el botón se esconde **Y se apaga**: solo con `display:none` quedaba
+  invisible pero HABILITADO, un estado a medias.
+  ⚠️ `noCheap` + `cheapOnly` dejaría al cliente **sin ningún paquete**, así que
+  gana `cheapOnly`. Hoy ningún evento trae las dos, y el careo avisa si pasa.
+  ⏳ **La asimetría del compilador NO se arregló** y queda clavada como testigo:
+  deja de importar en cuanto el index obedece la bandera. Uniformarla es tuerca
+  propia.
+
 - 🏆🔴 **SERIE CARDS COMPLETA EN PROD (23-sep-2026, #759 · #760 · #761): el card
   del cotizador acompaña, gobierna su itinerario y dice sus políticas.**
   `npm run mide:card-itin` (**69**) · `mide:card-poli` (**53**) ·

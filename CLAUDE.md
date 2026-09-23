@@ -40,7 +40,7 @@
 - Mapas de venues: mapas.js (MAPAS)
 - Lineups: lineups.js (LINEUPS)
 - Deploy: GitHub → Netlify automático
-- Ayuda contextual: FAB "?" flotante + modal mínimo + hints sutiles por paso (sin chatbot)
+- Ayuda contextual: ⚰️ **el FAB «?» y sus hints MURIERON** (medido en CARD-GUIA-1: el index borra sus llaves con el comentario «sistema de ayuda ya eliminado»). Lo que hay: el popup **«¿Cómo reservar tu lugar?»** una vez por evento, y **la guía por paso del cotizador** en `#d-placeholder` (CARD-GUIA-1). Sin chatbot.
 - Analytics: Google Analytics G-7JKGFQQQ7W
 - Dominio: conectareynosa.mx (GoDaddy → Netlify DNS)
 
@@ -166,6 +166,124 @@ aquí en adelante se dibuja contra Mercado Pago + 3DS. Un diseño que asuma Stri
 está caduco antes de escribirse.
 
 ### 🟡 Vivos
+
+- 🏆🔴 **SERIE CARDS COMPLETA EN PROD (23-sep-2026, #759 · #760 · #761): el card
+  del cotizador acompaña, gobierna su itinerario y dice sus políticas.**
+  `npm run mide:card-itin` (**69**) · `mide:card-poli` (**53**) ·
+  `mide:card-guia` (**29**). Material firmado de Memo en
+  `CARDS-ITINERARIOS-POLITICAS-BRIEF.md`; **los textos se copiaron, no se
+  parafrasearon**.
+  ⏳ **PIDE SQL, y no es opcional: `migraciones/CARD-ITIN-1.sql` va ANTES de que
+  nadie publique desde Esferas** — el candado se rehúsa (409) nombrando a
+  `pulsoquetaro` y `tecatecomuna`. 🔒 El texto **no se re-teclea: se MUEVE**
+  desde `extras -> promoModal -> desc`, que es la única forma de garantizar que
+  el itinerario de hoy es byte por byte el de mañana.
+
+  🔴 **TRES PREMISAS DEL ENCARGO NO SOBREVIVIERON A LA MEDICIÓN, y las tres
+  cambiaron el trabajo.** Es la forma de LAND-2, otra vez:
+  - **«Sin bandera cdmx → plantilla Monterrey» habría MENTIDO.** `ciudad` no es
+    un campo de dos valores: tiene **CINCO** (MTY 82 · CDMX 31 · null 2 ·
+    Morelos 1 · Saltillo 1) y **CONTRADICE al venue en tres filas** —
+    `tecatecomuna` (Puebla) y `pulsoquetaro` (Querétaro) están marcados «MTY», y
+    `bahidora2027` (Las Estacas, Morelos) también. **Cinco eventos no son ni
+    Monterrey ni CDMX.** Así que la clase se deriva del **VENUE** y hay un
+    **TERCER ESTADO: sin plantilla** — el card no pinta nada y la ficha lo pide
+    en naranja. Antes que un letrero que miente, ninguno.
+  - **«2+ pagos no registrados = baja automática» NO ES LO QUE PASA.** Medido:
+    (1) no hay nada automático — el único escritor de `estado:'baja'` es
+    `admin-lugar-baja` y su único llamador es un humano en el Palacio
+    (`kamehouse.js:7211`); ningún cron, y el de *strikes* es de reportes del
+    staff, no de pagos; (2) el umbral de la BAJA es **3**, no 2 —
+    `portal-morosidad-diario` manda «congelado y en riesgo de baja» a las 2 y
+    «en proceso de baja» a las 3+, y su encabezado dice **«Solo NOTIFICA — no da
+    de baja ni congela nada (eso lo hace un humano)»**; (3) cuenta quincenas
+    **VENCIDAS**, no «no registrados», que se lee como «pagué y no lo
+    reportaron». **Con la medición enfrente Memo eligió que el texto se ajuste
+    al hecho**, palabra por palabra igual que los correos. 🔒 El careo lo vigila
+    contra la FUENTE del cron **en los dos sentidos**: si el cron deja de decir
+    «Solo NOTIFICA» o le cambian los niveles, avisa de que el letrero se quedó
+    viejo.
+  - **«Montados sobre los hints del FAB»: EL FAB NO EXISTE.** El único flotante
+    es el de WhatsApp, y el propio index **borra** las llaves `wiz-hint-visto`,
+    `hints-vistos` y `help-fab-shown` con el comentario «sistema de ayuda ya
+    eliminado». ⚰️ **La línea de este libro que promete «FAB "?" flotante +
+    hints sutiles por paso» quedó VIEJA.** La guía se montó donde **ya había un
+    letrero que estaba MUDO**: `#d-placeholder` decía «Elige tus opciones para
+    ver tu cotización» —lo mismo para los cinco pasos— en las **nueve** veces
+    que se enciende. Es ROL-MONTO-MUDO-1 en el cotizador.
+
+  🔴 **LA LEY GRANDE DE LA SERIE: EN `index.html` UN `var` DE NIVEL SUPERIOR
+  LEÍDO POR CÓDIGO QUE ESTÁ ARRIBA VALE `undefined`.** Los `<script>` inline se
+  ejecutan **mientras la página se parsea**, y el deep-link de un evento
+  —`/<slug>`, **la url que se comparte**— llama a `showDetail()` desde ahí
+  mismo. Mordió dos veces y casi una tercera:
+  · `var ITIN_MTY` → `itinerarioDe()` devolvía `undefined` y **entrar por la url
+    dejaba el card ESCONDIDO mientras entrar por un clic lo mostraba**: el mismo
+    evento, dos caras, según la puerta. Hoy las plantillas son **funciones**.
+  · `var GUIA_ARRANQUE` → habría pintado literalmente **«undefined»** en el
+    cotizador, **y sin tirar error**: invisible en la consola.
+  · `var GUIA` → habría tirado `Cannot read properties of undefined`.
+  🔒 **La señal:** si algo se ve al entrar por un clic y **no** se ve al entrar
+  por la url, sospecha del **orden de parseo** antes que del CSS. Y lo cazó el
+  careo por **entrar por donde entra el cliente**: un careo que llamara
+  `showDetail()` a mano **sale VERDE** — comprobado.
+
+  🔴 **DOS DEFECTOS AJENOS, MEDIDOS Y ANOTADOS SIN ARREGLAR** (los dos piden
+  palabra de Memo):
+  - **`generarObjFestival` NO PUEDE CORRER**: referencia `sepSeg`, que no existe
+    en su ámbito → `ReferenceError` antes de emitir nada. Viene de `115c147` y
+    se comprobó contra `main`: **no es de esta serie**. Nunca se notó porque la
+    rama es alcanzable y **nadie la ha alcanzado**: de **117 fichas, 4 traen
+    objeto `festival` y CERO traen `paquetes`**, y el emisor solo entra ahí
+    cuando hay paquetes. Familia de la guarda inalcanzable: un emisor entero que
+    truena la primera vez que alguien lo use. **Arreglarlo pide decidir qué
+    separo emite un festival.** El careo deja un **testigo** que exige que
+    truene con ESE mensaje: el día que se arregle, se pone rojo y manda a leer
+    la nota.
+  - **UN CALLEJÓN EN CDMX**: tras elegir la zona, la habitación viene
+    **PRE-MARCADA** («Compartida»), el paso del transporte está **oculto** y la
+    cotización **no aparece** — el cliente tiene que **apretar la opción que ya
+    estaba marcada** para que el flujo siga. No se arregló (un paso
+    preseleccionado que aun así exige el clic es tuerca propia); **sí se le quitó
+    el silencio**: la frase de confirmación vive en la propia card
+    (`data-guia-confirma`).
+
+  🔒 **CUATRO LEYES NUEVAS, cada una pagada:**
+  1. **AGRUPAR UN TEXTO ROMPE SUS REFERENCIAS INTERNAS.** «pero no **ESE**
+     cargo» perdió su antecedente al repartir las políticas por temas: el cargo
+     de tarjeta quedó en otra caja y el pronombre apuntaba a nada. **Lo vio Jane
+     LEYENDO; ningún careo mío lo habría cazado.** Al repartir una lista en
+     temas hay que **barrer los pronombres**. Y el arreglo se prueba por
+     construcción: el careo toma el original, aplica **esa sola sustitución** y
+     exige igualdad — ninguna otra palabra puede colarse en el texto de Memo.
+  2. **EL ORDEN DE LOS PASOS LO DICE EL DOCUMENTO, NO UNA LISTA.** Escribir el
+     letrero en cada REVELADO daba el paso equivocado: `selPaquete` abre la zona
+     **y** la habitación en la misma pasada, así que ganaba el **último** y
+     pedía la habitación cuando faltaba la zona. Hoy cada paso lleva su llave en
+     `data-guia` y se recorre **en orden de documento** —el orden en que el
+     cliente lee—, nombrando el primero **a la vista y sin contestar**; y
+     «contestado» **se le pregunta al sitio** (`.active`).
+  3. **`innerText` DEVUELVE EL TEXTO TAL COMO SE PINTA.** `.pol-row` lleva
+     `text-transform:uppercase`, así que carear los seis textos de Memo contra
+     `innerText` los encontraba **en MAYÚSCULAS** y fallaba los seis. El careo
+     letra por letra va contra **`textContent`**; el `innerText` se queda para
+     comprobar que el estilo sigue vivo, que también es parte del letrero.
+  4. 🔴 **A UNA PR APILADA SE LE CAMBIA LA BASE A `main` ANTES DE MERGEARLA.**
+     #760 quedó **CLOSED y no MERGED** aunque su código **sí entró** (`e79dbd8`,
+     verificado con `merge-base --is-ancestor`): su base era `card-itin-1`, que
+     ya estaba dentro de main pero cuya **rama nunca se movió**, así que GitHub
+     no vio el merge contra su base — y re-apuntarla después se **rehúsa**
+     («There are no new commits between base branch 'main' and head branch»).
+     Con la #761 se hizo al revés —base a `main` **antes** del merge— y quedó
+     **MERGED**. Es la hermana de «el push que miente»: el registro miente
+     mientras el código está dentro.
+
+  ⚠️ **Y una publicación de 77 eventos de Memo cayó en medio del merge de
+  #759.** El `index.html` se auto-fusionó y se careó lo que importaba **byte a
+  byte**: las dos fichas migradas traen su itinerario **idéntico** (sha1 igual
+  al de la rama), ya **no** traen `promoModal`, `dalemix` conserva su promo y
+  los tres eventos del careo mantuvieron su venue y su estado. Los tres careos
+  corren en verde sobre el árbol final.
 
 - 🏆🔴 **CUADRE-5 EN PROD (23-sep-2026, #758): el «$0» tecleado deja de ser
   diferencia donde el index SÍ puede saber el total.** Regla firmada por Memo

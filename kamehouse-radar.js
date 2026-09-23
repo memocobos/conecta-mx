@@ -1241,10 +1241,71 @@ async function loadRadarPagos(){
       }).join('');
 }
 // ── ALERTAS ────────────────────────────────────────────────
+// ═══ [NUBE-3] EL RENGLÓN DE «LA NUBE ESTÁ VENCIDA» ════════════════════════
+// Decisión de Memo: el aviso es un RENGLÓN DE PANTALLA, no un cron que manda
+// correo. Así que vive aquí, derivado del estado de HOY, y no hay ni una línea
+// de envío en toda la serie.
+//
+// 🔒 EL LETRERO SE DERIVA Y SE CALLA CUANDO NO HAY NADA QUE DECIR: con los dos
+// modos vigentes NO se pinta. Un aviso permanente se vuelve parte del mueble y
+// deja de avisar — y esta casa ya pagó que «agotar lo ya agotado era mudo».
+//
+// 🔒 Y NO SE METE EN LA LISTA DE ALERTAS: ésas son filas GUARDADAS, con su id,
+// su «vista» y su destino. Ésta es un letrero vivo; darle un id falso y un
+// «marcar como vista» que no significa nada habría sido peor que no tenerlo.
+async function _radarNubeAviso() {
+  const caja = document.getElementById('rdr-nube-aviso');
+  if (!caja) return;
+  // Fail-soft CALLADO: si no se puede leer, no se inventa un aviso ni se
+  // pinta un error. El Radar no es el dueño de esta información.
+  let d = null;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d || d.ok === false) d = null;
+  } catch (_) { d = null; }
+  if (!d) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  const ahora = Number(d.ahora) || Date.now();
+  const flojos = [];
+  for (const m of [{ k: 'bus', n: 'autobús' }, { k: 'avion', n: 'avión' }]) {
+    const info = (d.modos && d.modos[m.k]) || {};
+    if (info.vigente) continue;
+    const ultima = (info.ultimas || [])[0];
+    flojos.push({ nombre: m.n, venció: ultima ? ultima.vigente_hasta : null });
+  }
+  if (!flojos.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  const enRey = (iso) => {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return '—';
+    try { return new Date(t).toLocaleString('sv-SE', { timeZone: RAD_TZ }).slice(0, 16); } catch (_) { return '—'; }
+  };
+  const lista = flojos.map((f) => '<b>' + f.nombre + '</b>'
+    + (f.venció ? (' (venció el ' + enRey(f.venció) + ')') : ' (nunca se ha cotizado)')).join(' y ');
+  // ⚠️ Se dice la CONSECUENCIA, no solo el hecho: sin eso, «vencida» no le
+  // dice a nadie qué está pasando en el sitio ahora mismo.
+  caja.innerHTML = '<div class="rdr-alert sev-alta no-vista" style="cursor:pointer" onclick="showHerramienta(\'nube\')">'
+    + '<div class="dot"></div>'
+    + '<div class="body">'
+    + '<div class="titulo">La nube voladora está vencida: ' + lista + '</div>'
+    + '<div class="mensaje">Mientras no haya cotización vigente, ese modo NO se vende en el sitio: '
+    + 'el cliente cae al WhatsApp. Súbela desde Herramientas → Nube voladora.</div>'
+    + '</div>'
+    + '<div class="meta">' + enRey(new Date(ahora).toISOString()) + '<br><span class="tipo">nube_vencida</span>'
+    + '<br><span class="rdr-ir">Ir a resolver →</span></div>'
+    + '</div>';
+  caja.style.display = '';
+}
+
 async function loadRadarAlertas(){
   _radarCache.alertas = await khRadar.alertasListar(); // [sec-radar-wl]
   renderAlertasFiltered('all');
   refreshAlertasBadge();
+  // [NUBE-3] El renglón derivado de la nube, al lado de las alertas guardadas.
+  // No se espera (`await`) a propósito: si esa lectura tarda, las alertas de
+  // verdad ya están pintadas — el aviso aparece cuando llegue.
+  _radarNubeAviso();
 }
 function renderAlertasFiltered(filtro){
   const arr = (_radarCache.alertas || []).filter(a => {

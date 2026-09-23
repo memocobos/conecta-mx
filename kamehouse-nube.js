@@ -216,3 +216,80 @@ async function nubeGuardar() {
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar cotización'; }
   }
 }
+
+// ═══ [NUBE-3] EL HISTORIAL CONSULTABLE ════════════════════════════════════
+// «¿Qué cotización regía el día que reservó?» — la pregunta que resuelve una
+// disputa de dinero LEYENDO en vez de recordando. Y por eso la tabla es
+// INSERT-only desde NUBE-1: el precio al que alguien cotizó es un hecho con
+// fecha, y un hecho con fecha no puede cambiar debajo.
+//
+// 🔒 LOS TRES ESTADOS SE ROTULAN, no se aplastan en «no hay». «Vigente ese
+// día», «vencida ese día» y «ANTERIOR AL NACIMIENTO» no son grados de lo
+// mismo: la cicatriz de Omar Courtz fue exactamente confundir «yo todavía no
+// existía» con «nunca cambió», y contestar el precio de HOY para un separo
+// pasado.
+//
+// 🔒 Y LA PREGUNTA NO SE RE-IMPLEMENTA AQUÍ: la pantalla pide y pinta. Quien
+// decide qué regía es `regiaEl` del lib, por su endpoint.
+var NUBE_EST = {
+  vigente:              { t: 'REGÍA ESE DÍA',            c: 'var(--green)' },
+  vencida:              { t: 'VENCIDA ESE DÍA',          c: 'var(--orange)' },
+  antes_del_nacimiento: { t: 'LA NUBE AÚN NO EXISTÍA',   c: 'var(--ts)' },
+  sin_datos:            { t: 'ESTE MODO NUNCA SE COTIZÓ', c: 'var(--ts)' },
+};
+async function nubeConsultar() {
+  var dia = (document.getElementById('nube-q-dia') || {}).value || '';
+  var caja = document.getElementById('nube-q-res');
+  if (!caja) return;
+  if (!dia) { caja.innerHTML = '<div style="font-size:12px;color:var(--orange)">Elige el día que quieres consultar.</div>'; return; }
+  caja.innerHTML = '<div class="loading-state">Leyendo el historial…</div>';
+  try {
+    var r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'historial', dia: dia }),
+    });
+    var d = await r.json().catch(function () { return {}; });
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
+    caja.innerHTML = _nubeHistHtml(d, dia);
+  } catch (e) {
+    khErrorCarga(caja, 'el historial de la nube', 'nubeConsultar', e);
+  }
+}
+function _nubeHistHtml(d, dia) {
+  var partes = NUBE_MODOS.map(function (m) {
+    var r = (d.modos && d.modos[m.k]) || {};
+    var est = NUBE_EST[r.estado] || { t: String(r.estado || '—').toUpperCase(), c: 'var(--ts)' };
+    var cuerpo;
+    if (r.estado === 'vigente' && r.fila) {
+      // El DATO que resuelve la disputa: el precio, su vigencia completa y
+      // QUIÉN la capturó. Los tres juntos, porque por separado no prueban nada.
+      cuerpo = '<b style="color:var(--tp);font-size:18px">' + _nubeMxn(r.fila.precio) + '</b>'
+        + ' <span style="font-size:11px;color:var(--ts)">por persona</span>'
+        + '<div style="font-size:11px;color:var(--ts);margin-top:4px">vigencia: <b>' + _nubeEnReynosa(r.fila.vigente_desde)
+        + '</b> → <b>' + _nubeEnReynosa(r.fila.vigente_hasta) + '</b> (hora de Reynosa)</div>'
+        + '<div style="font-size:11px;color:var(--ts)">la subió <b>' + _nubeEsc(r.fila.capturado_por || '—') + '</b>'
+        + ' el ' + _nubeEnReynosa(r.fila.creado_en) + '</div>'
+        + (r.fila.nota ? '<div style="font-size:11px;color:var(--ts);margin-top:2px">' + _nubeEsc(r.fila.nota) + '</div>' : '');
+    } else if (r.estado === 'vencida') {
+      cuerpo = '<div style="font-size:12px;color:var(--ts)">Ese día <b style="color:var(--tp)">no había cotización vigente</b>: '
+        + 'el sitio mandaba al WhatsApp y el precio lo puso un humano.'
+        + (r.fila ? ('<br>La última antes de ese día fue ' + _nubeMxn(r.fila.precio) + ', vencida el '
+                     + _nubeEnReynosa(r.fila.vigente_hasta) + ' (la subió ' + _nubeEsc(r.fila.capturado_por || '—') + ').')
+                  : '')
+        + '</div>';
+    } else if (r.estado === 'antes_del_nacimiento') {
+      cuerpo = '<div style="font-size:12px;color:var(--ts)">Ese día <b style="color:var(--tp)">la nube todavía no existía</b> para este modo'
+        + (r.nacimiento ? (': la primera cotización empezó a regir el <b>' + _nubeEnReynosa(new Date(r.nacimiento).toISOString()) + '</b>') : '')
+        + '. No es que no cambiara de precio — es que no había ninguno, y el sitio mandaba al WhatsApp.</div>';
+    } else {
+      cuerpo = '<div style="font-size:12px;color:var(--ts)">Este modo <b style="color:var(--tp)">nunca se ha cotizado</b>.</div>';
+    }
+    return '<div class="card" style="padding:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
+      + '<div class="card-lbl">' + m.emoji + ' ' + m.nombre + '</div>'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:' + est.c + '">' + est.t + '</span>'
+      + '</div>' + cuerpo + '</div>';
+  }).join('');
+  return '<div style="font-size:11px;color:var(--ts);margin-bottom:8px">Lo que regía el <b style="color:var(--tp)">'
+    + _nubeEsc(dia) + '</b> (leído por vigencia, no por «la última capturada»):</div>'
+    + '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + partes + '</div>';
+}

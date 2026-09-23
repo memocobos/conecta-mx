@@ -351,7 +351,15 @@ body.gano .mos.gana .mos-folio{display:none}
 /* ═══ [GANADOR-B2] EL CONTACTO DEL GANADOR, SOLO CON TOKEN ══════════════
    El teléfono ya vivía enmascarado aquí; lo que faltaba eran las dos puertas
    para hablarle. Nace apagado: lo enciende `pintarPanel` y SOLO con token. */
-.contacto{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+/* 🔴 UN RENGLÓN SIEMPRE, sin `flex-wrap`. Con envoltura la altura dependía de
+   lo ANCHO que midiera la tipografía: 34px con las fuentes de Google cargadas y
+   78px con la de respaldo —el cliente de red mala, o el careo de Jane—. Una
+   altura que depende de si cargó un CDN no se puede hacer caber.
+   El @ se recorta con puntos suspensivos y NO se pierde: va completo en el
+   `title` y en el `aria-label`, y el `href` lo lleva entero. */
+.contacto{display:none;gap:8px;margin-top:10px;flex-wrap:nowrap;justify-content:center;
+  align-items:stretch}
+.contacto a{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .contacto a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
   font-family:var(--font-display);font-weight:900;font-size:12px;letter-spacing:.08em;
   text-transform:uppercase;padding:9px 13px;border-radius:9px;
@@ -449,7 +457,7 @@ body.gano .mosaico{justify-content:center}
 /* ⚠️ 182px y no 236: con el panel del admin completo —teléfono, contacto y los
    tres botones— el bloque se pasaba del pliegue. Medido, no estimado; el
    desglose lo imprime el careo. */
-body.gano .mos.gana{width:min(48vw,182px);margin-left:auto;margin-right:auto}
+body.gano .mos.gana{width:min(44vw,164px);margin-left:auto;margin-right:auto}
 
 /* 🔴 [GANADOR-PODA-1] EL APRETADO VIVE EN `body.gano`, NO EN LAS REGLAS
    GENERALES. La orden de Memo es que todo quepa en 390×844 CON el panel del
@@ -463,6 +471,10 @@ body.gano .reloj{margin-top:10px;padding-top:10px}
 body.gano .reloj-n{font-size:clamp(44px,10vw,74px)}
 body.gano .cuando-giro{font-size:11.5px;line-height:1.4}
 body.gano .placa-ganador{margin-top:10px;padding:11px 12px}
+/* ⚠️ El nombre COMPLETO más largo del padrón real son 37 caracteres y a 24px
+   ocupa tres renglones. Aquí baja a 19-34px: sigue siendo el renglón más
+   grande de la placa y deja de empujar el bloque fuera del pliegue. */
+body.gano .placa-ganador .pg-n{font-size:clamp(19px,4.6vw,34px);line-height:1.05}
 body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;line-height:1.3}
 
 /* La placa de abajo: el nombre COMPLETO, para que quede claro que es una
@@ -591,9 +603,9 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
    qué: con los 19px y los 15/26 de padding del `.btn` general, «No contestó —
    volver a girar» envuelve en tres renglones dentro de una columna de 152px y
    los tres botones median 186px. Aquí el rótulo manda sobre la tipografía. */
-.acciones .btn{margin:0;width:100%;padding:11px 10px;font-size:14px;
-  letter-spacing:.04em;line-height:1.15}
-.acciones .btn-si{grid-column:1 / -1;padding:13px 10px;font-size:16px}
+.acciones .btn{margin:0;width:100%;padding:9px 8px;font-size:13px;
+  letter-spacing:.03em;line-height:1.12}
+.acciones .btn-si{grid-column:1 / -1;padding:11px 8px;font-size:15px}
 /* A 340px o menos (iPhone SE) dos columnas dejan los rótulos en tres renglones:
    ahí se vuelven a apilar. Se mide, no se supone. */
 @media (max-width:340px){
@@ -3096,6 +3108,11 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
     if (usr) {
       ig.href = 'https://instagram.com/' + encodeURIComponent(usr);
       ig.textContent = '@' + usr;
+      // 🔒 El rótulo se recorta en pantalla (un renglón fijo), así que el @
+      // COMPLETO tiene que vivir en otra parte o se perdería: va en el `title`
+      // y en el `aria-label`, además del `href`.
+      ig.title = '@' + usr;
+      ig.setAttribute('aria-label', 'Instagram del ganador: @' + usr);
       ig.removeAttribute('aria-disabled');
     } else {
       // Se queda A LA VISTA pero apagado: que el Instagram FALTE es un dato

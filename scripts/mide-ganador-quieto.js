@@ -31,19 +31,10 @@ process.env.PORTAL_SUPABASE_URL = process.env.PORTAL_SUPABASE_URL || 'https://ca
 process.env.PORTAL_SUPABASE_SERVICE_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || 'k';
 const G = require(RAIZ + '/netlify/functions/_lib/giveaway.js');
 
-const VESTIDO = '/imgs/giveaways/karol-g.jpg';
-const CAT = require(RAIZ + '/netlify/functions/_lib/catalogo-index.js');
-// 🔒 EL ARTISTA NO SE TECLEA NI EN EL CAREO. Se saca del catálogo del ÁRBOL
-// MEDIDO con el mismo parser y la misma llave que usa producción, así que la
-// aserción compara «lo que la página pidió» contra «lo que el catálogo dice»,
-// no contra un literal mío que podría estar de acuerdo con mi propio bug.
-function artistaDelArbol(dir) {
-  try {
-    const ev = CAT._parseEV(fs.readFileSync(path.join(dir, 'index.html'), 'utf8'));
-    const e = (ev || []).find((x) => x && x.id === G.EVENTO_CATALOGO);
-    return (e && e.img) ? String(e.img) : null;
-  } catch (e) { return null; }
-}
+// ⚰️ [GANADOR-PODA-1] Aquí vivían `VESTIDO` y `artistaDelArbol`, del tiempo en
+// que la tarjeta llevaba la imagen y la muestra de 30 s. Los dos se podaron.
+// ⚠️ Este careo sigue ANCLADO a su commit, así que mide un árbol que todavía
+// las tiene — y eso está bien: es el careo de GANADOR-QUIETO-2, no de la poda.
 const PEDIDOS_DEEZER = [];
 const PEDIDOS_FOTO = [];
 // 🔴 UN AUDIO DE VERDAD, GENERADO. Para probar que el botón ALTERNA hace falta
@@ -189,7 +180,6 @@ function datos() {
   return padrones[CUANTOS];
 }
 let WA = '8990000001';            // 10 dígitos, como los guarda el registro
-let ARTISTA = null;               // se llena del catálogo del árbol medido
 let DEEZER = { preview: 'https://cdns-preview-x.dzcdn.net/stream/careo-30s.mp3',
                title: 'Provenza', artist: 'KAROL G' };
 let IG = 'karla.m';
@@ -231,7 +221,7 @@ function estado() {
       momento_finalistas_en_ms: TI.momentoFinalistasMs(D.esc),
       // Como en producción: derivado del catálogo y SOLO con el ganador ya
       // revelado (la ruta es caliente y el catálogo no se pide en cada latido).
-      artista: rev ? ARTISTA : null },
+      },
     giros: [] };
 }
 // 🔒 `premio_texto` se DERIVA de `_lib`, igual que en producción: si el careo

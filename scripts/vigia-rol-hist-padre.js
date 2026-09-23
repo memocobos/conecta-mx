@@ -115,7 +115,7 @@ const llaves = (o) => Object.keys(o || {}).sort();
 const opciones = (j) => (j.al_abrir ? 1 : 0) + (j.cambios || []).length;
 
 (async () => {
-  console.log('CAREO ROL-HIST-PADRE-1');
+  console.log('VIGÍA VIVO · /rol y los precios  (era el careo de ROL-HIST-PADRE-1)');
   console.log('  BASE:', BASE);
   console.log('  HEAD:', HEAD);
   console.log('');

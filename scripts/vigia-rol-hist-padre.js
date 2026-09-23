@@ -80,11 +80,37 @@ async function preguntar(sitio, p) {
   return { status: r.status, cuerpo: await r.json() };
 }
 
-// Comparación estable: mismas llaves, mismo orden, mismo contenido.
+// ═══ 🔴 COMPARACIÓN ESTABLE, Y AHORA DE VERDAD ══════════════════════════════
+//
 // 🔒 NO SE QUITA NINGUNA CLAVE. El vigía viejo quitaba `LLAVES_NUEVAS` de HEAD
 // y no de BASE, y ése era el origen de los 252 «distintas»: la comparación
-// mentía por construcción. Aquí se comparan ENTERAS.
-const estable = (o) => JSON.stringify(o, Object.keys(o).sort());
+// mentía por construcción.
+//
+// 🔴 Y TENÍA UN SEGUNDO DEFECTO, PEOR, QUE NADIE HABÍA VISTO: era
+// `JSON.stringify(o, Object.keys(o).sort())`, y un ARRAY como segundo argumento
+// de `JSON.stringify` **no es un orden: es una lista blanca de claves que se
+// aplica a TODOS los niveles**. Como sólo listaba las claves de nivel 1, todo
+// lo anidado se serializaba VACÍO:
+//
+//     {ok:true, al_abrir:{precio:3400}}  →  {"al_abrir":{},"ok":true}
+//
+// O sea que el «byte a byte» del vigía **nunca comparó un precio**, ni una
+// hora, ni `cerrada`, ni `aplicable`. Habría dado 344 de 344 idénticas con
+// producción cotizando $9,999.
+//
+// 🔒 LO CAZÓ EL CONTROL POSITIVO POR SABOTAJE, en su primera guardia y antes de
+// que este vigía dijera un solo verde útil. Es la razón de existir de ese
+// bloque: un comparador que no puede ver una diferencia no está comparando.
+function ordenar(v) {
+  if (Array.isArray(v)) return v.map(ordenar);
+  if (v && typeof v === 'object') {
+    const out = {};
+    Object.keys(v).sort().forEach((k) => { out[k] = ordenar(v[k]); });
+    return out;
+  }
+  return v;
+}
+const estable = (o) => JSON.stringify(ordenar(o));
 const llaves = (o) => Object.keys(o || {}).sort();
 const opciones = (j) => (j.al_abrir ? 1 : 0) + (j.cambios || []).length;
 
@@ -135,7 +161,15 @@ const opciones = (j) => (j.al_abrir ? 1 : 0) + (j.cambios || []).length;
     const sab4 = JSON.parse(JSON.stringify(real));
     sab4.tz = 'America/Cancun';
     afirmar(estable(sab4) !== estable(real), 'S·caza el HUSO cambiado');
-    console.log('    cuatro sabotajes, cuatro cazados');
+    // 🔒 Y EL QUE CAZÓ EL DEFECTO DEL COMPARADOR, explícito: un cambio ANIDADO
+    // dos niveles adentro. Con el `estable` viejo esto pasaba desapercibido, y
+    // con él todos los precios y todas las horas.
+    const sab5 = JSON.parse(JSON.stringify(real));
+    if ((sab5.cambios || []).length) sab5.cambios[0].hora = '23:59';
+    else if (sab5.al_abrir) sab5.al_abrir.cerrada = !sab5.al_abrir.cerrada;
+    afirmar(estable(sab5) !== estable(real),
+      'S·caza un cambio ANIDADO (una hora, dos niveles adentro)');
+    console.log('    cinco sabotajes, cinco cazados');
   }
 
   // ── [V] IGUALDAD VIVA · LOS DOS SITIOS CONTESTAN LO MISMO ──────────────────

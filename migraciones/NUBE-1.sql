@@ -123,3 +123,28 @@ select 'trigger', (select count(*)::text from pg_trigger
 --      update public.nube_cotizaciones set precio_pp = 9999 where capturado_por = 'prueba-jane';
 --      delete from public.nube_cotizaciones where capturado_por = 'prueba-jane';
 --    rollback;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- CIERRE · CORRIDO POR JANE EL 23-SEP-2026, **ANTES DEL MERGE**
+-- ═══════════════════════════════════════════════════════════════════════════
+-- El orden importa y quedó así a propósito: el endpoint JAMÁS pisó producción
+-- sin su tabla. Un `nube-vigente` desplegado contra una tabla que no existe
+-- habría contestado su fail-soft —«no hay precio»— y eso se ve EXACTAMENTE
+-- igual que «nadie ha cotizado esta semana»: el hueco se habría escondido
+-- detrás de su propia red.
+--
+-- VERIFICADO POR JANE, punto por punto:
+--   · tabla creada                                                        ✓
+--   · 2 triggers (update + delete)                                        ✓
+--   · RLS = true con 0 políticas (deny-all de verdad, no prometido)       ✓
+--   · la prueba del trigger se DISPARÓ en transacción: mordió con su
+--     mensaje exacto, y el rollback dejó la tabla en 0 filas —
+--     SIN NACIMIENTO FALSO                                                ✓
+--   · la fila de prueba NO existe                                         ✓
+--
+-- 🔒 Y ESE ÚLTIMO PUNTO NO ES PAPELEO: la PRIMERA fila de un modo es su
+-- NACIMIENTO, y el historial contesta «la nube aún no existía» para cualquier
+-- día anterior. Una fila de prueba olvidada le habría inventado a la nube una
+-- fecha de nacimiento en septiembre, y la consulta histórica habría empezado a
+-- contestar «vencida» donde la verdad es «todavía no existía». Se probó el
+-- candado sin ensuciar el dato que el candado protege.

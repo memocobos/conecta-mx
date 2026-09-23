@@ -6025,7 +6025,22 @@ function nubeEstado(){
 function nubeDe(modo){
   var e=nubeEstado();
   var v=e[modo];
-  return (v && Number(v.precio)>0) ? v : null;
+  if(!v || !(Number(v.precio)>0)) return null;
+  // 🔴 LA VIGENCIA SE VUELVE A MIRAR **AQUÍ**, y no es paranoia: el endpoint ya
+  // filtra lo vencido en la fuente, pero su respuesta va por CDN con
+  // `s-maxage=600` y `stale-while-revalidate=3600` — o sea que el navegador
+  // puede recibir una respuesta de hasta UNA HORA de antigüedad. Una
+  // cotización que vence el domingo a las 23:59 podría llegar como «vigente»
+  // el lunes a las 00:30 desde la caché, y ese modo VENDERÍA un precio
+  // vencido: la mentira de NATA con dinero, entrando por la puerta de nuestra
+  // propia caché.
+  // 🔒 Lo cazó el careo mandando a propósito una cotización vencida: el
+  // navegador la vendía porque confiaba en que el servidor ya había filtrado.
+  // Quien pinta el precio es el último que puede comprobarlo, así que lo
+  // comprueba.
+  var hasta=Date.parse(v.vigente_hasta);
+  if(!Number.isFinite(hasta) || hasta<=Date.now()) return null;
+  return v;
 }
 // Se pide UNA vez por carga. El endpoint trae caché de CDN (10 min), así que
 // esto no pega a la base por visita.

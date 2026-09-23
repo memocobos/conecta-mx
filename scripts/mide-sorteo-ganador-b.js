@@ -112,7 +112,15 @@ const BASE = process.env.BASE || '9820489';
 // habrían salido rojas contra él. **Un arnés cuya tuerca siguiente retiró lo
 // que medía se actualiza a la verdad nueva, con su razón escrita — no se
 // silencia ni se deja tronando.** Los retiros están marcados con ⚰️ arriba.
-const HEAD_SHA = process.env.HEAD_SHA || '7e0fe75';
+// ⚠️ EL ANCLA SE MUEVE CON CADA COMMIT DE PRODUCCIÓN, y olvidarlo cuesta dos
+// corridas en rojo: `7e0fe75` era el commit ANTERIOR al apretón del peor caso,
+// así que `npm run mide:ganador-b` a secas medía ese árbol y daba y=905 con la
+// premisa del @ en 0. Le pasó a Jane dos veces antes de encontrarlo.
+// 🔒 LA LEY, en su tercera cara: con un careo de árboles archivados, MEDIR
+// EXIGE COMMITEAR — y COMMITEAR EXIGE RE-ANCLAR. Si se corre con
+// `HEAD_SHA=<sha>` a mano y sale verde pero a secas sale rojo, el ancla está
+// vieja; no es el código.
+const HEAD_SHA = process.env.HEAD_SHA || '9061433';
 let base = null, head = null;
 try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sacar BASE: ' + e.message); }
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }

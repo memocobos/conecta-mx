@@ -481,6 +481,38 @@ function servidor(raiz) {
     return out;
   });
   console.log('   desglose: ' + Object.keys(desglose).map((k) => k + ' ' + desglose[k]).join(' · '));
+  // 🔒 CANDADO DE LA PREMISA: esto mide el PEOR CASO o no mide nada. Sin estas
+  // aserciones, un rojo futuro se «arregla» acortando el nombre de prueba —y el
+  // defecto vuelve a producción para los ganadores de nombre largo, que es
+  // justo lo que Jane cazó. Los máximos salen del padrón REAL (37/18/17).
+  const peor = await pg.evaluate(() => ({
+    nombre: ((document.getElementById('pg-n') || {}).textContent || '').trim(),
+    ciudad: ((document.getElementById('pg-c') || {}).textContent || '').trim(),
+    premio: ((document.getElementById('pg-p') || {}).textContent || '').trim(),
+    ig: ((document.getElementById('c-ig') || {}).getAttribute('title') || ''),
+    fuente: getComputedStyle(document.getElementById('pg-n')).fontFamily,
+  }));
+  console.log('   el PEOR caso: nombre ' + peor.nombre.length + ' · ciudad «'
+    + peor.ciudad.split(' · ')[0] + '» · premio ' + peor.premio.length
+    + ' · @ ' + peor.ig.length + ' · fuente ' + peor.fuente.split(',')[0]);
+  af(peor.nombre.length >= 37,
+     '🔒 PREMISA: el nombre medido tiene ' + peor.nombre.length + ' caracteres y el máximo'
+     + ' del padrón real son 37. Sin el peor caso, este verde es suerte');
+  af(peor.premio.length >= 90,
+     '🔒 PREMISA: el premio medido tiene ' + peor.premio.length + ' caracteres; el PLUS,'
+     + ' que es el largo, tiene 93');
+  af(peor.ig.length >= 17,
+     '🔒 PREMISA: el @ medido tiene ' + peor.ig.length + ' y el máximo real son 17');
+  // 🔒 Y QUE LAS FUENTES DE VERDAD NO CARGARON: si cargaran, la medición sería
+  // la optimista y volvería a depender de la red de quien corre el careo.
+  af(!/Barlow/i.test(peor.fuente) || true, '');   // informativo: la familia declarada
+  const respaldo = await pg.evaluate(() => document.fonts
+    ? [...document.fonts].filter((f) => f.status === 'loaded').length : -1);
+  console.log('   tipografías cargadas: ' + respaldo + ' (bloqueadas a propósito)');
+  af(respaldo === 0,
+     '🔒 PREMISA: las tipografías NO debían cargar (' + respaldo + ' cargadas): si cargan,'
+     + ' esto mide el caso optimista y el careo vuelve a depender de la red');
+
   const h = caben.herramientas;
   console.log('   el bloque (foto → reloj): y=' + caben.top + '..' + caben.bot + ' en '
             + caben.vh + 'px (scrollY ' + caben.scrollY + ')');

@@ -10,7 +10,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 09c2bac  main sin nube
-//     HEAD = b8dc131  la tabla, el endpoint y la pantalla
+//     HEAD = 5af2da1  la tabla, el endpoint y la pantalla (el commit del MERGE)
 //
 // 🔒 LA CAPTURA ENTRA POR LA PANTALLA REAL DE BULMA: se sirve el markup
 // EXTRAÍDO de `kamehouse.html` con el módulo REAL `kamehouse-nube.js`, y lo
@@ -45,7 +45,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '09c2bac';
-const HEAD_SHA = process.env.HEAD_SHA || 'b8dc131';
+const HEAD_SHA = process.env.HEAD_SHA || '5af2da1';
 
 // ── EL RELOJ CONGELADO ────────────────────────────────────────────────────
 // Lunes 19-oct-2026, 10:00 de Reynosa. Se eligió a propósito: la semana que

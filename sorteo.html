@@ -446,7 +446,9 @@ body.gano #reloj-ganador{display:none}
 /* Y la tarjeta del ganador deja de ir a todo lo ancho: con `--cols:1` medía
    388px de alto y se comia el espacio de la placa. */
 body.gano .mosaico{justify-content:center}
-body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
+/* ⚠️ 200px y no 236: con el panel del admin completo —teléfono, contacto y los
+   tres botones— el bloque se pasaba del pliegue. Medido, no estimado. */
+body.gano .mos.gana{width:min(52vw,200px);margin-left:auto;margin-right:auto}
 
 /* La placa de abajo: el nombre COMPLETO, para que quede claro que es una
    persona y no la suma de tres rodillos. */
@@ -552,9 +554,9 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
 .reloj.agotado .reloj-n{color:var(--c-muted)}
 .reloj-l{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted);margin-top:5px}
 
-.tel{display:none;align-items:center;justify-content:center;gap:10px;margin-top:16px;
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:19px;letter-spacing:.06em;
-  background:rgba(0,0,0,.45);padding:9px 14px;border-radius:9px}
+.tel{display:none;align-items:center;justify-content:center;gap:10px;margin-top:12px;
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:17px;letter-spacing:.06em;
+  background:rgba(0,0,0,.45);padding:7px 12px;border-radius:9px}
 .tel button,.mini{background:none;border:1px solid rgba(255,255,255,.26);color:var(--c-ink);border-radius:8px;
   padding:6px 12px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:inherit}
 .mini:hover{border-color:rgba(255,255,255,.5)}
@@ -569,9 +571,14 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
    pliegue. En dos columnas el primero —«Aceptó el premio», el que se aprieta
    cuando todo va bien— se queda A LO ANCHO, y los dos descartes comparten
    renglón: son la excepción, no la regla, y así no se aprietan por reflejo. */
-.acciones{display:none;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
-.acciones .btn{margin:0;width:100%}
-.acciones .btn-si{grid-column:1 / -1}
+.acciones{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+/* 🔴 EL BOTÓN DE LA REJILLA ES MÁS CHICO QUE EL `.btn` SUELTO, y se midió por
+   qué: con los 19px y los 15/26 de padding del `.btn` general, «No contestó —
+   volver a girar» envuelve en tres renglones dentro de una columna de 152px y
+   los tres botones median 186px. Aquí el rótulo manda sobre la tipografía. */
+.acciones .btn{margin:0;width:100%;padding:11px 10px;font-size:14px;
+  letter-spacing:.04em;line-height:1.15}
+.acciones .btn-si{grid-column:1 / -1;padding:13px 10px;font-size:16px}
 /* A 340px o menos (iPhone SE) dos columnas dejan los rótulos en tres renglones:
    ahí se vuelven a apilar. Se mide, no se supone. */
 @media (max-width:340px){
@@ -1001,7 +1008,7 @@ body.gano .mos.gana{width:min(58vw,236px);margin-left:auto;margin-right:auto}
       <div class="st-msg" id="st-msg"></div>
     </div>
 
-    <div style="margin-top:16px">
+    <div style="margin-top:10px">
       <button class="mini" id="repetir"><svg class="ic" style="width:11px;height:11px"><use href="#ic-repetir"/></svg> Ver de nuevo</button>
     </div>
   </div>

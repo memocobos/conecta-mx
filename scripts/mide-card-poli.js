@@ -43,7 +43,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '6b1c789';
-const HEAD_SHA = process.env.HEAD_SHA || 'd3ca76c';
+const HEAD_SHA = process.env.HEAD_SHA || '7cfebbd';
 const EVENTO = 'frontera';   // un evento vivo cualquiera: las políticas no dependen del evento
 
 // LOS SEIS TEXTOS VIGENTES, copiados del BASE letra por letra. Son palabra de

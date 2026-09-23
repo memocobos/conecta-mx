@@ -133,7 +133,12 @@ const BASE2 = process.env.BASE2 || '3ac566e';
 //   · careo CONGELADO (el default): reproducible, no caduca.
 //   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:ganador-quieto`, que remide el
 //     árbol de hoy contra el MISMO BASE — útil el día que alguien toque esto.
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';   // se ancla antes del merge
+// 🔒 HEAD ANCLADO A UN COMMIT FIJO: con `HEAD` el careo mediría siempre el
+// árbol de hoy y dentro de tres tuercas le estaría culpando a ésta lo que otros
+// cambien. `fbcf3d6` trae `cerrarShow` y el medidor sin punto ciego.
+//   · careo CONGELADO (el default): reproducible, no caduca.
+//   · vigilante VIVO: `HEAD_SHA=HEAD npm run mide:ganador-quieto`.
+const HEAD_SHA = process.env.HEAD_SHA || 'fbcf3d6';
 let base = null, head = null;
 try { base = sacar(BASE, 'gb-base'); } catch (e) { console.error('no se pudo sacar BASE: ' + e.message); }
 try { head = sacar(HEAD_SHA, 'gb-head'); } catch (e) { console.error('no se pudo sacar HEAD: ' + e.message); }

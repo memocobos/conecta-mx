@@ -26,7 +26,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { MODOS, vigentes, regiaEl, filasDe, interna, _cualCubre } = require('./_lib/nube');
+const { MODOS, vigentes, regiaEl, resolver, filasDe, interna, _cualCubre } = require('./_lib/nube');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -69,7 +69,7 @@ async function eventosCdmx() {
     .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
 }
 
-const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos'];
+const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos', 'cobertura'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -106,6 +106,45 @@ exports.handler = async (event) => {
   };
 
   try {
+    // ── cobertura · ¿CUÁNTOS EVENTOS VIVOS SE QUEDAN SIN PRECIO? ───────────
+    // [NUBE-5] El renglón del Radar necesita una cuenta, no un precio: cuántos
+    // eventos de CDMX vivos NO tienen cotización propia NI general para un
+    // modo. «La general venció» y «tres eventos se quedaron sin nada» no son la
+    // misma noticia, y la segunda es la que dice el tamaño del problema.
+    //
+    // 🔒 LA PREGUNTA SE LE HACE AL DUEÑO, evento por evento (`resolver`), en vez
+    // de razonar aquí «si la general rige, todos están cubiertos» — que es
+    // cierto HOY y es exactamente la clase de atajo que vuelve a esta función
+    // una segunda opinión sobre la cascada. Lo que SÍ se hace es memoizar el
+    // LECTOR: la consulta de la general se repetiría 18 veces idéntica, y
+    // cachear una lectura no es re-implementar una regla.
+    if (accion === 'cobertura') {
+      const lista = await eventosCdmx();
+      if (lista == null) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el cat\u00e1logo' }) };
+      }
+      const memo = new Map();
+      const pedirMemo = async (qs) => {
+        if (memo.has(qs)) return memo.get(qs);
+        const v = await pedir(qs);
+        memo.set(qs, v);
+        return v;
+      };
+      const ahora = Date.now();
+      const sin = {}, propios = {};
+      for (const modo of MODOS) { sin[modo] = []; propios[modo] = 0; }
+      for (const ev of lista) {
+        for (const modo of MODOS) {
+          const r = await resolver(pedirMemo, modo, ev.id, ahora);
+          if (!r) sin[modo].push({ id: ev.id, nombre: ev.nombre, ds: ev.ds });
+          else if (r.heredado === false) propios[modo]++;
+        }
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({
+        ok: true, total: lista.length, sin, propios, consultas: memo.size, ahora,
+      }) };
+    }
+
     if (accion === 'eventos') {
       const lista = await eventosCdmx();
       if (lista == null) {

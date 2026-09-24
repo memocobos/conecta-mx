@@ -72,6 +72,38 @@ function servidor(raiz) {
     });
   });
 }
+// ⚠️ EL ONBOARDING TAPA LA PANTALLA, y eso es la realidad del cliente: el popup
+// «¿Cómo reservar tu lugar?» se abre **300 ms después** de la ficha y cubre todo
+// con `z-index:9999`, así que para apretar cualquier cosa hay que cerrarlo
+// primero — igual que lo hace una persona. Es la forma de `6b1c789`
+// (CARD-ITIN: «el careo cierra el onboarding como lo cierra el cliente»).
+//
+// 🔴 Y AQUÍ COSTÓ UNA CONDICIÓN DE MERGE. Mi versión apretaba «2 personas» a
+// ciegas: en mi máquina el clic **le ganaba la carrera** a los 300 ms y salía
+// verde, y en la de Jane el overlay ya estaba puesto y Playwright se quedó
+// esperando hasta el TimeoutError — dos corridas. Un careo que depende del
+// timing para no colgarse es la familia de la ventana de ~150 ms: **verde por
+// suerte en una máquina y caído en otra**, y de las dos formas no mide.
+//
+// 🔒 POR ESO NO SE SIGUE POR RELOJ: se espera a que el overlay DEJE DE TAPAR,
+// que es la condición de verdad. Y el estado se DEVUELVE, para poder afirmar
+// que el onboarding sigue vivo —que es la regresión que más miedo da— en vez
+// de que un careo verde esconda que dejó de salir.
+const _tapa = () => {
+  const e = document.getElementById('onboard-bg');
+  if (!e) return false;
+  const cs = getComputedStyle(e), r = e.getBoundingClientRect();
+  return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > 0 && r.height > 0;
+};
+async function cerrarOnboarding(pg) {
+  // Se le da su ventana de 300 ms para APARECER, sin colgarse si no aparece
+  // (no siempre sale: `showOnboarding` se salta con promo o itinerario solo).
+  const salio = await pg.waitForFunction(_tapa, { timeout: 2500 }).then(() => true).catch(() => false);
+  if (salio) await pg.evaluate(() => { if (typeof skipOnboarding === 'function') skipOnboarding(); });
+  // La condición, no el reloj: nadie aprieta nada hasta que el overlay se fue.
+  await pg.waitForFunction(`!(${_tapa.toString()})()`, { timeout: 10000 });
+  return salio;
+}
 const BASE = process.env.BASE || '5b2c107';
 const HEAD_SHA = process.env.HEAD_SHA || '192af31';
 
@@ -214,6 +246,7 @@ const dinero = (s) => Number(String(s == null ? '' : s).replace(/[^0-9]/g, '')) 
     // pantalla que ningún cliente ve—. Se aprieta «2 personas», que es un clic
     // de verdad, y se AFIRMA que se apretó.
     await pg.waitForSelector('#w-viajeros .wiz-btn', { timeout: 15000 });
+    const onbSalio = await cerrarOnboarding(pg);
     await pg.click('#w-viajeros .wiz-btn:nth-child(2)');
     await pg.waitForFunction("document.getElementById('pp-cheap') && document.getElementById('pp-cheap').textContent !== '—'", { timeout: 15000 }).catch(() => {});
     const leer = () => pg.evaluate(`(() => {
@@ -224,9 +257,11 @@ const dinero = (s) => Number(String(s == null ? '' : s).replace(/[^0-9]/g, '')) 
                ev: document.body.getAttribute('data-ev'), viaj: (typeof selViaj === 'number' ? selViaj : null) };
     })()`);
     const d = await leer();
+    d.onbSalio = onbSalio;
     await ctx.close();
     console.log('    ' + quien.padEnd(5) + ' plus ' + (d.plus && d.plus.txt) + ' · cheap ' + (d.cheap && d.cheap.txt)
-      + ' · stay ' + (d.stay && d.stay.txt) + ' · ride ' + (d.ride && d.ride.txt) + '   errores: ' + errs.length);
+      + ' · stay ' + (d.stay && d.stay.txt) + ' · ride ' + (d.ride && d.ride.txt)
+      + '   onboarding: ' + (onbSalio ? 'salió y se cerró' : 'no salió') + '   errores: ' + errs.length);
     return { d, errs };
   }
   const tB = await tarjeta(uB, 'BASE'), tH = await tarjeta(uH, 'HEAD');
@@ -271,6 +306,7 @@ const dinero = (s) => Number(String(s == null ? '' : s).replace(/[^0-9]/g, '')) 
   await pgC.goto(uH + '/', { waitUntil: 'domcontentloaded' });
   await pgC.evaluate("showDetail('edc27')");
   await pgC.waitForSelector('#w-viajeros .wiz-btn', { timeout: 15000 });
+  const onbClic = await cerrarOnboarding(pgC);
   await pgC.click('#w-viajeros .wiz-btn:nth-child(2)');
   await pgC.waitForFunction("document.getElementById('pp-cheap').textContent !== '—'", { timeout: 15000 }).catch(() => {});
   const porClic = await pgC.evaluate("document.getElementById('pp-cheap').textContent.trim()");
@@ -278,6 +314,16 @@ const dinero = (s) => Number(String(s == null ? '' : s).replace(/[^0-9]/g, '')) 
   af(porClic === tH.d.cheap.txt,
      'el CHEAP sale distinto por la url (' + tH.d.cheap.txt + ') que por el clic (' + porClic + '): sospecha '
      + 'del ORDEN DE PARSEO antes que del CSS — un `var` de nivel superior leído desde arriba vale undefined');
+  console.log('    onboarding → por la url ' + (tH.d.onbSalio ? 'SÍ' : 'no') + ' · por el clic ' + (onbClic ? 'SÍ' : 'no'));
+  // 🔒 SE AFIRMA QUE EL ONBOARDING SIGUE VIVO. Si un día deja de salir, el careo
+  // seguiría verde sin él —y el popup de «¿cómo reservar?» es de Memo—, así que
+  // su ausencia tiene que ser un rojo, no un silencio. Por las DOS puertas,
+  // porque es «una vez por evento por dispositivo» y cada contexto es nuevo.
+  af(tB.d.onbSalio && tH.d.onbSalio && onbClic,
+     'el onboarding YA NO SALE en alguna de las tres corridas (url BASE ' + tB.d.onbSalio + ' / url HEAD '
+     + tH.d.onbSalio + ' / clic ' + onbClic + '). O se rompió el popup de «¿Cómo reservar tu lugar?», o '
+     + 'esta ficha entró en el caso de `_promoVa`/`_itinSolo` que se lo salta — en ese caso el careo deja '
+     + 'de estar midiendo la pantalla tapada, que es la del cliente.');
   af(errC.length === 0, 'la página tiró errores por el camino del clic: ' + JSON.stringify(errC).slice(0, 200));
 
   // ── [R] LO QUE NO SE DEBÍA MOVER ──────────────────────────────────────

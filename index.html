@@ -3110,7 +3110,66 @@ function evMusicQuery(ev,idx){
 // puede contener chars especiales (modales, tooltips, etc.).
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
 function fmt(n){var r=Math.round(n*100)/100;if(r===Math.round(r))return'$'+Math.round(r).toLocaleString('es-MX');return'$'+r.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function minP(ev){var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));if(ev.cheapOnly&&ev.cheapZonas)_z=ev.cheapZonas;var a=_z.filter(function(z){return !z.ag&&!z.prox&&z.p>0;});if(!a.length){if(ev.rideOnly&&ev.ride>0)return ev.ride;return 0;}return Math.min.apply(null,a.map(function(z){return z.p;}));}
+// ═══ [DESDE-PAQ-1] EL «DESDE» DE UN PAQUETE TIENE UN SOLO DUEÑO ══════════
+// Reporte de Memo con capturas (23-sep-2026, EDC27): la tarjeta pintaba PLUS
+// «desde $4,100» y CHEAP «desde $5,200» — el todo incluido MÁS BARATO que el
+// boleto solo— cuando el CHEAP real de 1 día son $2,400.
+//
+// LA CAUSA: los dos leían UNIVERSOS DISTINTOS. El PLUS recorría la lista
+// global MÁS las de cada fecha; el CHEAP leía SOLO la global, que en edc27
+// trae el precio de los 3 días ($5,200). Dos preguntas iguales contestadas en
+// dos sitios acaban contestándose distinto — y aquí la respuesta es un precio.
+//
+// 🔒 EL UNIVERSO ES EL MISMO PARA LOS CUATRO: la lista global del paquete MÁS
+// la de cada fecha de la multifecha. STAY no trae lista propia porque vende el
+// MISMO boleto sin transporte, así que se sirve de la respuesta de PLUS —eso es
+// más fuerte que darle un universo gemelo, que sería otra lista por divergir—.
+// Y el hotel NO entra aquí: depende de cuánta gente viaja, que es estado de la
+// pantalla, no dato del evento. Los totales del cotizador NO se tocan.
+//
+// ⚠️ `prox` SE FILTRA IGUAL EN LOS DOS. El CHEAP filtraba solo `ag`, así que una
+// zona con precio aún no publicado podía ganar el mínimo y anunciar un número
+// que nadie puede comprar. (`prox` no es «a la venta»: son tres estados.)
+function _desdeUniverso(ev, campo) {
+  var pool = (ev[campo] && Array.isArray(ev[campo])) ? ev[campo].slice() : [];
+  if (ev.multifecha) ev.multifecha.forEach(function(mf) {
+    var z = mf[campo];
+    if (!z) return;
+    // Las listas por fecha llegan como arreglo, pero el compilador también ha
+    // emitido objetos indexados: se aceptan las dos formas, como hace minPrice.
+    pool = pool.concat(Array.isArray(z) ? z : Object.keys(z).map(function(k) { return z[k]; }));
+  });
+  var a = pool.filter(function(z) { return z && !z.ag && !z.prox && z.p > 0; });
+  if (!a.length) return 0;
+  return Math.min.apply(null, a.map(function(z) { return z.p; }));
+}
+function desdeDelPaquete(ev, paquete) {
+  if (paquete === 'cheap') return _desdeUniverso(ev, 'cheapZonas');
+  if (paquete === 'ride') {
+    // El universo del RIDE no son zonas: son los `ride` de cada fecha, con el
+    // del evento como respaldo. Ya se recorría bien y su comentario decía por
+    // qué —«el DESDE es el MÍNIMO disponible, no el de la fecha elegida»—;
+    // aquí solo se muda a la misma puerta.
+    var rs = [];
+    if (ev.multifecha) ev.multifecha.forEach(function(m) {
+      var r = m.ride || ev.ride || 0;
+      if (r > 0) rs.push(r);
+    });
+    if (rs.length) return Math.min.apply(null, rs);
+    return ev.ride || (isCDMX(ev) ? 2900 : 2700);
+  }
+  // plus (y, por derivación, stay)
+  var m = _desdeUniverso(ev, (ev.cheapOnly && ev.cheapZonas) ? 'cheapZonas' : 'zonas');
+  // 🔴 RIDE-VIVO-1 VIVE AQUÍ, Y NO ES DECORACIÓN: un `rideOnly` sin zonas
+  // capturadas SÍ tiene precio. Mi primera versión del dueño se comió esta cola
+  // y `bts` y `straykids` caían de $2,900 a $0 **en la tarjeta del catálogo**,
+  // que es lo que `minP` pinta. Lo cazó medir el barrido, no leer el diff.
+  if (!m && ev.rideOnly && ev.ride > 0) return ev.ride;
+  return m;
+}
+// `minP` se queda como la PUERTA del PLUS —tiene cinco llamadores, incluida la
+// tarjeta del catálogo— y le pregunta al dueño.
+function minP(ev){return desdeDelPaquete(ev,'plus');}
 
 var _imgCache={};
 function searchDeezer(artistName){
@@ -3357,42 +3416,19 @@ function renderCatalog(){
 
 
 // ── State ─────────────────────────────────────────────────────────────────
-// ── Package definitions ───────────────────────────────────────────────────
-function getPaquetes(ev) {
-  var cdmx = ev.v && ev.v.toLowerCase().indexOf('cdmx') >= 0;
-  var zonas = ev.zonas || [];
-  var avail = zonas.filter(function(z){return !z.ag && z.p > 0;});
-  var plusMin = avail.length ? Math.min.apply(null, avail.map(function(z){return z.p;})) : 0;
-
-  return [
-    { id:'plus', name:'Plus', badge:'PLUS',
-      desc: 'Boleto + '+txtTransporte(cur)+' + Hospedaje + Kit Conecta',
-      basePrice: 0, includesBoleto: true, includesHotel: true,
-      priceLabel: plusMin ? 'Desde ' + fmt(plusMin) : 'Cotizar' },
-
-    { id:'ride', name:'Ride', badge:'RIDE',
-      desc: txtTransporte(cur)+' + Hospedaje + Kit Conecta · sin boleto',
-      basePrice: cdmx ? 2900 : 2700,
-      includesBoleto: false, includesHotel: true,
-      priceLabel: fmt(cdmx ? 2900 : 2700) + ' + boleto' },
-
-    { id:'stay', name:'Stay', badge:'STAY',
-      desc: cdmx ? 'Boleto + Hospedaje + Kit Conecta · sin transporte a CDMX'
-                 : 'Boleto + Hospedaje + Kit Conecta · sin transporte',
-      // `stayDiscount` aquí es metadata que NADIE consume (medido: 0 lecturas de
-      // `.stayDiscount` en este archivo) — el precio de la tarjeta lo pinta
-      // `stayDsc` más abajo. Se deja alineado con la constante para que no
-      // vuelva a leerse como una segunda regla.
-      basePrice: 0, stayDiscount: cdmx ? 0 : STAY_DESCUENTO, cdmx: cdmx,
-      includesBoleto: true, includesHotel: true,
-      priceLabel: cdmx ? 'Cotizar' : (plusMin ? 'Desde ' + fmt(Math.max(0, plusMin - STAY_DESCUENTO)) : 'Cotizar') },
-
-    { id:'cheap', name:'Cheap', badge:'CHEAP',
-      desc: 'Boleto + Kit Conecta · sin transporte ni hospedaje',
-      basePrice: 0, includesBoleto: true, includesHotel: false,
-      priceLabel: plusMin ? 'Desde ' + fmt(plusMin) : 'Cotizar' }
-  ];
-}
+// ── [DESDE-PAQ-1] ⚰️ AQUÍ VIVÍA `getPaquetes(ev)`, PODADA ─────────────
+// Era la QUINTA manera de decir «desde cuánto», y la peor: su `plusMin` leía
+// SOLO `ev.zonas` —ni una fecha de la multifecha— y filtraba solo `ag`, sin
+// `prox`; y el `priceLabel` del CHEAP pintaba **el mínimo del PLUS**, que es
+// justo el defecto que esta tuerca arregla, escrito a mano.
+//
+// 🔒 SE PODÓ PORQUE SE MIDIÓ: **CERO llamadores** en todo el árbol (una sola
+// ocurrencia de `getPaquetes(`, su propia declaración) y **cero lectores** de
+// `priceLabel` fuera de las cuatro líneas que lo escribían. Es la trampa de
+// «dos objetos con el mismo papel»: unificar ahí no habría cambiado un píxel y
+// se habría reportado como arreglo. Y es la lección de FEST-SEP-1 otra vez: una
+// regla vieja SIN LECTOR es la mitad del hoyo — dejarla habría dejado cuatro
+// letreros equivocados esperando al primero que la conectara.
 
 
 
@@ -5309,12 +5345,7 @@ function updatePkgCards(){
   // RIDE: "DESDE" en la card debe ser el MÍNIMO ride disponible — no el de la
   // fecha actualmente seleccionada (que es 0 antes de que el usuario elija).
   // El cálculo del total final usa la fecha seleccionada vía calcular().
-  var mfRideMin=0;
-  if(cur.multifecha){
-    var _rs=cur.multifecha.map(function(m){return m.ride||cur.ride||0;}).filter(function(r){return r>0;});
-    if(_rs.length) mfRideMin=Math.min.apply(null,_rs);
-  }
-  var rideBase=mfRideMin||cur.ride||(cdmx?2900:2700);
+  var rideBase=desdeDelPaquete(cur,'ride');
   var rideCost=rideBase+(mh>0?mh:0);
   $$('pi-ride').textContent=txtTransporte(cur)+(cur.noHotel?' · Boleto · Kit Conecta':' · Hospedaje · Kit');
   $$('pp-ride').textContent=fmt(rideCost);
@@ -5479,9 +5510,12 @@ function updatePkgCards(){
   if(cur.diaFirst&&selBoleto&&cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].cheapZonas){
     var cz=cur.multifecha[selFechaIdx].cheapZonas[selBoleto];
     if(cz&&cz.p>0){cheapMinP=cz.p;hasChp=true;}
-  } else if(cur.cheapZonas&&Array.isArray(cur.cheapZonas)){
-    var cheapArr=cur.cheapZonas.filter(function(z){return !z.ag&&z.p>0;});
-    if(cheapArr.length>0){cheapMinP=Math.min.apply(null,cheapArr.map(function(z){return z.p;}));hasChp=true;}
+  } else {
+    // [DESDE-PAQ-1] Aquí vivía el defecto: leía SOLO `cur.cheapZonas` y se
+    // perdía las listas por fecha. Hoy pregunta al dueño del «desde», que
+    // recorre el MISMO universo que el PLUS.
+    cheapMinP=desdeDelPaquete(cur,'cheap');
+    if(cheapMinP>0)hasChp=true;
   }
   if(hasChp){
     $$('pi-cheap').textContent='Boleto · Kit Conecta';

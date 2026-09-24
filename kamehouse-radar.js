@@ -1279,7 +1279,25 @@ async function _radarNubeAviso() {
     const ultima = (info.ultimas || [])[0];
     flojos.push({ nombre: m.n, venció: ultima ? ultima.vigente_hasta : null });
   }
-  if (!flojos.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  // [NUBE-5] LA COBERTURA: cuántos eventos vivos se quedan SIN PRECIO. «La
+  // general venció» es un hecho; «tres eventos no tienen nada» es el TAMAÑO, y
+  // es lo que decide si esto se atiende hoy o el lunes. Fail-soft CALLADO: si
+  // no se puede contar, el renglón sigue diciendo lo que sí sabe.
+  let cob = null;
+  try {
+    const rc = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'cobertura' }),
+    });
+    const dc = await rc.json().catch(() => null);
+    if (rc.ok && dc && dc.ok !== false) cob = dc;
+  } catch (_) { cob = null; }
+  // 🔒 EL AVISO SE CALLA CUANDO NO HAY NADA QUE DECIR, y «nada» son las DOS
+  // cosas: ningún modo vencido Y ningún evento descubierto. Un aviso permanente
+  // se vuelve parte del mueble y deja de avisar.
+  const descubiertos = cob
+    ? [...new Set([].concat(...Object.values(cob.sin || {}).map((a) => a.map((e) => e.id))))]
+    : [];
+  if (!flojos.length && !descubiertos.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
   const enRey = (iso) => {
     const t = Date.parse(iso);
     if (!Number.isFinite(t)) return '—';
@@ -1287,6 +1305,14 @@ async function _radarNubeAviso() {
   };
   const lista = flojos.map((f) => '<b>' + f.nombre + '</b>'
     + (f.venció ? (' (venció el ' + enRey(f.venció) + ')') : ' (nunca se ha cotizado)')).join(' y ');
+  // La cuenta, dicha por modo y con NOMBRES: «3 eventos» manda a buscar; «edc27,
+  // knotfest y flowfest» se resuelve.
+  const porModo = cob ? ['bus', 'avion'].map((k) => {
+    const a = (cob.sin && cob.sin[k]) || [];
+    if (!a.length) return '';
+    const nombres = a.slice(0, 4).map((e) => e.id).join(', ') + (a.length > 4 ? (' y ' + (a.length - 4) + ' más') : '');
+    return '<b>' + a.length + '</b> sin ' + (k === 'bus' ? 'autobús' : 'avión') + ' (' + nombres + ')';
+  }).filter(Boolean).join(' · ') : '';
   // ⚠️ Se dice la CONSECUENCIA, no solo el hecho: sin eso, «vencida» no le
   // dice a nadie qué está pasando en el sitio ahora mismo.
   // [NUBE-4] 🔴 ESTE `onclick` ERA `showHerramienta('nube')` Y SE HABRÍA ROTO EN
@@ -1297,9 +1323,16 @@ async function _radarNubeAviso() {
   caja.innerHTML = '<div class="rdr-alert sev-alta no-vista" style="cursor:pointer" onclick="showPage(\'nube\')">'
     + '<div class="dot"></div>'
     + '<div class="body">'
-    + '<div class="titulo">La cotización GENERAL de la nube está vencida: ' + lista + '</div>'
+    + '<div class="titulo">'
+    + (flojos.length ? ('La cotización GENERAL de la nube está vencida: ' + lista)
+                     : 'Hay eventos de CDMX vivos sin precio de transporte')
+    + (cob ? (' · <b>' + descubiertos.length + '</b> de <b>' + cob.total + '</b> eventos vivos sin precio') : '')
+    + '</div>'
     + '<div class="mensaje">Mientras no haya cotización vigente, ese modo NO se vende en el sitio: '
-    + 'el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).</div>'
+    + 'el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).'
+    + (porModo ? ('<br>' + porModo + '.') : '')
+    + (cob && cob.total && !descubiertos.length ? '<br>Los ' + cob.total + ' eventos vivos SÍ tienen precio (propio o heredado de la general).' : '')
+    + '</div>'
     + '</div>'
     + '<div class="meta">' + enRey(new Date(ahora).toISOString()) + '<br><span class="tipo">nube_vencida</span>'
     + '<br><span class="rdr-ir">Ir a resolver →</span></div>'

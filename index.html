@@ -1372,6 +1372,15 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <div class="zona-grid" id="d-transport"></div>
   </div>
 
+  <!-- [NUBE-5] CÓMO LLEGAR · los dos modos con su precio vigente y sus horarios.
+       Nace OCULTO y solo se enciende cuando hay algo que decir: un card vacío
+       en la ficha de un evento de Monterrey sería un letrero sin contenido. -->
+  <div class="card" id="d-nube-card" style="display:none">
+    <div class="card-lbl">Cómo llegar</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px" id="d-nube-hint">Lo que cuesta llegar a CDMX esta semana.</div>
+    <div id="d-nube-cuerpo"></div>
+  </div>
+
   <!-- [CARD-ITIN-1] ITINERARIO -->
   <div class="card" id="d-itin-card" style="display:none">
     <div class="card-lbl">Itinerario</div>
@@ -5061,7 +5070,12 @@ function showDetail(id, _skipHistory){
   // ⚠️ `nubePedir` es una DECLARACIÓN de función, así que está disponible
   // aunque esto corra a media parseada por el deep-link; y su estado no vive en
   // un `var` de nivel superior, justo por eso.
-  try{ if(typeof nubePedir==='function') nubePedir(); }catch(e){}
+  try{ if(typeof nubePedir==='function') nubePedir(cur); }catch(e){}
+  // [NUBE-5] El card se pinta YA con lo que se sepa (normalmente nada la
+  // primera vez) y se repinta cuando la respuesta caiga. Pintarlo aquí y no
+  // solo en el `then` es lo que hace que abrir un evento YA VISITADO en la
+  // misma visita muestre su precio al instante, sin otra vuelta a la red.
+  try{ if(typeof nubeCardPintar==='function') nubeCardPintar(cur); }catch(e){}
   // [CARD-GUIA-1] El letrero vuelve a su frase de arranque al abrir un card.
   // Sin esto se queda PEGADO el del evento anterior: abrir otro evento diría
   // «Ahora elige tu habitación» antes de que el cliente eligiera nada. Un
@@ -6067,15 +6081,26 @@ function selHotel(btn,e,n){
 // un `var` de arriba ya existe por hoisting pero vale `undefined`. Vive colgado
 // de `window` dentro de una función, así que el orden de parseo deja de
 // importar — y de paso nadie puede leerlo sin pasar por su puerta.
-function nubeEstado(){
-  if(!window.__nube) window.__nube={pedida:false,ok:false,bus:null,avion:null};
-  return window.__nube;
+// [NUBE-5] 🔴 EL ESTADO PASA A SER **POR EVENTO**, y no es cosmética: con un
+// solo cajón global, abrir `edc27` y luego `knotfest` en la misma visita le
+// pintaba al segundo el precio del primero. Los botones y `cur` son globales y
+// la pantalla se reusa entre eventos — el bug de `cheapBtn` de NOCHEAP-1 y de
+// `rideBtn` de CAT-AGOT-1, ahora con un PRECIO, que es peor: un letrero mal
+// heredado se ve, y un precio de otro evento se paga.
+// Sigue colgado de `window` dentro de una función, por la ley del hoisting.
+function nubeEstado(ev){
+  if(!window.__nube) window.__nube={};
+  // La llave es el SLUG del evento; `''` es la consulta GENERAL (la de NUBE-2,
+  // que sigue existiendo para quien no pregunta por un evento).
+  var k=(ev&&ev.id)?String(ev.id):'';
+  if(!window.__nube[k]) window.__nube[k]={pedida:false,ok:false,bus:null,avion:null};
+  return window.__nube[k];
 }
 // La cotización de un modo, o null. `null` significa UNA cosa: no hay precio
 // que vender — vencida, sin fila, o la red se cayó. Los tres casos caen al
 // mismo lado, que es el comportamiento de HOY.
-function nubeDe(modo){
-  var e=nubeEstado();
+function nubeDe(modo,ev){
+  var e=nubeEstado(ev||(typeof cur!=='undefined'?cur:null));
   var v=e[modo];
   if(!v || !(Number(v.precio)>0)) return null;
   // 🔴 LA VIGENCIA SE VUELVE A MIRAR **AQUÍ**, y no es paranoia: el endpoint ya
@@ -6099,18 +6124,29 @@ function nubeDe(modo){
 // ⚠️ FAIL-SOFT DURO Y CALLADO: cualquier tropiezo deja los dos modos en null y
 // el sitio se comporta EXACTAMENTE como antes de esta tuerca. El camino viejo
 // es el respaldo y no se borró.
-function nubePedir(){
-  var e=nubeEstado();
+function nubePedir(ev){
+  var quien=ev||(typeof cur!=='undefined'?cur:null);
+  var e=nubeEstado(quien);
   if(e.pedida) return;
   e.pedida=true;
+  // [NUBE-5] Se pide CON el evento, y el servidor resuelve la herencia: su
+  // cotización propia si la tiene, la general si no. El CDN llavea por url
+  // completa, así que cada evento tiene su propia entrada de caché y ninguno
+  // puede servirle el precio de otro.
+  var qs=(quien&&quien.id)?('?evento='+encodeURIComponent(quien.id)):'';
   try{
-    fetch('/.netlify/functions/nube-vigente',{headers:{'Accept':'application/json'}})
+    fetch('/.netlify/functions/nube-vigente'+qs,{headers:{'Accept':'application/json'}})
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(!d || d.ok!==true) return;
         e.ok=true;
         e.bus=(d.bus && Number(d.bus.precio)>0) ? d.bus : null;
         e.avion=(d.avion && Number(d.avion.precio)>0) ? d.avion : null;
+        // [NUBE-5] Y se repinta el card de «Cómo llegar», que nació oculto
+        // esperando este dato. Solo si el cliente sigue en ESTE evento: la
+        // respuesta puede llegar tarde y pintarla sobre otra ficha sería
+        // exactamente el precio heredado que este estado por evento evita.
+        try{ if(typeof nubeCardPintar==='function' && cur && quien && cur.id===quien.id) nubeCardPintar(cur); }catch(_){}
         // Si el cliente YA está en el paso del transporte y no ha elegido
         // nada, se repinta para que vea el precio en vez del WhatsApp.
         // ⚠️ Y SOLO SI NO HA ELEGIDO: repintar borraría su selección y su
@@ -6132,6 +6168,78 @@ function nubePedir(){
 // Medido sobre los 116 eventos del catálogo: la regla derivada devuelve
 // EXACTAMENTE `['arre']`, evento por evento, igual que el cableado. Así que
 // esto no cambia nada hoy y cierra el hoyo de mañana.
+// ═══ [NUBE-5] EL CARD «CÓMO LLEGAR» ══════════════════════════════════════
+// Los dos modos con su precio vigente y sus HORARIOS, en la ficha de cada
+// evento de CDMX. Función DECLARADA (ley del hoisting: el deep-link `/<slug>`
+// llama a `showDetail()` a media parseada, y un `var` de arriba valdría
+// `undefined` — el card se vería por clic y NO por la url, que es la que se
+// comparte).
+//
+// 🔒 FAIL-SOFT POR MODO, como en NUBE-2: sin precio, ese modo NO INVENTA nada —
+// ofrece el WhatsApp de cotización, que es el camino de siempre. Y si NINGUNO
+// de los dos tiene precio, el card entero se esconde: un card que solo dice
+// «pregunta por WhatsApp» dos veces es ruido encima del botón flotante que ya
+// está ahí.
+//
+// 🔒 LA HERENCIA SE ROTULA. Un precio general presentado como el de este evento
+// es un dato bueno con la etiqueta equivocada — la lección de ROL-HIST-PADRE.
+// El cliente no necesita la palabra «heredado»: necesita saber que es la tarifa
+// general de CDMX y no una negociada para su fecha.
+//
+// ⚠️ NO SE TOCA EL COTIZADOR. El precio que se VENDE sigue saliendo del mismo
+// `selTransporteBtn` y su total de la misma multiplicación en `calcular()`.
+// Este card INFORMA; la venta vive donde vivía.
+function nubeCardHtml(ev){
+  var lejos=true;
+  try{ var d=_diasEventoMx(ev&&ev.ds); if(d!=null) lejos=(d>15); }catch(_){}
+  var vueloIncluido=nubeVueloIncluido(ev);
+  var modos=[];
+  if(!(ev&&ev.noBus)&&!vueloIncluido) modos.push({k:'bus',emoji:'🚌',n:'Autobús',wa:'528132321405'});
+  if(!vueloIncluido) modos.push({k:'avion',emoji:'✈️',n:'Avión',wa:'528132321405'});
+  if(!modos.length) return '';
+  var hay=false;
+  var filas=modos.map(function(m){
+    // 🔒 LA FRONTERA DE LOS 15 DÍAS APLICA AQUÍ TAMBIÉN, y es la MISMA regla
+    // firmada que gobierna el paso del transporte: cerca del evento el precio
+    // del lunes ya no aguanta y cotiza un humano. Pintar aquí un precio que el
+    // cotizador se rehúsa a vender sería el card contradiciendo al embudo.
+    var v=lejos?nubeDe(m.k,ev):null;
+    if(v){
+      hay=true;
+      return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)">'
+        + '<div><b>'+m.emoji+' '+m.n+'</b>'
+        + (v.heredado ? '<span style="font-size:10px;color:rgba(255,255,255,.55);margin-left:6px">tarifa general CDMX</span>' : '')
+        + (v.horarios ? ('<div style="font-size:11px;color:rgba(255,255,255,.62);margin-top:3px">🕓 '+escHtml(v.horarios)+'</div>') : '')
+        + '</div>'
+        + '<div style="white-space:nowrap;text-align:right"><b>'+fmt(Number(v.precio))+'</b>'
+        + '<div style="font-size:10px;color:rgba(255,255,255,.55)">por persona</div></div>'
+        + '</div>';
+    }
+    // Sin precio: el camino de siempre, dicho con palabras.
+    var texto=lejos ? 'Se cotiza al momento' : 'Faltan menos de 15 días: se cotiza al momento';
+    return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)">'
+      + '<div><b>'+m.emoji+' '+m.n+'</b></div>'
+      + '<a href="https://wa.me/'+m.wa+'?text='+encodeURIComponent('Hola! Quiero cotizar el '+m.n.toLowerCase()+' a CDMX para '+((ev&&ev.a)||''))
+      + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--yellow,#e8ff4c);white-space:nowrap">'+texto+' →</a>'
+      + '</div>';
+  }).join('');
+  // 🔒 Si NINGÚN modo tiene precio, no hay card: no se estrena una caja para
+  // repetir lo que el botón de WhatsApp ya dice.
+  if(!hay) return '';
+  return filas
+    + '<div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:8px">'
+    + 'Tarifa de esta semana. El precio final se confirma al reservar.</div>';
+}
+function nubeCardPintar(ev){
+  var caja=document.getElementById('d-nube-card');
+  var cuerpo=document.getElementById('d-nube-cuerpo');
+  if(!caja||!cuerpo) return;
+  // Solo en eventos de CDMX: la nube es el transporte A CDMX.
+  var html=(ev&&isCDMX(ev)) ? nubeCardHtml(ev) : '';
+  cuerpo.innerHTML=html;
+  caja.style.display=html?'':'none';
+}
+
 function nubeVueloIncluido(ev){
   var inc=(ev&&ev.inc)||[];
   for(var i=0;i<inc.length;i++){ if(/\bavi[oó]n\b|\bvuelo\b/i.test(String(inc[i]))) return true; }
@@ -6182,8 +6290,10 @@ function buildTransporteButtons(){
       + '<div class="z-name">'+ico+' '+etq+'</div>'
       + '<div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
   }
-  var cotBus=lejos?nubeDe('bus'):null;
-  var cotAvion=(lejos&&!vueloIncluido)?nubeDe('avion'):null;
+  // [NUBE-5] Se le pide al estado DE ESTE EVENTO. Antes el cajón era global y
+  // el segundo evento de la visita habría cotizado con el precio del primero.
+  var cotBus=lejos?nubeDe('bus',cur):null;
+  var cotAvion=(lejos&&!vueloIncluido)?nubeDe('avion',cur):null;
   var h='';
   if(!hideBus) h+=_tBoton('bus','Autobús','🚌',waBus,cotBus?Math.round(Number(cotBus.precio)):0);
   h+=_tBoton('avion','Avión','✈️',waAvion,cotAvion?Math.round(Number(cotAvion.precio)):0);

@@ -16,7 +16,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 19f8d16  el bus cotizaba al número de reservas
-//     HEAD = c63b84b  cotiza al de viajes
+//     HEAD = b36c041  cotiza al de viajes (el commit del MERGE)
 //
 // Se corre:  npm run mide:num-bus-1
 // ══════════════════════════════════════════════════════════════════════════
@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '19f8d16';
-const HEAD_SHA = process.env.HEAD_SHA || 'c63b84b';
+const HEAD_SHA = process.env.HEAD_SHA || 'b36c041';
 const VIAJES   = '528132321405';   // vuelos y buses: COTIZAR
 const RESERVAS = '528119771072';   // reservar, apartar, informes
 

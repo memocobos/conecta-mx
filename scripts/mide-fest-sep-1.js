@@ -74,9 +74,15 @@ const FICHA = {
   slug: 'careofest', nombre: 'Careo Fest', titulo: 'Careo Fest',
   fecha_inicio: '2026-11-20', fechas_extra: JSON.stringify(['2026-11-21']),
   ciudad: 'MTY', venue: 'Parque Fundidora', status: '', color: 'azul',
-  inc: JSON.stringify(['Boleto', 'Kit Conecta']), sep: 500,
+  inc: JSON.stringify(['Boleto', 'Kit Conecta']),
   zonas: JSON.stringify([{ n: 'General', p: 3200 }]),
 };
+// ⚠️ LA FICHA BASE NO TRAE `sep`, Y ES A PROPÓSITO — me costó dos rojos.
+// Con un `sep: 500` en la base, «ausente» se escribía omitiéndolo del `extra`…
+// y el `Object.assign` lo reintroducía: el caso salía `,sep:500` ROTULADO
+// «ausente». La ausencia se consigue NO TENIENDO la llave, no dejando de
+// nombrarla — si no, el caso de [D] mide justo lo contrario de lo que dice.
+
 const emitir = (lib, extra) => lib._generarObj(Object.assign({}, FICHA, extra || {}), HOY);
 // El segmento del separo, AISLADO del resto del objeto.
 const segSep = (obj) => { const m = String(obj).match(/,sep:(-?\d+)/); return m ? m[0] : '(no emite)'; };

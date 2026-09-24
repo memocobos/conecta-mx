@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5b2c107';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '5771d8c';
 const iso = (s) => new Date(s).toISOString();
 const AHORA = Date.parse('2026-09-24T10:00:00-05:00');
 
@@ -407,10 +407,23 @@ let EVENTOS_REALES = [];
   // ── [V] EL SQL · el acta dice lo que la base contesta ─────────────────
   console.log('\n[V] la migración');
   const sql = fs.readFileSync(path.join(h.dir, 'migraciones/NUBE-4.sql'), 'utf8');
-  af(/add column if not exists evento_id text null/i.test(sql), 'el SQL no agrega `evento_id text null`');
-  af(/add column if not exists horarios\s+text null/i.test(sql), 'el SQL no agrega `horarios text`');
-  af(!/create table|drop table|delete from|update /i.test(sql),
-     'el SQL hace algo más que agregar columnas: la tabla es INSERT-only y su historial es el dato');
+  // 🔒 LOS COMENTARIOS FUERA ANTES DE ASERTAR AUSENCIA. Mi primera versión de
+  // la aserción de abajo se puso ROJA cazando la palabra «UPDATE» **del propio
+  // acta**, que explica que el trigger cubre UPDATE y DELETE. Es la aserción de
+  // ausencia que se caza sola, y ya van cinco: el comentario que explica por
+  // qué X no está CONTIENE X.
+  const sqlCodigo = sql.replace(/--[^\n]*/g, '');
+  af(/add column if not exists evento_id text null/i.test(sqlCodigo), 'el SQL no agrega `evento_id text null`');
+  af(/add column if not exists horarios\s+text null/i.test(sqlCodigo), 'el SQL no agrega `horarios text`');
+  // Lo que NO puede hacer: tocar filas ni re-crear la tabla. Un índice sí — la
+  // consulta del dueño filtra por (modo, evento_id) y sin él cada card de un
+  // evento hace un scan de la tabla entera.
+  af(!/\b(create|drop)\s+table\b|\bdelete\s+from\b|\bupdate\s+\w+\s+set\b|\binsert\s+into\b/i.test(sqlCodigo),
+     'el SQL toca FILAS o re-crea la tabla: es INSERT-only y su historial ES el dato. Solo puede agregar '
+     + 'columnas (y su índice).');
+  af(/create index/i.test(sqlCodigo),
+     'falta el índice por (modo, evento_id, vigencia): sin él, resolver el card de cada evento de CDMX '
+     + 'escanea la tabla completa, y son 18 eventos vivos por visita');
   af(/UPDATE DELETE|UPDATE y DELETE|UPDATE\b[\s\S]{0,40}DELETE/i.test(sql),
      'el acta no dice que el trigger cubre UPDATE y DELETE (y NO INSERT): un acta que no reproduce lo que '
      + 'la base contesta manda a buscar un hueco que no existe');

@@ -498,6 +498,32 @@ function horaShowSeg(esfera) {
   return v ? ("horaShow:'" + escStr(v) + "',") : '';
 }
 
+// [ESF-E1g] sep: el separo PLUS. NO SE INVENTA — misma regla que `added` y las
+// banderas de hotel en E1d: solo se emite si la esfera lo trae.
+//
+// Antes caía a 500 cuando faltaba, y eso no era un default: era una AFIRMACIÓN
+// sobre un evento que no la hacía. 13 objetos del catálogo no tienen `sep`
+// (agotados y "por confirmar", con `zonas:[]`) y el compilador les añadía uno,
+// así que ninguno era gobernable.
+//
+// No emitirlo NO cambia el sitio: `precio-zona` ya trata el separo ausente como
+// INDETERMINADO a propósito (AUD-2: "el separo ES la ganancia; mejor que no se
+// venda a que se venda sin ella"), portal lee `ev.sep || 500` y rol `ev.sep||0`.
+// Lo que cambia es que el compilador deja de decir algo que el evento no dice.
+//
+// 🔒 [FEST-SEP-1] Y LO PREGUNTAN LOS DOS CAMINOS, por eso vive aquí arriba.
+// `generarObjFestival` concatenaba `sepSeg` SIN declararlo —`ReferenceError`
+// antes de emitir un solo byte— y dos líneas antes tenía un `sepN` con default
+// 500 que NADIE leía: el fósil de la regla que este mismo comentario derogó.
+// Las dos caras del mismo hueco: la regla buena sin llamador y la vieja sin
+// lector. «Yo elijo el separo, igual que en todos los eventos» es palabra de
+// Memo (23-sep-2026), y una pregunta de dinero contestada en dos sitios acaba
+// contestándose distinto.
+function sepSeg(esfera) {
+  return (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
+    ? (',sep:' + Math.round(Number(esfera.sep))) : '';
+}
+
 // ═══ [ESF-CIERRE-FINAL] LOS CAMPOS QUE ESFERAS NO MODELA ══════════════════
 // El catálogo tiene campos escritos a mano que no valía la pena convertir en
 // columna con formulario: `promoModal` (un modal de itinerario con emojis y
@@ -951,8 +977,6 @@ function generarObjFestival(esfera, fest, hoy) {
   const incSeg = incRows.length
     ? ('inc:[' + incRows.map((s) => "'" + escStr(s) + "'").join(',') + ']')
     : 'inc:[]';
-  const sepN = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
-    ? Math.round(Number(esfera.sep)) : 500;
   const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
 
   // Flags (mismo orden que coronacapital).
@@ -1028,7 +1052,7 @@ function generarObjFestival(esfera, fest, hoy) {
     "',ds:'" + escStr(dsFinal) +
     "',v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + itinerarioSeg(esfera) + horaShowSeg(esfera) + incSeg + sepSeg + notaSeg +
+    "'," + itinerarioSeg(esfera) + horaShowSeg(esfera) + incSeg + sepSeg(esfera) + notaSeg +
     bancoSeg + ',multifecha:[' + mfStr + '],' + topZonas + pagosSegmento() + '}';
 }
 
@@ -1106,20 +1130,6 @@ function generarObj(esfera, hoy) {
   const incSeg = incRows.length
     ? ("inc:[" + incRows.map((s) => "'" + escStr(s) + "'").join(',') + ']')
     : 'inc:[]';
-  // [ESF-E1g] sep: el separo PLUS. NO SE INVENTA — misma regla que `added` y las
-  // banderas de hotel en E1d: solo se emite si la esfera lo trae.
-  //
-  // Antes caía a 500 cuando faltaba, y eso no era un default: era una AFIRMACIÓN
-  // sobre un evento que no la hacía. 13 objetos del catálogo no tienen `sep`
-  // (agotados y "por confirmar", con `zonas:[]`) y el compilador les añadía uno,
-  // así que ninguno era gobernable.
-  //
-  // No emitirlo NO cambia el sitio: `precio-zona` ya trata el separo ausente como
-  // INDETERMINADO a propósito (AUD-2: "el separo ES la ganancia; mejor que no se
-  // venda a que se venda sin ella"), portal lee `ev.sep || 500` y rol `ev.sep||0`.
-  // Lo que cambia es que el compilador deja de decir algo que el evento no dice.
-  const sepSeg = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
-    ? (',sep:' + Math.round(Number(esfera.sep))) : '';
   // sepCheap: SOLO si el evento tiene cheapZonas (alguna pc>0) Y sep_cheap definido.
   // [ESF-SEPCHEAP] "¿Este evento vende CHEAP?" se preguntaba SOLO por
   // `zonas[].pc > 0` — la forma vieja, anterior a que ESF-E1c le diera a CHEAP
@@ -1232,7 +1242,7 @@ function generarObj(esfera, hoy) {
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa + lineupConcSeg(esfera) + flashPromoSeg(esfera) + flagsSeg + extrasSegmento(esfera) +
     itinerarioSeg(esfera) + horaShowSeg(esfera) +
-    incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
+    incSeg + sepSeg(esfera) + sepCheapSeg + rideSeg + notaSeg +
     bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
     // festival y que en los 8 conciertos del catálogo.

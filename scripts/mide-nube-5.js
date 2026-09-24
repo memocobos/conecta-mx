@@ -42,8 +42,8 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
-const BASE = process.env.BASE || '08cbc46';
-const HEAD_SHA = process.env.HEAD_SHA || '9cb546b';
+const BASE = process.env.BASE || '427c0dc';   // el merge de NUBE-4 (#770): el dato por evento, sin card
+const HEAD_SHA = process.env.HEAD_SHA || 'ae16450';   // el commit del MERGE (#771)
 
 // ── LO QUE EL ENDPOINT CONTESTA, POR EVENTO ─────────────────────────────
 // `edc27` tiene bus PROPIO con horarios · `knotfest` HEREDA la general ·

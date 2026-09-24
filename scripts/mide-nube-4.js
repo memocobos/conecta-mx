@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5b2c107';
-const HEAD_SHA = process.env.HEAD_SHA || '5771d8c';
+const HEAD_SHA = process.env.HEAD_SHA || '427c0dc';   // el commit del MERGE (#770)
 const iso = (s) => new Date(s).toISOString();
 const AHORA = Date.parse('2026-09-24T10:00:00-05:00');
 

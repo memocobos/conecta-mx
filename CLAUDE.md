@@ -167,6 +167,168 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **DESDE-PAQ-1 EN PROD (24-sep-2026, #769): el «desde» de cada paquete tiene
+  UN dueño — y eran CINCO sitios, uno muerto.** Reporte de Memo con capturas:
+  la tarjeta pintaba PLUS «desde $4,100» y CHEAP «desde $5,200» —el todo
+  incluido más barato que el boleto solo— cuando el CHEAP real de 1 día son
+  **$2,400**. `npm run mide:desde-paq-1` (**41**), cero SQL.
+
+  **La causa: universos distintos.** El PLUS recorría la lista global MÁS las de
+  cada fecha; el CHEAP leía **solo la global**, que en edc27 trae el precio de
+  los 3 días. `desdeDelPaquete(ev, paquete)` es hoy el dueño: global + todas las
+  fechas, filtrando `ag` **y `prox`** igual para los dos. PLUS entra por `minP`
+  (su puerta, 5 llamadores), CHEAP y RIDE preguntan, y **STAY se sirve de la
+  respuesta de PLUS** porque vende el MISMO boleto sin transporte — más fuerte
+  que darle un universo gemelo. El hotel NO entra: depende de cuánta gente
+  viaja, que es estado de la pantalla.
+  ⚠️ **`prox` se filtraba solo en el PLUS**: una zona CHEAP con precio aún sin
+  publicar podía ganar el mínimo y anunciar un número que nadie puede comprar.
+
+  🔴 **EL ENCARGO DECÍA «DOS CAMINOS» Y ERAN CINCO, uno MUERTO.**
+  `getPaquetes(ev)` tenía **CERO llamadores**, leía solo `ev.zonas` sin `prox`, y
+  su `priceLabel` del CHEAP pintaba **el mínimo del PLUS** — el defecto de esta
+  tuerca escrito a mano. **Unificar ahí no habría cambiado un píxel y se habría
+  reportado como arreglo**: la trampa de «dos objetos con el mismo papel». Se
+  podó, y es la lección de FEST-SEP-1 otra vez: **una regla vieja SIN LECTOR es
+  la mitad del hoyo**.
+  🔴 **Y el otro «camino» es INALCANZABLE: `diaFirst` lo traen 0 de 117
+  eventos.** Se dejó intacto —cambiar lo que no se puede medir es peor— con un
+  **vigilante VIVO** contra el árbol de TRABAJO, no contra el archivado: mide un
+  hecho del catálogo de hoy, y puesto contra un commit nunca podría avisar.
+
+  🔴 **EL ROJO QUE CASI MERGEO:** mi primer dueño se comió la cola de
+  RIDE-VIVO-1 —un `rideOnly` sin zonas SÍ tiene precio— y **`bts` y `straykids`
+  caían de $2,900 a $0 en la tarjeta del catálogo**, porque `minP` es quien la
+  pinta. Lo cazó el barrido, no leer el diff.
+
+  🔒 **LAS COMPUERTAS QUE DECIDEN SI EL NÚMERO SE PINTA VAN COPIADAS DEL ORDEN
+  REAL.** Sin ellas el barrido mide *fórmulas*: salían **cuatro** violaciones de
+  la invariante y dos eran de `fanfest-*`, que son `rideOnly` y **no pintan
+  ninguno** de los dos números. Con las compuertas puestas, **en BASE hay
+  exactamente 1 evento violando con la ficha abierta, y es el de Memo** (`harry`
+  también violaba, pero está agotado y su ficha no abre). Se mueve el CHEAP en
+  DOS eventos (edc27 5200→2400 · harry 5000→2600) y el PLUS en NINGUNO.
+  ⚠️ **Y un rojo del arnés:** leía los `pp-*` recién abierta la ficha y dio
+  **cuatro rojos sobre código sano, BASE incluido** — `updatePkgCards` solo la
+  llama `selViajeros`, así que hasta que el cliente elige cuántos viajan los
+  cuatro letreros dicen «—». Es ROL-MONTO-MUDO: **saltarse un paso del wizard
+  mide una pantalla que ningún cliente ve.**
+  ⚠️ **Y la condición de merge de Jane, que vale para todo careo de clic: el
+  overlay del onboarding se abre 300 ms después con `z-index:9999`, y mi clic le
+  GANABA LA CARRERA en mi máquina** — verde por suerte aquí, `TimeoutError` en
+  la de ella. Se cierra como lo cierra el cliente (`skipOnboarding`) y **se
+  espera a que el overlay DEJE DE TAPAR, por condición y no por reloj**. Más la
+  aserción de que **el onboarding siga saliendo**: si deja de salir, el careo
+  seguiría verde sin él y ese popup es de Memo.
+
+- 🏆🔴 **NUBE-4 + NUBE-5 EN PROD (24-sep-2026, #770 y #771): la cotización de
+  transporte es POR EVENTO, con horarios, y cada ficha de CDMX pinta su card.**
+  `npm run mide:nube-4` (**68**) · `mide:nube-5` (**35**). **SQL corrido por Jane
+  con acta** (`migraciones/NUBE-4.sql`).
+
+  **La forma del dato:** `evento_id text NULL` —y **NULL significa «GENERAL CDMX
+  (todos)»**, no un hueco— más `horarios text` (aerolínea, hora de salida y
+  regreso). **Los horarios viajan CON la cotización, así que su historial sale
+  GRATIS**: cada captura es una fila nueva y la fila lleva los suyos.
+  Medido antes del acta: **1 trigger (UPDATE+DELETE, no INSERT)** y **0 filas** —
+  nadie había capturado, así que el ALTER no tuvo que decidir qué eran las filas
+  viejas. Y `text` sin FK: el catálogo público no vive en la base, es el `var
+  EV` del index y ahí la llave es el **slug**.
+
+  🔒 **LA RESOLUCIÓN ES HERENCIA ROTULADA (la forma de ROL-HIST-PADRE):** la
+  cotización DEL EVENTO manda → sin ella la GENERAL → sin ninguna, WhatsApp; y
+  **`heredado:true` VIAJA**, porque un precio general presentado como el del
+  evento es un dato bueno con la etiqueta equivocada. **Lo específico gana
+  AUNQUE la general sea MÁS NUEVA** — el padrón del careo lo pone al revés a
+  propósito. Y `heredado` **solo puede ser true cuando se preguntó por un
+  evento**: en la consulta general no hay de quién heredar.
+
+  🔴 **UN DEFECTO MÍO DE FORMA:** hice `regiaEl` **recursiva sobre sí misma** y
+  la llamada interna le pasaba el evento en un **quinto argumento que nadie
+  lee** — `eventoId` quedaba en null y **las filas propias del evento nunca se
+  habrían consultado**. Hoy hay núcleo (`_regiaEnLlave`) y cascada (`regiaEl`)
+  separados: **un dueño con dos trabajos se confunde consigo mismo.**
+
+  🔒 **EL CANDADO BYTE-A-BYTE DE NUBE-3, RE-FORMADO — y Jane firmó que ésta es
+  la forma correcta.** Ese careo exigía que `_lib/nube.js` fuera idéntico al de
+  BASE, porque «la forma fácil de romper *pregúntale al dueño* es cambiarle la
+  respuesta al dueño». **Aquí el dueño cambió DE VERDAD, con todos sus
+  bebedores en la MISMA tuerca**, así que el candado no puede ser la igualdad:
+  es **el arnés que se actualiza a la verdad nueva, no se re-ancla al pasado**.
+  Hoy exige que **nadie resuelva la herencia por su cuenta** (ni arme su propio
+  `evento_id=is.null`, ni DECIDA el `heredado`, ni el navegador resuelva) y que
+  **la cascada se escriba en un sitio por pregunta**.
+  ⚠️ **No se puso rojo solo** (está anclado a su par de commits, la lección de
+  FEST-SEP-1): se anotó a mano, y Jane dio por bueno que eso era lo honesto.
+
+  **La pluma: UN selector, TRES voces** (el patrón de FLUJO-UX-4) — el mismo
+  control filtra lo que se lista, manda sobre lo que se guarda y atribuye la
+  consulta. Tres selectores habrían sido tres listas del mismo dato, y peor: **se
+  podría estar mirando el precio de un evento y capturando el de otro.**
+  🔒 **Nace vacío (DEFAULTS-1) y el guardado lo exige, porque es una
+  ATRIBUCIÓN. Y son TRES valores, no dos:** `''` es «todavía no elegí» y
+  `__general__` es «**elegí** la general» — aplastarlos haría que no elegir se
+  guardara como cotización general, que rige para todos.
+  🔒 **La lista de eventos se DERIVA** (los CDMX vivos que usan el paso del
+  transporte, por la regla de `isCDMX` + `nubeVueloIncluido`): hoy **18**. `noBus`
+  SÍ entra —sigue usando el paso, con avión solamente—; el que ya incluye el
+  vuelo no, o se le vendería dos veces. Y si el catálogo no se puede leer **se
+  DICE (502)**: una lista vacía se leería como «no hay eventos de CDMX».
+  🔒 **El evento se valida en la PUERTA:** un slug mal escrito crearía una fila
+  huérfana que no rige para nadie con la pantalla diciendo «ya coticé».
+
+  **La Nube se mudó al listado principal, junto a Esferas.** Sin estrenar
+  permiso, medido: `PERMISOS_TABS` **byte a byte el de BASE** y el barrido del
+  menú **deriva** de `[id^="page-"]` filtrando por `nav-<id>`.
+  🔴 **El Radar llamaba a `showHerramienta('nube')`** y su «Ir a resolver →»
+  habría llevado a una **pantalla en blanco**: la ley de «quitar del menú no es
+  quitar un botón».
+  ⚠️ **Consecuencia medida y dicha: a bulma y milk se les apaga el desplegable
+  de Herramientas**, porque su visibilidad también se deriva y la Nube era la
+  única que tenían. Es correcto — ya no es una herramienta.
+
+  **NUBE-5, el card «Cómo llegar»** en la ficha de cada evento de CDMX: los dos
+  modos con su precio vigente, sus **horarios**, y **«tarifa general CDMX»**
+  cuando es heredada (el cliente no necesita la palabra «heredado»: necesita
+  saber que no es una tarifa negociada para su fecha).
+  🔴 **Y AHÍ SALIÓ EL DEFECTO GORDO: el estado era GLOBAL.** `window.__nube`
+  era un solo cajón, así que abrir `edc27` y luego `knotfest` en la misma visita
+  **le pintaba al segundo el precio del primero**. Es el bug de `cheapBtn`
+  (NOCHEAP-1) y de `rideBtn` (CAT-AGOT-1) —los globales que la pantalla reusa—
+  **ahora con un PRECIO, que es peor: un letrero mal heredado se ve; un precio de
+  otro evento se paga.** Hoy está llaveado por slug, y el repintado comprueba que
+  el cliente siga en ese evento antes de pintar.
+  **Los candados de NUBE-2, todos:** la vigencia se re-verifica **donde se
+  pinta** (el CDN puede servir una respuesta de hasta UNA HORA) · **fail-soft por
+  modo** —sin precio ese modo ofrece el WhatsApp y no inventa— · la frontera de
+  los 15 días **también aquí** (pintar un precio que el cotizador se rehúsa a
+  vender sería el card contradiciendo al embudo) · función DECLARADA por la ley
+  del hoisting · y **si ningún modo tiene precio, el card se esconde**.
+  **El cotizador NO se tocó:** `calcular()` (20 011 bytes) y `selTransporteBtn()`
+  careados **byte a byte**, cortados por balance de llaves.
+  **El renglón del Radar aprendió la cobertura:** cuántos eventos vivos se quedan
+  sin precio propio ni heredado, por modo y **con NOMBRES** — «3 eventos» manda a
+  buscar, «edc27, knotfest y flowfest» se resuelve — y **se calla cuando no hay
+  nada que decir**. La pregunta se le hace al dueño evento por evento,
+  **memoizando el LECTOR**: cachear una lectura no es re-implementar una regla.
+
+  🔴 **LEY NUEVA DEL MERGE, pagada en la #771: en una PR APILADA el
+  `package.json` no se resuelve «conservando los dos lados» — se conserva la
+  **UNIÓN SIN REPETIR**.** La rama de arriba ya trae los renglones de la de
+  abajo, así que concatenar dejó `mide:nube-4` **dos veces**: JSON válido (la
+  última gana), npm funciona, **cero errores** — una trampa latente que el
+  siguiente merge lee como intencional. Y la otra cara ya conocida: conservar los
+  dos lados deja la primera línea **sin coma**, y eso sí revienta, pero tampoco
+  avisa hasta que alguien corre npm.
+
+  ⚠️ **`vigia:color` sigue 🔴 y NO se le movió la base:** hoy da js **1026** ·
+  html **202** contra la base `cd251cc` de 888/187. Medido por archivo:
+  `kamehouse-nube.js` tiene **29 aciertos, 28 `var(--x)` y CERO literales**, o sea
+  que lo que crece es **el sistema de temas funcionando**, no deuda — y
+  `vigia:color-literal`, **que es el medidor de la serie COLOR**, sigue 🟢 **sin
+  crecimiento**. Mover la base habría bendecido los 71 sin triar de otros.
+
+
 - 🏆🔴 **SERIE NUBE VOLADORA COMPLETA EN PROD (23-sep-2026, #762 · #763 · #764):
   el transporte a CDMX se cotiza cada lunes y el sitio lo BEBE.** El `2500`
   tecleado del bus murió y el avión pasó de link de WhatsApp a paquete

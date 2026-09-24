@@ -70,7 +70,7 @@ function servidor(raiz) {
   });
 }
 const BASE = process.env.BASE || '8006830';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '1350bf1';
 
 // El onboarding tapa la pantalla (z-index 9999, 300 ms después). Se cierra como
 // lo cierra una persona y se espera POR CONDICIÓN, no por reloj — la condición
@@ -262,22 +262,30 @@ const FOTO = `(() => {
   // 🔒 EL MECANISMO SE QUEDA COMO MECANISMO Y NO COMO PROMESA: se le SIEMBRA el
   // atributo y se exige que la frase salga. Un lector sin su dato que además no
   // se puede comprobar es un hueco declarado, no tapado.
-  await pgG.goto(uH + '/edc27', { waitUntil: 'domcontentloaded' });
-  const onbG = await pgG.waitForFunction(_tapa, { timeout: 2500 }).then(() => true).catch(() => false);
-  if (onbG) await pgG.evaluate(() => { if (typeof skipOnboarding === 'function') skipOnboarding(); });
-  await pgG.waitForFunction(`!(${_tapa.toString()})()`, { timeout: 10000 });
-  const sembrado = await pgG.evaluate(`(() => {
+  // ⚠️ SE SIEMBRA SOBRE EL ESTADO REAL, y me costó un rojo: la primera versión
+  // le ponía el atributo a una página RECIÉN ABIERTA, donde el paso del hotel
+  // está SIN CONTESTAR — así que `guiaPintar` lo nombraba («Ahora elige tu
+  // habitación») y nunca llegaba a la rama del atributo, que solo corre cuando
+  // todo lo visible ESTÁ contestado y aun así no hay cotización. Se recorre el
+  // camino del cliente primero, que es el único estado donde esa rama existe.
+  await ctxG.close();
+  const rG = await recorrer(uH, 'edc27', { dejar: true });
+  const sembrado = await rG.pg.evaluate(`(() => {
     const c = document.getElementById('w-hotel-card');
     if (!c) return { ok: false };
+    const marcado = !!document.querySelector('#d-hotel .h-btn.active');
     c.setAttribute('data-guia-confirma', 'TESTIGO SEMBRADO');
-    c.style.display = 'block';
-    // Se apagan los pasos de después para que el hotel sea el ÚLTIMO a la vista.
+    // Se apagan los pasos de DESPUÉS y la cotización, para reproducir el único
+    // estado en que esa rama corre: el hotel es el último a la vista, contestado.
     const t = document.getElementById('w-transport-card'); if (t) t.style.display = 'none';
     const r = document.getElementById('d-result'); if (r) r.style.display = 'none';
     if (typeof guiaPintar === 'function') guiaPintar();
-    return { ok: true, texto: (document.getElementById('d-placeholder') || {}).textContent || '' };
+    return { ok: true, marcado, texto: (document.getElementById('d-placeholder') || {}).textContent || '' };
   })()`);
-  await ctxG.close();
+  await rG.ctx.close();
+  af(sembrado.marcado,
+     'la premisa del sembrado falla: el paso del hotel tiene que estar CONTESTADO para que esa rama '
+     + 'exista, y la habitación no quedó marcada');
   console.log('    con el atributo sembrado → ' + JSON.stringify(sembrado.texto));
   af(sembrado.ok && /TESTIGO SEMBRADO/.test(sembrado.texto || ''),
      'el lector de `data-guia-confirma` ya NO funciona: entonces no es un mecanismo esperando a un '
@@ -290,18 +298,45 @@ const FOTO = `(() => {
   console.log('\n[S] las dos ramas de selPaquete');
   const htmlH = fs.readFileSync(path.join(h.dir, 'index.html'), 'utf8');
   const htmlB = fs.readFileSync(path.join(b.dir, 'index.html'), 'utf8');
-  function rama(html, desde, hasta) {
-    const i = html.indexOf(desde); const j = html.indexOf(hasta, i);
-    return (i < 0 || j < 0) ? null : html.slice(i, j);
+  // ⚠️ LAS RAMAS SE CORTAN POR BALANCE DE LLAVES, NO POR UN PREFIJO DE TEXTO.
+  // Mi primera versión anclaba en `'// Normal flow'` y ese prefijo casa PRIMERO
+  // con el comentario de `selFecha` —«Normal flow only (non-diaFirst…)»—, que
+  // vive antes en el archivo: el careo midió una rebanada que empezaba en OTRA
+  // función y se puso rojo sobre código correcto. Es la lección de `gzReactivar`:
+  // **un prefijo no es un ancla.**
+  function _balance(html, desde) {
+    let i = html.indexOf('{', desde), prof = 0, k = i;
+    for (;; k++) { if (html[k] === '{') prof++; else if (html[k] === '}') prof--; if (prof === 0) break; }
+    return { ini: i, fin: k };
+  }
+  // 🔒 Y LOS COMENTARIOS FUERA ANTES DE MEDIR POSICIONES. La aserción de abajo
+  // se puso ROJA cazando el `buildHotelButtons()` que vive DENTRO del comentario
+  // que explica el arreglo («esta línea vivía DESPUÉS de `buildHotelButtons()`»).
+  // Es la aserción que se caza sola — van SIETE— y aquí en su forma nueva: no
+  // era una ausencia, era una POSICIÓN. El comentario que explica dónde estaba
+  // algo NOMBRA ese algo, y lo nombra ANTES.
+  const _pelado = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  function ramasDeSelPaquete(html) {
+    const iFn = html.indexOf('function selPaquete(');
+    if (iFn < 0) return null;
+    const fn = _balance(html, iFn);
+    const cuerpoFn = html.slice(fn.ini, fn.fin + 1);
+    const iDia = cuerpoFn.indexOf('if(cur.diaFirst){');
+    if (iDia < 0) return null;
+    const bloqueDia = _balance(cuerpoFn, iDia);
+    return {
+      diaFirst: _pelado(cuerpoFn.slice(bloqueDia.ini, bloqueDia.fin + 1)),
+      normal: _pelado(cuerpoFn.slice(bloqueDia.fin + 1)),
+    };
   }
   // En las dos ramas, el `display='none'` del transporte va ANTES del
   // `buildHotelButtons()`. Se mide por POSICIÓN, no por presencia.
-  for (const [etiqueta, desde, hasta] of [
-    ['diaFirst', "if(cur.diaFirst){", "} else {\n    // Normal flow"],
-    ['normal', "// Normal flow", "$$('d-placeholder').style.display='block';"],
-  ]) {
-    const txt = rama(htmlH, desde, hasta);
-    af(txt, 'no se pudo aislar la rama ' + etiqueta + ' de selPaquete: el ancla del careo está vieja');
+  const ramasH = ramasDeSelPaquete(htmlH);
+  af(ramasH && ramasH.diaFirst && ramasH.normal,
+     'no se pudieron aislar las dos ramas de `selPaquete`: el instrumento está roto y sus ausencias no '
+     + 'dirían nada');
+  for (const etiqueta of ['diaFirst', 'normal']) {
+    const txt = ramasH ? ramasH[etiqueta] : null;
     if (!txt) continue;
     const iHide = txt.indexOf("$$('w-transport-card').style.display='none'");
     const iHotel = txt.indexOf('buildHotelButtons()');
@@ -313,7 +348,9 @@ const FOTO = `(() => {
        + 'vuelve a esconder. Es el callejón.');
   }
   // Y el control: en BASE la rama normal lo tenía DESPUÉS.
-  const normB = rama(htmlB, '// Normal flow', "$$('d-placeholder').style.display='block';");
+  const ramasB = ramasDeSelPaquete(htmlB);
+  const normB = ramasB ? ramasB.normal : null;
+  af(normB, 'no se pudo aislar la rama normal de selPaquete en BASE');
   const bHide = normB ? normB.indexOf("$$('w-transport-card').style.display='none'") : -1;
   const bHotel = normB ? normB.indexOf('buildHotelButtons()') : -1;
   console.log('    BASE normal  esconde@' + bHide + '  buildHotelButtons@' + bHotel);

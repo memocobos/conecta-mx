@@ -105,7 +105,7 @@ async function cerrarOnboarding(pg) {
   return salio;
 }
 const BASE = process.env.BASE || '5b2c107';
-const HEAD_SHA = process.env.HEAD_SHA || '192af31';
+const HEAD_SHA = process.env.HEAD_SHA || 'b9b1bb6';   // el commit del MERGE (#769)
 
 // ── LAS COMPUERTAS QUE DECIDEN SI EL NÚMERO SE PINTA ────────────────────
 // Copiadas del ORDEN REAL de updatePkgCards, no parafraseadas. Sin ellas el

@@ -2214,6 +2214,10 @@ function loadPage(name) {
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
  if (name === 'esferas') { loadEsferasEventos(); n1Cargar(); }
+ // [NUBE-4] La Nube se mudó al listado principal (orden de Memo), así que su
+ // carga vive donde viven las de las páginas. Antes colgaba de
+ // `showHerramienta`, y ahí ya no hay botón que la llame.
+ if (name === 'nube') loadNube();
  if (name === 'baba') babaCargar();
  if (name === 'yamcha') loadYamcha();
  if (name === 'radio') loadRadio();
@@ -4562,9 +4566,11 @@ function showHerramienta(name) {
   // [NUBE-1] Sin esto la pantalla abre VACÍA y parece rota: es la pérdida
   // silenciosa de «quitar del menú no es quitar un botón», al revés — poner el
   // botón no es poner la pantalla.
-  if (name === 'nube') {
-    loadNube();
-  }
+  // [NUBE-4] ⚰️ Aquí colgaba `if (name === 'nube') loadNube();`. La Nube dejó
+  // de ser una herramienta: su botón vive en el listado principal y su carga
+  // en `loadPage`. Medido: cero llamadores de `showHerramienta('nube')` en el
+  // árbol. Dejar la carga en los DOS sitios habría sido la segunda puerta que
+  // todavía no ha divergido.
   // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
   // Si el admin sale de cualquier herramienta, paramos los timers del Radar.
   stopRolAnalyticsAutoRefresh();

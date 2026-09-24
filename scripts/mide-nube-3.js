@@ -349,9 +349,30 @@ function servidor(raiz) {
      'la premisa falla: `regiaEl` no venía de NUBE-1, así que no se puede afirmar que esta tuerca le preguntó al dueño');
   const libHead = fs.readFileSync(path.join(h.dir, 'netlify/functions/_lib/nube.js'), 'utf8');
   const libBase = fs.readFileSync(path.join(b.dir, 'netlify/functions/_lib/nube.js'), 'utf8');
+  // ⏳ [NUBE-4] ESTE CANDADO SIGUE SIENDO CIERTO **PARA ESTE PAR DE COMMITS**,
+  // y por eso se queda: NUBE-3 de verdad no tocó al dueño. Lo que hay que saber
+  // es que **ya no protege el futuro**, porque este careo lee el árbol de
+  // `HEAD_SHA` — un par anclado no puede ver lo que pase después, y se quedaría
+  // verde para siempre (la lección de FEST-SEP-1, donde un testigo anclado
+  // nunca avisó de su propio arreglo).
+  //
+  // 🔴 EN **NUBE-4** EL DUEÑO CAMBIÓ DE VERDAD, con palabra de Memo (24-sep-2026):
+  // recibe `evento_id` y resuelve la herencia rotulada (la del evento manda,
+  // si no la general). Eso NO es «cambiarle la respuesta al dueño para que
+  // encaje con la pantalla nueva» — que es lo que este candado combate—: es una
+  // pregunta NUEVA, y sus CUATRO bebedores (endpoint, pluma, historial y Radar)
+  // se actualizaron en la MISMA tuerca.
+  //
+  // El candado se RE-FORMÓ allá, a lo que de verdad protege: `npm run mide:nube-4`
+  // exige que nadie resuelva la herencia por su cuenta al lado del dueño —ni el
+  // endpoint, ni la pluma, ni el navegador— y que la cascada se escriba en un
+  // solo sitio. Cuatro copias que hoy coinciden son cuatro respuestas esperando
+  // a divergir, y aquí la respuesta es un precio.
   af(libHead === libBase,
      '🔴 esta tuerca TOCÓ `_lib/nube.js`: la pregunta se le hace al dueño, no se le cambia la respuesta '
-     + 'para que encaje con la pantalla nueva');
+     + 'para que encaje con la pantalla nueva. ⚠️ Si este rojo salió después de re-anclar el careo a un '
+     + 'commit POSTERIOR a NUBE-4, no es un defecto: ahí el dueño cambió a propósito y el candado vive en '
+     + '`mide:nube-4`. Lee la nota de arriba antes de «arreglarlo» revirtiendo nada.');
 
   completo = true;
   marcador();

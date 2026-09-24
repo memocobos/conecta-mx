@@ -1261,6 +1261,10 @@ async function _radarNubeAviso() {
   let d = null;
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      // [NUBE-4] Sin `evento_id` = la GENERAL, y es la pregunta correcta para este
+      // renglón: la general vencida afecta a TODOS los eventos de CDMX que no
+      // tengan una propia, o sea al caso común. (Contar cuántos eventos quedan
+      // sin cotización propia NI general es otra pregunta, y es de NUBE-5.)
       method: 'POST', body: JSON.stringify({ accion: 'listar' }),
     });
     d = await r.json().catch(() => null);
@@ -1285,12 +1289,17 @@ async function _radarNubeAviso() {
     + (f.venció ? (' (venció el ' + enRey(f.venció) + ')') : ' (nunca se ha cotizado)')).join(' y ');
   // ⚠️ Se dice la CONSECUENCIA, no solo el hecho: sin eso, «vencida» no le
   // dice a nadie qué está pasando en el sitio ahora mismo.
-  caja.innerHTML = '<div class="rdr-alert sev-alta no-vista" style="cursor:pointer" onclick="showHerramienta(\'nube\')">'
+  // [NUBE-4] 🔴 ESTE `onclick` ERA `showHerramienta('nube')` Y SE HABRÍA ROTO EN
+  // SILENCIO: la Nube se mudó al listado principal, así que su carga vive en
+  // `loadPage` y por la puerta vieja la pantalla salía VACÍA — un «Ir a
+  // resolver» que lleva a una pantalla en blanco. Es la ley de «quitar del
+  // menú no es quitar un botón»: lo que cuelga del `nav-*` se barre entero.
+  caja.innerHTML = '<div class="rdr-alert sev-alta no-vista" style="cursor:pointer" onclick="showPage(\'nube\')">'
     + '<div class="dot"></div>'
     + '<div class="body">'
-    + '<div class="titulo">La nube voladora está vencida: ' + lista + '</div>'
+    + '<div class="titulo">La cotización GENERAL de la nube está vencida: ' + lista + '</div>'
     + '<div class="mensaje">Mientras no haya cotización vigente, ese modo NO se vende en el sitio: '
-    + 'el cliente cae al WhatsApp. Súbela desde Herramientas → Nube voladora.</div>'
+    + 'el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).</div>'
     + '</div>'
     + '<div class="meta">' + enRey(new Date(ahora).toISOString()) + '<br><span class="tipo">nube_vencida</span>'
     + '<br><span class="rdr-ir">Ir a resolver →</span></div>'

@@ -154,6 +154,18 @@
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Eventos</div>
    <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
+   <!-- [NUBE-4] LA NUBE SE MUDA AL LISTADO PRINCIPAL, junto a Esferas (orden de
+        Memo, 24-sep-2026). Era `nav-dropdown-item` + `showHerramienta`; hoy es
+        `nav-btn` + `showPage`, la MISMA forma que Esferas.
+        🔒 NO ESTRENA PERMISO: `nube` ya estaba en PERMISOS_TABS para roshi,
+        bulma y milk desde NUBE-1, y el barrido del menú DERIVA su lista de
+        `[id^="page-"]` filtrando por que exista un `nav-<id>` — le da igual si
+        el botón es del nav o del desplegable. Medido en el careo.
+        ⚠️ Y esto APAGA el desplegable de Herramientas para bulma y milk: su
+        visibilidad también se deriva («se ve si al rol le queda al menos una
+        herramienta») y la Nube era la única que tenían. Es correcto —ya no es
+        una herramienta— y va dicho aquí para que no se lea como una pérdida. -->
+   <button class="nav-btn" onclick="showPage('nube')" id="nav-nube"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Nube voladora</span></button>
    <button class="nav-btn" onclick="showPage('baba')" id="nav-baba"><svg class="nav-ic"><use href="#ic-baba"/></svg><span>La Casa de Uranai Baba</span></button>
    <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
@@ -171,7 +183,6 @@
         ven «herramientas», así que no se estrena permiso ni se toca el menú
         principal. `aplicarPermisosUI` deriva la lista del DOM, así que nace
         CERRADA hasta que PERMISOS_TABS la nombre — el lado correcto para fallar. -->
-   <button class="nav-dropdown-item" id="nav-nube" onclick="showHerramienta('nube')"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Nube voladora</span></button>
   </div>
  </nav>
 
@@ -2730,6 +2741,29 @@
      </div>
    </div>
 
+   <!-- [NUBE-4] UN SELECTOR, TRES VOCES — el patrón de FLUJO-UX-4. El mismo
+        control (1) FILTRA lo que se lista, (2) MANDA sobre lo que la captura va
+        a escribir y (3) ATRIBUYE la consulta del historial. Tres selectores
+        habrían sido tres listas del mismo dato esperando a divergir, y peor:
+        se podría estar mirando el precio de un evento y capturando el de otro.
+        🔒 NACE VACÍO (DEFAULTS-1) y el guardado lo EXIGE: elegir solo pondría
+        el precio en el evento equivocado, que es una ATRIBUCIÓN, no una forma.
+        🔒 Y «General CDMX» es una OPCIÓN EXPLÍCITA Y ANUNCIADA, no la ausencia
+        de elección: la cotización general rige de verdad para los eventos sin
+        una propia, así que tiene que poder elegirse a propósito. -->
+   <div class="card" style="padding:14px;margin-bottom:14px">
+    <div class="form-group" style="margin:0">
+     <label>¿De qué se habla?</label>
+     <select class="cot-input" id="nube-evento" style="width:100%;max-width:520px" onchange="nubeEventoCambio()">
+      <option value="">— elige —</option>
+     </select>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px" id="nube-evento-ayuda">
+       Manda sobre las tres cosas de esta pantalla: lo que se lista, lo que se guarda y lo que se consulta.
+       La lista de eventos sale del catálogo, no está escrita a mano.
+     </div>
+    </div>
+   </div>
+
    <div id="nube-cuerpo"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
 
    <div class="card" style="padding:16px;margin-top:14px">
@@ -2760,8 +2794,18 @@
       </div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px" id="nube-previa"></div>
      </div>
-     <div class="form-group">
-      <label>Nota <span style="color:var(--ts);font-weight:400">(opcional)</span></label>
+     <!-- [NUBE-4] LOS HORARIOS VIAJAN CON LA COTIZACIÓN, y por eso su historial
+          sale gratis: cada captura es una fila nueva y la fila lleva SUS
+          horarios. Guardarlos aparte habría pedido su propia tabla y su propia
+          pregunta de «cuáles regían ese día». -->
+     <div class="form-group" style="grid-column:1/-1">
+      <label>Horarios <span style="color:var(--ts);font-weight:400">(opcional · sale en el card del evento)</span></label>
+      <textarea class="cot-input" id="nube-horarios" rows="2" style="width:100%;resize:vertical"
+        placeholder="ej. Volaris · sale 7:10 am del MAM, regresa 9:40 pm del AICM"></textarea>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">Aerolínea o línea, hora de salida y de regreso. Lo que el cliente necesita saber.</div>
+     </div>
+     <div class="form-group" style="grid-column:1/-1">
+      <label>Nota <span style="color:var(--ts);font-weight:400">(opcional · interna, NO sale al sitio)</span></label>
       <input class="cot-input" id="nube-nota" placeholder="ej. vuelo con escala, sale más barato" style="width:100%">
      </div>
     </div>

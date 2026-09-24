@@ -40,6 +40,7 @@
     "mide:num-bus-1": "node scripts/mide-num-bus-1.js",
     "mide:desde-paq-1": "node scripts/mide-desde-paq-1.js",
     "mide:nube-4": "node scripts/mide-nube-4.js",
-    "mide:nube-5": "node scripts/mide-nube-5.js"
+    "mide:nube-5": "node scripts/mide-nube-5.js",
+    "mide:callejon-cdmx-1": "node scripts/mide-callejon-cdmx-1.js"
   }
 }

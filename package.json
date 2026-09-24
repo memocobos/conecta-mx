@@ -38,6 +38,7 @@
     "mide:nube-3": "node scripts/mide-nube-3.js",
     "mide:nocheap-1": "node scripts/mide-nocheap-1.js",
     "mide:num-bus-1": "node scripts/mide-num-bus-1.js",
-    "mide:nube-4": "node scripts/mide-nube-4.js"
+    "mide:nube-4": "node scripts/mide-nube-4.js",
+    "mide:nube-5": "node scripts/mide-nube-5.js"
   }
 }

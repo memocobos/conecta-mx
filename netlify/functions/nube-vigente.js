@@ -67,9 +67,20 @@ exports.handler = async (event) => {
     return res(200, { ok: false, bus: null, avion: null }, { 'Cache-Control': 'no-store' });
   }
   try {
-    const v = await vigentes(lector(), Date.now());
+    // [NUBE-4] `?evento=<slug>` pide la cotización DE ESE EVENTO, con herencia:
+    // la propia manda, si no la GENERAL, y `heredado:true` viaja para que el
+    // card lo ROTULE. Sin el parámetro se contesta la general, que es lo que
+    // pedía NUBE-1 — así el llamador viejo sigue teniendo sentido.
+    //
+    // ⚠️ LA CACHÉ DEL CDN LLAVEA POR URL COMPLETA, query incluida, así que cada
+    // evento tiene su propia entrada y ninguno puede servirle el precio de otro.
+    // Eso hay que decirlo porque es lo que hace seguro dejar el mismo `s-maxage`.
+    const q = (event.queryStringParameters || {});
+    const evento = (typeof q.evento === 'string' && q.evento.trim()) ? q.evento.trim().slice(0, 120) : null;
+    const v = await vigentes(lector(), Date.now(), evento);
     return res(200, {
       ok: true,
+      evento: evento,
       bus: v.bus || null,
       avion: v.avion || null,
     }, { 'Cache-Control': CACHE });

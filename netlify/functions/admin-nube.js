@@ -31,7 +31,45 @@ const { MODOS, vigentes, regiaEl, filasDe, interna, _cualCubre } = require('./_l
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
-const ACCIONES = ['listar', 'cotizar', 'historial'];
+const { fetchEventosRaw } = require('./_lib/catalogo-index');
+
+// [NUBE-4] LA LISTA DE EVENTOS SE DERIVA DEL CATÁLOGO, NO SE TECLEA. Un arreglo
+// de slugs a mano es la lista al lado de la realidad que esta casa ya pagó siete
+// veces: el día que entre un evento de CDMX nuevo, la pluma no lo ofrecería y
+// nadie se enteraría — se vería igual que «todavía no hay que cotizarlo».
+//
+// La regla, copiada de dónde el sitio la aplica (`isCDMX` y `nubeVueloIncluido`
+// de index.html, el paso del transporte):
+//   · es de CDMX (por el VENUE, que es lo que el index mira),
+//   · no pasó,
+//   · y su paquete NO incluye ya el vuelo — si lo incluye, no usa este paso y
+//     ofrecerlo invitaría a venderle el vuelo DOS veces.
+// ⚠️ `noBus` SÍ entra: ese evento sigue usando el paso, con avión solamente.
+function _esCdmx(ev) {
+  const v = String((ev && ev.v) || '').toUpperCase();
+  return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO');
+}
+function _vueloIncluido(ev) {
+  const inc = (ev && ev.inc) || [];
+  return inc.some((x) => /\bavi[o\u00f3]n\b|\bvuelo\b/i.test(String(x)));
+}
+// El día de hoy en REYNOSA. `toISOString()` nunca es «hoy» en México: pasadas
+// las 6 de la tarde de acá ya es el día siguiente en Greenwich, y en esta casa
+// se trabaja de noche.
+function _hoyReynosa() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+}
+async function eventosCdmx() {
+  const EV = await fetchEventosRaw();
+  if (!Array.isArray(EV)) return null;      // NO se inventa una lista vacía
+  const hoy = _hoyReynosa();
+  return EV
+    .filter((ev) => ev && ev.id && _esCdmx(ev) && !ev._past && String(ev.ds || '') >= hoy && !_vueloIncluido(ev))
+    .map((ev) => ({ id: String(ev.id), nombre: String(ev.a || ev.id), ds: ev.ds || null, st: ev.st || '' }))
+    .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+}
+
+const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -68,11 +106,28 @@ exports.handler = async (event) => {
   };
 
   try {
+    if (accion === 'eventos') {
+      const lista = await eventosCdmx();
+      if (lista == null) {
+        // 🔒 NO SE CONTESTA UNA LISTA VACÍA CUANDO NO SE PUDO LEER. Un `[]` aquí
+        // dejaría el selector con solo la opción general y se leería como «no hay
+        // eventos de CDMX» — la diferencia entre «no hay» y «no pude» otra vez.
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el cat\u00e1logo para armar la lista de eventos' }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, eventos: lista }) };
+    }
+
+    // [NUBE-4] El evento del que se habla. AUSENTE o vacío = la GENERAL, que es
+    // un caso REAL y no un dato que falta: la pantalla lo dice con palabras
+    // («— General CDMX (todos) —»).
+    const eventoId = (typeof body.evento_id === 'string' && body.evento_id.trim())
+      ? body.evento_id.trim() : null;
+
     if (accion === 'listar') {
       const ahora = Date.now();
       const modos = {};
       for (const modo of MODOS) {
-        const filas = await filasDe(pedir, modo, 12);
+        const filas = await filasDe(pedir, modo, eventoId, 12);
         modos[modo] = {
           // La vigente sale del DUEÑO (`_cualCubre`), no de «la primera de la
           // lista»: una fila capturada para el lunes que viene NO rige hoy, y
@@ -81,7 +136,13 @@ exports.handler = async (event) => {
           ultimas: filas.map(interna),
         };
       }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, modos, ahora }) };
+      // [NUBE-4] Y la RESOLUCIÓN, que es otra pregunta que la de «mis filas»:
+      // con el evento elegido, `vigente` de arriba puede estar en null y aun
+      // así haber precio — el heredado de la general. La pantalla tiene que
+      // poder decir «este evento no tiene cotización propia, rige la general»
+      // en vez de «no hay precio», que sería falso.
+      const resuelto = await vigentes(pedir, ahora, eventoId);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_id: eventoId, modos, resuelto, ahora }) };
     }
 
     // ── historial · ¿QUÉ REGÍA EL DÍA X? ──────────────────────────────────
@@ -109,8 +170,8 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Ese día no se entiende: ' + crudo }) };
       }
       const modos = {};
-      for (const modo of MODOS) modos[modo] = await regiaEl(pedir, modo, dia);
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia: new Date(dia).toISOString(), modos }) };
+      for (const modo of MODOS) modos[modo] = await regiaEl(pedir, modo, dia, eventoId);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia: new Date(dia).toISOString(), evento_id: eventoId, modos }) };
     }
 
     // ── cotizar ────────────────────────────────────────────────────────────
@@ -150,6 +211,27 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'La vigencia está al revés: termina antes de empezar' }) };
     }
     const nota = typeof body.nota === 'string' && body.nota.trim() ? body.nota.trim().slice(0, 400) : null;
+    // [NUBE-4] Los HORARIOS: texto libre (aerolínea, hora de salida y regreso).
+    // Opcionales a propósito — una cotización sin horarios sigue siendo un
+    // precio válido, y el card los omite en vez de inventarlos.
+    const horarios = typeof body.horarios === 'string' && body.horarios.trim()
+      ? body.horarios.trim().slice(0, 600) : null;
+    // 🔒 EL EVENTO SE VALIDA CONTRA LA LISTA DERIVADA, en la PUERTA. Un slug
+    // mal escrito crearía una fila huérfana que no rige para nadie y que nadie
+    // podría encontrar: el precio quedaría capturado y el sitio seguiría en
+    // WhatsApp, con la pantalla diciendo «ya coticé». Es el «éxito vacío» con
+    // dinero enfrente, y el dato imposible se rehusa donde se captura.
+    if (eventoId != null) {
+      const lista = await eventosCdmx();
+      if (lista == null) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el cat\u00e1logo para comprobar el evento. Intenta de nuevo.' }) };
+      }
+      if (!lista.some((e) => e.id === eventoId)) {
+        return { statusCode: 400, headers, body: JSON.stringify({
+          error: 'Ese evento no est\u00e1 en la lista de eventos de CDMX vivos: ' + eventoId,
+        }) };
+      }
+    }
     // Del TOKEN, no del body.
     // 🔒 EL NOMBRE DEL CAMPO SE LEYÓ DEL CÓDIGO DE LA OTRA PUNTA, no de mi
     // memoria: `verifyAdminAuth` documenta su payload como
@@ -168,9 +250,11 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         modo,
+        evento_id: eventoId,
         precio_pp: precio,
         vigente_desde: new Date(desde).toISOString(),
         vigente_hasta: new Date(hasta).toISOString(),
+        horarios,
         nota,
         capturado_por: String(quien).slice(0, 120),
       }),
@@ -185,7 +269,7 @@ exports.handler = async (event) => {
     // Se devuelve además el estado VIGENTE recalculado, para que la pantalla
     // pinte lo que de verdad rige en vez de suponer que lo recién capturado
     // manda: si Bulma capturó para el lunes que viene, hoy sigue la de antes.
-    const v = await vigentes(pedir, Date.now());
+    const v = await vigentes(pedir, Date.now(), eventoId);
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, fila: nueva, vigentes: v }) };
   } catch (e) {
     console.error('[admin-nube]', (e && e.message) || e);

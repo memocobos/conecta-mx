@@ -78,14 +78,102 @@ function _nubeEsc(s) {
 }
 
 let _nubeDatos = null;
+let _nubeEventos = null;         // la lista DERIVADA del catálogo (null = aún no se pidió)
+
+// [NUBE-4] 🔒 TRES VALORES, NO DOS, y el centinela existe por eso: `''` es
+// «todavía no elegí» y `NUBE_GENERAL` es «ELEGÍ la general». Aplastarlos en
+// el vacío haría que no elegir se guardara como cotización general — un default
+// silencioso sobre una ATRIBUCIÓN, que es justo lo que DEFAULTS-1 prohíbe: el
+// precio general rige para TODOS los eventos sin uno propio.
+const NUBE_GENERAL = '__general__';
+// Lo que el selector dice hoy. Devuelve `{ elegido, eventoId }`:
+//   elegido=false  → nadie eligió (no se lista, no se guarda, no se consulta)
+//   eventoId=null  → la GENERAL, elegida a propósito
+function _nubeSel() {
+  const v = (document.getElementById('nube-evento')?.value || '').trim();
+  if (!v) return { elegido: false, eventoId: null };
+  return { elegido: true, eventoId: (v === NUBE_GENERAL) ? null : v };
+}
+// Cómo se NOMBRA lo elegido, para que ningún letrero diga «null» ni se quede
+// mudo. La general se nombra con palabras porque es un caso real.
+function _nubeNombre(eventoId) {
+  if (eventoId == null) return 'General CDMX (todos)';
+  const e = (_nubeEventos || []).find((x) => x.id === eventoId);
+  return e ? (e.nombre + (e.ds ? (' · ' + e.ds) : '')) : eventoId;
+}
+
+// La lista de eventos se PIDE al servidor, que la DERIVA del catálogo. Aquí no
+// se teclea ni se filtra por nuestra cuenta: una segunda regla de «qué evento
+// usa el paso del transporte» acabaría contestando distinto que el index.
+async function _nubeCargarEventos() {
+  const sel = document.getElementById('nube-evento');
+  if (!sel) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'eventos' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
+    _nubeEventos = Array.isArray(d.eventos) ? d.eventos : [];
+    const previo = sel.value;
+    sel.innerHTML = '<option value="">— elige —</option>'
+      // 🔒 ANUNCIADA CON PALABRAS y primera de las de verdad: la cotización
+      // general NO es «sin evento», es la que rige para los que no tienen una
+      // propia. Que se pueda elegir a propósito es la mitad del diseño.
+      + '<option value="' + NUBE_GENERAL + '">— General CDMX (todos) —</option>'
+      + _nubeEventos.map((e) => '<option value="' + _nubeEsc(e.id) + '">'
+          + _nubeEsc(e.nombre) + (e.ds ? (' · ' + _nubeEsc(e.ds)) : '')
+          + (e.st ? (' [' + _nubeEsc(e.st) + ']') : '') + '</option>').join('');
+    if (previo) sel.value = previo;             // no se le pierde lo elegido al refrescar
+  } catch (e) {
+    // 🔒 NO SE DEJA UN SELECTOR CON SOLO LA GENERAL: eso se leería como «no hay
+    // eventos de CDMX» y mandaría toda cotización al cajón general. Se DICE.
+    _nubeEventos = null;
+    sel.innerHTML = '<option value="">— no se pudo leer la lista de eventos —</option>';
+    const ayuda = document.getElementById('nube-evento-ayuda');
+    if (ayuda) ayuda.innerHTML = '<b style="color:var(--orange)">No se pudo leer el catálogo</b>, '
+      + 'así que la lista de eventos no está. Refresca: capturar sin saber a qué evento va sería peor.';
+  }
+}
+function nubeEventoCambio() {
+  const ayuda = document.getElementById('nube-evento-ayuda');
+  const { elegido, eventoId } = _nubeSel();
+  if (ayuda && _nubeEventos) {
+    ayuda.innerHTML = elegido
+      ? ('Hablando de <b style="color:var(--tp)">' + _nubeEsc(_nubeNombre(eventoId)) + '</b>. '
+         + (eventoId == null
+            ? 'Esta cotización rige para <b>todos</b> los eventos de CDMX que no tengan una propia.'
+            : 'Su cotización propia le <b>gana</b> a la general, aunque la general sea más nueva.'))
+      : 'Manda sobre las tres cosas de esta pantalla: lo que se lista, lo que se guarda y lo que se consulta.';
+  }
+  // El historial de la consulta anterior era de OTRO evento: se borra en vez de
+  // quedarse ahí pareciendo de éste.
+  const q = document.getElementById('nube-q-res');
+  if (q) q.innerHTML = '';
+  if (elegido) loadNube();
+  else {
+    const cont = document.getElementById('nube-cuerpo');
+    if (cont) cont.innerHTML = '<div class="card" style="padding:18px;text-align:center;font-size:13px;color:var(--ts)">'
+      + 'Elige arriba <b style="color:var(--tp)">de qué se habla</b> para ver las cotizaciones.</div>';
+  }
+}
 
 async function loadNube() {
   const cont = document.getElementById('nube-cuerpo');
   if (!cont) return;
+  // La lista de eventos se pide UNA vez por carga de pantalla.
+  if (_nubeEventos == null) await _nubeCargarEventos();
+  const { elegido, eventoId } = _nubeSel();
+  if (!elegido) {
+    cont.innerHTML = '<div class="card" style="padding:18px;text-align:center;font-size:13px;color:var(--ts)">'
+      + 'Elige arriba <b style="color:var(--tp)">de qué se habla</b> para ver las cotizaciones.</div>';
+    _nubeFormReset();
+    return;
+  }
   cont.innerHTML = '<div class="loading-state">Leyendo la nube…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-nube', {
-      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+      method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: eventoId || undefined }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
@@ -106,6 +194,10 @@ function _nubePintar(d) {
     // 🔒 TRES ESTADOS, dichos con palabras. «Sin cotización» y «vencida» no son
     // lo mismo y las dos tienen la MISMA consecuencia en el sitio, así que la
     // consecuencia se dice en los dos casos: nadie tiene que deducirla.
+    // [NUBE-4] La RESOLUCIÓN con herencia, que es OTRA pregunta que «mis filas»:
+    // este evento puede no tener cotización propia y aun así tener precio — el
+    // de la general. Decir «sin cotización» ahí sería falso.
+    const res = (d.resuelto && d.resuelto[m.k]) || null;
     let estado, detalle;
     if (v) {
       estado = '<span style="color:var(--green)">VIGENTE</span>';
@@ -113,7 +205,20 @@ function _nubePintar(d) {
         + ' <span style="font-size:11px;color:var(--ts)">por persona</span>'
         + '<div style="font-size:11px;color:var(--ts);margin-top:4px">rige hasta <b>' + _nubeEnReynosa(v.vigente_hasta) + '</b>'
         + ' (hora de Reynosa) · la subió ' + _nubeEsc(v.capturado_por || '—') + '</div>'
+        + (v.horarios ? '<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(v.horarios) + '</div>' : '')
         + (v.nota ? '<div style="font-size:11px;color:var(--ts);margin-top:2px">' + _nubeEsc(v.nota) + '</div>' : '');
+    } else if (res && res.heredado) {
+      // 🔒 CUATRO ESTADOS AHORA, Y EL NUEVO SE ROTULA: «este evento no tiene
+      // cotización propia, y rige la GENERAL». Sin este renglón la pantalla
+      // diría «sin cotización → WhatsApp» mientras el sitio SÍ vende — la
+      // pantalla mintiendo en el sentido contrario, que es el peor.
+      estado = '<span style="color:var(--blue,var(--ts))">HEREDA LA GENERAL</span>';
+      detalle = '<b style="color:var(--tp);font-size:19px">' + _nubeMxn(res.precio) + '</b>'
+        + ' <span style="font-size:11px;color:var(--ts)">por persona</span>'
+        + '<div style="font-size:11px;color:var(--ts);margin-top:4px">Este evento <b>no tiene cotización propia</b>: '
+        + 'rige la <b style="color:var(--tp)">general de CDMX</b>, hasta <b>' + _nubeEnReynosa(res.vigente_hasta) + '</b> (hora de Reynosa).</div>'
+        + (res.horarios ? ('<div style="font-size:11px;color:var(--ts);margin-top:2px">🕓 ' + _nubeEsc(res.horarios) + '</div>') : '')
+        + '<div style="font-size:11px;color:var(--ts);margin-top:2px">Captura una aquí y le gana, aunque la general sea más nueva.</div>';
     } else {
       const ultima = (info.ultimas || [])[0];
       estado = '<span style="color:var(--orange)">' + (ultima ? 'VENCIDA' : 'SIN COTIZACIÓN') + '</span>';
@@ -122,6 +227,7 @@ function _nubePintar(d) {
             ? ('La última venció el <b>' + _nubeEnReynosa(ultima.vigente_hasta) + '</b> ('
                + _nubeMxn(ultima.precio) + ', la subió ' + _nubeEsc(ultima.capturado_por || '—') + ').')
             : 'Este modo nunca se ha cotizado.')
+        + (_nubeSel().eventoId != null ? ' <b>Y la general tampoco rige hoy.</b>' : '')
         + ' <b style="color:var(--tp)">En el sitio, este modo manda al WhatsApp</b> — no se pinta ningún precio.'
         + '</div>';
     }
@@ -141,7 +247,12 @@ function _nubePintar(d) {
       + '</div>';
   }).join('');
 
-  cont.innerHTML = '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + tarjetas + '</div>'
+  // 🔒 EL ENCABEZADO DICE DE QUIÉN SON ESTAS TARJETAS. Con un selector que
+  // manda sobre tres cosas, unas tarjetas sin dúeño escrito se leen como «la
+  // nube» y se capturó sobre otro evento — la atribución se ve, no se recuerda.
+  cont.innerHTML = '<div style="font-size:11px;color:var(--ts);margin-bottom:8px;text-transform:uppercase;letter-spacing:.1em">'
+    + 'cotizaciones de <b style="color:var(--tp)">' + _nubeEsc(_nubeNombre(_nubeSel().eventoId)) + '</b></div>'
+    + '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + tarjetas + '</div>'
     + '<div style="font-size:11px;color:var(--ts);margin-top:10px">'
     + '<b style="color:var(--tp)">La tabla es el historial.</b> Una captura nueva NO corrige la anterior: '
     + 'agrega una fila. Así, el día que alguien diga «a mí me dijeron $X», la respuesta se lee — no se recuerda.'
@@ -157,6 +268,13 @@ function _nubeFormReset() {
   if (p) p.value = '';
   const n = document.getElementById('nube-nota');
   if (n) n.value = '';
+  const ho = document.getElementById('nube-horarios');
+  if (ho) ho.value = '';
+  // ⚠️ EL SELECTOR DE EVENTO **NO** SE LIMPIA AQUÍ, y es a propósito: es el
+  // MANDO de la pantalla, no un campo del formulario. Borrarlo tras guardar
+  // dejaría la lista y el historial sin dúeño y obligaría a re-elegirlo para
+  // capturar el segundo modo del mismo evento — que es justo lo que se hace
+  // los lunes: bus y avión, uno tras otro.
   // La vigencia SÍ trae default, y va anunciada en su etiqueta.
   const f = document.getElementById('nube-hasta-fecha');
   if (f && !f.value) f.value = _nubeProximoDomingoISO();
@@ -185,9 +303,14 @@ async function nubeGuardar() {
   const f = (document.getElementById('nube-hasta-fecha')?.value || '').trim();
   const h = (document.getElementById('nube-hasta-hora')?.value || '').trim() || '23:59';
   const nota = (document.getElementById('nube-nota')?.value || '').trim();
+  const horarios = (document.getElementById('nube-horarios')?.value || '').trim();
+  const { elegido, eventoId } = _nubeSel();
   // 🔒 EL GUARDADO EXIGE LO QUE NACIÓ VACÍO. Y estas guardas NO son decorativas
   // ni «por si acaso»: el selector nace sin valor a propósito, así que ésta es
   // la rama que de verdad se alcanza — no la guarda dormida de `kmt-prov`.
+  // [NUBE-4] Y el evento es lo PRIMERO que se exige: sin él no se sabe de quién
+  // es el precio, y «General CDMX» tiene su propia opción para poder elegirse.
+  if (!elegido) return showToast('Elige arriba de qué se habla: un evento o «General CDMX»', 'error');
   if (!modo) return showToast('Elige el modo: autobús o avión', 'error');
   if (!precio || !(Number(precio) > 0)) return showToast('Escribe el precio por persona', 'error');
   if (!f) return showToast('Escribe hasta cuándo rige', 'error');
@@ -201,14 +324,16 @@ async function nubeGuardar() {
       method: 'POST',
       body: JSON.stringify({
         accion: 'cotizar', modo,
+        evento_id: eventoId || undefined,
         precio_pp: Number(precio),
         vigente_hasta: new Date(hasta).toISOString(),
+        horarios: horarios || undefined,
         nota: nota || undefined,
       }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
-    showToast('Cotización guardada', 'success');
+    showToast('Cotización guardada · ' + _nubeNombre(eventoId), 'success');
     await loadNube();
   } catch (e) {
     showToast(e.message, 'error');
@@ -241,11 +366,12 @@ async function nubeConsultar() {
   var dia = (document.getElementById('nube-q-dia') || {}).value || '';
   var caja = document.getElementById('nube-q-res');
   if (!caja) return;
+  if (!_nubeSel().elegido) { caja.innerHTML = '<div style="font-size:12px;color:var(--orange)">Elige arriba de qué se habla antes de consultar: la respuesta cambia por evento.</div>'; return; }
   if (!dia) { caja.innerHTML = '<div style="font-size:12px;color:var(--orange)">Elige el día que quieres consultar.</div>'; return; }
   caja.innerHTML = '<div class="loading-state">Leyendo el historial…</div>';
   try {
     var r = await khAdminFetch('/.netlify/functions/admin-nube', {
-      method: 'POST', body: JSON.stringify({ accion: 'historial', dia: dia }),
+      method: 'POST', body: JSON.stringify({ accion: 'historial', dia: dia, evento_id: _nubeSel().eventoId || undefined }),
     });
     var d = await r.json().catch(function () { return {}; });
     if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
@@ -264,6 +390,11 @@ function _nubeHistHtml(d, dia) {
       // QUIÉN la capturó. Los tres juntos, porque por separado no prueban nada.
       cuerpo = '<b style="color:var(--tp);font-size:18px">' + _nubeMxn(r.fila.precio) + '</b>'
         + ' <span style="font-size:11px;color:var(--ts)">por persona</span>'
+        // 🔒 LA HERENCIA SE ROTULA TAMBIÉN AQUÍ. Un precio de la general
+        // presentado como el del evento es un dato BUENO con la etiqueta
+        // equivocada — y este renglón existe para resolver disputas.
+        + (r.heredado ? '<div style="font-size:11px;color:var(--orange);margin-top:4px">Era la cotización <b>GENERAL de CDMX</b>: ese día este evento no tenía una propia.</div>' : '')
+        + (r.fila.horarios ? '<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(r.fila.horarios) + '</div>' : '')
         + '<div style="font-size:11px;color:var(--ts);margin-top:4px">vigencia: <b>' + _nubeEnReynosa(r.fila.vigente_desde)
         + '</b> → <b>' + _nubeEnReynosa(r.fila.vigente_hasta) + '</b> (hora de Reynosa)</div>'
         + '<div style="font-size:11px;color:var(--ts)">la subió <b>' + _nubeEsc(r.fila.capturado_por || '—') + '</b>'
@@ -290,6 +421,7 @@ function _nubeHistHtml(d, dia) {
       + '</div>' + cuerpo + '</div>';
   }).join('');
   return '<div style="font-size:11px;color:var(--ts);margin-bottom:8px">Lo que regía el <b style="color:var(--tp)">'
-    + _nubeEsc(dia) + '</b> (leído por vigencia, no por «la última capturada»):</div>'
+    + _nubeEsc(dia) + '</b> para <b style="color:var(--tp)">' + _nubeEsc(_nubeNombre(_nubeSel().eventoId))
+    + '</b> (leído por vigencia, no por «la última capturada»):</div>'
     + '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + partes + '</div>';
 }

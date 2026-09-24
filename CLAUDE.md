@@ -306,7 +306,7 @@ está caduco antes de escribirse.
   deja de importar en cuanto el index obedece la bandera. Uniformarla es tuerca
   propia.
 
-- ⏳ **NUM-BUS-1 EN PR (#766): el bus cotiza al 8132321405, no al de reservas.**
+- 🏆 **NUM-BUS-1 EN PROD (23-sep-2026, #766): el bus cotiza al 8132321405, no al de reservas.**
   Regla firmada de Memo (23-sep). `npm run mide:num-bus-1` (**27**), cero SQL,
   **cambia exactamente un número**. ⚠️ **No lo introdujo NUBE-2: lo HEREDÓ** —
   esa línea traía el de reservas desde antes de que la nube existiera, y queda
@@ -1615,6 +1615,13 @@ está caduco antes de escribirse.
 - **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`. **Verificar el
   push contra el ref TRAÍDO DE VUELTA (`fetch` + `rev-parse origin/main`), no
   contra su propia salida — y solo entonces borrar la rama.**
+  ⚠️ **`package.json` CHOCA SIEMPRE entre dos ramas paralelas, y no es un
+  problema: es la forma del archivo.** Cada tuerca con careo nuevo agrega su
+  renglón al final de `scripts`, así que dos ramas que nacieron el mismo día
+  conflictan ahí sin falta. Pasó DOS veces el 23-sep. Se resuelve igual todas
+  las veces —**se conservan LOS DOS**— y se verifica que el JSON parsea y que
+  las dos entradas están, porque un `package.json` roto no da error hasta que
+  alguien corre npm.
 - 🔒 **El reloj de Reynosa es `America/Matamoros`, NO Cancún ni Monterrey.**
   Reynosa **sí** cambia con EE.UU. (8-mar → 1-nov); la que dejó de cambiar es
   Monterrey (decreto de 2022). Son **133 días al año** de diferencia con Cancún,

@@ -47,9 +47,13 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
-// BASE: el main anterior a esta tuerca (trae el ReferenceError vivo).
-const BASE = process.env.BASE || 'origin/main';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+// 🔒 LOS DOS LADOS SON COMMITS FIJOS, no refs que se mueven. `origin/main` y
+// `HEAD` se leen como commits hoy y como otra cosa mañana: con BASE en
+// `origin/main`, el día del merge BASE y HEAD serían el mismo árbol y el
+// control positivo de [A] moriría en silencio.
+// BASE: el main anterior a esta tuerca — trae el ReferenceError vivo.
+const BASE = process.env.BASE || '5b2c107';
+const HEAD_SHA = process.env.HEAD_SHA || 'ab50660';
 const HOY = '2026-09-23';
 
 // Sin comentarios: una aserción sobre el TEXTO del archivo se caza sola, porque

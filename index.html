@@ -6154,7 +6154,18 @@ function buildTransporteButtons(){
   // firmada que hoy protege al bus, extendida a su hermano nuevo: cerca del
   // evento el precio del lunes ya no aguanta y cotiza un humano.
   var lejos=(diasRestantes>15);
-  var waBus='https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')');
+  // ═══ [NUM-BUS-1] EL BUS COTIZA AL NÚMERO DE VIAJES ══════════════════════
+  // Regla firmada de Memo (23-sep-2026): las cotizaciones de AUTOBÚS van al
+  // 8132321405 —el número de vuelos y buses—, no al 8119771072, que es el de
+  // RESERVAS. Antes mandaba a reservas: a quien pedía un precio de transporte
+  // le contestaba quien no lo cotiza.
+  // ⚠️ NO lo introdujo NUBE-2: lo HEREDÓ. Esa línea traía el número de
+  // reservas desde antes de que la nube existiera, y NUBE-2 solo la movió de
+  // sitio — queda dicho para que nadie lea el `git blame` y culpe a la tuerca
+  // equivocada.
+  // 🔒 Y el del avión (abajo) YA estaba en el 8132321405: los dos hermanos
+  // cotizan por el mismo número, que es justo lo que la regla pide.
+  var waBus='https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')');
   var waAvion='https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')');
   // Un modo se VENDE cuando está lejos del evento Y la nube trae su precio
   // vigente. Si no, cae a SU WhatsApp — exactamente como antes de la nube.

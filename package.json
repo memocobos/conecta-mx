@@ -42,6 +42,7 @@
     "mide:nube-4": "node scripts/mide-nube-4.js",
     "mide:nube-5": "node scripts/mide-nube-5.js",
     "mide:fest-sep-1": "node scripts/mide-fest-sep-1.js",
-    "mide:callejon-cdmx-1": "node scripts/mide-callejon-cdmx-1.js"
+    "mide:callejon-cdmx-1": "node scripts/mide-callejon-cdmx-1.js",
+    "mide:itin-arriba-1": "node scripts/mide-itin-arriba-1.js"
   }
 }

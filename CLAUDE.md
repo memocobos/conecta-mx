@@ -592,12 +592,18 @@ está caduco antes de escribirse.
   ⚠️ **Los `wa.me/52`+dígitos de `sorteo.html` y `kamehouse.js` NO son nuestros
   números**: abren el chat **del cliente** (el teléfono del ganador, el de un
   viajero). Contarlos habría vuelto el control ruido.
-  ⏳ **Y un DUDOSO que espera palabra de Memo:** `radio/index.html` tiene
-  etiqueta «Cotizar por WhatsApp» y mensaje «info de los tours» — la etiqueta
-  apunta a viajes y el mensaje a reservas. Se dejó en reservas y el careo lo
-  deja **clavado**: si alguien lo cambia sin su palabra, ese renglón se pone
-  rojo y pregunta. **La frontera entre «cotizar» y «reservar» es su palabra, no
-  un grep.**
+  ✅ **EL DUDOSO DEJÓ DE SER DUDOSO — RADIO-ETIQ-1 en prod (25-sep-2026, #767).**
+  `radio/index.html` tenía etiqueta «Cotizar por WhatsApp» y mensaje «info de
+  los tours»: la etiqueta apuntaba a viajes y el mensaje a reservas, así que se
+  dejó en reservas y el careo lo dejó **clavado** esperando palabra. La palabra
+  llegó (Memo, 23-sep): **la etiqueta cambia a «Cotiza tu evento», el número SE
+  QUEDA en reservas (8119771072) y el mensaje como está.** Un solo texto
+  visible se mueve; el `href` no.
+  🔒 **Y el renglón clavado se ACTUALIZÓ a la verdad nueva con la firma en el
+  comentario, en vez de silenciarse** — 29 verdes (eran 27), con tres candados
+  nuevos: el número sigue en reservas, la etiqueta dice lo que dice, y el
+  mensaje no se tocó. **La frontera entre «cotizar» y «reservar» era su palabra,
+  no un grep** — y por eso el careo podía esperarla sin inventarla.
 
 - 🏆🔴 **SERIE CARDS COMPLETA EN PROD (23-sep-2026, #759 · #760 · #761): el card
   del cotizador acompaña, gobierna su itinerario y dice sus políticas.**

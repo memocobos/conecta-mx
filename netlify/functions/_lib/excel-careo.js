@@ -102,6 +102,24 @@ function mapearColumnas(filaEncabezado) {
     // abonado; meter el total ahí inflaría el abonado de todo el mundo y el
     // montón de pagos se volvería basura. El total es otra cuenta.
     total: idx('Total'),
+    // [CUADRE-6] LA COLUMNA DEL VUELO. Regla de Memo (24-sep-2026): «hay una
+    // columna de vuelos en el Excel con el costo; intentemos cuadrar con eso».
+    //
+    // El encabezado literal es **«Avión - Bus»** y la columna **VARÍA**: medido
+    // por Jane el 25-sep sobre 4 pestañas de CDMX servidas por el cosechador
+    // real, va en la **19** (EDC, Corona) y en la **20** (Bruno, Knotfest). Se
+    // busca POR EL LITERAL DEL ENCABEZADO, jamás por índice fijo — la misma
+    // razón por la que `Total` se busca así desde CUADRE-1a: contar celdas
+    // habría leído «Código» en las pestañas con una vacía de más.
+    //
+    // ⚠️ NO CONFUNDIR con el bloque de costos del evento (fila 4, col ~30:
+    // «Vuelos/Kits/Boletos/Van/Hotel…»): ése es el gasto TOTAL del evento y no
+    // es de esta tuerca. Aquí el valor es POR PERSONA.
+    //
+    // ⚠️ Y NO ENTRA A `mapa.dinero`, por lo mismo que `total`: ahí viven las
+    // columnas que se SUMAN para el abonado, y meter el vuelo inflaría el
+    // abonado de todo el mundo. El vuelo es otra cuenta.
+    avionBus: idx('Avión - Bus'),
     pagos: [],
   };
   for (let i = 0; i < celdas.length; i++) {
@@ -181,6 +199,15 @@ function parsearPestana(filas, encabezado, reglaZona) {
     const celdaTot = mapa.total >= 0 ? f[mapa.total] : null;
     const totalLegible = mapa.total >= 0 && /[0-9]/.test(String(celdaTot == null ? '' : celdaTot));
     const totalFila = totalLegible ? leerDinero(celdaTot) : 0;
+    // [CUADRE-6] EL VUELO DE LA FILA, con el MISMO candado del hueco que el
+    // total: una celda VACÍA no es un vuelo de cero. `leerDinero` contesta 0
+    // para '' y para '$0', y aquí esos dos son cosas distintas — un `$0`
+    // TECLEADO en un paquete con avión no se sabe si es «no capturado» o
+    // «todavía no compra vuelo», y eso solo lo afirma quien captura. Los dos
+    // casos se quedan FUERA del montón, pero por razones distintas y dichas.
+    const celdaVue = mapa.avionBus >= 0 ? f[mapa.avionBus] : null;
+    const vueloLegible = mapa.avionBus >= 0 && /[0-9]/.test(String(celdaVue == null ? '' : celdaVue));
+    const vueloFila = vueloLegible ? leerDinero(celdaVue) : 0;
     const clave = normalizarNombre(nombreCrudo);
     const ya = out.get(clave);
     if (ya) {
@@ -200,6 +227,11 @@ function parsearPestana(filas, encabezado, reglaZona) {
       // persona acaba con `total: null`, que es la verdad: no se sabe.
       ya.total += totalFila;
       if (!totalLegible) ya.totalIncompleto = true;
+      // El vuelo se SUMA entre las filas del grupo, igual que el abonado y el
+      // total: la pestaña lleva una fila por boleto y el valor es POR PERSONA,
+      // así que un grupo de 4 que voló trae cuatro montos que son su vuelo.
+      ya.vuelo += vueloFila;
+      if (!vueloLegible) ya.vueloIncompleto = true;
       if (!ya.zona && zona) ya.zona = zona;
       if (!ya.talla && mapa.talla >= 0) ya.talla = String(f[mapa.talla] == null ? '' : f[mapa.talla]).trim();
     } else {
@@ -209,6 +241,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
         // cambiarla sería otra tuerca. `zonas` se AÑADE al lado.
         zonas: zona ? { [zona]: 1 } : {},
         total: totalFila, totalIncompleto: !totalLegible,
+        vuelo: vueloFila, vueloIncompleto: !vueloLegible,
         paquete: mapa.paquete >= 0 ? String(f[mapa.paquete] == null ? '' : f[mapa.paquete]).trim() : '',
         // [EXCEL-CAREO-FIX-1] La talla no se usa para decidir nada: viaja como
         // EVIDENCIA, para poder cuadrar el montón de apartados contra las 141
@@ -220,8 +253,11 @@ function parsearPestana(filas, encabezado, reglaZona) {
   // El hueco se resuelve al final, una sola vez: quien traiga aunque sea una
   // fila sin total legible sale con `total: null` — ausencia, no cero.
   const personas = [...out.values()].map((p) => {
-    const { totalIncompleto, ...resto } = p;
-    return { ...resto, total: totalIncompleto ? null : p.total };
+    const { totalIncompleto, vueloIncompleto, ...resto } = p;
+    return { ...resto, total: totalIncompleto ? null : p.total,
+             // `null` = no se sabe (columna ausente o celda vacía en alguna de
+             // sus filas). `0` = el cero TECLEADO. Dos cosas distintas.
+             vuelo: vueloIncompleto ? null : p.vuelo };
   });
   return { personas, mapa, descartes, chatarraPorZona };
 }
@@ -289,12 +325,47 @@ function esDerivado(notas) {
 // o la celda vacía— ya se salta antes y NUNCA fue una diferencia: son dos cosas
 // distintas y confundirlas taparía el hueco además del cero.
 const CUADRE5_FECHA = '22-sep-2026';
+// ── [CUADRE-6] LA EXCLUSIÓN DE CDMX ENCOGE ─────────────────────────────────
+// Regla de Memo (24-sep-2026). La acotación de CUADRE-5 decía que los `$0` de
+// CDMX en paquetes con transporte se quedan fuera **porque el index no sabe el
+// vuelo**. Ahora la pestaña SÍ lo dice: la columna «Avión - Bus» trae el monto
+// por persona. Así que la exclusión encoge — deja de aplicar a quien trae su
+// vuelo capturado, y **sigue aplicando a quien no**.
+//
+// 🔒 LA MEDICIÓN QUE LO HACE SEGURO: el dueño (`resolverPrecioVenta`) NO mete
+// el transporte en el total de un evento de CDMX — medido el 25-sep sobre
+// `edc27`: PLUS total 9100 = `zonaP` 9100 con **`transportCost: 0`**. O sea que
+// el vuelo COMPLETA el total en vez de duplicarlo. Sin esa medición, sumar el
+// vuelo habría sido contar el transporte dos veces.
+//
+// 🔴 Y UN CASO QUE EL ENCARGO NO ACOTA, medido: el **RIDE** de CDMX es un
+// paquete «con transporte» cuyo total del sistema **YA ES** ese transporte
+// (`edc27` RIDE: total 2900 con **`zonaP: 0`**). Sumarle el vuelo contaría el
+// transporte DOS VECES. Por eso el vuelo solo completa cuando el total del
+// dueño está armado sobre un BOLETO, y eso **se le pregunta a su respuesta**
+// (`desglose.zonaP > 0`) en el runner — aquí no se adivina por el nombre del
+// paquete.
+//
+// ⚠️ UN `$0` DE VUELO NO ABRE LA PUERTA, y tampoco una celda vacía: en un
+// paquete con avión, «cero» no se distingue de «no capturado» ni de «todavía
+// no compra vuelo», y eso solo lo afirma quien captura. Los dos se quedan
+// fuera, con motivos DISTINTOS para que el conteo diga cuál es cada montón.
+const CUADRE6_FECHA = '24-sep-2026';
 function reglaCeroTecleado(fila, cdmx) {
   if (Number(fila.excel_total) !== 0) return { aplica: false, motivo: null };
   if (!fila.derivado) return { aplica: false, motivo: 'libreta' };
   const paq = String(fila.paquete || '').trim().toLowerCase();
-  if (cdmx && paq !== 'cheap') return { aplica: false, motivo: 'cdmx' };
-  return { aplica: true, motivo: null };
+  if (cdmx && paq !== 'cheap') {
+    const v = Number(fila.vuelo);
+    if (fila.vuelo == null) return { aplica: false, motivo: 'cdmx_sin_vuelo' };
+    if (!(Number.isFinite(v) && v > 0)) return { aplica: false, motivo: 'cdmx_vuelo_cero' };
+    // Entra POR EL VUELO, y se dice: el runner tiene que sumarlo y la pantalla
+    // tiene que rotularlo. Sin esta marca, el runner tendría que volver a
+    // preguntarse si este renglón es de CDMX — la segunda opinión sobre la
+    // misma regla.
+    return { aplica: true, motivo: null, clase: 'cdmx_con_vuelo', vuelo: v };
+  }
+  return { aplica: true, motivo: null, clase: 'catalogo' };
 }
 
 function carear(personasExcel, viajerosBase, opciones) {
@@ -413,6 +484,9 @@ function carear(personasExcel, viajerosBase, opciones) {
       nombre: p.nombre, viajero_id: v.id, excel_total: p.total, sistema_total: sis,
       diferencia: dif, derivado: esDerivado(v.notas), filas: p.filas,
       zona: p.zona, paquete: p.paquete,
+      // [CUADRE-6] El vuelo del GRUPO (sumado entre sus filas). `null` = no se
+      // sabe; `0` = el cero tecleado.
+      vuelo: p.vuelo == null ? null : Number(p.vuelo),
     };
     // [CUADRE-5] El $0 tecleado que cae en la regla sale del montón de
     // diferencias y va al suyo. NO se borra: Memo tiene que poder ver cuántos
@@ -451,6 +525,9 @@ function carear(personasExcel, viajerosBase, opciones) {
         // boletos son todos de la misma zona. Sin el mapa, el runner tendría
         // que repartirlos, que es justo lo que no se puede inventar.
         zonas: Object.assign({}, p.zonas || {}),
+        // [CUADRE-6] POR QUÉ ENTRÓ, dicho por la regla y no re-derivado: el
+        // runner suma el vuelo solo en `cdmx_con_vuelo`, y la pantalla rotula.
+        clase: r.clase || 'catalogo',
       });
       delete enRegla.diferencia;
       ceroRegla.push(enRegla);
@@ -471,7 +548,21 @@ function carear(personasExcel, viajerosBase, opciones) {
              fecha: CUADRE5_FECHA,
              cdmx,
              en_regla: ceroRegla.length,
-             fuera_cdmx: ceroFuera.cdmx || 0,
+             // [CUADRE-6] LA CLASE NUEVA, CON SU NOMBRE. Los `$0` de CDMX que
+             // ahora ENTRAN por su vuelo se cuentan aparte de los que entran
+             // por el catálogo: son dos maneras distintas de armar el total y
+             // un montón sin nombre es un montón que nadie revisa.
+             cuadre6_fecha: CUADRE6_FECHA,
+             en_regla_cdmx_con_vuelo: ceroRegla.filter((x) => x.clase === 'cdmx_con_vuelo').length,
+             en_regla_catalogo: ceroRegla.filter((x) => x.clase !== 'cdmx_con_vuelo').length,
+             // Y los dos motivos de CDMX, separados: «no trae vuelo» y «trae
+             // vuelo en $0» son hechos distintos de quien captura.
+             fuera_cdmx_sin_vuelo: ceroFuera.cdmx_sin_vuelo || 0,
+             fuera_cdmx_vuelo_cero: ceroFuera.cdmx_vuelo_cero || 0,
+             // ⚰️ El nombre viejo se queda, sumando los dos, para que la
+             // pantalla que ya lo pintaba no se quede muda mientras alguien la
+             // actualiza. Un contador que desaparece es un renglón en blanco.
+             fuera_cdmx: (ceroFuera.cdmx_sin_vuelo || 0) + (ceroFuera.cdmx_vuelo_cero || 0) + (ceroFuera.cdmx || 0),
              fuera_libreta: ceroFuera.libreta || 0,
              // Tiene que ser SIEMPRE 0: `reglaCeroTecleado` solo puede decir
              // «libreta» o «cdmx» cuando se rehúsa. Viaja de todos modos —en

@@ -238,6 +238,13 @@ async function correrCareo(eventoId) {
       fila.sistema_total_motivo = zonas.length > 1
         ? `${filas} boletos en ${zonas.length} zonas — se confirma a ojo`
         : `${filas} boletos y ${enLaZona} con zona — se confirma a ojo`;
+      // 🔴 [CUADRE-6] UN MOTIVO SIN SU AUSENCIA NO SE VE, y es un hueco
+      // PRE-EXISTENTE que destapó el caso del RIDE. La pantalla pinta el motivo
+      // **solo si `sistema_total` es null**; cuando la base trae
+      // `total_contrato = 0` —que también es «pendiente»— el cero se quedaba y
+      // el renglón decía «$0 de la base», tragándose la explicación. Un cero es
+      // una afirmación; aquí la verdad es una AUSENCIA.
+      fila.sistema_total = null;
       continue;
     }
     try {
@@ -246,16 +253,50 @@ async function correrCareo(eventoId) {
         num_personas: filas, para_careo: true,
       });
       if (r && r.ok && Number.isFinite(Number(r.total))) {
-        fila.sistema_total = Number(r.total);
-        fila.sistema_total_origen = 'catalogo';
+        // ── [CUADRE-6] EL VUELO DE LA PESTAÑA COMPLETA EL TOTAL ──────────────
+        // Solo en los renglónes que la REGLA marcó `cdmx_con_vuelo` — la marca
+        // la pone `reglaCeroTecleado`, aquí no se vuelve a preguntar si el
+        // evento es de CDMX: eso sería la segunda opinión sobre la misma regla.
+        //
+        // 🔒 Y SE LE PREGUNTA A LA RESPUESTA DEL DUEÑO SI SU TOTAL VA SOBRE UN
+        // BOLETO. Medido el 25-sep sobre `edc27`: PLUS trae `zonaP 9100` con
+        // `transportCost 0` — el total NO incluye el transporte, así que el
+        // vuelo lo COMPLETA. Pero **RIDE trae `zonaP 0` y su total (2900) YA ES
+        // el transporte terrestre**: sumarle el vuelo contaría el transporte
+        // DOS VECES. El paquete no se adivina por su nombre — se lee del
+        // desglose que el dueño devuelve.
+        const base = Number(r.total);
+        const zonaP = Number(r.desglose && r.desglose.zonaP);
+        const vuelo = Number(fila.vuelo);
+        if (fila.clase === 'cdmx_con_vuelo') {
+          if (!(Number.isFinite(zonaP) && zonaP > 0)) {
+            // El total del dueño ES el transporte (RIDE): el renglón se queda
+            // pendiente diciendo por qué, en vez de pintar un número doble.
+            fila.sistema_total_motivo = 'el total del sistema YA es el transporte '
+              + '(paquete sin boleto): sumarle el vuelo lo contaría dos veces — se confirma a ojo';
+            fila.sistema_total = null;      // el motivo se ve porque el total es una AUSENCIA
+            continue;
+          }
+          fila.sistema_total = Math.round((base + vuelo) * 100) / 100;
+          fila.sistema_total_origen = 'catalogo_mas_vuelo';
+          // El rótulo lo arma la pantalla con estos dos datos; aquí viajan por
+          // separado para que nadie tenga que re-restar para saber cuánto era
+          // el vuelo.
+          fila.sistema_total_vuelo = vuelo;
+          fila.sistema_total_catalogo = base;
+        } else {
+          fila.sistema_total = base;
+          fila.sistema_total_origen = 'catalogo';
+        }
         // Cuántos boletos entraron en ese número. La pantalla LO DICE: un total
         // cuatro veces más grande sin decir que son cuatro boletos se lee como
         // un error de la cuenta.
         fila.sistema_total_boletos = filas;
       } else {
         fila.sistema_total_motivo = (r && r.motivo) || 'el catálogo no dio precio';
+        fila.sistema_total = null;
       }
-    } catch (err) { fila.sistema_total_motivo = err.message; }
+    } catch (err) { fila.sistema_total_motivo = err.message; fila.sistema_total = null; }
   }
   if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
 

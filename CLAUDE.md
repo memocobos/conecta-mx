@@ -167,6 +167,83 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **CUADRE-6 EN PROD (25-sep-2026, #774): el careo aprende la columna
+  «Avión - Bus» y la exclusión de CDMX ENCOGE.** Regla de Memo (24-sep):
+  «hay una columna de vuelos en el Excel con el costo; intentemos cuadrar con
+  eso». `npm run mide:cuadre-6` (**46**) · `mide:cuadre-total` (**151**, eran
+  150), **cero SQL**, y la fase sigue **SOLO LEYENDO**.
+
+  **La columna, medida por Jane sobre 4 pestañas de CDMX servidas por el
+  cosechador real:** el literal es **«Avión - Bus»**, vive en la **fila 10** y la
+  columna **VARÍA** — **19** en EDC/Corona, **20** en Bruno/Knotfest. Se busca
+  **por el literal, jamás por índice**, igual que `Total` desde CUADRE-1a. Se
+  captura **por persona, sumando entre las filas del grupo**, con el mismo
+  candado del hueco que el total — **una celda vacía no es un vuelo de cero** —
+  y **fuera de `mapa.dinero`**, donde viven las columnas que se suman para el
+  abonado.
+  ⚠️ **No confundir con el bloque de costos del evento** (fila 4, col ~30:
+  «Vuelos/Kits/Boletos/Van/Hotel…»): ése es el gasto TOTAL del evento.
+
+  🔒 **LA MEDICIÓN QUE HIZO SEGURA LA SUMA, y sin ella habría sido doble
+  conteo:** el dueño (`resolverPrecioVenta`) **NO mete el transporte** en el
+  total de un evento de CDMX — medido sobre `edc27`: PLUS total **9100** =
+  `zonaP` 9100 con **`transportCost: 0`**. O sea que el vuelo **COMPLETA** el
+  total en vez de duplicarlo. Eso es justo lo que CUADRE-5 no podía saber.
+
+  🔴 **UN CASO QUE EL ENCARGO NO ACOTABA: el RIDE.** Es «con transporte—
+  tal como dice la regla— pero **su total del sistema YA ES ese transporte**
+  (`edc27` RIDE: total **2900** con **`zonaP: 0`**). Sumarle el vuelo contaría
+  el transporte **DOS VECES**. Así que el vuelo completa **solo cuando el total
+  del dueño va sobre un BOLETO**, y eso **se le pregunta a su desglose**
+  (`zonaP > 0`) — **no se adivina por el nombre del paquete**. El renglón entra
+  al montón (trae su vuelo) y el **runner** se rehúsa a componerlo *diciendo por
+  qué*: mejor que dejarlo en el montón de diferencias.
+
+  🔴 **Y UN HUECO PRE-EXISTENTE QUE ESE CASO DESTAPÓ: un motivo sin su
+  ausencia NO SE VE.** La pantalla pinta el motivo de un renglón pendiente
+  **solo si `sistema_total` es `null`**; cuando la base trae `total_contrato =
+  0` —que también es «pendiente»— el cero se quedaba y el renglón decía
+  **«$0 de la base»**, tragándose la explicación. **Ya mordía a CUADRE-5** en su
+  caso de «N boletos en M zonas». Hoy los **tres** caminos que dejan motivo
+  ponen `sistema_total = null`: **un cero es una afirmación, y aquí la verdad es
+  una AUSENCIA.**
+
+  **La regla encoge, y no de más.** CDMX + paquete con transporte + `$0`:
+  **entra** si trae vuelo > 0 · **fuera** si el vuelo viene en `$0` TECLEADO ·
+  **fuera** si la celda está vacía — y los dos «fuera» con **motivos
+  distintos**. ⚠️ En un paquete con avión, «cero» no se distingue de «no
+  capturado» ni de «todavía no compra vuelo»: **eso solo lo afirma quien
+  captura**. El total se rotula **«del catálogo vivo + vuelo de pestaña $X»**,
+  con las dos patas viajando por separado para que nadie tenga que restar.
+
+  **El careo:** control positivo del INSTRUMENTO con los **tres montos reales de
+  Knotfest** ($4,900 · $3,385 · $2,500) — si encuentra cero, el problema es el
+  arnés · la columna probada en **los DOS moldes** (19 y 20), porque si los dos
+  dieran el mismo número un índice fijo pasaría · `fuera_otro` sigue en **0** y
+  las clases **PARTEN** el montón · la puerta `para_careo` sigue con **dos**
+  clientes (los otros cinco llamadores cotizan VENTA) · **cero escrituras con
+  control positivo** · y anclado a dos commits.
+  🔒 **LA SUMA NO SE RE-IMPLEMENTA EN EL ARNÉS:** le pregunta al dueño **por
+  separado**, lee el vuelo de la **celda SERVIDA** por su literal, y carea las
+  dos patas contra lo que el runner imprimió. Si el arnés repitiera la cuenta
+  del runner, los dos podrían estar igual de equivocados.
+
+  ⚠️ **TRES ROJOS MÍOS, LOS TRES DEL INSTRUMENTO.** (1) **La base de mentira
+  INVENTÓ NOMBRES**: sembré `excel_mapeos` con `activo` y el runner consulta
+  **`excel_pestanas`** con **`activa`** — `SIN_MAPEO`, el arnés se cayó y
+  reportó **7 rojos que no eran del código**. (2) **Leí de memoria la forma de
+  la respuesta**: el handler **esparce** los montones al tope (`...r`), no bajo
+  `montones`, y de las personas devuelve **solo el conteo** — 28 rojos con el
+  código sano. (3) **Mi fixture dejó el Total VACÍO** en la segunda fila del
+  grupo, y eso vuelve `total: null` a la persona ENTERA, así que `carear` la
+  saltaba y nunca llegaba al montón.
+  ⏳ **Y el careo de CUADRE-5 se actualizó a la verdad nueva:** su testigo
+  mutaba `fuera_cdmx` y el chip ya no lo pinta de una pieza, así que el testigo
+  **se movió** a los dos contadores nuevos con su razón escrita. El contador
+  viejo sobrevive como su **SUMA**, para que nada se quede mudo. **No se
+  silenció.**
+
+
 - 🏆 **ITIN-ARRIBA-1 EN PROD (25-sep-2026, #773): el itinerario se muda ARRIBA
   del paso 1.** Orden de Memo: **el cliente antoja el viaje primero y cotiza
   después**. `npm run mide:itin-arriba-1` (**34**), cero SQL, **una mudanza**.

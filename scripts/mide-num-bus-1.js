@@ -16,7 +16,7 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS.
 //     BASE = 19f8d16  el bus cotizaba al número de reservas
-//     HEAD = b36c041  cotiza al de viajes (el commit del MERGE)
+//     HEAD = f0cb4bc  cotiza al de viajes · y la etiqueta de la radio (RADIO-ETIQ-1)
 //
 // Se corre:  npm run mide:num-bus-1
 // ══════════════════════════════════════════════════════════════════════════
@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '19f8d16';
-const HEAD_SHA = process.env.HEAD_SHA || 'b36c041';
+const HEAD_SHA = process.env.HEAD_SHA || 'f0cb4bc';
 const VIAJES   = '528132321405';   // vuelos y buses: COTIZAR
 const RESERVAS = '528119771072';   // reservar, apartar, informes
 
@@ -263,17 +263,28 @@ function censo(dir) {
     const nH = (sH.match(/wa\.me\/\d{10,}/g) || []).join(',');
     af(nB === nH, f + ' cambió sus números de WhatsApp y no debía: ' + nB + ' → ' + nH);
   }
-  // ⏳ EL DUDOSO, NOMBRADO Y NO TOCADO: la radio. Su etiqueta dice «Cotizar
-  // por WhatsApp» y su mensaje dice «quiero info de los tours»: la etiqueta
-  // apunta a viajes y el mensaje a reservas. Es justo la frontera que Memo
-  // decide, así que se deja como está y se DICE — si se cambia sin su palabra,
-  // este renglón se pone rojo y pregunta.
+  // ✅ EL DUDOSO DEJÓ DE SER DUDOSO — **decisión firmada de Memo, 23-sep-2026**
+  // (RADIO-ETIQ-1). El careo lo dejó clavado preguntando y la respuesta fue:
+  // el número se QUEDA en reservas y lo que cambia es la ETIQUETA, que decía
+  // «Cotizar por WhatsApp» y ahora dice «Cotiza tu evento». Así el botón deja
+  // de prometer una cotización de transporte —que no es lo que ese mensaje
+  // pide— y el destino coincide con lo que de verdad hace: pedir informes.
+  //
+  // 🔒 Y SE VIGILAN LAS DOS MITADES, no solo el número: la contradicción que
+  // este renglón cazaba era entre la etiqueta y el destino, así que medir solo
+  // uno de los dos la dejaría volver por el otro lado.
   const radioH = fs.readFileSync(path.join(h.dir, 'radio/index.html'), 'utf8');
   const radioNum = (radioH.match(/wa\.me\/(\d{10,})/) || [])[1];
-  console.log('    ⏳ radio/index.html → ' + radioNum + '  (etiqueta «Cotizar por WhatsApp», mensaje «info de los tours»)');
+  const radioEtq = (radioH.match(/class="btn btnWA"[^>]*>([^<]+)</) || [])[1] || '';
+  console.log('    ✅ radio/index.html → ' + radioNum + '  etiqueta: «' + radioEtq.trim() + '»');
   af(radioNum === RESERVAS,
-     'la radio cambió de número sin palabra de Memo: su etiqueta dice «Cotizar» y su mensaje «info de los '
-     + 'tours» — la frontera entre cotizar y reservar es suya, no de un grep');
+     'la radio cambió de número: por decisión firmada de Memo (23-sep) se QUEDA en reservas — lo que se '
+     + 'movió fue la etiqueta, no el destino');
+  af(/Cotiza tu evento/.test(radioEtq),
+     'la etiqueta de la radio ya no dice «Cotiza tu evento» sino «' + radioEtq.trim() + '»: si vuelve a '
+     + 'prometer una cotización, vuelve la contradicción con su mensaje de «info de los tours»');
+  af(/info%20de%20los%20tours|info de los tours/.test(radioH),
+     'el mensaje de la radio cambió: la decisión firmada era tocar SOLO la etiqueta');
   // Y los `wa.me/52`+dígitos variables NO son nuestros números: abren el chat
   // del CLIENTE. Se comprueba que siguen siendo plantilla, no un literal.
   const sorteoH = fs.readFileSync(path.join(h.dir, 'sorteo.html'), 'utf8');

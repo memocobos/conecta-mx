@@ -68,7 +68,7 @@ function servidor(raiz) {
   });
 }
 const BASE = process.env.BASE || 'db7e2b2';   // la punta de callejon-cdmx-1, la PR de abajo
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '5df0527';
 // El overlay del onboarding se abre 300 ms después con z-index 9999. Se cierra
 // COMO LO CIERRA EL CLIENTE y se espera POR CONDICIÓN — la condición de merge
 // de la #769: un careo que depende del timing sale verde por suerte.

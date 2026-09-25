@@ -246,8 +246,40 @@ async function correrCareo(eventoId) {
         num_personas: filas, para_careo: true,
       });
       if (r && r.ok && Number.isFinite(Number(r.total))) {
-        fila.sistema_total = Number(r.total);
-        fila.sistema_total_origen = 'catalogo';
+        // ── [CUADRE-6] EL VUELO DE LA PESTAÑA COMPLETA EL TOTAL ──────────────
+        // Solo en los renglónes que la REGLA marcó `cdmx_con_vuelo` — la marca
+        // la pone `reglaCeroTecleado`, aquí no se vuelve a preguntar si el
+        // evento es de CDMX: eso sería la segunda opinión sobre la misma regla.
+        //
+        // 🔒 Y SE LE PREGUNTA A LA RESPUESTA DEL DUEÑO SI SU TOTAL VA SOBRE UN
+        // BOLETO. Medido el 25-sep sobre `edc27`: PLUS trae `zonaP 9100` con
+        // `transportCost 0` — el total NO incluye el transporte, así que el
+        // vuelo lo COMPLETA. Pero **RIDE trae `zonaP 0` y su total (2900) YA ES
+        // el transporte terrestre**: sumarle el vuelo contaría el transporte
+        // DOS VECES. El paquete no se adivina por su nombre — se lee del
+        // desglose que el dueño devuelve.
+        const base = Number(r.total);
+        const zonaP = Number(r.desglose && r.desglose.zonaP);
+        const vuelo = Number(fila.vuelo);
+        if (fila.clase === 'cdmx_con_vuelo') {
+          if (!(Number.isFinite(zonaP) && zonaP > 0)) {
+            // El total del dueño ES el transporte (RIDE): el renglón se queda
+            // pendiente diciendo por qué, en vez de pintar un número doble.
+            fila.sistema_total_motivo = 'el total del sistema YA es el transporte '
+              + '(paquete sin boleto): sumarle el vuelo lo contaría dos veces — se confirma a ojo';
+            continue;
+          }
+          fila.sistema_total = Math.round((base + vuelo) * 100) / 100;
+          fila.sistema_total_origen = 'catalogo_mas_vuelo';
+          // El rótulo lo arma la pantalla con estos dos datos; aquí viajan por
+          // separado para que nadie tenga que re-restar para saber cuánto era
+          // el vuelo.
+          fila.sistema_total_vuelo = vuelo;
+          fila.sistema_total_catalogo = base;
+        } else {
+          fila.sistema_total = base;
+          fila.sistema_total_origen = 'catalogo';
+        }
         // Cuántos boletos entraron en ese número. La pantalla LO DICE: un total
         // cuatro veces más grande sin decir que son cuatro boletos se lee como
         // un error de la cuenta.

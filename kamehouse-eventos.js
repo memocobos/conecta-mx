@@ -697,9 +697,15 @@ function _excelCareoHtml(d) {
       completo: evento <b>fuera de CDMX</b>, o paquete <b>CHEAP</b> en cualquier lado. Esos $0 salen del montón
       de arriba y se cuentan aquí — <b style="color:var(--tp)">no se borran</b>, y no traen botón de «aplicar»:
       aplicarlos escribiría el $0 encima de un total bueno.
-      <br><b style="color:var(--tp)">${c5.en_regla || 0}</b> caen en la regla ·
-      <b style="color:var(--orange)">${c5.fuera_cdmx || 0}</b> quedan FUERA por ser <b>CDMX en paquete con
-      transporte</b> — el autobús son $2,500 pero el avión se cotiza a mano, así que el index no sabe el vuelo ·
+      <br><b style="color:var(--tp)">${c5.en_regla || 0}</b> caen en la regla${c5.en_regla_cdmx_con_vuelo
+        ? ` (<b style="color:var(--green)">${c5.en_regla_cdmx_con_vuelo}</b> de ellos son <b>CDMX que cuadran con su vuelo</b>
+           de la columna «Avión - Bus» de la pestaña, regla del ${_evtEsc(c5.cuadre6_fecha || '')})` : ''} ·
+      <b style="color:var(--orange)">${c5.fuera_cdmx_sin_vuelo || 0}</b> quedan FUERA por ser <b>CDMX en paquete con
+      transporte SIN vuelo capturado</b> — el autobús son $2,500 pero el avión se cotiza a mano, así que sin ese
+      dato el index no sabe el total ·
+      <b style="color:var(--orange)">${c5.fuera_cdmx_vuelo_cero || 0}</b> traen el <b>vuelo en $0</b> y tampoco entran:
+      en un paquete con avión, «cero» no se distingue de «no capturado» ni de «todavía no compra vuelo» — eso
+      solo lo afirma quien captura ·
       <b style="color:var(--orange)">${c5.fuera_libreta || 0}</b> son <b>exactos de libreta</b> y tampoco entran:
       ahí un $0 enfrente es un cambio real.
       ${c5.catalogo_error ? `<br><b style="color:var(--red)">El catálogo no se pudo leer (${_evtEsc(c5.catalogo_error)})</b>,
@@ -716,7 +722,15 @@ function _excelCareoHtml(d) {
           ? `<span style="color:var(--orange)">sin total — ${_evtEsc(x.sistema_total_motivo || 'el catálogo no dio precio')}</span>`
           // Si el total cubre VARIOS boletos, la pantalla lo dice: un número
           // cuatro veces más grande sin esa palabra se lee como un error.
-          : `${_evtMxn(x.sistema_total)} <span style="color:var(--ts);font-size:11px">${x.sistema_total_origen === 'catalogo'
+          // [CUADRE-6] TRES ORÍGENES, no dos: de la base, del catálogo vivo, o
+          // del catálogo vivo MÁS el vuelo que la pestaña capturó. El tercero se
+          // ROTULA con su monto — un total de CDMX que ahora sí cuadra lo hace
+          // por un dato que vino del Excel, y quien lo mira tiene que poder
+          // verlo sin restar.
+          : `${_evtMxn(x.sistema_total)} <span style="color:var(--ts);font-size:11px">${
+                x.sistema_total_origen === 'catalogo_mas_vuelo'
+                ? `del catálogo vivo + vuelo de pestaña ${_evtMxn(x.sistema_total_vuelo)}${x.sistema_total_boletos > 1 ? ` · ${x.sistema_total_boletos} boletos` : ''}`
+                : x.sistema_total_origen === 'catalogo'
                 ? `del catálogo vivo${x.sistema_total_boletos > 1 ? ` · ${x.sistema_total_boletos} boletos` : ''}`
                 : 'de la base'}</span>`)))}</div>
     </details>

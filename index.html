@@ -1289,6 +1289,25 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <p class="wiz-transmodo-note">La opción de autobús estará disponible próximamente con precio especial.</p>
   </div>
 
+  <!-- [CARD-ITIN-1 · mudado por ITIN-ARRIBA-1] ITINERARIO — ARRIBA DEL PASO 1.
+       Orden de Memo (25-sep-2026): **el cliente antoja el viaje primero y
+       cotiza después**. Vivía debajo de los cinco pasos del wizard, o sea que
+       para verlo había que pasar por encima de la cotización entera.
+       🔒 SE MUDÓ EL BLOQUE, NO SE RE-ESCRIBIÓ: es byte por byte el mismo
+       markup — el careo lo carea por sha1 contra el de BASE. Re-teclearlo
+       habría sido la copia que todavía no diverge.
+       ⚠️ No trae `data-guia`, así que la guía por paso (CARD-GUIA-1), que
+       recorre esos nodos en ORDEN DE DOCUMENTO, no se entera de esta mudanza.
+       El careo lo AFIRMA contra BASE en vez de suponerlo.
+       ⚠️ Y Políticas NO se toca: sigue al fondo del todo, empujándose conforme
+       el wizard se expande. -->
+  <!-- [CARD-ITIN-1] ITINERARIO -->
+  <div class="card" id="d-itin-card" style="display:none">
+    <div class="card-lbl">Itinerario</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px" id="d-itin-hint">Así se vive el viaje, paso por paso.</div>
+    <button class="btn-itin" id="d-itin-btn" onclick="abrirItinerario()">🗺️ Ver itinerario</button>
+  </div>
+
   <!-- PASO 1: VIAJEROS -->
   <div class="wiz-card" id="w-viajeros-card">
     <div class="wiz-lbl"><span class="wiz-num-badge">1</span>¿Cuántos viajeros?</div>
@@ -1387,13 +1406,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <div class="card-lbl">Cómo llegar</div>
     <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px" id="d-nube-hint">Lo que cuesta llegar a CDMX esta semana.</div>
     <div id="d-nube-cuerpo"></div>
-  </div>
-
-  <!-- [CARD-ITIN-1] ITINERARIO -->
-  <div class="card" id="d-itin-card" style="display:none">
-    <div class="card-lbl">Itinerario</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:10px" id="d-itin-hint">Así se vive el viaje, paso por paso.</div>
-    <button class="btn-itin" id="d-itin-btn" onclick="abrirItinerario()">🗺️ Ver itinerario</button>
   </div>
 
   <!-- INCLUYE -->

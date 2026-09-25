@@ -167,6 +167,114 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **ITIN-ARRIBA-1 EN PROD (25-sep-2026, #773): el itinerario se muda ARRIBA
+  del paso 1.** Orden de Memo: **el cliente antoja el viaje primero y cotiza
+  después**. `npm run mide:itin-arriba-1` (**34**), cero SQL, **una mudanza**.
+  Políticas no se toca: sigue al fondo, empujándose conforme el wizard crece.
+  🔒 **SE MUDÓ EL BLOQUE, NO SE RE-ESCRIBIÓ**, y el careo lo carea por **sha1**
+  (`6a1a0ddf57de` en los dos lados) más la aserción de que aparece **una sola
+  vez** — una mudanza mal hecha lo deja duplicado y el segundo, oculto, no
+  estorba hasta que estorba.
+  🔒 **«ARRIBA» SE MIDE EN PÍXELES, NO EN EL MARKUP** (el ALTO no es el DÓNDE):
+  390px itin@543→388 contra viaj@388→535, y lo mismo en 1350px. El markup puede
+  estar bien y el CSS ponerlo abajo igual. El **orden del DOM** se lo contesta el
+  navegador (`compareDocumentPosition`), no un `indexOf` sobre el archivo.
+  🔒 **La secuencia de la guía se AFIRMA, no se supone:** CARD-GUIA-1 recorre
+  `[data-guia]` en orden de DOCUMENTO y el card del itinerario no lleva ese
+  atributo — careada byte a byte contra BASE, con candado de cardinalidad. Y el
+  **tercer estado** (bahidora, sin plantilla) sigue apagado en los dos lados.
+  ⚠️ `mide:card-itin` **no asumía la posición vieja** — medido: mide por id y por
+  cadena de visibilidad, y `compareDocumentPosition`/`previousElementSibling`/
+  `.top` aparecen **0 veces**. No se cambió nada ahí, y queda dicho.
+
+- 🏆🔴 **CALLEJON-CDMX-1 EN PROD (25-sep-2026, #772): la pre-selección YA
+  confirmaba sola — un renglón que corría después la deshacía.** Firmado por
+  Memo: «arréglenlo». `npm run mide:callejon-cdmx-1` (**35**), cero SQL,
+  **un renglón que se mueve de sitio**.
+
+  **Medido por la puerta del cliente en 390×844, y el PAR decidió el arreglo:**
+  en `edc27` (CDMX) tras elegir zona el transporte seguía **oculto** y el total
+  salía **vacío**; en `frontera` (MTY) el mismo flujo daba **$8,300**. O sea que
+  `selH` ya quedaba puesto y el flujo se cerraba solo — lo roto era otra cosa.
+
+  **La causa:** `buildHotelButtons` pre-marca «Compartida» con un **clic de
+  verdad**, así que `selHotel` corre y en CDMX **MUESTRA** el paso del
+  transporte; un renglón más abajo `selPaquete` se lo volvía a esconder.
+  🔴 **Fuera de CDMX la rama `else` de `selHotel` TAMBIÉN lo esconde, así que
+  ese renglón era un no-op: el defecto vivía en el único camino donde no lo
+  era.** Por eso nadie lo había visto en Monterrey.
+  🔒 **Y la rama de al lado ya tenía el orden bueno:** el camino `diaFirst` de
+  **esta misma función** esconde el transporte ANTES del `if(hasHotel)`. El
+  arreglo es la **simetría de la función consigo misma** — y la rama que estaba
+  bien es la que **0 de 117 eventos alcanzan**.
+  🔒 **No se quitó la pre-marca**: el otro arreglo posible (nacer sin marcar)
+  le habría **cobrado un clic a todo el país** para arreglar un orden de líneas.
+  Y ese default **cabe en DEFAULTS-1**: no es atribución —es la opción de `e:0`,
+  la más barata, no puede inflar la cotización— y va **ANUNCIADO**.
+  ⚰️ **La frase `data-guia-confirma` de CARD-GUIA se RETIRÓ** del card del hotel:
+  existía por este callejón y hoy mentiría. 🔒 El lector se queda como
+  **MECANISMO y no como promesa**, y la diferencia es que el careo **le siembra
+  el atributo** y exige que la frase salga.
+
+  🔴 **TRES ROJOS MÍOS, LOS TRES DEL INSTRUMENTO — y el tercero es una cara
+  NUEVA de una ley vieja.** (1) `'// Normal flow'` como ancla casa **primero**
+  con el comentario de `selFecha`: **un prefijo no es un ancla**, hoy corta por
+  balance de llaves. (2) Sembré el atributo en una página recién abierta, donde
+  el paso está **sin contestar**, así que esa rama nunca corría. (3) 🔒 **LA
+  ASERCIÓN QUE SE CAZA SOLA, PERO DE UNA POSICIÓN, NO DE UNA AUSENCIA:** el
+  `buildHotelButtons()` que el careo encontraba *antes* del `display='none'`
+  vivía **dentro del comentario que explica el arreglo**. El comentario que dice
+  dónde estaba algo lo NOMBRA, y lo nombra antes. **Los comentarios fuera antes
+  de medir posiciones**, no solo antes de asertar ausencias.
+
+- 🏆🔴 **FEST-SEP-1 EN PROD (25-sep-2026, #768): el separo del festival tiene UN
+  dueño.** Regla firmada de Memo (23-sep): «yo elijo el separo», igual que en
+  todos los eventos. `npm run mide:fest-sep-1` (**45**), cero SQL, y **cero
+  bytes publicados cambian hoy** — las 4 fichas con objeto `festival`
+  (bahidora, edc27, palnorte, vivelatino) traen `sep=500` y **CERO paquetes**,
+  careadas byte a byte.
+
+  `generarObjFestival` concatenaba **`sepSeg` sin declararlo** → `ReferenceError`
+  antes de emitir un byte. 🔴 **Y dos líneas antes tenía un `sepN` con default
+  500 que NADIE leía: el fósil de la regla que ESF-E1g derogó** («antes caía a
+  500 cuando faltaba, y eso no era un default: era una AFIRMACIÓN»). Las **dos
+  caras del mismo hueco**: la regla buena sin llamador y la vieja sin lector.
+  Hoy `sepSeg(esfera)` es dueño top-level y los dos caminos le preguntan.
+
+  🔴 **LA TERCERA CARA DEL ANCLA, y es la lección grande:** el encargo decía
+  que el **testigo** de `mide:card-itin` se pondría rojo con el arreglo.
+  **Medido: no se pone.** Ese careo lee el árbol de `HEAD_SHA`, así que con el
+  arreglo ya commiteado siguió en **69 verdes** imprimiendo «sepSeg is not
+  defined». **Un testigo anclado a un commit no puede atestiguar un arreglo
+  posterior**: se habría quedado verde para siempre afirmando un defecto que ya
+  no existe, y **el verde caducado no avisa**. Se relevó A MANO — *un testigo de
+  un defecto AJENO se re-ancla EN la tuerca que lo arregla*. 69 → **71**.
+  ⚠️ **Y la ausencia no se consigue dejando de nombrar la llave:** mi ficha base
+  traía `sep: 500`, así que el caso «ausente» se escribía omitiéndolo del
+  `extra`… y `Object.assign` lo reintroducía: salía `,sep:500` **rotulado
+  «ausente»**. Dos rojos, los dos míos.
+  ⚠️ **Verificado por Jane y cerrado:** el caso `sep=vacío → sep:0` de la matriz
+  **no puede ocurrir en producción** — `esferas_eventos.sep` es `integer`, una
+  cadena vacía no cabe. Se queda en el careo como caso teórico de la simetría.
+
+- 🔴🔒 **LEY DEL MERGE, en su forma final (pagada tres veces esta semana): el
+  choque de `scripts` del `package.json` se resuelve por UNIÓN SIN REPETIR, y la
+  llave se saca con REGEX de la cadena entrecomillada — NO con `split(':')`.**
+  Las tres caras:
+  - **Conservar los dos lados deja la primera línea SIN COMA.** Eso sí revienta,
+    pero **no avisa** hasta que alguien corre npm.
+  - **En una PR APILADA, concatenar duplica llaves**: la rama de arriba ya trae
+    los renglones de la de abajo. `mide:nube-4` quedó **dos veces** en la #771 —
+    JSON válido (la última gana), npm funciona, **cero errores**: una trampa
+    latente que el siguiente merge lee como intencional.
+  - 🔴 **Y el separador vive DENTRO del dato:** estas llaves llevan dos puntos
+    (`"mide:nube-4"`), así que partir por `:` las colapsa **todas** en `"mide` y
+    sobrevive una sola. Mi resolvedor se lo comió todo y lo cazó el `node -e`
+    que exige las llaves esperadas. **Todo resolvedor de este choque termina en
+    dos comprobaciones: que el JSON PARSEA y que hay CERO llaves duplicadas en
+    el texto crudo** — la segunda no la ve `JSON.parse`.
+
+
 - 🏆🔴 **DESDE-PAQ-1 EN PROD (24-sep-2026, #769): el «desde» de cada paquete tiene
   UN dueño — y eran CINCO sitios, uno muerto.** Reporte de Memo con capturas:
   la tarjeta pintaba PLUS «desde $4,100» y CHEAP «desde $5,200» —el todo

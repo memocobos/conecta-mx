@@ -52,7 +52,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'd4d1185';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '4f78bbc';
 
 // ── LOS ENCABEZADOS REALES, ENTEROS ─────────────────────────────────────
 // Recortarlos a «las columnas que me importan» es fabricar una pestaña que no
@@ -108,8 +108,16 @@ const PESTANA_19 = conPreludio(CAB_19, [
   // CDMX + RIDE + $0 + CON vuelo → el total del sistema YA es el transporte.
   filaExcel(CAB_19, { Nombre: 'Efra Ride', Paquete: 'RIDE', Boleto: 'General', Total: '$0', 'Avión - Bus': '$4,900' }),
   // Un GRUPO: dos filas de la misma persona, cada una con su vuelo por persona.
+  // ⚠️ LAS DOS FILAS CON SU `$0` TECLEADO. Mi primera versión dejó el Total de
+  // la segunda VACÍO, y eso vuelve `total: null` a la persona entera — así que
+  // `carear` la saltaba (`if (p.total == null) continue`) y Fanny no llegaba al
+  // montón: cuatro rojos sobre código sano. El hueco del total es OTRO caso, y
+  // tiene su propia persona abajo.
   filaExcel(CAB_19, { Nombre: 'Fanny Grupo', Paquete: 'PLUS', Boleto: 'General', Total: '$0', 'Avión - Bus': '$2,500' }),
-  filaExcel(CAB_19, { Nombre: 'Fanny Grupo', Paquete: 'PLUS', Boleto: 'General', Total: '', 'Avión - Bus': '$2,500' }),
+  filaExcel(CAB_19, { Nombre: 'Fanny Grupo', Paquete: 'PLUS', Boleto: 'General', Total: '$0', 'Avión - Bus': '$2,500' }),
+  // El hueco de UNA columna no contamina a la otra: Total vacío → `total: null`
+  // (y por eso no llega al montón), pero su vuelo se cosecha igual.
+  filaExcel(CAB_19, { Nombre: 'Gina Hueco', Paquete: 'PLUS', Boleto: 'General', Total: '', 'Avión - Bus': '$1,700' }),
 ]);
 // La MISMA gente en el molde de la columna 20: el literal tiene que encontrarla
 // igual. Si el careo solo midiera un molde, un índice fijo pasaría.
@@ -124,15 +132,23 @@ const PESTANA_SIN_VUELO = conPreludio(CAB_SIN_VUELO, [
   filaExcel(CAB_SIN_VUELO, { Nombre: 'Ana Volo', Paquete: 'PLUS', Boleto: 'General', Total: '$0' }),
 ]);
 
-const NOMBRES = ['Ana Volo', 'Beto Cero', 'Caro Vacia', 'Delia Cheap', 'Efra Ride', 'Fanny Grupo', 'Knot 1', 'Knot 2', 'Knot 3'];
+const NOMBRES = ['Ana Volo', 'Beto Cero', 'Caro Vacia', 'Delia Cheap', 'Efra Ride', 'Fanny Grupo', 'Gina Hueco', 'Knot 1', 'Knot 2', 'Knot 3'];
 // El lado del sistema: todos DERIVADOS (la regla lo exige) y con el total en 0
 // —el caso «pendiente» que el runner pisa con el precio vivo—.
+// ⚠️ LOS NOMBRES DE LA BASE FALSA SE LEYERON DEL CÓDIGO DE LA OTRA PUNTA, no
+// de mi memoria — y me costó la primera corrida entera: sembré `excel_mapeos`
+// con `activo`, y el runner consulta **`excel_pestanas`** con **`activa`**. El
+// handler contestó `SIN_MAPEO` y el arnés se cayó con 7 rojos que no eran del
+// código. Es la cuarta forma en que un mock miente: **inventa nombres**.
 const BASE_DB = {
+  excel_pestanas: [{ evento_id: 'edc27', pestana: 'P', regla_zona: null, activa: true, notas: null }],
   viajeros_evento: NOMBRES.map((n, i) => ({
-    id: 'v' + i, nombre: n, evento_id: 'edc27', total_contrato: 0,
-    notas: 'derivado del catálogo', tipo_viajero: null, estado: 'activo',
+    id: 'v' + i, evento_id: 'edc27', nombre: n, tipo_viajero: 'cliente',
+    abonado_previo: 0, total_contrato: 0,
+    // `esDerivado` mira las notas: la regla del $0 solo cubre los DERIVADOS.
+    notas: 'TOTAL-1: contrato derivado del catálogo (se afina contra la pestaña)',
+    zona_boleto: 'General', tipo_paquete: 'PLUS',
   })),
-  excel_mapeos: [{ evento_id: 'edc27', pestana: 'P', zona: null, activo: true }],
   stock_ajustes: [],
 };
 
@@ -211,8 +227,11 @@ async function correr(dir, opciones) {
   });
   return { res, d: JSON.parse(res.body || '{}'), escrituras: red.escrituras };
 }
-const dePila = (d, nombre) => ((d.montones && d.montones.totales_cero_regla) || []).find((x) => x.nombre === nombre);
-const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === nombre);
+// ⚠️ LA FORMA DE LA RESPUESTA SE LEYÓ DEL HANDLER, no de mi memoria: esparce
+// los montones al TOPE (`...r`), no bajo `montones`, y de las personas devuelve
+// **solo el conteo** (`excel:{personas:N}`) — la lista no viaja. Mi primera
+// versión leía `d.montones.*` y `d.personas`, y dio 28 rojos con el código sano.
+const dePila = (d, nombre) => ((d && d.totales_cero_regla) || []).find((x) => x.nombre === nombre);
 
 (async function main() {
   process.on('exit', marcador);
@@ -226,7 +245,20 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
   console.log('[I] el instrumento · los montos REALES de Knotfest');
   const rKnot = await correr(h.dir, { pestanas: { P: PESTANA_KNOT } });
   af(rKnot.res.statusCode === 200 && rKnot.d.ok !== false, 'el careo no contestó 200/ok: ' + rKnot.res.body.slice(0, 200));
-  const knotVuelos = KNOT_MONTOS.map((m, i) => { const p = enPersonas(rKnot.d, 'Knot ' + (i + 1)); return p ? p.vuelo : null; });
+  // La cosecha se le pregunta a SU DUEÑO (`parsearPestana` del lib del árbol
+  // de HEAD), sobre la MISMA rejilla que la red falsa sirvió: la respuesta del
+  // handler no lleva la lista de personas, solo su conteo.
+  const { parsearPestana } = require(path.join(h.dir, 'netlify/functions/_lib/excel-careo.js'));
+  const cosechaDe = (rejilla) => parsearPestana(rejilla, { fila: 10 }, null);
+  const knotP = cosechaDe(PESTANA_KNOT);
+  const knotVuelos = KNOT_MONTOS.map((m, i) => {
+    const p = knotP.personas.find((x) => x.nombre === 'Knot ' + (i + 1));
+    return p ? p.vuelo : null;
+  });
+  console.log('    la columna se localizó en el índice ' + knotP.mapa.avionBus + ' (molde de Bruno/Knotfest: 20)');
+  af(knotP.mapa.avionBus === 20,
+     'la columna del vuelo no se localizó donde Jane la midió en el molde de Knotfest (20): '
+     + knotP.mapa.avionBus);
   console.log('    cosechados: ' + JSON.stringify(knotVuelos) + '   esperados: ' + JSON.stringify(KNOT_MONTOS));
   af(knotVuelos.filter((v) => Number(v) > 0).length === 3,
      '🔴 CONTROL POSITIVO DEL INSTRUMENTO: la cosecha encontró ' + knotVuelos.filter((v) => Number(v) > 0).length
@@ -240,7 +272,15 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
   const r19 = await correr(h.dir, { pestanas: { P: PESTANA_19 } });
   const r20 = await correr(h.dir, { pestanas: { P: PESTANA_20 } });
   const rSin = await correr(h.dir, { pestanas: { P: PESTANA_SIN_VUELO } });
-  const a19 = enPersonas(r19.d, 'Ana Volo'), a20 = enPersonas(r20.d, 'Ana Volo'), aSin = enPersonas(rSin.d, 'Ana Volo');
+  const c19 = cosechaDe(PESTANA_19), c20 = cosechaDe(PESTANA_20), cSin = cosechaDe(PESTANA_SIN_VUELO);
+  const buscar = (c, n) => c.personas.find((x) => x.nombre === n);
+  const a19 = buscar(c19, 'Ana Volo'), a20 = buscar(c20, 'Ana Volo'), aSin = buscar(cSin, 'Ana Volo');
+  console.log('    índices localizados por el literal: molde A ' + c19.mapa.avionBus
+    + ' · molde B ' + c20.mapa.avionBus + ' · sin la columna ' + cSin.mapa.avionBus);
+  af(c19.mapa.avionBus === 19 && c20.mapa.avionBus === 20,
+     'la columna no se localizó en los DOS moldes (19 y 20): ' + JSON.stringify([c19.mapa.avionBus, c20.mapa.avionBus])
+     + '. Si los dos dieran el mismo número, un índice fijo pasaría y el careo no lo notaría');
+  af(cSin.mapa.avionBus === -1, 'sin el literal la columna tiene que salir en -1: ' + cSin.mapa.avionBus);
   console.log('    molde col 19 → vuelo ' + JSON.stringify(a19 && a19.vuelo)
     + '   ·   molde col 20 → vuelo ' + JSON.stringify(a20 && a20.vuelo)
     + '   ·   sin la columna → vuelo ' + JSON.stringify(aSin && aSin.vuelo));
@@ -260,7 +300,10 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
 
   // ── [R] LA EXCLUSIÓN DE CDMX ENCOGE, y no de más ──────────────────────
   console.log('\n[R] la regla, caso por caso');
-  const d = r19.d, c6 = d.montones.cuadre5;
+  const d = r19.d;
+  af(d && d.cuadre5 && Array.isArray(d.totales_cero_regla),
+     'la corrida del molde 19 no trajo los montones: ' + String(r19.res.body).slice(0, 220));
+  const c6 = (d && d.cuadre5) || {};
   const filaDe = (n) => dePila(d, n);
   for (const [nombre, entra, porque] of [
     ['Ana Volo', true, 'CDMX + PLUS + $0 CON vuelo → entra por CUADRE-6'],
@@ -326,10 +369,14 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
      + 'lee como un error de la cuenta');
   // ⚠️ Y la fila del grupo con el TOTAL vacío no vuelve nulo su vuelo: son dos
   // columnas distintas y cada hueco es el suyo.
-  const pFan = enPersonas(r19.d, 'Fanny Grupo');
-  af(pFan && pFan.total === 0 && Number(pFan.vuelo) === 5000,
-     'el hueco de una columna contaminó a la otra: total ' + JSON.stringify(pFan && pFan.total)
-     + ' vuelo ' + JSON.stringify(pFan && pFan.vuelo) + '. La fila 2 trae Total vacío y vuelo $2,500');
+  const pGina = buscar(c19, 'Gina Hueco');
+  af(pGina && pGina.total === null && Number(pGina.vuelo) === 1700,
+     'el hueco de una columna contaminó a la otra: con el Total VACÍO y el vuelo en $1,700, la persona '
+     + 'tiene que salir con `total: null` y `vuelo: 1700`. Salió total '
+     + JSON.stringify(pGina && pGina.total) + ' vuelo ' + JSON.stringify(pGina && pGina.vuelo));
+  af(!filaDe('Gina Hueco'),
+     'la persona con el Total VACÍO llegó al montón: `carear` la salta porque `total: null` es «no se '
+     + 'sabe», y taparlo con un cero sería inventar una diferencia');
 
   // ── [D] EL RIDE NO SE DUPLICA ─────────────────────────────────────────
   // 🔴 Caso que el encargo no acotaba, y lo destapó medir el desglose del
@@ -355,8 +402,13 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
   af(c6 && c6.fuera_otro === 0,
      '🔴 `fuera_otro` dejó de ser 0 (' + (c6 && c6.fuera_otro) + '): hay una clase de $0 que nadie nombró, '
      + 'y un montón sin nombre es un montón que nadie revisa');
-  af(c6 && c6.en_regla_cdmx_con_vuelo === 1,
-     'la clase nueva tenía que contar 1 (Ana Volo): ' + JSON.stringify(c6 && c6.en_regla_cdmx_con_vuelo));
+  // ⚠️ SON DOS, Y EL SEGUNDO ES EL RIDE. La REGLA lo deja entrar —trae su vuelo—
+  // y es el RUNNER el que se rehúsa a componer su total, porque el del sistema
+  // ya es el transporte. El renglón vive en el montón **con su motivo**, que es
+  // mejor que dejarlo en el de diferencias: mi expectativa de 1 estaba mal.
+  af(c6 && c6.en_regla_cdmx_con_vuelo === 3,
+     'la clase nueva tenía que contar 3 (Ana Volo, Efra Ride y Fanny Grupo): '
+     + JSON.stringify(c6 && c6.en_regla_cdmx_con_vuelo));
   af(c6 && c6.en_regla_catalogo >= 1, 'la clase del catálogo se quedó en 0: ' + JSON.stringify(c6 && c6.en_regla_catalogo));
   af(c6 && c6.en_regla === c6.en_regla_cdmx_con_vuelo + c6.en_regla_catalogo,
      'las dos clases de «en la regla» no PARTEN el montón: ' + c6.en_regla + ' ≠ '
@@ -407,18 +459,24 @@ const enPersonas = (d, nombre) => (d.personas || []).find((x) => x.nombre === no
   // ── [B] CONTROL POSITIVO · BASE no conoce la columna ──────────────────
   console.log('\n[B] control positivo · BASE');
   const rB = await correr(b.dir, { pestanas: { P: PESTANA_19 } });
-  const aB = enPersonas(rB.d, 'Ana Volo'), fB = dePila(rB.d, 'Ana Volo');
-  const cB = rB.d.montones.cuadre5;
+  const { parsearPestana: parsearBase } = require(path.join(b.dir, 'netlify/functions/_lib/excel-careo.js'));
+  const aB = parsearBase(PESTANA_19, { fila: 10 }, null).personas.find((x) => x.nombre === 'Ana Volo');
+  const mapaB = parsearBase(PESTANA_19, { fila: 10 }, null).mapa;
+  const fB = dePila(rB.d, 'Ana Volo');
+  const cB = (rB.d && rB.d.cuadre5) || {};
   console.log('    BASE → vuelo cosechado ' + JSON.stringify(aB && aB.vuelo)
     + '  ·  Ana Volo en la regla: ' + !!fB + '  ·  fuera_cdmx ' + (cB && cB.fuera_cdmx));
-  af(aB && aB.vuelo === undefined,
-     'BASE ya cosechaba el vuelo: entonces esta tuerca no aporta la columna y el verde de arriba no dice '
-     + 'nada. Salió ' + JSON.stringify(aB && aB.vuelo));
+  af(aB && aB.vuelo === undefined && mapaB.avionBus === undefined,
+     'BASE ya cosechaba el vuelo (o ya localizaba la columna): entonces esta tuerca no aporta nada y el '
+     + 'verde de arriba no dice nada. Salió vuelo=' + JSON.stringify(aB && aB.vuelo)
+     + ' avionBus=' + JSON.stringify(mapaB.avionBus));
   af(!fB,
      '🔴 CONTROL POSITIVO: en BASE «Ana Volo» (CDMX + PLUS + $0) tenía que quedarse FUERA de la regla. Si '
      + 'ya entraba, la exclusión no encogió con esta tuerca');
-  af(cB && Number(cB.fuera_cdmx) === 3,
-     'en BASE los tres $0 de CDMX con transporte tenían que contarse juntos en `fuera_cdmx`: '
+  // En BASE los CUATRO $0 de CDMX con transporte (Ana, Beto, Caro, Efra) más
+  // Fanny caen juntos en un solo contador — sin distinguir quién trae vuelo.
+  af(cB && Number(cB.fuera_cdmx) >= 4,
+     'en BASE los $0 de CDMX con transporte tenían que contarse JUNTOS en `fuera_cdmx` (al menos 4): '
      + JSON.stringify(cB && cB.fuera_cdmx));
   af(cB && cB.cuadre6_fecha === undefined, 'BASE ya traía la fecha de CUADRE-6');
 

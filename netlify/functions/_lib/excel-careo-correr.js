@@ -238,6 +238,13 @@ async function correrCareo(eventoId) {
       fila.sistema_total_motivo = zonas.length > 1
         ? `${filas} boletos en ${zonas.length} zonas — se confirma a ojo`
         : `${filas} boletos y ${enLaZona} con zona — se confirma a ojo`;
+      // 🔴 [CUADRE-6] UN MOTIVO SIN SU AUSENCIA NO SE VE, y es un hueco
+      // PRE-EXISTENTE que destapó el caso del RIDE. La pantalla pinta el motivo
+      // **solo si `sistema_total` es null**; cuando la base trae
+      // `total_contrato = 0` —que también es «pendiente»— el cero se quedaba y
+      // el renglón decía «$0 de la base», tragándose la explicación. Un cero es
+      // una afirmación; aquí la verdad es una AUSENCIA.
+      fila.sistema_total = null;
       continue;
     }
     try {
@@ -267,6 +274,7 @@ async function correrCareo(eventoId) {
             // pendiente diciendo por qué, en vez de pintar un número doble.
             fila.sistema_total_motivo = 'el total del sistema YA es el transporte '
               + '(paquete sin boleto): sumarle el vuelo lo contaría dos veces — se confirma a ojo';
+            fila.sistema_total = null;      // el motivo se ve porque el total es una AUSENCIA
             continue;
           }
           fila.sistema_total = Math.round((base + vuelo) * 100) / 100;
@@ -286,8 +294,9 @@ async function correrCareo(eventoId) {
         fila.sistema_total_boletos = filas;
       } else {
         fila.sistema_total_motivo = (r && r.motivo) || 'el catálogo no dio precio';
+        fila.sistema_total = null;
       }
-    } catch (err) { fila.sistema_total_motivo = err.message; }
+    } catch (err) { fila.sistema_total_motivo = err.message; fila.sistema_total = null; }
   }
   if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
 

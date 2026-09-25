@@ -764,11 +764,20 @@ const CASO = () => ({
   const testigo = JSON.parse(JSON.stringify(d9));
   testigo.cuadre5.fecha = 'FECHA-TESTIGO-777';
   testigo.cuadre5.en_regla = 4242;
-  testigo.cuadre5.fuera_cdmx = 3131;
   testigo.cuadre5.fuera_libreta = 2121;
+  // ⏳ ACTUALIZADO EN CUADRE-6 (25-sep-2026), con su razón: el chip ya NO pinta
+  // `fuera_cdmx` de una pieza. La exclusión de CDMX **encogió** —un $0 con su
+  // vuelo capturado ahora ENTRA— así que los que se quedan fuera se dicen en
+  // DOS montones con nombre propio: `fuera_cdmx_sin_vuelo` y
+  // `fuera_cdmx_vuelo_cero`. El contador viejo sobrevive como su SUMA (para que
+  // nada se quede mudo), pero la pantalla pinta los dos nuevos — así que el
+  // testigo se muta donde de verdad se lee. **No se silenció: se movió.**
+  testigo.cuadre5.fuera_cdmx_sin_vuelo = 3131;
+  testigo.cuadre5.fuera_cdmx_vuelo_cero = 1717;
+  testigo.cuadre5.fuera_cdmx = 3131 + 1717;
   const htmlT = pintar(testigo);
   af(htmlT.includes('FECHA-TESTIGO-777'), 'la fecha del chip NO se deriva de la respuesta: está tecleada en la pantalla');
-  ['4242', '3131', '2121'].forEach((n) =>
+  ['4242', '3131', '1717', '2121'].forEach((n) =>
     af(htmlT.includes(n), 'el conteo ' + n + ' no llegó a la pantalla: la pantalla lo está recontando por su cuenta'));
   console.log('    HTML con CUADRE-5: ' + html9.length + ' bytes');
 

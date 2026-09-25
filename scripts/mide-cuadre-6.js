@@ -52,7 +52,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'd4d1185';
-const HEAD_SHA = process.env.HEAD_SHA || '4f78bbc';
+const HEAD_SHA = process.env.HEAD_SHA || '2f026eb';
 
 // ── LOS ENCABEZADOS REALES, ENTEROS ─────────────────────────────────────
 // Recortarlos a «las columnas que me importan» es fabricar una pestaña que no

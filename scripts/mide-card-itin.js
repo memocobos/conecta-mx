@@ -52,7 +52,10 @@ const BASE = process.env.BASE || '53bb769';
 // cambien. Y la otra cara, pagada tres veces en #756: **commitear exige
 // re-anclar** — si con `HEAD_SHA=<sha>` a mano sale verde y a secas sale rojo,
 // el ancla está vieja, no el código.
-const HEAD_SHA = process.env.HEAD_SHA || 'bbb9921';
+// ⏳ RE-ANCLADO en FEST-SEP-1 (23-sep-2026): el testigo de la rama del festival
+// se relevó por la medición de verdad, y esa medición solo existe en el árbol
+// nuevo. El ancla vieja era `bbb9921` (el merge de CARD-ITIN-1).
+const HEAD_SHA = process.env.HEAD_SHA || 'ab50660';
 
 // ── LOS CUATRO EVENTOS, uno por clase ────────────────────────────────────
 const CASOS = {
@@ -359,46 +362,54 @@ async function abrirEvento(page, base, id) {
   const objRaro = emite({ itinerario: "linea 1\nno's escape </script>" });
   af(/itinerario:'linea 1\\nno\\'s escape <\\\/script>'/.test(objRaro),
      'el itinerario no sale escapado (saltos, comilla y cierre de script): ' + (objRaro.match(/itinerario:'[^,]*/) || [''])[0]);
-  // ── LAS DOS RAMAS DEL EMISOR · y un defecto AJENO que salió al medirlas ──
-  // 🔴 `generarObjFestival` NO PUEDE CORRER. Referencia `sepSeg`, que no existe
-  // en su ámbito (ahí solo se declaran `incSeg` y `notaSeg`), así que tira
-  // ReferenceError antes de emitir nada. NO ES DE ESTA TUERCA: viene de
-  // `115c147`, el commit que nació esa función, y se comprobó contra `main`.
-  // Nunca se notó porque la rama es alcanzable pero NADIE la ha alcanzado:
-  // medido en la base el 23-sep, de 117 fichas hay 4 con objeto `festival` y
-  // CERO con `paquetes` no vacío — y `generarObj` solo entra ahí cuando hay
-  // paquetes. Es la familia de la guarda inalcanzable: un emisor entero que
-  // truena la primera vez que alguien lo use.
+  // ── LAS DOS RAMAS DEL EMISOR · el testigo, RELEVADO ────────────────
+  // ✅ EL DEFECTO AJENO QUE ESTE BLOQUE VIGILABA YA ESTÁ ARREGLADO. Este careo
+  // dejó dicho que `generarObjFestival` no podía correr —referenciaba `sepSeg`,
+  // que no existía en su ámbito— y puso un TESTIGO que exigía que tronara con
+  // ESE mensaje, para ponerse rojo el día del arreglo. **FEST-SEP-1** lo
+  // arregló (23-sep-2026, palabra de Memo: «yo elijo el separo, igual que en
+  // todos los eventos»): `sepSeg(esfera)` es hoy un dueño top-level y los DOS
+  // caminos le preguntan. Así que la aserción que NO SE PODÍA HACER —«la rama
+  // del festival EMITE el itinerario»— ya se puede, y es la que va.
   //
-  // ⚠️ Por eso la aserción de «la rama del festival EMITE el itinerario» NO SE
-  // PUEDE HACER, y se dice en vez de callarse. En su lugar quedan DOS:
-  //   (a) el segmento está ESCRITO en esa rama (lo débil que sí se puede);
-  //   (b) un TESTIGO del defecto ajeno: se exige que truene con ESE mensaje.
-  //       El día que alguien lo arregle, (b) se pone ROJO y manda a leer esto
-  //       para cambiarlo por la medición de verdad. Un defecto de otro no se
-  //       arregla de contrabando dentro de esta tuerca: necesita decidir qué
-  //       separo emite un festival, y eso es palabra de Memo.
+  // 🔴 Y POR QUÉ SE RELEVA A MANO ES UNA LEY, LA TERCERA CARA DEL ANCLA: **un
+  // testigo anclado a un commit no puede atestiguar un arreglo posterior.**
+  // Este careo lee el árbol de `HEAD_SHA`, así que el día del arreglo NO se
+  // puso rojo —medido: 69 verdes y «rama festival → sepSeg is not defined» con
+  // el arreglo ya commiteado en la rama—. Se habría quedado verde para siempre
+  // afirmando un defecto que ya no existe, y eso es peor que un rojo: **el
+  // verde caducado no avisa**. Un testigo de un defecto AJENO se re-ancla EN
+  // la tuerca que lo arregla, y se re-ancla a mano.
+  //
+  // De las dos que quedaban, (a) —el segmento ESCRITO en esa rama— se queda:
+  // es el candado estructural del barrido de dos ramas, y sigue valiendo para
+  // cualquier campo futuro que se emita en una sola.
   const fuenteLib = fs.readFileSync(path.join(h.dir, 'netlify/functions/_lib/esferas-compile.js'), 'utf8');
   const cuerpoFest = fuenteLib.slice(fuenteLib.indexOf('function generarObjFestival'),
                                      fuenteLib.indexOf('function generarObj(esfera, hoy)'));
   af(/itinerarioSeg\(esfera\)/.test(cuerpoFest) && /horaShowSeg\(esfera\)/.test(cuerpoFest),
      'la rama del FESTIVAL no lleva escrito el segmento del itinerario: un campo emitido en una sola '
      + 'rama se pierde en la otra — la lección del barrido de dos ramas');
-  let fest = null;
+  let fest = null, festErr = null;
   try {
-    lib._generarObj(Object.assign({}, fichaBase, {
-      festival: JSON.stringify({ paquetes: [{ lbl: 'Día 1', noches: 1 }] }),
+    fest = lib._generarObj(Object.assign({}, fichaBase, {
+      festival: JSON.stringify({ paquetes: [{ lbl: 'Día 1', noches: 1, zonas: [{ n: 'General', p: 1000 }] }] }),
       multifecha: JSON.stringify([{ lbl: 'Día 1', ds: '2026-12-01', zonas: [{ n: 'General', p: 1000 }] }]),
       itinerario: 'ITINERARIO DEL FESTIVAL',
     }), HOY);
-    fest = '(no tronó)';
-  } catch (e) { fest = e.message; }
-  console.log('    rama festival → ' + fest);
-  af(/sepSeg is not defined/.test(String(fest)),
-     'TESTIGO CADUCADO (y es una buena noticia): `generarObjFestival` ya no truena con «sepSeg is not '
-     + 'defined». Alguien arregló ese defecto AJENO, así que esta aserción sobra: cámbiala por la '
-     + 'medición de verdad — emitir con `itinerario` y exigir `itinerario:\'ITINERARIO DEL FESTIVAL\'`. '
-     + 'Salió: ' + fest);
+  } catch (e) { festErr = e.message; }
+  console.log('    rama festival → ' + (festErr ? 'TRUENA: ' + festErr
+    : (String(fest).match(/itinerario:'[^']*'/) || ['(no emite itinerario)'])[0]));
+  af(!festErr,
+     'la rama del FESTIVAL vuelve a tronar, así que el itinerario no se puede medir ahí: ' + festErr);
+  // La premisa de que se entró POR la rama del festival y no por la de
+  // concierto: el formato festival DERIVA su `multifecha` de los paquetes.
+  af(fest && /multifecha:\[/.test(String(fest)),
+     'no se puede afirmar que el objeto salga del emisor de FESTIVAL: sin esa premisa, la aserción de '
+     + 'abajo podría estar midiendo el camino de concierto otra vez');
+  af(fest && /itinerario:'ITINERARIO DEL FESTIVAL'/.test(String(fest)),
+     'la rama del FESTIVAL no emite el itinerario de la ficha — un campo emitido en una sola rama se '
+     + 'pierde en la otra. Salió: ' + String(fest).slice(0, 200));
 
   // EL SET. Se EVALÚA (se lee el Set exportado), no se busca con un regex: un
   // regex cuenta lo comentado como declarado.

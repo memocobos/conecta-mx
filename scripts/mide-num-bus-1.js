@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '19f8d16';
-const HEAD_SHA = process.env.HEAD_SHA || 'f0cb4bc';
+const HEAD_SHA = process.env.HEAD_SHA || '26c1fbe';   // el commit del MERGE (#767)
 const VIAJES   = '528132321405';   // vuelos y buses: COTIZAR
 const RESERVAS = '528119771072';   // reservar, apartar, informes
 

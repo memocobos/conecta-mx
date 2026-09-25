@@ -70,7 +70,7 @@ function servidor(raiz) {
   });
 }
 const BASE = process.env.BASE || '8006830';
-const HEAD_SHA = process.env.HEAD_SHA || '1350bf1';
+const HEAD_SHA = process.env.HEAD_SHA || '4a76bd3';   // el commit del MERGE (#772)
 
 // El onboarding tapa la pantalla (z-index 9999, 300 ms después). Se cierra como
 // lo cierra una persona y se espera POR CONDICIÓN, no por reloj — la condición

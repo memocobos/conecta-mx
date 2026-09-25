@@ -67,8 +67,9 @@ function servidor(raiz) {
     });
   });
 }
-const BASE = process.env.BASE || 'db7e2b2';   // la punta de callejon-cdmx-1, la PR de abajo
-const HEAD_SHA = process.env.HEAD_SHA || '5df0527';
+const BASE = process.env.BASE || '4a76bd3';   // el merge de CALLEJON-CDMX-1 (#772): el arbol con el
+// callejon cerrado y el itinerario TODAVIA abajo — el par sigue aislando la mudanza.
+const HEAD_SHA = process.env.HEAD_SHA || '403611b';   // el commit del MERGE (#773)
 // El overlay del onboarding se abre 300 ms después con z-index 9999. Se cierra
 // COMO LO CIERRA EL CLIENTE y se espera POR CONDICIÓN — la condición de merge
 // de la #769: un careo que depende del timing sale verde por suerte.

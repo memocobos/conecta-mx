@@ -1361,7 +1361,15 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
 
   <!-- PASO 4/5: HABITACIÓN -->
-  <div class="wiz-card" id="w-hotel-card" data-guia="hotel" data-guia-confirma="Confirma tu habitación para seguir." style="display:none">
+  <!-- [CALLEJON-CDMX-1] ⚰️ AQUÍ VIVÍA `data-guia-confirma="Confirma tu
+       habitación para seguir."`, y SE RETIRA PORQUE YA MENTIRÍA. Esa frase la
+       puso CARD-GUIA-1 para ponerle voz a un callejón que esta tuerca acaba de
+       cerrar: en CDMX la habitación venía pre-marcada y el flujo exigía
+       re-clicarla. Hoy la pre-selección confirma sola —medido: tras elegir
+       zona el paso del transporte YA está a la vista—, así que pedirle al
+       cliente que confirme lo que ya está confirmado lo mandaría a apretar un
+       botón que no hace falta. Un letrero que sobrevive a su causa miente. -->
+  <div class="wiz-card" id="w-hotel-card" data-guia="hotel" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-hotel-n">4</span>Tipo de habitación</div>
     <div class="hotel-grid" id="d-hotel"></div>
   </div>
@@ -5632,6 +5640,37 @@ function selPaquete(btn,pkg){
     } else {
       $$('w-zona-card').style.display='none';
     }
+    // ── [CALLEJON-CDMX-1] EL ORDEN, QUE ERA EL CALLEJÓN ────────────────────
+    // 🔴 Esta línea vivía **DESPUÉS** de `buildHotelButtons()`, y ahí deshacía lo
+    // único que el auto-clic acababa de hacer. `buildHotelButtons` pre-marca
+    // «Compartida» con un CLIC DE VERDAD — la opción más barata, `e:0`, y la
+    // de 8 de cada 10 clientes— así que `selHotel` corre, y en CDMX `selHotel`
+    // **MUESTRA** el paso del transporte. Un renglón más abajo se lo volvía a
+    // esconder.
+    //
+    // Medido por la puerta del cliente en 390×844, evento por evento:
+    //   · edc27 (CDMX) — tras elegir zona: habitación MARCADA, `selH` puesto,
+    //     transporte OCULTO y **cotización VACÍA**. Re-clicando la habitación
+    //     que ya estaba marcada, el transporte aparece. El callejón.
+    //   · frontera (no-CDMX) — tras elegir zona: **total $8,300**. Sin callejón.
+    // Y por eso nadie lo había visto fuera de CDMX: en el resto del país la
+    // rama `else` de `selHotel` **también** esconde el transporte, así que esta
+    // línea era un no-op. El defecto vivía en el único camino donde no lo era.
+    //
+    // 🔒 LA PRE-SELECCIÓN NO SE QUITÓ, PORQUE YA CONFIRMABA SOLA: `selH` queda
+    // puesto y el flujo de no-CDMX llega al total sin un clic más. Ese es el
+    // arreglo VERAZ de los dos que Memo puso sobre la mesa — el otro (nacer sin
+    // marcar, DEFAULTS-1) le habría cobrado un clic a todo el país para
+    // arreglar un orden de líneas. Y el default aquí **cabe en DEFAULTS-1**: no
+    // es una atribución (no le imputa dinero a nadie, es la opción de `e:0`,
+    // la más barata, así que no puede inflar la cotización) y va **ANUNCIADO**,
+    // marcado a la vista con su «Sin costo extra».
+    //
+    // 🔒 Y LA RAMA DE AL LADO YA TENÍA EL ORDEN BUENO: el camino `diaFirst` de
+    // esta misma función esconde el transporte **antes** del `if(hasHotel)`.
+    // O sea que el arreglo es la SIMETRÍA de la función consigo misma — y la
+    // rama que estaba bien es la que **0 de 117 eventos alcanzan**.
+    $$('w-transport-card').style.display='none';
     if(hasHotel){
       $$('w-hotel-n').textContent=stepN;
       buildHotelButtons();
@@ -5639,7 +5678,6 @@ function selPaquete(btn,pkg){
     } else {
       $$('w-hotel-card').style.display='none';
     }
-    $$('w-transport-card').style.display='none';
   }
 
   $$('d-placeholder').style.display='block';
@@ -6597,16 +6635,20 @@ function guiaPintar(respaldo){
     var txt = GUIA[c.getAttribute('data-guia')];
     if (txt) { el.textContent = txt; return; }
   }
-  // 🔴 TODOS LOS PASOS A LA VISTA ESTÁN CONTESTADOS Y AUN ASÍ NO HAY
-  // COTIZACIÓN. Medido en CDMX: tras elegir la zona, la habitación viene
-  // PRE-MARCADA («Compartida»), el paso del transporte todavía está oculto y
-  // el total no aparece — el cliente tiene que APRETAR la opción que ya estaba
-  // marcada para que el flujo siga. Ahí el letrero decía «Elige tus opciones
-  // para ver tu cotización», que es justo el silencio que esta tuerca viene a
-  // quitar: no le dice QUÉ apretar.
-  // ⚠️ El callejón es PRE-EXISTENTE y no se arregla aquí (un paso preseleccionado
-  // que aun así exige el clic es tuerca propia, con su decisión). Lo que se
-  // arregla es el silencio.
+  // ⏳ [CALLEJON-CDMX-1] ESTE LECTOR SE QUEDA, Y HOY NO TIENE NINGÚN PORTADOR.
+  // Nació en CARD-GUIA-1 para el caso «todos los pasos a la vista contestados y
+  // aun así sin cotización», que en CDMX pasaba porque la habitación venía
+  // pre-marcada, el transporte seguía OCULTO y el total no llegaba: el cliente
+  // tenía que apretar la opción que ya estaba marcada. **Esa causa murió**
+  // (esta tuerca movió un renglón de `selPaquete`), así que la frase del card
+  // del hotel se RETIRÓ — habría quedado mintiendo.
+  //
+  // 🔒 SE QUEDA COMO MECANISMO Y NO COMO PROMESA, y la diferencia es que el
+  // careo lo MIDE: le siembra el atributo a un card y exige que la frase salga.
+  // Un lector sin su dato es la mitad de un hoyo (la guarda inalcanzable), y
+  // «declarar un hueco no es taparlo» — si esto no se pudiera comprobar,
+  // sobraría. El día que un paso vuelva a poder quedarse contestado sin dar
+  // cotización, ese card trae su propia frase y esto la pinta.
   var listo = false;
   try {
     var res = document.getElementById('d-result');

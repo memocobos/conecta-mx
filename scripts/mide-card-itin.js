@@ -55,7 +55,7 @@ const BASE = process.env.BASE || '53bb769';
 // ⏳ RE-ANCLADO en FEST-SEP-1 (23-sep-2026): el testigo de la rama del festival
 // se relevó por la medición de verdad, y esa medición solo existe en el árbol
 // nuevo. El ancla vieja era `bbb9921` (el merge de CARD-ITIN-1).
-const HEAD_SHA = process.env.HEAD_SHA || 'ab50660';
+const HEAD_SHA = process.env.HEAD_SHA || '2e246c3';   // re-anclado al merge de FEST-SEP-1 (#768)
 
 // ── LOS CUATRO EVENTOS, uno por clase ────────────────────────────────────
 const CASOS = {

@@ -53,7 +53,7 @@ function sacar(ref, etiqueta) {
 // control positivo de [A] moriría en silencio.
 // BASE: el main anterior a esta tuerca — trae el ReferenceError vivo.
 const BASE = process.env.BASE || '5b2c107';
-const HEAD_SHA = process.env.HEAD_SHA || 'ab50660';
+const HEAD_SHA = process.env.HEAD_SHA || '2e246c3';   // el commit del MERGE (#768)
 const HOY = '2026-09-23';
 
 // Sin comentarios: una aserción sobre el TEXTO del archivo se caza sola, porque

@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '61ee30f';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || 'e1d2faa';
 
 // ── LOS PARES REALES ────────────────────────────────────────────────────
 // Leídos de la base el 25-sep-2026 con un GROUP BY por (evento, zona
@@ -118,8 +118,12 @@ const DISTINTAS = [
   const consumeBoleto = () => true;
   // El caso real: la compra dice «Retractil Oro» (sin acento, como la pestaña) y
   // la ficha dice «Retráctil Oro».
+  // ⚠️ LOS NÚMEROS CIERRAN EN **0** A PROPÓSITO, y me costó tres rojos: el aviso
+  // solo NOMBRA las zonas en riesgo (`num <= 0`), así que con 5 disponibles no
+  // dice nada de ella y la lectura no se puede carear. Con 5 − 2 − 3 = 0 la
+  // zona SÍ sale en el aviso, y el par queda medible en los dos lados.
   const entrada = {
-    compras: [{ evento_id: 'frontera#1', zona: 'Retractil Oro', cantidad: 10 }],
+    compras: [{ evento_id: 'frontera#1', zona: 'Retractil Oro', cantidad: 5 }],
     ajustes: [{ evento_id: 'frontera#1', zona: 'RETRACTIL ORO', vendidos_fuera: 2 }],
     viajeros: [{ evento_id: 'frontera#1', zona_boleto: 'Retráctil Oro', boletos: 3, tipo_paquete: 'PLUS', tipo_viajero: 'cliente' }],
     consumeBoleto,
@@ -136,8 +140,8 @@ const DISTINTAS = [
      '🔴 en HEAD las tres ortografías siguen dando ' + llavesH.length + ' llaves: ' + JSON.stringify(llavesH));
   af(llavesH[0] === normalizarZona('Retráctil Oro'),
      'la llave no es la normalizada por el dueño: ' + JSON.stringify(llavesH[0]));
-  af(stH.get('frontera#1').get(llavesH[0]) === 5,
-     'la cuenta no es 10 − 2 − 3 = 5: ' + stH.get('frontera#1').get(llavesH[0]));
+  af(stH.get('frontera#1').get(llavesH[0]) === 0,
+     'la cuenta no es 5 − 2 − 3 = 0: ' + stH.get('frontera#1').get(llavesH[0]));
   // 🔒 Y EL LECTOR: el aviso busca con la ortografía de la FICHA y tiene que
   // encontrarla. Se entra por `avisosStock`, que es quien lo hace de verdad.
   const ficha = { zonas: [{ n: 'Retráctil Oro', p: 6100 }], cheapZonas: [], multifecha: null };
@@ -147,12 +151,19 @@ const DISTINTAS = [
   const zonaDe = (r) => ((r && r.zonas) || []).find((z) => z.zona === 'Retráctil Oro');
   console.log('    BASE aviso: ' + JSON.stringify(zonaDe(avB)));
   console.log('    HEAD aviso: ' + JSON.stringify(zonaDe(avH)));
-  af(zonaDe(avB) && zonaDe(avB).motivo === 'sin pedido capturado',
-     'CONTROL POSITIVO del lector: en BASE el aviso tenía que decir «sin pedido capturado» sobre una zona '
-     + 'que SÍ tiene 10 compradas — ése es el hoyo. Salió ' + JSON.stringify(zonaDe(avB)));
-  af(zonaDe(avH) && zonaDe(avH).disponibles === 5,
-     '🔴 el aviso sigue sin encontrar el pedido: normalizar solo el escritor dejaría TODAS las zonas sin '
-     + 'pedido. Salió ' + JSON.stringify(zonaDe(avH)));
+  // 🔴 EL CONTROL POSITIVO, Y EL SÍNTOMA REAL ES PEOR DE LO QUE YO ESPERABA:
+  // en BASE el aviso no dice «sin pedido» — dice **SOBREVENDIDA en −3**, porque
+  // encuentra la resta de los viajeros (que casualmente escribieron como la
+  // ficha) y NO las 5 compradas ni los 2 vendidos fuera. O sea que el aviso
+  // cuenta **solo lo que casualmente casa con la ortografía de la ficha** y
+  // pinta una sobreventa que no existe. La verdad es 0.
+  af(zonaDe(avB) && zonaDe(avB).disponibles === -3 && zonaDe(avB).motivo === 'sobrevendida',
+     'CONTROL POSITIVO del lector: en BASE el aviso tenía que pintar −3 «sobrevendida» — cuenta solo la '
+     + 'resta que casa con la ficha y se pierde las 5 compradas. Salió ' + JSON.stringify(zonaDe(avB)));
+  af(zonaDe(avH) && zonaDe(avH).disponibles === 0 && zonaDe(avH).motivo === 'stock 0',
+     '🔴 el aviso sigue sin encontrar el pedido completo: normalizar solo el escritor dejaría TODAS las '
+     + 'zonas sin pedido, y normalizar solo el lector las dejaría a todas en cero. Salió '
+     + JSON.stringify(zonaDe(avH)));
   // 🔒 Y LO PINTADO NO SE TOCA: el aviso dice la ortografía de la FICHA, no la llave.
   af(zonaDe(avH) && zonaDe(avH).zona === 'Retráctil Oro',
      'el aviso pinta la LLAVE en vez del nombre de la ficha: lo guardado y lo pintado no se tocan — la '

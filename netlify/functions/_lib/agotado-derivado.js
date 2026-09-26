@@ -35,6 +35,9 @@
 // Copiar aquí su orden de mando sería la segunda fuente que esta casa colecciona
 // —y ya mordió con `cheapZonas`, que dejó de ser un espejo en ESF-E1c.
 const C = require('./esferas-compile');
+// [ZONA-NORM-1] El dueño de «¿son la misma zona?»: una sola forma para todos
+// los puntos de casamiento.
+const { normalizarZona } = require('./normalizar-zona');
 
 // Lo que el catálogo entiende por «no se vende»: el `ag` que ya usa el index.
 const AGOTADA = 1;
@@ -214,9 +217,14 @@ function simetrizarFicha(ficha) {
 // evento entero sin pedido. Cada fecha es su propia unidad.
 
 // disponiblesPorZona: Map|objeto zona → número.
+// [ZONA-NORM-1] 🔒 EL LECTOR NORMALIZA IGUAL QUE EL ESCRITOR, y es la mitad
+// que no se puede olvidar: el Map lo llavea `disponiblesPorEvento` con la
+// ortografía de lo CAPTURADO y aquí se busca con la de la FICHA. Normalizar solo
+// un lado dejaría TODAS las zonas sin pedido — el hoyo al revés y más grande.
 function _disp(mapa, zona) {
   if (!mapa) return undefined;
-  return (typeof mapa.get === 'function') ? mapa.get(zona) : mapa[zona];
+  const k = normalizarZona(zona);
+  return (typeof mapa.get === 'function') ? mapa.get(k) : mapa[k];
 }
 
 // ── EL AVISO ────────────────────────────────────────────────────────────────
@@ -300,10 +308,17 @@ function avisosStock({ ficha, slug, stock }) {
 // pueda interrogar con las filas reales de calle24, sin red.
 function disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto }) {
   const stock = new Map();      // evento → Map(zona → comprados)
+  // [ZONA-NORM-1] 🔒 LA LLAVE ES LA ZONA NORMALIZADA. Antes era `String(zona)`
+  // a pelo, así que «Retractil Oro» de una pestaña y «Retráctil Oro» de la ficha
+  // eran DOS llaves: lo capturado restaba de una que el aviso nunca consulta.
+  // Las tres pasadas entran por aquí, así que normalizar en `meter` las cubre a
+  // las tres sin repetir la regla en ninguna.
+  // ⚠️ Lo PINTADO no cambia: el aviso sigue diciendo el nombre de la ficha.
   const meter = (m, ev, zona, n) => {
     if (!m.has(ev)) m.set(ev, new Map());
     const z = m.get(ev);
-    z.set(zona, (z.get(zona) || 0) + n);
+    const k = normalizarZona(zona);
+    z.set(k, (z.get(k) || 0) + n);
   };
   (compras || []).forEach((c) => {
     if (!c || !c.evento_id || !c.zona) return;

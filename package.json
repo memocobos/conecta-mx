@@ -44,6 +44,7 @@
     "mide:fest-sep-1": "node scripts/mide-fest-sep-1.js",
     "mide:callejon-cdmx-1": "node scripts/mide-callejon-cdmx-1.js",
     "mide:itin-arriba-1": "node scripts/mide-itin-arriba-1.js",
-    "mide:cuadre-6": "node scripts/mide-cuadre-6.js"
+    "mide:cuadre-6": "node scripts/mide-cuadre-6.js",
+    "mide:zona-norm-1": "node scripts/mide-zona-norm-1.js"
   }
 }

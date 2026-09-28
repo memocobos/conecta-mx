@@ -167,6 +167,79 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **ZONA-NORM-1 EN PROD (28-sep-2026, #775): el casamiento de zonas aprende
+  acentos y mayúsculas.** Medido por Jane (25-sep): siete eventos tenían la
+  misma zona escrita distinto. El stock casa por **cadena EXACTA**, así que esas
+  filas restaban de una llave que NO EXISTE.
+  `npm run mide:zona-norm-1` (**35**), cero SQL, y los **7 careos** que tocan
+  estos libs en verde (boletos 15 · cuadre-total 151 · cuadre-6 46 ·
+  cuadre-aplicar 108 · numerología 84 · cuadre-todo 59 · stock-vivo 22).
+
+  **`_lib/normalizar-zona` es el dueño** (minúsculas + sin diacríticos **por su
+  rango NFD** + espacios colapsados) y le preguntan: `disponiblesPorEvento` (las
+  tres pasadas, vía `meter`), la búsqueda de zona de `resolverPrecioVenta` y el
+  agrupado de boletos-por-zona de CUADRE-5. Y **`normalizarNombre` del careo
+  PIDE la forma** en vez de repetirla: eran la misma escrita dos veces.
+  🔴 **Y SU LECTOR, que es la mitad que no se puede olvidar:** el Map lo llavea
+  lo CAPTURADO y `_disp` del aviso lo busca con la ortografía de la FICHA.
+  **Normalizar un solo lado dejaría TODAS las zonas sin pedido** — el hoyo al
+  revés y más grande.
+  🔒 **Solo el CASAMIENTO**: lo guardado y lo pintado no se tocan. La ficha
+  sigue siendo la ortografía canónica y el aviso dice SU nombre, con su aserción.
+
+  **El precio, medido ANTES de cobrarlo:** si una ficha tuviera dos zonas
+  DISTINTAS que normalizadas coincidan, esto las fundiría. Barrido del catálogo
+  servido: **265 listas, 2 302 zonas, CERO colisiones**. 🔒 Con su **control
+  positivo** —se le siembra el par «Vip»/«VIP» y el buscador lo caza, porque sin
+  esa mitad «no hay colisiones» sería una ausencia sin instrumento— y
+  **vigilante VIVO contra el árbol de trabajo**, porque es un hecho del catálogo
+  que cambia con cualquier publicación y anclado a un commit nunca podría avisar.
+  ⚠️ Y **no funde lo que SÍ es distinto**: «General» ≠ «General Viernes»,
+  «Sección C» ≠ «Sección D», «VIP» ≠ «VIP Plus». Sin ese par, un normalizador
+  que borrara de más pasaría todo lo demás. Y la zona inventada **sigue
+  rehusándose**: normalizar no puede volverse «casar con lo que sea».
+
+  🔴🔒 **LA LEY GRANDE DE ESTA TUERCA ES DE MEDICIÓN, Y ME LA COBRÓ JANE: DOS
+  BARRIDOS CORRECTOS PUEDEN CONTESTAR PREGUNTAS DISTINTAS, Y REPORTAR UNO COMO
+  SI FUERA EL OTRO MANDA A BUSCAR HOYOS QUE NO EXISTEN.**
+  Yo conté «5 grupos en 4 eventos» de drift vivo. Ella no lo reprodujo, y
+  exigió que reprodujera o lo retirara. **Reproduje: la consulta da los mismos 5
+  grupos contra la base viva, tres días después.** Pero mi consulta agrupa por
+  (evento, zona normalizada) sobre **lo CAPTURADO** — **capturado contra
+  capturado** — y la de ella compara **capturado contra la FICHA**. Los dos son
+  correctos; lo que estaba mal era presentar el mío como si contestara el suyo.
+  **Medido renglón por renglón, la forma es SIEMPRE la misma en los cinco:**
+  `compras` y `viajeros_evento` casan con la ficha **byte a byte**, y la
+  ortografía desalineada vive **SOLO en `stock_ajustes`**.
+
+  🔴 **Y ESO CAMBIÓ EL SÍNTOMA, que es lo que de verdad importaba.** Mi fixture
+  puso la ortografía rara en `compras` y la buena en `viajeros` —**al revés de
+  la realidad**— y demostraba una «sobreventa» que en producción NO ocurre: **el
+  resultado correcto por la razón equivocada**, otra vez. La forma real, con los
+  números de `ultramexico` (compras «General» 20 · viajeros «General» 2 ·
+  ajustes «**GENERAL**» 2):
+
+      BASE: [["General",18],["GENERAL",-2]]   ← la llave FANTASMA
+      HEAD: [["general",16]]                    ← 20 − 2 − 2
+
+  O sea que **BASE contaba de MÁS, no de menos**: el `vendidos_fuera` se perdía
+  en una llave que nadie consulta y la zona parecía tener **18** cuando tenía
+  **16**. Y con la verdad en cero, **el aviso se queda CALLADO** sobre una zona
+  agotada — ése es el dinero.
+  ⚠️ **Corolario del método:** la fuente del drift es `stock_ajustes`, no las
+  pestañas de compras. Un censo de «zonas desalineadas» tiene que decir **contra
+  qué** las compara, o los dos barridos parecen contradecirse cuando no lo están.
+
+  ⏳ **DOS HALLAZGOS DE JANE, ANOTADOS Y AJENOS A ESTA TUERCA:** «**Zona
+  Doritos**» en alfredito era una PALABRA de más (no un acento) y **ella ya la
+  corrigió en la base** — el normalizador no la habría casado, y **no debe**. Y
+  «**Sección C**» de `hilary` está **vendida y comprada sin existir en la ficha**:
+  es un hoyo de FICHA y **espera palabra de Memo**.
+  ⏳ **Y `_lib/disponibilidad`** (el `stockPorZona` del endpoint público, el chip
+  «¡Últimos 3!» del index) **también casa por cadena exacta** y NO estaba en el
+  encargo: es tuerca propia, con su propia medición de qué ve el cliente.
+
+
 - 🏆🔴 **CUADRE-6 EN PROD (25-sep-2026, #774): el careo aprende la columna
   «Avión - Bus» y la exclusión de CDMX ENCOGE.** Regla de Memo (24-sep):
   «hay una columna de vuelos en el Excel con el costo; intentemos cuadrar con

@@ -56,7 +56,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '61ee30f';
-const HEAD_SHA = process.env.HEAD_SHA || 'e1d2faa';
+const HEAD_SHA = process.env.HEAD_SHA || '196e278';   // el commit del MERGE (#775)
 
 // ── LOS PARES REALES ────────────────────────────────────────────────────
 // Leídos de la base el 25-sep-2026 con un GROUP BY por (evento, zona

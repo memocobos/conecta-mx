@@ -8,9 +8,19 @@
 //
 // 🔒 LOS DOS LADOS SON COMMITS. Commitear exige RE-ANCLAR.
 //
-// 🔒 LOS PARES SON REALES, LEÍDOS DE LA BASE el 25-sep DESPUÉS de que Jane
-// alineara los datos de hoy. No son ejemplos inventados: los inventados
-// comparten mis sesgos, y aquí el dato ES el caso.
+// 🔒 LOS PARES SON REALES, LEÍDOS DE LA BASE VIVA — y REPRODUCIDOS el 28-sep
+// con la misma consulta, idénticos. No son ejemplos inventados.
+//
+// 🔴 PERO OJO CON QUÉ MIDE ESTE CENSO, que es donde me equivoqué al contarlo:
+// agrupa por (evento, zona normalizada) sobre **lo CAPTURADO** y pide los
+// grupos con más de una ortografía — o sea **capturado contra capturado**. El
+// barrido de Jane compara **capturado contra la FICHA**, y por eso dio otra
+// cuenta: los dos son correctos y contestan preguntas distintas.
+// Medido renglón por renglón el 28-sep, la forma es SIEMPRE la misma:
+//   · `compras` y `viajeros_evento` casan con la ficha **byte a byte**,
+//   · y la ortografía desalineada vive **SOLO en `stock_ajustes`**.
+// Eso importa porque `stock_ajustes` es una de las TRES pasadas del contador:
+// su `vendidos_fuera` restaba de una llave FANTASMA que nadie más usaba.
 //
 // 🔒 EL CONTROL POSITIVO ES UNA COLISIÓN, no una ausencia: si una ficha tuviera
 // dos zonas DISTINTAS que normalizadas coincidan, el normalizador las FUNDIRÍA.
@@ -112,62 +122,66 @@ const DISTINTAS = [
   // ── [S] EL STOCK · escritor y lector, el par completo ─────────────────
   // 🔴 Normalizar solo el ESCRITOR dejaría TODAS las zonas sin pedido: el hoyo
   // al revés y más grande. Se mide el par entero, con las filas reales.
-  console.log('\n[S] el stock: lo capturado resta de la llave de la ficha');
+  console.log('\n[S] el stock: el `vendidos_fuera` que restaba de una llave fantasma');
   const { disponiblesPorEvento, avisosStock } = reqH('agotado-derivado');
-  const { disponiblesPorEvento: dispB } = reqB('agotado-derivado');
+  const { disponiblesPorEvento: dispB, avisosStock: avisosB } = reqB('agotado-derivado');
   const consumeBoleto = () => true;
-  // El caso real: la compra dice «Retractil Oro» (sin acento, como la pestaña) y
-  // la ficha dice «Retráctil Oro».
-  // ⚠️ LOS NÚMEROS CIERRAN EN **0** A PROPÓSITO, y me costó tres rojos: el aviso
-  // solo NOMBRA las zonas en riesgo (`num <= 0`), así que con 5 disponibles no
-  // dice nada de ella y la lectura no se puede carear. Con 5 − 2 − 3 = 0 la
-  // zona SÍ sale en el aviso, y el par queda medible en los dos lados.
-  const entrada = {
-    compras: [{ evento_id: 'frontera#1', zona: 'Retractil Oro', cantidad: 5 }],
-    ajustes: [{ evento_id: 'frontera#1', zona: 'RETRACTIL ORO', vendidos_fuera: 2 }],
-    viajeros: [{ evento_id: 'frontera#1', zona_boleto: 'Retráctil Oro', boletos: 3, tipo_paquete: 'PLUS', tipo_viajero: 'cliente' }],
+  // 🔒 LA FORMA ES LA REAL, medida en `ultramexico` el 28-sep: compras
+  // «General» 20 · viajeros «General» 2 · ajustes «**GENERAL**» 2. O sea que los
+  // dos que casan con la ficha son compras y viajeros, y el que se desalinea es
+  // el `vendidos_fuera`. Mi primera versión de este bloque puso la ortografía
+  // rara en compras y la buena en viajeros — al revés de la realidad— y por eso
+  // demostraba una «sobreventa» que en producción NO ocurre. El resultado era
+  // correcto por la razón equivocada.
+  const REAL = { compras: 20, viajeros: 2, ajustes: 2 };   // ultramexico, 28-sep
+  const entradaDe = (nCompras) => ({
+    compras: [{ evento_id: 'ultramexico', zona: 'General', cantidad: nCompras }],
+    viajeros: [{ evento_id: 'ultramexico', zona_boleto: 'General', boletos: REAL.viajeros,
+                 tipo_paquete: 'PLUS', tipo_viajero: 'cliente' }],
+    ajustes: [{ evento_id: 'ultramexico', zona: 'GENERAL', vendidos_fuera: REAL.ajustes }],
     consumeBoleto,
-  };
-  const stH = disponiblesPorEvento(entrada);
-  const stB = dispB(entrada);
-  const llavesH = [...stH.get('frontera#1').keys()], llavesB = [...stB.get('frontera#1').keys()];
-  console.log('    BASE llaves: ' + JSON.stringify(llavesB));
-  console.log('    HEAD llaves: ' + JSON.stringify(llavesH));
-  af(llavesB.length === 3,
-     'CONTROL POSITIVO: en BASE las tres ortografías tenían que dar TRES llaves distintas (el hoyo). '
-     + 'Salieron ' + llavesB.length + ': ' + JSON.stringify(llavesB));
-  af(llavesH.length === 1,
-     '🔴 en HEAD las tres ortografías siguen dando ' + llavesH.length + ' llaves: ' + JSON.stringify(llavesH));
-  af(llavesH[0] === normalizarZona('Retráctil Oro'),
-     'la llave no es la normalizada por el dueño: ' + JSON.stringify(llavesH[0]));
-  af(stH.get('frontera#1').get(llavesH[0]) === 0,
-     'la cuenta no es 5 − 2 − 3 = 0: ' + stH.get('frontera#1').get(llavesH[0]));
-  // 🔒 Y EL LECTOR: el aviso busca con la ortografía de la FICHA y tiene que
-  // encontrarla. Se entra por `avisosStock`, que es quien lo hace de verdad.
-  const ficha = { zonas: [{ n: 'Retráctil Oro', p: 6100 }], cheapZonas: [], multifecha: null };
-  const avH = avisosStock({ ficha, slug: 'frontera#1', stock: stH });
-  const { avisosStock: avisosB } = reqB('agotado-derivado');
-  const avB = avisosB({ ficha, slug: 'frontera#1', stock: stB });
-  const zonaDe = (r) => ((r && r.zonas) || []).find((z) => z.zona === 'Retráctil Oro');
-  console.log('    BASE aviso: ' + JSON.stringify(zonaDe(avB)));
-  console.log('    HEAD aviso: ' + JSON.stringify(zonaDe(avH)));
-  // 🔴 EL CONTROL POSITIVO, Y EL SÍNTOMA REAL ES PEOR DE LO QUE YO ESPERABA:
-  // en BASE el aviso no dice «sin pedido» — dice **SOBREVENDIDA en −3**, porque
-  // encuentra la resta de los viajeros (que casualmente escribieron como la
-  // ficha) y NO las 5 compradas ni los 2 vendidos fuera. O sea que el aviso
-  // cuenta **solo lo que casualmente casa con la ortografía de la ficha** y
-  // pinta una sobreventa que no existe. La verdad es 0.
-  af(zonaDe(avB) && zonaDe(avB).disponibles === -3 && zonaDe(avB).motivo === 'sobrevendida',
-     'CONTROL POSITIVO del lector: en BASE el aviso tenía que pintar −3 «sobrevendida» — cuenta solo la '
-     + 'resta que casa con la ficha y se pierde las 5 compradas. Salió ' + JSON.stringify(zonaDe(avB)));
+  });
+  const entrada = entradaDe(REAL.compras);
+  const stH = disponiblesPorEvento(entrada), stB = dispB(entrada);
+  const mH = stH.get('ultramexico'), mB = stB.get('ultramexico');
+  console.log('    BASE: ' + JSON.stringify([...mB.entries()]));
+  console.log('    HEAD: ' + JSON.stringify([...mH.entries()]));
+  // 🔴 EL CONTROL POSITIVO: en BASE el `vendidos_fuera` cae en una llave que
+  // NADIE consulta, así que la de la ficha queda INFLADA en esos 2 boletos.
+  af(mB.size === 2 && mB.get('General') === REAL.compras - REAL.viajeros && mB.get('GENERAL') === -REAL.ajustes,
+     'CONTROL POSITIVO: en BASE tenían que quedar DOS llaves — «General» con '
+     + (REAL.compras - REAL.viajeros) + ' y la FANTASMA «GENERAL» con ' + (-REAL.ajustes)
+     + '. Salió ' + JSON.stringify([...mB.entries()]));
+  af(mH.size === 1 && mH.get(normalizarZona('General')) === REAL.compras - REAL.viajeros - REAL.ajustes,
+     '🔴 en HEAD tenía que quedar UNA llave con ' + (REAL.compras - REAL.viajeros - REAL.ajustes)
+     + ' (20 − 2 − 2): ' + JSON.stringify([...mH.entries()]));
+  af(mB.get('General') > mH.get(normalizarZona('General')),
+     'el hoyo era que BASE contaba de MÁS (no de menos): el `vendidos_fuera` se perdía, así que la zona '
+     + 'parecía tener ' + mB.get('General') + ' cuando tenía ' + mH.get(normalizarZona('General')));
+
+  // 🔒 Y LO QUE ESO LE HACE AL AVISO: se queda CALLADO. El aviso solo nombra
+  // las zonas en riesgo (`num <= 0`), así que con la cuenta inflada NO AVISA de
+  // una zona que ya se acabó. Se mide con los números escalados para que la
+  // verdad sea 0 — misma forma, otra escala.
+  const enCero = entradaDe(REAL.viajeros + REAL.ajustes);    // 4 − 2 − 2 = 0
+  const stH0 = disponiblesPorEvento(enCero), stB0 = dispB(enCero);
+  const ficha = { zonas: [{ n: 'General', p: 3200 }], cheapZonas: [], multifecha: null };
+  const avH = avisosStock({ ficha, slug: 'ultramexico', stock: stH0 });
+  const avB = avisosB({ ficha, slug: 'ultramexico', stock: stB0 });
+  const zonaDe = (r) => ((r && r.zonas) || []).find((z) => z.zona === 'General');
+  console.log('    con la verdad en 0 → BASE avisa: ' + JSON.stringify(zonaDe(avB))
+    + '   ·   HEAD avisa: ' + JSON.stringify(zonaDe(avH)));
+  af(!zonaDe(avB),
+     '🔴 CONTROL POSITIVO: en BASE el aviso tenía que quedarse CALLADO sobre una zona que ya está en '
+     + 'cero — porque la cuenta que consulta está inflada por el `vendidos_fuera` perdido. Salió '
+     + JSON.stringify(zonaDe(avB)));
   af(zonaDe(avH) && zonaDe(avH).disponibles === 0 && zonaDe(avH).motivo === 'stock 0',
-     '🔴 el aviso sigue sin encontrar el pedido completo: normalizar solo el escritor dejaría TODAS las '
-     + 'zonas sin pedido, y normalizar solo el lector las dejaría a todas en cero. Salió '
-     + JSON.stringify(zonaDe(avH)));
-  // 🔒 Y LO PINTADO NO SE TOCA: el aviso dice la ortografía de la FICHA, no la llave.
-  af(zonaDe(avH) && zonaDe(avH).zona === 'Retráctil Oro',
-     'el aviso pinta la LLAVE en vez del nombre de la ficha: lo guardado y lo pintado no se tocan — la '
-     + 'ficha es la ortografía canónica. Salió ' + JSON.stringify(zonaDe(avH) && zonaDe(avH).zona));
+     '🔴 el aviso sigue sin ver el cero: ' + JSON.stringify(zonaDe(avH)));
+  // 🔒 Y LO PINTADO NO SE TOCA: el aviso dice la ortografía de la FICHA, no la
+  // llave normalizada.
+  af(zonaDe(avH) && zonaDe(avH).zona === 'General',
+     'el aviso pinta la LLAVE en vez del nombre de la ficha: lo guardado y lo pintado no se tocan. Salió '
+     + JSON.stringify(zonaDe(avH) && zonaDe(avH).zona));
 
   // ── [V] LA VENTA · el alta real que mordió a Jane ─────────────────────
   console.log('\n[V] el alta real: «' + ALTA_REAL.pestana + '» contra la ficha «' + ALTA_REAL.ficha + '»');

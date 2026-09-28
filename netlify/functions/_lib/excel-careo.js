@@ -13,11 +13,14 @@
 // ── nombres ─────────────────────────────────────────────────────────────────
 // minúsculas · sin acentos · espacios colapsados. Es la llave del careo: dos
 // filas con el mismo nombre normalizado son LA MISMA PERSONA.
-function normalizarNombre(s) {
-  return String(s == null ? '' : s)
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // los acentos, por su rango: escribirlos literales los deja a merced del editor
-    .toLowerCase().replace(/\s+/g, ' ').trim();
-}
+// [ZONA-NORM-1] 🔒 LA FORMA SE PIDE, NO SE REPITE. Esta función y el
+// normalizador de zonas eran la MISMA forma escrita dos veces — dos listas que
+// todavía no divergen. El día que una aprendiera a quitar puntos y la otra no,
+// una zona casaría en el careo y no en el stock, y nadie sabría por qué.
+// ⚠️ El NOMBRE se queda: aquí se normalizan NOMBRES de personas, y llamarlo
+// `normalizarZona` en el careo sería mentir sobre qué se está comparando.
+const { normalizarZona: _formaNorm } = require('./normalizar-zona');
+function normalizarNombre(s) { return _formaNorm(s); }
 
 // La chatarra: filas que no son viajeros sino reventa o control interno. Se
 // mira sobre el nombre YA normalizado, porque en el Excel viene de todas las

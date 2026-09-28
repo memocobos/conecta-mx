@@ -22,6 +22,9 @@ const { mapearLibro, fundirNumerologia, parsearLibro, PESTANA_LIBRO } = require(
 // vivo por paquete+zona. Los dos salen del MISMO dueño que usa el index.
 const { fetchEventosRaw } = require('./catalogo-index');
 const { esCDMX, resolverPrecioVenta } = require('./precio-zona');
+// [ZONA-NORM-1] El dueño de «¿son la misma zona?»: una sola forma para todos
+// los puntos de casamiento.
+const { normalizarZona } = require('./normalizar-zona');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -230,7 +233,19 @@ async function correrCareo(eventoId) {
   for (const fila of (montones.totales_cero_regla || [])) {
     if (fila.sistema_total_origen !== 'pendiente') continue;
     const filas = Math.max(1, Number(fila.filas) || 1);
-    const porZona = fila.zonas || {};
+    // [ZONA-NORM-1] 🔒 LOS BOLETOS SE AGRUPAN POR ZONA **NORMALIZADA**. La
+    // pestaña es la fuente del drift, así que una misma persona podía traer dos
+    // filas de la MISMA zona escritas distinto —«Retractil Oro» y «Retráctil
+    // Oro»— y el candado las contaba como DOS: el renglón se quedaba pendiente
+    // con «2 boletos en 2 zonas» sobre boletos que son de la misma.
+    // ⚠️ La zona que se le pasa al dueño sigue siendo `fila.zona`, la ESCRITA:
+    // él ya la normaliza para buscarla, y mandarle una llave en minúsculas sería
+    // decidir aquí algo que es suyo.
+    const porZona = {};
+    for (const [zc, n] of Object.entries(fila.zonas || {})) {
+      const k = normalizarZona(zc);
+      porZona[k] = (porZona[k] || 0) + (Number(n) || 0);
+    }
     const zonas = Object.keys(porZona);
     const zonaUnica = zonas.length === 1 ? zonas[0] : null;
     const enLaZona = zonaUnica ? Number(porZona[zonaUnica]) || 0 : 0;

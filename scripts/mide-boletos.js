@@ -148,10 +148,24 @@ const SOYLUNA = () => ({
   const st = disponiblesPorEvento({
     compras: base.compras, ajustes: base.stock_ajustes, viajeros: base.viajeros_evento, consumeBoleto,
   });
-  const vipPub = st.get('soyluna').get('VIP');
-  console.log(`    VIP según el publish: ${vipPub}`);
+  // ⏳ ACTUALIZADO EN ZONA-NORM-1 (25-sep-2026), con su razón: el Map de
+  // `disponiblesPorEvento` ya NO se llavea con la ortografía cruda de lo
+  // capturado, sino con la zona **NORMALIZADA** — porque «Retractil Oro» de una
+  // pestaña y «Retráctil Oro» de la ficha eran dos llaves y lo capturado restaba
+  // de una que el aviso nunca consultaba. Así que `.get('VIP')` ya no existe.
+  // 🔒 Y LA LLAVE SE LA PIDE AL DUEÑO en vez de teclear `'vip'`: si mañana la
+  // forma aprende a quitar puntos, este careo la sigue sin que nadie lo toque —
+  // teclear la llave a mano sería la copia que todavía no diverge.
+  const { normalizarZona } = require(path.join(RAIZ, 'netlify/functions/_lib/normalizar-zona'));
+  const vipPub = st.get('soyluna').get(normalizarZona('VIP'));
+  console.log(`    VIP según el publish: ${vipPub}   (llave «${normalizarZona('VIP')}»)`);
   af(vipPub === 1, 'el contador del publish dice ' + vipPub + ' y debe decir 1 (20 − 17 − 2)');
-  af(st.get('soyluna').get('Barrera') === 11, 'Barrera en el publish: ' + st.get('soyluna').get('Barrera') + ', se esperaban 11');
+  af(st.get('soyluna').get(normalizarZona('Barrera')) === 11,
+     'Barrera en el publish: ' + st.get('soyluna').get(normalizarZona('Barrera')) + ', se esperaban 11');
+  // Y el candado que la mudanza de llave hace posible: la MISMA zona escrita de
+  // otra forma cae en la MISMA cuenta, que es el punto de la tuerca.
+  af(st.get('soyluna').get(normalizarZona('  vip  ')) === vipPub,
+     'la zona escrita distinto NO cae en la misma llave: es justo el hoyo que ZONA-NORM-1 cierra');
 
   // ── [6] LO QUE VE EL CLIENTE: «¡Últimos 3!» ──────────────────────────────
   // El remate: el endpoint público tiene que sacar el 3 por su cuenta, que es

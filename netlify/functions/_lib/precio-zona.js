@@ -31,6 +31,9 @@ const STAY_DESCUENTO = 500;
 const SEPARO_CHEAP_DEFAULT = 1000;
 
 const { fetchEventosRaw, fetchHotelesGlobales } = require('./catalogo-index');
+// [ZONA-NORM-1] El dueño de «¿son la misma zona?»: una sola forma para todos
+// los puntos de casamiento.
+const { normalizarZona } = require('./normalizar-zona');
 
 const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
 
@@ -167,8 +170,14 @@ function _calcularPrecio(ev, opts) {
   // Zona (candado: el precio unitario sale de la zona del EV, nunca del input).
   let selZ = null;
   if (hasZona) {
+    // [ZONA-NORM-1] 🔒 SE CASA POR LA ZONA NORMALIZADA, no por cadena exacta.
+    // Mordió a Jane en un ALTA REAL: «Retractil Oro» tecleado en una pestaña
+    // contestaba «zona no encontrada en el catálogo» mientras la ficha decía
+    // «Retráctil Oro». El precio sigue saliendo de la zona del EV — lo que cambia
+    // es cómo se la ENCUENTRA, nunca de dónde sale el número.
     const zonaNombre = String((opts && opts.zona) || '');
-    selZ = _zonaLista(ev, paquete, fechaIdx).find(z => z && z.n === zonaNombre) || null;
+    const zonaK = normalizarZona(zonaNombre);
+    selZ = _zonaLista(ev, paquete, fechaIdx).find(z => z && normalizarZona(z.n) === zonaK) || null;
     if (!selZ) return { ok: false, motivo: 'zona no encontrada en el catálogo' };
     // 🔒 AUD-2: las banderas del catálogo mandan. `ag` = agotada, `prox` = aún no
     // sale a la venta. Antes solo se miraba el precio, así que una zona marcada

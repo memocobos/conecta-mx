@@ -112,7 +112,9 @@ function prepararArbol(dir) {
   const va = require.resolve(path.join(dir, 'netlify/functions/_lib/verify-admin.js'));
   require.cache[va] = { id: va, filename: va, loaded: true, exports: {
     corsCheck: () => 'https://conectareynosa.mx',
-    verifyAdminAuthLive: async (ev, roles) => ({ valid: true, roles, user: { id: 'u1', correo: 'bulma@x' } }),
+    // `rol` LEÍDO del handler (jwtRol = auth.user.rol), no recordado: sin él,
+    // viajero_migrar contesta 403 y el careo mediría el portero, no la puerta.
+    verifyAdminAuthLive: async (ev, roles) => ({ valid: true, roles, user: { id: 'u1', correo: 'bulma@x', rol: 'maestro_roshi' } }),
   } };
   // 🔒 catalogo-index CACHEA 10 min: sin el borrado, un escenario le regala el
   // catálogo al siguiente y el orden de las corridas decide el resultado.
@@ -185,7 +187,10 @@ const evPost = (accion, body) => ({
       }
     }
     console.log('    ' + (EV || []).length + ' fichas · ' + zonasTot + ' zonas en el universo de la puerta');
-    af(zonasTot > 1000, 'el barrido midió de verdad (cardinalidad): ' + zonasTot);
+    // ⚠️ El universo de la PUERTA es por ficha SIN repetir (875 el 28-sep);
+    // el 2 302 de ZONA-NORM-1 contaba por LISTA (una zona en 3 fechas = 3).
+    // Son dos preguntas distintas — la lección de los dos barridos de Jane.
+    af(zonasTot > 500, 'el barrido midió de verdad (cardinalidad): ' + zonasTot);
     af(choques.length === 0, 'CERO colisiones normalizadas dentro de una ficha: ' + choques.join(' · '));
     // 🔒 Control positivo del instrumento: se siembra el par y se exige cazarlo.
     const evTrampa = { id: 'trampa', zonas: [{ n: 'Vip', p: 1 }, { n: 'VIP', p: 1 }] };
@@ -268,7 +273,9 @@ const evPost = (accion, body) => ({
   console.log('[4] viajero_migrar · HEAD y BASE');
   {
     prepararArbol(h.dir);
-    const red = armarRed(h.dir, { viajeros_evento: [], stock_ajustes: [], usuarios: [], eventos_calendario: [] });
+    // `eventos_meta` LEÍDO del handler: el candado de «el evento existe» se
+    // pregunta ahí por slug, y sin la fila el careo mediría ese candado ajeno.
+    const red = armarRed(h.dir, { viajeros_evento: [], stock_ajustes: [], usuarios: [], eventos_meta: [{ slug: 'ultramexico' }] });
     global.fetch = red.fetchFalso;
     const mod = require(path.join(h.dir, 'netlify/functions/admin-coordi-asignaciones.js'));
     const cuerpo = { evento_id: 'ultramexico', nombre: 'Prueba Puerta', tipo_paquete: 'cheap', total_contrato: 1000 };
@@ -284,7 +291,7 @@ const evPost = (accion, body) => ({
     af(/GENERAL.*General/.test(JSON.parse(r2.body || '{}').zona_aviso || ''), 'y la respuesta lo dice');
     // BASE: aceptaba la inventada Y la mal escrita — el par de este candado
     prepararArbol(b.dir);
-    const redB = armarRed(b.dir, { viajeros_evento: [], stock_ajustes: [], usuarios: [], eventos_calendario: [] });
+    const redB = armarRed(b.dir, { viajeros_evento: [], stock_ajustes: [], usuarios: [], eventos_meta: [{ slug: 'ultramexico' }] });
     global.fetch = redB.fetchFalso;
     const modB = require(path.join(b.dir, 'netlify/functions/admin-coordi-asignaciones.js'));
     const rB = await modB.handler(evPost('viajero_migrar', { ...cuerpo, zona_boleto: 'GENERAL' }));

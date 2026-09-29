@@ -45,8 +45,9 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' kamehouse.js kamehouse-eventos.js kamehouse-resumen.js | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
+// 🔒 Re-anclado tras mergear (la ley del ancla).
 const BASE = process.env.BASE || 'e7a7494';        // el merge de ITIN-NOBUS-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || 'cd4fc96'; // el merge de esta tuerca
 
 // Corta una función por NOMBRE CON PARÉNTESIS y balance de llaves.
 function funcionDe(src, nombre) {

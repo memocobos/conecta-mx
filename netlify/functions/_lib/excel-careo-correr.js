@@ -25,6 +25,9 @@ const { esCDMX, resolverPrecioVenta } = require('./precio-zona');
 // [ZONA-NORM-1] El dueño de «¿son la misma zona?»: una sola forma para todos
 // los puntos de casamiento.
 const { normalizarZona } = require('./normalizar-zona');
+// [DISPO-NORM-1] La puerta de la chatarra: sus llaves se canonizan a la
+// ortografía de la ficha antes de que `planear` las compare con la base.
+const { zonasCanonicasDe, resolverZonaFicha } = require('./zona-ficha');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
@@ -194,14 +197,36 @@ async function correrCareo(eventoId) {
   // 🔒 FAIL-SOFT CONSERVADOR: si el catálogo no se puede leer, `cdmx` va en
   // `null` y `carear` asume CDMX, o sea que NO tapa ningún $0. Ante la duda, la
   // diferencia se sigue viendo.
-  let cdmx = null, catalogoError = null;
+  let cdmx = null, catalogoError = null, evCat = null;
   try {
     const crudos = await fetchEventosRaw();
     const slug = String(eventoId).split('#')[0];
     const e = Array.isArray(crudos) ? crudos.find((x) => x && x.id === slug) : null;
-    if (e) cdmx = esCDMX(e);
+    if (e) { cdmx = esCDMX(e); evCat = e; }
     else catalogoError = `"${slug}" no está en el catálogo`;
   } catch (err) { catalogoError = err.message; }
+
+  // ── [DISPO-NORM-1] LA CHATARRA ENTRA POR LA PUERTA ───────────────────────
+  // Las llaves de `chatarraPorZona` vienen de la PESTAÑA, que es la fuente del
+  // drift («GENERAL», «Seccion D»…). Sin esto, el montón `fuera` de `planear`
+  // comparaba la ortografía del Excel contra la de la base y PROPONÍA deshacer
+  // la alineación: crear la llave fantasma y poner en cero la canónica —
+  // ocurrió en producción el 28-sep, el mismo día de la alineación.
+  // 🔒 Solo se CANONIZA lo que normalizado ES una zona de la ficha; una llave
+  // que la ficha no tiene («-», la fila sin zona de la pestaña) viaja tal cual:
+  // la chatarra es un contador, no una venta, y borrarle el renglón raro sería
+  // esconder boletos. Si dos ortografías colapsan a la misma canónica, se SUMAN.
+  if (evCat) {
+    const canonicas = zonasCanonicasDe(evCat);
+    const canonizada = {};
+    for (const zc in chatarraPorZona) {
+      const v = resolverZonaFicha(canonicas, zc);
+      const llave = (v.estado === 'canonizada') ? v.zona : zc;
+      canonizada[llave] = (canonizada[llave] || 0) + chatarraPorZona[zc];
+    }
+    for (const k in chatarraPorZona) delete chatarraPorZona[k];
+    Object.assign(chatarraPorZona, canonizada);
+  }
 
   // 4. Los montones.
   const montones = carear(personasLado, base.viajeros, { cdmx });

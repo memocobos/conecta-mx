@@ -47,9 +47,12 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
-// BASE = el main de antes de esta tuerca. HEAD = el árbol de la tuerca.
+// BASE = el main de antes de esta tuerca. HEAD = el commit del MERGE.
+// 🔒 Re-anclado tras mergear (la ley del ancla: commitear exige RE-ANCLAR;
+// dejarlo en 'HEAD' habría hecho que la siguiente tuerca reviente aserciones
+// ajenas — o peor, que un rojo futuro se lea como suyo).
 const BASE = process.env.BASE || '5963e21';
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '6ca49aa';
 
 // ── LA RED FALSA · respeta filtros, guarda estado, CAPTURA CUERPOS ─────────
 // Los nombres de tabla y columna están LEÍDOS de los handlers, no recordados.

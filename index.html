@@ -6844,7 +6844,14 @@ function itinEsMty(ev){
 function itinClase(ev){
   if(!ev)return '';
   if(typeof ev.itinerario==='string'&&ev.itinerario.trim())return 'propio';
-  if(itinEsCdmx(ev))return 'cdmx';
+  // [ITIN-NOBUS-1] Un CDMX `noBus` NO recibe la plantilla: sus dos variantes
+  // describen la reunión en la Central de Autobuses y el regreso en bus/avión
+  // de un transporte que ese evento NO VENDE («NO incluye transporte a CDMX,
+  // llega por tu cuenta» — la nota de vaiven, contradicha por su propio card).
+  // Reporte de Memo, 28-sep. Es el tercer estado de CARD-ITIN-1: antes que un
+  // letrero que miente, ninguno — hasta que la ficha traiga itinerario propio,
+  // que gana arriba y reabre el card.
+  if(itinEsCdmx(ev))return ev.noBus?'':'cdmx';
   if(itinEsMty(ev))return 'mty';
   return '';
 }

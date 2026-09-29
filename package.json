@@ -46,6 +46,7 @@
     "mide:itin-arriba-1": "node scripts/mide-itin-arriba-1.js",
     "mide:cuadre-6": "node scripts/mide-cuadre-6.js",
     "mide:zona-norm-1": "node scripts/mide-zona-norm-1.js",
-    "mide:dispo-norm-1": "node scripts/mide-dispo-norm-1.js"
+    "mide:dispo-norm-1": "node scripts/mide-dispo-norm-1.js",
+    "mide:num-multifecha-1": "node scripts/mide-num-multifecha-1.js"
   }
 }

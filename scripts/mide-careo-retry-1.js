@@ -50,8 +50,12 @@ const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
 
 // Corta una función por NOMBRE CON PARÉNTESIS y balance de llaves.
 function funcionDe(src, nombre) {
-  const i = src.indexOf('function ' + nombre + '(');
+  let i = src.indexOf('function ' + nombre + '(');
   if (i < 0) return null;
+  // ⚠️ EL `async` VA ADELANTE del ancla y el indexOf se lo comía: la rebanada
+  // salía como función SIN async y el vm tronaba en el primer await. El
+  // prefijo se re-mira hacia atrás en vez de suponerse.
+  if (src.slice(Math.max(0, i - 6), i) === 'async ') i -= 6;
   let d = 0, j = src.indexOf('{', i);
   for (let k = j; k < src.length; k++) {
     if (src[k] === '{') d++;

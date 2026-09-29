@@ -264,6 +264,93 @@ async function khAdminFetch(url, options) {
   return resp;
 }
 
+// ═══ [CAREO-RETRY-1] EL RECORRIDO DEL CAREO GLOBAL, EN UN SOLO DUEÑO ═══════
+// Vivía DOS veces —_excelTodoRecorrer (Eventos) y _resumenActRecorrer
+// (Resumen)— y las dos eran «dos listas que todavía no divergen». Hoy las dos
+// DELEGAN aquí, porque el arreglo de esta tuerca (reintentos) escrito dos
+// veces habría divergido a la primera.
+//
+// Lo que pasó el 28-sep, medido en una corrida real de 71 eventos: el Apps
+// Script de Google se satura con las tandas de 10 en paralelo — 29 cosechas
+// contestaron «una PÁGINA» o «solo POST», y 7 tandas enteras dieron 504 (el
+// reloj de 10 s de Netlify; CUADRE-3 midió 4.7 s/evento un día bueno, ese día
+// hubo eventos arriba de 10). Reintentados EN SERIE, 29 de 29 se recuperaron.
+// El botón veía 29 rojos de nada.
+//
+// Dos remedios, los dos con nombre:
+//  · LA TANDA SE ENCOGE ante un 5xx (10 → 5 → 2) y se reintenta el MISMO
+//    `desde` tras una pausa — la continuación por índice ya lo permitía sin
+//    tocar el servidor. Si con tanda 2 sigue cayendo tres veces, se corta
+//    DICIENDO cuántos eventos quedaron sin recorrer.
+//  · Los eventos cuya COSECHA falló con un error TRANSITORIO (Google contestó
+//    página / no-JSON / sin respuesta) se reintentan UNO POR UNO al final, en
+//    serie y con pausa, por la puerta del careo de un evento
+//    (admin-excel-aplicar, con el MISMO `confirmar`). «No hay pestaña» y
+//    «sin encabezado» NO se reintentan: esos se arreglan sembrando, no
+//    insistiendo.
+// 🔒 El reintento de un `confirmar:true` es seguro POR DISEÑO —«la
+//    idempotencia la da el re-careo, no la base»: el careo fresco del
+//    reintento ya no ve lo aplicado— y el arnés lo AFIRMA en vez de darlo
+//    por sabido (mide-careo-retry-1, sección [I]).
+// 🔒 Sigue subiendo SOLO un índice. Jamás montos.
+const _KH_CAREO_TRANSITORIOS = ['NO_ES_JSON', 'SIN_RESPUESTA'];
+
+function _khEsperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function khExcelRecorrer(confirmar, alAvanzar) {
+  const eventos = []; let desde = 0, total = null, vueltas = 0, tanda = 10, fallosTanda = 0;
+  for (;;) {
+    vueltas++;
+    if (vueltas > 80) throw new Error('El recorrido no termina: se corta.');
+    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
+      method: 'POST', body: JSON.stringify({ desde, tanda, confirmar }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      // Un 5xx de la tanda casi siempre es el reloj o Google saturado: la
+      // tanda se encoge y se reintenta el MISMO desde. Un 4xx no: ese es real.
+      if (r.status >= 500) {
+        fallosTanda++;
+        if (tanda > 2) { tanda = Math.max(2, Math.floor(tanda / 2)); await _khEsperar(1200); continue; }
+        if (fallosTanda < 6) { await _khEsperar(1500); continue; }
+        throw new Error('El servidor siguió fallando con tanda de 2 (desde el evento ' + desde
+          + (total ? ' de ' + total : '') + '): se corta diciendo dónde quedó.');
+      }
+      throw new Error(d.error || ('Error ' + r.status));
+    }
+    fallosTanda = 0;
+    eventos.push(...(d.eventos || []));
+    total = d.total;
+    if (alAvanzar) alAvanzar(eventos.length, total);
+    if (d.hecho) break;
+    if (d.siguiente <= desde) throw new Error('La continuación no avanzó: se corta para no girar en vacío.');
+    desde = d.siguiente;
+  }
+  // ── Los transitorios, uno por uno y en serie ──────────────────────────────
+  for (let i = 0; i < eventos.length; i++) {
+    const e = eventos[i];
+    if (!e || !e.error || !_KH_CAREO_TRANSITORIOS.includes(e.error.codigo)) continue;
+    for (let intento = 0; intento < 2; intento++) {
+      await _khEsperar(900);
+      try {
+        const r2 = await khAdminFetch('/.netlify/functions/admin-excel-aplicar', {
+          method: 'POST', body: JSON.stringify(confirmar ? { evento_id: e.evento_id, confirmar: true } : { evento_id: e.evento_id }),
+        });
+        const d2 = await r2.json().catch(() => ({}));
+        if (r2.ok && d2.ok !== false && d2.plan) {
+          // La MISMA forma que arma el servidor en la tanda, para que quien
+          // pinta no distinga un reintentado de uno de primera.
+          eventos[i] = { evento_id: e.evento_id, nombre: e.nombre || null, plan: d2.plan,
+                         resultado: d2.resultado || undefined, reintentado: true };
+          break;
+        }
+      } catch (_) { /* el error original se conserva si no se pudo */ }
+    }
+    if (alAvanzar) alAvanzar(eventos.filter((x) => !x.error).length, total);
+  }
+  return { eventos, total, vueltas };
+}
+
 // [ses-1] El servidor NO es ambiguo, y hay que leerlo tal cual en vez de
 // adivinar (verificado ejecutando el guardia real con un token vencido, con un
 // rol sin permiso y sin header):

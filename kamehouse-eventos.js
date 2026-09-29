@@ -873,24 +873,12 @@ function _excelAplicarPreviaHtml(d, alcance) {
 // recalcula su careo y escribe sobre ESE resultado.
 let _excelTodoCorriendo = false;
 
+// [CAREO-RETRY-1] El bucle se MUDÓ a `khExcelRecorrer` (kamehouse.js): vivía
+// aquí Y en el Resumen, y el arreglo de los reintentos escrito dos veces
+// habría divergido a la primera. Esta función queda como el nombre que sus
+// llamadores conocen; la forma del acumulador no cambió.
 async function _excelTodoRecorrer(confirmar, alAvanzar) {
-  const acc = { eventos: [], total: null, vueltas: 0 };
-  let desde = 0;
-  for (;;) {
-    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
-      method: 'POST', body: JSON.stringify({ desde, tanda: 10, confirmar }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
-    acc.eventos.push(...(d.eventos || []));
-    acc.total = d.total; acc.vueltas++;
-    if (alAvanzar) alAvanzar(acc.eventos.length, d.total);
-    if (d.hecho) return acc;
-    // 🔒 Si la continuación no avanzara, esto sería un bucle infinito contra
-    // producción. Se corta con nombre en vez de girar para siempre.
-    if (d.siguiente <= desde) throw new Error('La continuación no avanzó (desde ' + desde + '): se corta para no girar en vacío.');
-    desde = d.siguiente;
-  }
+  return khExcelRecorrer(confirmar, alAvanzar);
 }
 
 function _excelTodoSumar(eventos) {

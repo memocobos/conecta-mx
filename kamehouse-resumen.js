@@ -1439,21 +1439,10 @@ function _resumenActualizarHtml(g, totalEventos, hecho) {
 
 let _resumenActCorriendo = false;
 
+// [CAREO-RETRY-1] El bucle se MUDÓ a `khExcelRecorrer` (kamehouse.js) — un
+// solo dueño para las dos pantallas; los reintentos viven allá.
 async function _resumenActRecorrer(confirmar, alAvanzar) {
-  const eventos = []; let desde = 0, total = null, vueltas = 0;
-  for (;;) {
-    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
-      method: 'POST', body: JSON.stringify({ desde, tanda: 10, confirmar }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
-    eventos.push(...(d.eventos || [])); total = d.total; vueltas++;
-    if (alAvanzar) alAvanzar(eventos.length, total);
-    if (d.hecho) return { eventos, total };
-    if (d.siguiente <= desde) throw new Error('La continuación no avanzó: se corta para no girar en vacío.');
-    desde = d.siguiente;
-    if (vueltas > 40) throw new Error('El recorrido no termina: se corta.');
-  }
+  return khExcelRecorrer(confirmar, alAvanzar);
 }
 
 async function resumenActualizar() {

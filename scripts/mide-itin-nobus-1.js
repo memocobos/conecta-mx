@@ -46,8 +46,17 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' index.html imgs.js mapas.js lineups.js | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
+// 🔒 Re-anclado tras mergear (la ley del ancla). ⚠️ PRIMERA CORRIDA PENDIENTE
+// EN LA MAC: el sandbox del 28-sep no tenía las libs de Chromium (libXdamage)
+// y no hay root. Lo que SÍ se midió ese día, y queda como acta interina:
+//   · BASE VIVO (producción, entrando por /vaiven): card visible, el modal
+//     dice «Central de Autobuses» y «Viaje en bus» — la mentira, confirmada;
+//   · HEAD a nivel función (las mismas itinClase/itinerarioDe del árbol,
+//     extraídas por balance de llaves): vaiven '', knotfest 'cdmx' con sus
+//     dos variantes, emmanuel 'mty', pulso/comuna 'propio' — y la cobertura
+//     derivada: vaiven y coronacapital, nadie más.
 const BASE = process.env.BASE || 'ee4c0ef';       // el merge de NUM-MULTIFECHA-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || 'e7a7494'; // el merge de esta tuerca
 
 // Sirve el árbol; una ruta que no es archivo cae al index — así el deep-link
 // `/vaiven` entra POR DONDE ENTRA EL CLIENTE.

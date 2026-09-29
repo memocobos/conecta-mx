@@ -51,6 +51,10 @@ const { duerme, motivoNoDuerme, consumeBoleto } = require('./_lib/paquete-viaje'
 // dinero y la usan la cuenta del evento y los saldos. Una cuarta copia sería la
 // que diverja el día que alguien "mejore" una sola.
 const { saldoMigrado } = require('./_lib/cuenta-evento');
+// [DISPO-NORM-1] La puerta de zonas: la zona del boleto nace con la ortografía
+// de la FICHA o no nace (firmado por Memo, 28-sep). Sin ella, un alta con
+// «GENERAL» descuenta stock de una llave que el aviso de agotado no consulta.
+const { puertaZona } = require('./_lib/zona-ficha');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
@@ -716,9 +720,28 @@ exports.handler = async (event) => {
       if (!PAQUETES_MIGRAR.includes(paquete)) {
         return bad(headers, `tipo_paquete inválido: se espera uno de ${PAQUETES_MIGRAR.join(', ')}`);
       }
-      const zona = String(body.zona_boleto || '').trim();
+      let zona = String(body.zona_boleto || '').trim();
       if (!zona) return bad(headers, 'la zona del boleto es obligatoria');
       if (zona.length > 120) return bad(headers, 'zona demasiado larga');
+      // [DISPO-NORM-1] La puerta: desconocida se RECHAZA (una zona que la ficha
+      // no tiene es hoyo de ficha y espera Esferas — el caso «Sección C» de
+      // hilary); canonizada se guarda con la ortografía de la ficha; catálogo
+      // ilegible o evento fuera de él pasa TAL CUAL con aviso en la respuesta
+      // (fail-soft dicho: la migración no se detiene porque el CDN tosió).
+      const vzMig = await puertaZona(eventoId, zona);
+      let zonaAvisoMig = null;
+      if (vzMig.estado === 'desconocida') {
+        const lista = (vzMig.canonicas || []).join(' · ');
+        return bad(headers, `La zona «${zona}» no existe en la ficha de ${eventoId}. `
+          + (lista ? `Las de la ficha: ${lista}. ` : '')
+          + 'Si es una zona nueva, primero se agrega en Esferas.');
+      }
+      if (vzMig.estado === 'canonizada') {
+        zonaAvisoMig = `Zona corregida a la ortografía de la ficha: «${vzMig.capturada}» → «${vzMig.zona}»`;
+        zona = vzMig.zona;
+      } else if (vzMig.estado === 'sin-catalogo' || vzMig.estado === 'sin-evento') {
+        zonaAvisoMig = 'La zona se guardó sin validar contra la ficha (catálogo ilegible o evento fuera de él).';
+      }
 
       // El dinero. `total_contrato` es obligatorio: una fila sin él NO SUMA en
       // ninguna cuenta (lo dice saldoMigrado en _lib/cuenta-evento), así que
@@ -830,7 +853,7 @@ exports.handler = async (event) => {
         }
       } catch (_) { /* el aviso es best-effort: jamás tumba una alta que YA se guardó */ }
 
-      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble });
+      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig });
     }
 
     // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────

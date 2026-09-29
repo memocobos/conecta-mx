@@ -31,6 +31,9 @@
 // =============================================================================
 
 const { normalizarNombre, TOLERANCIA_MXN } = require('./excel-careo');
+// [DISPO-NORM-1] El dueño de «¿son la misma zona?» — el montón `fuera` empareja
+// chatarra↔base por zona normalizada, jamás por cadena exacta.
+const { normalizarZona } = require('./normalizar-zona');
 
 // Los paquetes que `viajero_migrar` acepta. Se dicen aquí para poder SALTAR
 // con motivo en vez de mandar un alta a rebotar contra el otro handler.
@@ -228,18 +231,38 @@ function planear(careo, opciones) {
   // convertiría cada clic en boletos de más: es la mordida de CREA-1.
   const fuera = [];
   if (quiere('fuera')) {
-    const actualPorZona = new Map();
-    for (const a of (careo.ajustes || [])) actualPorZona.set(String(a.zona || '').trim(), a);
-    const zonasCh = new Set([...Object.keys(careo.chatarraPorZona || {}),
-                             ...[...actualPorZona.keys()].filter(Boolean)]);
-    for (const z of zonasCh) {
-      if (!z) continue;
-      const contado = Number((careo.chatarraPorZona || {})[z] || 0);
-      const fila = actualPorZona.get(z);
+    // [DISPO-NORM-1] 🔒 EL EMPAREJAMIENTO ES POR ZONA **NORMALIZADA**, no por
+    // cadena exacta. Con el emparejamiento exacto, una llave del Excel escrita
+    // distinto a la de la base («GENERAL» vs «General») salía como DOS
+    // renglones: crear la fantasma Y poner en cero la buena — el careo del
+    // 28-sep propuso exactamente eso, deshaciendo una alineación del mismo
+    // día. La ortografía que se ESCRIBE es la de la fila que ya existe en la
+    // base (que desde la puerta es la canónica), y solo si no hay fila, la de
+    // la chatarra (que `correrCareo` ya canonizó contra la ficha).
+    const actualPorNorm = new Map();   // norm → fila de stock_ajustes
+    for (const a of (careo.ajustes || [])) {
+      const zt = String(a.zona || '').trim();
+      if (zt) actualPorNorm.set(normalizarZona(zt), a);
+    }
+    const contadoPorNorm = new Map();  // norm → { zona: ortografía chatarra, n }
+    for (const zc in (careo.chatarraPorZona || {})) {
+      const zt = String(zc).trim();
+      if (!zt) continue;
+      const k = normalizarZona(zt);
+      const ya = contadoPorNorm.get(k);
+      if (ya) ya.n += Number(careo.chatarraPorZona[zc] || 0);
+      else contadoPorNorm.set(k, { zona: zt, n: Number(careo.chatarraPorZona[zc] || 0) });
+    }
+    for (const k of new Set([...actualPorNorm.keys(), ...contadoPorNorm.keys()])) {
+      const fila = actualPorNorm.get(k);
+      const ch = contadoPorNorm.get(k);
+      const contado = Number((ch && ch.n) || 0);
       const actual = Number((fila && fila.vendidos_fuera) || 0);
       if (contado === actual) continue;
-      if (claves && !claves.has(normalizarNombre(z))) continue;
-      fuera.push({ zona: z, de: actual, a: contado, ajuste_id: (fila && fila.id) || null });
+      const zEscribe = (fila && String(fila.zona).trim()) || (ch && ch.zona) || '';
+      if (!zEscribe) continue;
+      if (claves && !claves.has(normalizarNombre(zEscribe))) continue;
+      fuera.push({ zona: zEscribe, de: actual, a: contado, ajuste_id: (fila && fila.id) || null });
     }
   }
 

@@ -19,6 +19,35 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { cargarDisponibilidad, desgloseZona } = require('./_lib/disponibilidad');
+// [DISPO-NORM-1] La puerta: la zona capturada se valida contra la FICHA y se
+// guarda con SU ortografía. Firmado por Memo (28-sep): el dato nace bien.
+const { puertaZona } = require('./_lib/zona-ficha');
+
+// [DISPO-NORM-1] El veredicto de la puerta, aplicado con la política de los
+// escritores de VENTA: desconocida → se RECHAZA nombrando las de la ficha;
+// canonizada → se guarda la de la ficha y se DICE; catálogo ilegible o evento
+// fuera del catálogo → se acepta tal cual y se AVISA (fail-soft dicho, nunca
+// una puerta que deja a Ximena sin capturar porque el CDN tosió — pero tampoco
+// una que finge haber validado).
+// Devuelve { zona, aviso } o { error } para contestar 400.
+async function zonaPorLaPuerta(evento_id, zona) {
+  const v = await puertaZona(evento_id, zona);
+  if (v.estado === 'desconocida') {
+    const lista = (v.canonicas || []).join(' · ');
+    return { error: `La zona «${zona}» no existe en la ficha de ${evento_id}. `
+      + (lista ? `Las de la ficha: ${lista}. ` : '')
+      + 'Si es una zona nueva, primero se agrega en Esferas.' };
+  }
+  if (v.estado === 'canonizada') {
+    return { zona: v.zona, aviso: `Zona corregida a la ortografía de la ficha: «${v.capturada}» → «${v.zona}»` };
+  }
+  if (v.estado === 'sin-catalogo' || v.estado === 'sin-evento') {
+    return { zona: v.zona, aviso: v.estado === 'sin-catalogo'
+      ? 'No se pudo leer el catálogo: la zona se guardó SIN validar contra la ficha.'
+      : `El evento ${evento_id} no está en el catálogo: la zona se guardó sin validar.` };
+  }
+  return { zona: v.zona };
+}
 
 const ROLES_PALACIO = ['maestro_roshi'];            // compras (captura de inventario): solo roshi
 const ROLES_STOCK = ['maestro_roshi', 'bulma'];     // semáforo + offset "vendidos fuera": roshi/bulma
@@ -111,9 +140,13 @@ exports.handler = async (event) => {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || !EVENTO_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
 
-      const zona = String(body.zona || '').trim();
+      let zona = String(body.zona || '').trim();
       if (!zona) return bad(headers, 'La zona es obligatoria');
       if (zona.length > ZONA_MAX) return bad(headers, `La zona no puede pasar de ${ZONA_MAX} caracteres`);
+      // [DISPO-NORM-1] La puerta: contra la ficha, ANTES de tocar la base.
+      const vz = await zonaPorLaPuerta(evento_id, zona);
+      if (vz.error) return bad(headers, vz.error);
+      zona = vz.zona;
 
       const cantidad = Number(body.cantidad);
       if (!Number.isInteger(cantidad) || cantidad < 0) return bad(headers, 'La cantidad debe ser un entero >= 0');
@@ -143,7 +176,7 @@ exports.handler = async (event) => {
       });
       if (!r.ok) return upstream(headers, await r.text(), 'insert');
       const rows = await r.json();
-      return ok(headers, { compra: rows[0] || null });
+      return ok(headers, { compra: rows[0] || null, zona_aviso: vz.aviso || null });
     }
 
     // ── compras: eliminar ────────────────────────────────────────────────
@@ -198,9 +231,32 @@ exports.handler = async (event) => {
     if (accion === 'ajuste_guardar') {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || !EVENTO_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
-      const zona = String(body.zona || '').trim();
+      let zona = String(body.zona || '').trim();
       if (!zona) return bad(headers, 'La zona es obligatoria');
       if (zona.length > ZONA_MAX) return bad(headers, `La zona no puede pasar de ${ZONA_MAX} caracteres`);
+      // [DISPO-NORM-1] La puerta, con UNA holgura que la venta no tiene: si la
+      // zona desconocida YA TIENE fila en stock_ajustes (una llave vieja como
+      // «-» o «Seccion C», anteriores a la puerta), se deja EDITAR — cerrarle
+      // la edición a lo que ya existe dejaría números reales sin corregir. Lo
+      // que la puerta impide es que NAZCA otra llave fantasma.
+      const vzAj = await puertaZona(evento_id, zona);
+      let zonaAviso = null;
+      if (vzAj.estado === 'canonizada') {
+        zonaAviso = `Zona corregida a la ortografía de la ficha: «${vzAj.capturada}» → «${vzAj.zona}»`;
+        zona = vzAj.zona;
+      } else if (vzAj.estado === 'desconocida') {
+        const rl = await fetch(`${env.KH_SB_URL}/rest/v1/stock_ajustes?evento_id=eq.${encodeURIComponent(evento_id)}&zona=eq.${encodeURIComponent(zona)}&select=id&limit=1`, { headers: sbHeaders });
+        if (!rl.ok) return upstream(headers, await rl.text(), 'consulta');
+        const yaHay = await rl.json().catch(() => []);
+        if (!Array.isArray(yaHay) || !yaHay.length) {
+          const lista = (vzAj.canonicas || []).join(' · ');
+          return bad(headers, `La zona «${zona}» no existe en la ficha de ${evento_id}. `
+            + (lista ? `Las de la ficha: ${lista}. ` : '')
+            + 'Si es una zona nueva, primero se agrega en Esferas.');
+        }
+      } else if (vzAj.estado === 'sin-catalogo' || vzAj.estado === 'sin-evento') {
+        zonaAviso = 'La zona se guardó sin validar contra la ficha (catálogo ilegible o evento fuera de él).';
+      }
       const vendidos_fuera = Number(body.vendidos_fuera);
       if (!Number.isInteger(vendidos_fuera) || vendidos_fuera < 0) return bad(headers, 'Vendidos fuera debe ser un entero >= 0');
       const nota = cleanText(body.nota, NOTA_MAX);
@@ -230,7 +286,7 @@ exports.handler = async (event) => {
         });
         if (!pr.ok) return upstream(headers, await pr.text(), 'update');
         const prows = await pr.json();
-        return ok(headers, { ajuste: (Array.isArray(prows) ? prows[0] : prows) || null });
+        return ok(headers, { ajuste: (Array.isArray(prows) ? prows[0] : prows) || null, zona_aviso: zonaAviso });
       }
 
       // 2) no existe → INSERT; si 23505 (carrera) → PATCH
@@ -241,7 +297,7 @@ exports.handler = async (event) => {
       });
       if (ir.ok) {
         const irows = await ir.json();
-        return ok(headers, { ajuste: (Array.isArray(irows) ? irows[0] : irows) || null });
+        return ok(headers, { ajuste: (Array.isArray(irows) ? irows[0] : irows) || null, zona_aviso: zonaAviso });
       }
       const insErrTxt = await ir.text();
       if (ir.status === 409 || insErrTxt.includes('23505')) {
@@ -252,7 +308,7 @@ exports.handler = async (event) => {
         });
         if (!pr2.ok) return upstream(headers, await pr2.text(), 'update');
         const p2rows = await pr2.json();
-        return ok(headers, { ajuste: (Array.isArray(p2rows) ? p2rows[0] : p2rows) || null });
+        return ok(headers, { ajuste: (Array.isArray(p2rows) ? p2rows[0] : p2rows) || null, zona_aviso: zonaAviso });
       }
       return upstream(headers, insErrTxt, 'insert');
     }

@@ -167,6 +167,52 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **CUATRO TUERCAS DEL 28-SEP EN MAIN LOCAL — ⏳ PENDIENTE `git push` DE MEMO**
+  (el sandbox no tiene credenciales de GitHub; hasta el push, el sitio servido
+  NO las trae). Las siembras de base SÍ ya viven. Merges: 6ca49aa · ee4c0ef ·
+  e7a7494 · cd4fc96, cada careo re-anclado a su merge.
+  - **DISPO-NORM-1** (`mide:dispo-norm-1`, 35✅) — LA PUERTA de zonas, firmada
+    por Memo (opción A): compras, vendidos-fuera y altas de viajeros validan la
+    zona contra la FICHA — desconocida se RECHAZA nombrando las de la ficha,
+    mal escrita se guarda con la ortografía canónica y SE DICE, catálogo
+    ilegible pasa tal cual Y CONFIESA. `_lib/zona-ficha` es el dueño (universo
+    = zonas + cheapZonas + multifecha; 875 zonas, 0 colisiones, vigilante
+    vivo). El montón `fuera` de `planear` empareja NORMALIZADO y la chatarra se
+    canoniza en `correrCareo`: el mismo 28-sep el careo había propuesto
+    DESHACER la alineación de esa mañana (crear «GENERAL», matar «General»).
+    Holgura dicha: una llave vieja que YA existe en stock_ajustes («-»,
+    «Seccion C») se puede seguir EDITANDO; lo que no puede es NACER otra.
+  - **NUM-MULTIFECHA-1** (`mide:num-multifecha-1`, 13✅ + SQL con acta en
+    `migraciones/NUM-MULTIFECHA-1.sql`, corrido por Jane) — medido en el bloque
+    real de Corona: el libro pone el DÍA en la columna de ZONA con la fecha
+    vacía, y la llave (nombre,fecha) fugaba los $1,000 del Domingo al careo del
+    viernes. `mapearLibro` aprende el orden de herencia rotulada: fecha escrita
+    > zona sembrada > ∅ (primera función). 7 mapeos sembrados (Corona
+    Vie/Sab/Dom → #0/#1/#2 — inertes hasta el deploy—, alfredito, ironmaiden,
+    frontera#0, caifanes#1). Ya cayeron EN VIVO por los ∅: +$7,200 Lizbeth
+    (alfredito) y +$600 Itzamar (frontera#0), aplicados. ⏳ Palabra de Memo:
+    «EDC 2026» $12,800 (¿edc2026 pasado o ventas de edc27?), «Pablo» y «Toño»
+    de Iron Maiden (solo nombre de pila, no se dieron de alta), «Cristian
+    Nodal» $20,200 SIN ficha.
+  - **ITIN-NOBUS-1** (`mide:itin-nobus-1`, ⏳ primera corrida Playwright EN LA
+    MAC: al sandbox le faltan libs de Chromium y no hay root; el acta interina
+    vive en el propio script) — un CDMX `noBus` ya NO recibe la plantilla del
+    transporte que no vende: vaiven decía «Central de Autobuses» y «Viaje en
+    bus» contra su propia nota de «llega por tu cuenta». Tercer estado de
+    CARD-ITIN-1 hasta tener itinerario propio (que gana arriba y reabre el
+    card). ⚠️ Consecuencia medida y dicha: **coronacapital también** — su
+    plantilla mentía igual. Verificado: BASE vivo en producción (la mentira,
+    por la URL del cliente) + HEAD a nivel función; knotfest/emmanuel/propios
+    byte a byte intactos.
+  - **CAREO-RETRY-1** (`mide:careo-retry-1`, 20✅) — el bucle del careo global
+    vivía DOS veces (Eventos y Resumen); hoy delegan en `khExcelRecorrer`
+    (kamehouse.js), que ante un 5xx ENCOGE la tanda (10→5→2) reintentando el
+    MISMO desde, y al final reintenta EN SERIE los errores transitorios de
+    cosecha (NO_ES_JSON/SIN_RESPUESTA) por la puerta de un evento — SIN_MAPEO
+    no se reintenta. Medido el 28-sep: 29/71 cosechas rebotadas por Google, 7
+    tandas en 504, y las 29 recuperadas en serie. La idempotencia del
+    reintento con confirmar la AFIRMA el careo (diferencia 0 → cero abonos).
+
 - 🏆🔴 **ZONA-NORM-1 EN PROD (28-sep-2026, #775): el casamiento de zonas aprende
   acentos y mayúsculas.** Medido por Jane (25-sep): siete eventos tenían la
   misma zona escrita distinto. El stock casa por **cadena EXACTA**, así que esas

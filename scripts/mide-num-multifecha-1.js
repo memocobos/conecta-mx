@@ -44,8 +44,9 @@ function sacar(ref, etiqueta) {
   execSync('git archive ' + sha + ' netlify/functions | tar -x -C ' + dir, { cwd: RAIZ, shell: '/bin/bash' });
   return { sha, dir };
 }
+// 🔒 Re-anclado tras mergear (la ley del ancla: commitear exige RE-ANCLAR).
 const BASE = process.env.BASE || '6ca49aa';        // el merge de DISPO-NORM-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || 'ee4c0ef'; // el merge de esta tuerca
 
 // ── EL FIXTURE: LA FORMA DEL BLOQUE REAL ────────────────────────────────────
 // Leída de `numerologia.personas` del careo de coronacapital#0 en producción

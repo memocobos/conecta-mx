@@ -190,10 +190,18 @@ está caduco antes de escribirse.
     > zona sembrada > ∅ (primera función). 7 mapeos sembrados (Corona
     Vie/Sab/Dom → #0/#1/#2 — inertes hasta el deploy—, alfredito, ironmaiden,
     frontera#0, caifanes#1). Ya cayeron EN VIVO por los ∅: +$7,200 Lizbeth
-    (alfredito) y +$600 Itzamar (frontera#0), aplicados. ⏳ Palabra de Memo:
-    «EDC 2026» $12,800 (¿edc2026 pasado o ventas de edc27?), «Pablo» y «Toño»
-    de Iron Maiden (solo nombre de pila, no se dieron de alta), «Cristian
-    Nodal» $20,200 SIN ficha.
+    (alfredito) y +$600 Itzamar (frontera#0), aplicados.
+    ✅ **Las tres palabras de Memo llegaron (28-sep):**
+    · «**EDC 2026**» del libro ES el evento pasado (feb-2026, pre-corte) — se
+      queda SIN mapear; lo de edc27 vive bajo «EDC 2027 - 19,20,21 de febrero».
+    · «**Cristian Nodal**» fue venta suelta de boletos, NUNCA hubo tour — sin
+      ficha y sin mapeo A PROPÓSITO; sus $20,200 son del montón sin-mapeo que
+      se nombra y no se toca.
+    · «**Pablo**» y «**Toño**» de ironmaiden: boletos vendidos AL COSTO — ya
+      están de alta (General A, 1 boleto c/u) con nota de total pendiente.
+      ⏳ Falta el NÚMERO del costo para su `total_contrato` (ironmaiden no
+      tiene compras cargadas todavía, así que el costo no se puede leer de
+      ningún lado — lo dice Memo o entra al cargar el pedido en Kamisama).
   - **ITIN-NOBUS-1** (`mide:itin-nobus-1`, ⏳ primera corrida Playwright EN LA
     MAC: al sandbox le faltan libs de Chromium y no hay root; el acta interina
     vive en el propio script) — un CDMX `noBus` ya NO recibe la plantilla del

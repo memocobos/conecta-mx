@@ -242,6 +242,19 @@ function llave(nombre, fecha) {
 //   · `personas` — las del libro que mapean a ESTE evento.
 //   · `sinMapeo` — agrupadas por (evento_libro, fecha_libro), con su conteo y
 //     su dinero, para poder enseñarlas sin tocarlas.
+//
+// [NUM-MULTIFECHA-1] 🔒 CUANDO LA FECHA ESTÁ VACÍA, LA ZONA PUEDE DESAMBIGUAR.
+// Medido el 28-sep sobre el bloque real de Corona: sus tres filas traen la
+// fecha VACÍA y el DÍA en la columna de zona («Viernes», «Domingo»). Con la
+// llave (nombre, fecha) a secas, las tres caían en el mapeo «sin fecha» → #0,
+// y los $1,000 del Domingo se fugaban al viernes — el careo de #0 los veía de
+// más y el de #2 de menos, LOS DOS en silencio.
+// El orden es el de la herencia rotulada (NUBE-4): LO ESPECÍFICO GANA —
+//   1. (nombre, fecha) cuando la fila TRAE fecha;
+//   2. (nombre, zona) cuando la fecha está vacía Y existe esa siembra;
+//   3. (nombre, ∅) — el «sin fecha → primera función» del acta del 19-sep.
+// Un evento normal no cambia: su zona es una zona de verdad («General») y
+// nadie siembra «Junior H||General», así que el paso 2 nunca casa.
 function mapearLibro(personasLibro, mapeos, eventoId) {
   const porLlave = new Map();
   for (const m of (mapeos || [])) {
@@ -252,7 +265,10 @@ function mapearLibro(personasLibro, mapeos, eventoId) {
   }
   const personas = [], sinMapeoMap = new Map();
   for (const p of (personasLibro || [])) {
-    const destino = porLlave.get(llave(p.evento_libro, p.fecha_libro));
+    const sinFecha = !_txt(p.fecha_libro);
+    let destino = sinFecha ? null : porLlave.get(llave(p.evento_libro, p.fecha_libro));
+    if (!destino && sinFecha && _txt(p.zona)) destino = porLlave.get(llave(p.evento_libro, p.zona));
+    if (!destino && sinFecha) destino = porLlave.get(llave(p.evento_libro, ''));
     if (!destino) {
       const k = llave(p.evento_libro, p.fecha_libro);
       const ya = sinMapeoMap.get(k);

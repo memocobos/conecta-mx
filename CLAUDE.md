@@ -2041,6 +2041,25 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **«ROCK 9» ES UNA AGENCIA — es el NOMBRE del comprador, no un código ni un
+  error. NO SE VUELVE A PREGUNTAR (Memo ya lo explicó varias veces, 30-sep).**
+  Le separa boletos CHEAP del Corona y sus pagos viven en Numerología; sus
+  filas en viajeros_evento (coronacapital#0 y #2) están BIEN y su historial ya
+  se reparó. Si el careo la nombra en negativas o avisos de Corona, es el
+  estado esperado de una agencia con boletos repartidos entre el libro y la
+  pestaña: **se deja en paz.**
+- ⚠️ **El Excel de arjona escribe «Segundo Nivel»; la ficha dice «2do Nivel».**
+  Son LA MISMA (palabra de Memo, 30-sep) pero la puerta no adivina palabra↔
+  numeral, así que cada persona nueva de esa zona se atorará en el careo hasta
+  que las chicas escriban «2do Nivel» en la columna Boleto. Giovanna y
+  Samantha entraron a mano con la zona buena.
+- ⚠️ **Natanael Cano SE POSPUSO al 27-Nov-2026** (aviso de Memo, 29-sep). La
+  pestaña nueva es «Natanael Cano - 27 de Noviembre» y el mapeo de
+  excel_pestanas ya apunta ahí (acta 30-sep).
+- 🔒 **EL CAREO NO CAPTURA PEDIDOS/COMPRAS.** Escribe abonos, totales, boletos
+  por persona, chatarra→vendidos_fuera y altas — el inventario (compras con
+  costo) NUNCA: es el paso 6 del plan (stock real en Kamisama), tuerca propia
+  con proveedor obligatorio por DEFAULTS-1.
 - 🔒 **No cuelgues NADA de `.hs-media` (ni de la portada de una tarjeta).**
   `showInitials()` —el fallback de la foto del artista, **asíncrono**— hace
   `imgEl.parentElement.innerHTML = ...` y **reescribe la portada entera** cuando

@@ -357,42 +357,44 @@ function limpiar(dir) {
      '`portal-mi-plan-migrado` ya no busca el plan por `viajeros_evento?correo=eq.<minúsculas>`: la llave del '
      + 'cuarto paso cambió, y con ella la razón por la que la invitación manda el correo en minúsculas');
 
-  // ── 🔴 EL HOYO QUE SALIÓ DE LEERLO: el `eq` es SENSIBLE A MAYÚSCULAS ────
-  // Una fila guardada como «Laura@Correo.com» no la encuentra un JWT
-  // «laura@correo.com». La persona se registra, el Portal la enlaza y su plan sale
-  // VACÍO — con nuestro correo diciendo «ya puedes ver tu plan». Esta tuerca no lo
-  // arregla (es un UPDATE a datos de gente) pero NO PUEDE CALLARLO.
-  console.log('\n[¡] el ojo del plan vacío · el correo con mayúsculas en la fila');
-  const ojo = (vp.d.ojo_plan_vacio || []);
-  console.log('    marcados: ' + ver(() => ojo.map((x) => x.correo + ' — ' + (x.ojo_plan_vacio || '').slice(0, 50))));
-  af(ojo.length === 1 && /laura/.test(ojo[0].correo),
-     () => '🔴 Laura tiene UNA fila guardada como «Laura@Correo.com» y el reporte no la marca. '
-     + '`portal-mi-plan-migrado` busca con `eq` EXACTO en minúsculas: esa fila es invisible para ella, así que '
-     + 'vería su viaje incompleto — y el correo que le mandamos dice que ya puede verlo. Salió ' + ver(() => ojo));
-  af(ojo.length === 1 && Array.isArray(ojo[0].filas_invisibles) && ojo[0].filas_invisibles.includes('v1'),
-     () => 'no se NOMBRA la fila invisible: sin el id, el humano no sabe cuál arreglar. ' + ver(() => ojo[0]));
-  af(ojo.length === 1 && /incompleto/i.test(ojo[0].ojo_plan_vacio || ''),
-     () => 'Laura tiene UNA fila buena y UNA mala, así que su caso es «vería su viaje INCOMPLETO», no «plan '
-     + 'vacío»: los dos casos se arreglan igual pero NO se explican igual. ' + ver(() => ojo[0].ojo_plan_vacio));
-  af(vp.d.resumen && vp.d.resumen.ojo_plan_vacio === 1,
-     () => 'el resumen no cuenta el montón del ojo: es lo que Memo mira antes del primer envío. ' + ver(() => vp.d.resumen));
+  // ── ⚰️ EL OJO DEL PLAN VACÍO, RETIRADO POR PLAN-CASE-1 ────────────────
+  // ⚠️ ESTE BLOQUE EXIGÍA LO CONTRARIO y se actualiza a la verdad nueva CON SU
+  // RAZÓN, no se silencia. Cuando se escribió, `portal-mi-plan-migrado` casaba con
+  // `eq` sensible a mayúsculas y 285 filas (244 personas) eran invisibles para sus
+  // dueños: el montón `ojo_plan_vacio` era el FRENO del primer envío.
+  // PLAN-CASE-1 arregló el LECTOR el mismo día, así que esas filas ya se leen bien
+  // y seguir avisando sería un letrero que sobrevive a su causa — mandaría a
+  // arreglar a mano 244 filas sanas y frenaría el envío por nada.
+  // 🔒 Y NO SE BORRA EL BLOQUE: se convierte en TESTIGO. Lo que antes exigía que el
+  // aviso saliera, ahora exige que el aviso NO salga **y** que el casamiento
+  // insensible siga vivo en el Portal. El día que alguien revierta el lector, este
+  // testigo cae — que es exactamente lo que un vigía tiene que hacer.
+  console.log('\n[⚰️] el ojo del plan vacío · retirado por PLAN-CASE-1, con testigo');
+  console.log('    ojo_plan_vacio: ' + ver(() => (vp.d.ojo_plan_vacio || []).length)
+    + '   ·   filas con mayúsculas (dato, no aviso): '
+    + ver(() => (vp.d.invitar || []).reduce((a, x) => a + ((x.filas_con_mayusculas || []).length), 0)));
+  af((vp.d.ojo_plan_vacio || []).length === 0,
+     () => '⚰️ el aviso del plan vacío volvió a salir. Desde PLAN-CASE-1 el lector ya no es ciego a las '
+     + 'mayúsculas, así que este aviso MIENTE: mandaría a arreglar a mano filas que ya se leen bien. '
+     + 'Si de verdad hay algo que avisar, es que alguien revirtió el casamiento insensible. Salió '
+     + ver(() => vp.d.ojo_plan_vacio));
+  af(vp.d.resumen && vp.d.resumen.ojo_plan_vacio === 0,
+     () => 'el resumen no reporta el montón en cero: ' + ver(() => vp.d.resumen && vp.d.resumen.ojo_plan_vacio));
+  // 🔒 El conteo CRUDO se conserva (sigue siendo verdad y sirve para re-medir el
+  // padrón): Laura tiene UNA fila con mayúsculas, y eso no cambió.
+  af((vp.d.invitar || []).some((x) => (x.filas_con_mayusculas || []).includes('v1')),
+     () => 'el DATO de qué filas traen mayúsculas se perdió al retirar el aviso: el aviso sobraba, el dato no '
+     + '— es con lo que se re-mide el padrón. ' + ver(() => (vp.d.invitar || []).map((x) => x.filas_con_mayusculas)));
+  // 🔴 EL TESTIGO: el casamiento insensible SIGUE VIVO en el Portal. Si esto cae,
+  // el aviso de arriba tendría que volver — y el careo lo dice con esas palabras.
   {
-    // 🔒 CONTROL: si TODAS las filas de alguien están en mayúsculas, el aviso
-    // tiene que decir «VACÍO», no «incompleto». Dos casos, dos frases.
-    const guardado = VIAJEROS.slice();
-    VIAJEROS.push({ id: 'vM', nombre: 'Todo Mayus Perez', correo: 'TODO@Correo.com', portal_cliente_id: 'cM' });
-    const vpM = await pedir({ accion: 'vista_previa', evento_id: 'karolg#1' });
-    VIAJEROS.length = 0; guardado.forEach((v) => VIAJEROS.push(v));
-    const soloMayus = (vpM.d.ojo_plan_vacio || []).find((x) => /todo@correo/.test(x.correo));
-    console.log('    todo en mayúsculas → ' + ver(() => soloMayus && soloMayus.ojo_plan_vacio.slice(0, 60)));
-    af(soloMayus && /VACÍO/.test(soloMayus.ojo_plan_vacio),
-       () => 'con TODAS sus filas en mayúsculas el aviso tenía que decir que su plan saldría VACÍO: '
-       + ver(() => soloMayus && soloMayus.ojo_plan_vacio));
-  }
-  {
-    const { llaveCorreo } = require(path.join(h.dir, 'netlify/functions/_lib/correo-forma.js'));
-    af(llaveCorreo('Laura@Correo.com') === 'laura@correo.com',
-       () => 'la llave del correo no normaliza a minúsculas: ' + ver(() => llaveCorreo('Laura@Correo.com')));
+    const srcPlanHoy = fs.readFileSync(path.join(h.dir, 'netlify/functions/portal-mi-plan-migrado.js'), 'utf8');
+    const insensible = /correo=ilike\./.test(srcPlanHoy) && /toLowerCase\(\) === correo/.test(srcPlanHoy);
+    console.log('    testigo · el Portal casa insensible a mayúsculas: ' + insensible);
+    af(insensible,
+       '🔴 TESTIGO DE PLAN-CASE-1 CAÍDO: `portal-mi-plan-migrado` volvió a casar de forma sensible a '
+       + 'mayúsculas. Entonces 285 filas (244 personas) son otra vez invisibles para sus dueños, y el aviso '
+       + '`ojo_plan_vacio` que esta tuerca retiró tiene que VOLVER antes de invitar a nadie.');
   }
 
   // ── [C] CONTROL POSITIVO · en BASE esto NO EXISTÍA ────────────────────

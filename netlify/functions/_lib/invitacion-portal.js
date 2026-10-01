@@ -65,7 +65,19 @@ function aQuienInvitar(viajeros, yaInvitados) {
   const invitar = [], yaEstaban = [];
   for (const g of grupos.values()) {
     const fila = { correo: g.correo, nombre: g.nombre, filas: g.filas.length, portal_cliente_id: g.portal_cliente_id,
-                   // 🔴 OJO MEDIDO AL CONSTRUIR ESTA TUERCA: `portal-mi-plan-migrado`
+                   // ⚰️ [PLAN-CASE-1, 1-oct] **ESTE AVISO SE RETIRA, NO SE SILENCIA.**
+                   // Lo que seguía era cierto cuando se escribió y dejó de serlo el mismo
+                   // día: `portal-mi-plan-migrado` ya NO casa con `eq` sensible — estrecha
+                   // con `ilike` y la autoridad es su filtro `lower()` de los dos lados.
+                   // Esas 285 filas YA NO SON INVISIBLES, así que seguir avisando sería un
+                   // letrero que sobrevive a su causa: mandaría a arreglar a mano 244 filas
+                   // que ya se leen bien, y el «freno» frenaría el primer envío por nada.
+                   // 🔒 Queda `ojo_plan_vacio` SIEMPRE VACÍO y un TESTIGO en el arnés que
+                   // exige que el casamiento insensible siga vivo: el día que alguien
+                   // revierta el lector, ese testigo cae — y este montón volvería a tener
+                   // sentido. Borrarlo entero habría dejado el hoyo sin vigilancia.
+                   // El texto original, para que la historia se pueda leer:
+                   // «`portal-mi-plan-migrado`
                    // busca el plan con `viajeros_evento?correo=eq.<correo del JWT en
                    // minúsculas>`, y el `eq` de PostgREST es SENSIBLE A MAYÚSCULAS. Una
                    // fila guardada como «Laura@Correo.com» NO se encuentra: la persona se
@@ -76,19 +88,23 @@ function aQuienInvitar(viajeros, yaInvitados) {
                    // ⚠️ NO SE SALTA SOLA: se REPORTA, y la decisión es de un humano —
                    // arreglar la fila es un UPDATE a datos de gente y eso no lo hace un
                    // botón de invitar. Lo que esta pieza no puede hacer es callarlo.
-                   filas_invisibles: g.filas.filter((f) => f.correoCrudo != null
+                   // ⚰️ Se conserva el CONTEO como dato (cuántas filas traen mayúsculas)
+                   // porque sigue siendo verdad y es útil para re-medir el padrón; lo que
+                   // se retira es el AVISO, que ya no describe ningún problema.
+                   filas_con_mayusculas: g.filas.filter((f) => f.correoCrudo != null
                       && String(f.correoCrudo) !== String(f.correoCrudo).toLowerCase()).map((f) => f.id) };
-    fila.ojo_plan_vacio = fila.filas_invisibles.length > 0 ? (fila.filas_invisibles.length === fila.filas
-        ? 'TODAS sus filas tienen el correo con mayúsculas: `portal-mi-plan-migrado` las busca con un `eq` '
-          + 'exacto en minúsculas, así que su plan saldría VACÍO. Arreglar la fila primero.'
-        : 'alguna de sus filas tiene el correo con mayúsculas: esa NO aparecerá en su plan (el `eq` es '
-          + 'sensible a mayúsculas). Vería su viaje incompleto.')
-      : null;
+    // 🔒 SIEMPRE null DESDE PLAN-CASE-1. No se borró el campo para no romper a quien
+    // lo lea, y porque un `null` constante con su razón escrita cuenta la historia
+    // mejor que un campo desaparecido.
+    fila.ojo_plan_vacio = null;
     if (yaInvitados.has(g.correo)) yaEstaban.push({ ...fila, motivo: 'ya se le invitó (está en la bitácora)' });
     else invitar.push(fila);
   }
   return { invitar, ya_invitados: yaEstaban, saltados, personas: grupos.size,
-           // El montón que Memo tiene que mirar ANTES del primer envío real.
+           // ⚰️ VACÍO DESDE PLAN-CASE-1 (1-oct): el lector dejó de ser ciego a las
+           // mayúsculas, así que ya no hay nadie a quien la invitación mande a una
+           // pantalla en blanco por esta causa. Si este montón vuelve a llenarse, es
+           // que alguien revirtió el casamiento insensible del Portal.
            ojo_plan_vacio: invitar.filter((x) => x.ojo_plan_vacio) };
 }
 

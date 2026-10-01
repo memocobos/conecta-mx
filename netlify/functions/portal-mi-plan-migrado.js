@@ -68,11 +68,57 @@ exports.handler = async (event) => {
 
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   try {
-    const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=eq.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,tipo_paquete,zona_boleto,total_contrato,abonado_previo&limit=200', { headers: hKH });
+    // ═══ [PLAN-CASE-1] EL LECTOR DESAMBIGUA, NO LOS DATOS ═══════════════════
+    // 🔴 EL HOYO QUE ESTO CIERRA: `correo=eq.X` es SENSIBLE A MAYÚSCULAS, y el
+    // correo del JWT viene en minúsculas. Una fila guardada como
+    // «Victorgael2929@gmail.com» era INVISIBLE para su propio dueño: el Portal le
+    // enseñaba un plan VACÍO o INCOMPLETO. Medido contra la base viva el 1-oct:
+    // **285 filas · 244 personas** con el correo que no es su propia minúscula —
+    // ~1 de cada 5 de las que tienen correo. No era un caso raro.
+    //
+    // 🔒 CERO UPDATEs A `viajeros_evento`. 285 filas de datos de gente no se tocan
+    // para arreglar un LECTOR, y además el crudo del correo es justo el dato que
+    // delata el problema (la ley de `boletos_crudo`: una normalización que borra el
+    // crudo deja ciego al siguiente lector). Quien desambigua es quien lee — la
+    // forma de ROL-HIST-PADRE.
+    //
+    // ── POR QUÉ `ilike` Y NO «traer y comparar en el handler» ────────────────
+    // Medido contra la base viva, no supuesto:
+    //   · `correo` NO TIENE ÍNDICE (los únicos son `evento_id` y la pk), así que el
+    //     `eq` de hoy YA es un Seq Scan. El plan de los dos es IDÉNTICO:
+    //     cost 0.00..187.85, buffers hit=156 en los dos casos. No se pierde ningún
+    //     índice porque no había ninguno que perder.
+    //   · 2,550 filas / 1,512 kB. El `~~*` cuesta ~1.4 ms más en total.
+    //   · La alternativa —traer por otro filtro y comparar aquí— no tiene otro
+    //     filtro que usar: el cliente solo sabe su correo. Sería traerse las 2,550
+    //     filas a la función en cada visita: el MISMO barrido en la base, más
+    //     cientos de KB por la red. Estrictamente peor.
+    //
+    // ⚠️⚠️ Y AQUÍ EL CANDADO QUE NO SE NEGOCIA: en ILIKE, `_` casa CUALQUIER
+    // carácter y `%` cualquier cadena. **94 filas / 73 personas tienen `_` en su
+    // correo** (medido), así que esto NO es teórico: `maria_lopez@gmail.com` como
+    // patrón casaría `mariaXlopez@gmail.com`. Hoy, por suerte, ninguno de los 73
+    // pesca filas ajenas — pero la corrección no puede depender de que los datos
+    // sigan con suerte.
+    //
+    // 🔒 ASÍ QUE EL `ilike` SOLO ESTRECHA, Y LA AUTORIDAD ES ESTE HANDLER. El
+    // patrón solo puede SOBRE-pescar (un comodín casa más, nunca menos), así que
+    // el filtro de abajo es completo: lo que sobra se tira y nada que debía estar
+    // se pierde. Esa asimetría es la razón de que este diseño sea seguro — si el
+    // `ilike` pudiera sub-pescar, filtrar después NO bastaría.
+    //
+    // Y no se escapan los comodines a propósito: un escape mal interpretado por
+    // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
+    // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
+    const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
+      + '&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,total_contrato,abonado_previo&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
-    const viajeros = await vR.json();
-    if (!Array.isArray(viajeros) || !viajeros.length) {
+    const crudos = await vR.json();
+    // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
+    // vuelve inofensivo cualquier comodín del patrón.
+    const viajeros = (Array.isArray(crudos) ? crudos : [])
+      .filter((v) => String(v && v.correo != null ? v.correo : '').trim().toLowerCase() === correo);
+    if (!viajeros.length) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours: [] }) };
     }
 

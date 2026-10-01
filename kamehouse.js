@@ -302,19 +302,40 @@ async function khExcelRecorrer(confirmar, alAvanzar) {
   for (;;) {
     vueltas++;
     if (vueltas > 80) throw new Error('El recorrido no termina: se corta.');
-    const r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
-      method: 'POST', body: JSON.stringify({ desde, tanda, confirmar }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) {
+    // ══ [CAREO-RED-1] UN FETCH QUE REVIENTA **ES** UN 5xx ══════════════════
+    // Deuda anotada de CAREO-RETRY-1 y pagada aquí: la red caída, un «Failed to
+    // fetch», el DNS o un CORS raro NO son un `status` — son una EXCEPCIÓN, y se
+    // escapaban del bucle tirando el recorrido ENTERO, justo lo que esta
+    // escalera existe para evitar. El 30-sep se le puso un envoltorio por fuera
+    // a mano; eso no es arreglo, porque deja al dueño sin la escalera.
+    // 🔒 NO HAY SEGUNDA ESCALERA: la excepción entra por la MISMA (encoger
+    // tanda → pausa → reintentar el MISMO `desde` → cortar diciendo dónde
+    // quedó). Dos escaleras serían dos listas que todavía no divergen, y la de
+    // la red decidiría cuándo se abandona un recorrido de 100+ eventos.
+    let r = null, d = null, revento = null;
+    try {
+      r = await khAdminFetch('/.netlify/functions/admin-excel-actualizar-todo', {
+        method: 'POST', body: JSON.stringify({ desde, tanda, confirmar }),
+      });
+      d = await r.json().catch(() => ({}));
+    } catch (e) { revento = e; }
+    // ⚠️ EL ORDEN IMPORTA: `revento` se pregunta PRIMERO y corta el `||`, porque
+    // con el fetch reventado `r` es null y un `!r.ok` sería un TypeError — el
+    // recorrido moriría por el arreglo en vez de por la red.
+    if (revento != null || !r.ok || !d.ok) {
       // Un 5xx de la tanda casi siempre es el reloj o Google saturado: la
       // tanda se encoge y se reintenta el MISMO desde. Un 4xx no: ese es real.
-      if (r.status >= 500) {
+      if (revento != null || r.status >= 500) {
         fallosTanda++;
         if (tanda > 2) { tanda = Math.max(2, Math.floor(tanda / 2)); await _khEsperar(1200); continue; }
         if (fallosTanda < 6) { await _khEsperar(1500); continue; }
-        throw new Error('El servidor siguió fallando con tanda de 2 (desde el evento ' + desde
-          + (total ? ' de ' + total : '') + '): se corta diciendo dónde quedó.');
+        // 🔒 Y AL CORTAR SE DICE DE QUÉ MURIÓ. «El servidor siguió fallando» con
+        // la red caída manda a revisar Google cuando el problema es el wifi: dos
+        // causas que se ven igual son una causa que nadie arregla.
+        throw new Error((revento != null
+            ? 'La red siguió fallando con tanda de 2 (' + (revento.message || revento) + ')'
+            : 'El servidor siguió fallando con tanda de 2')
+          + ' (desde el evento ' + desde + (total ? ' de ' + total : '') + '): se corta diciendo dónde quedó.');
       }
       throw new Error(d.error || ('Error ' + r.status));
     }

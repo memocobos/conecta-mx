@@ -40,12 +40,19 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '09ac540';       // el merge de CONCILIA-1
-const HEAD_SHA = process.env.HEAD_SHA || '557e14c';   // el commit del MERGE de MIG-1d-ii
+// ⚠️ RE-ANCLADO POR **PLAN-CASE-1**, no por MIG-1d-ii: esa tuerca cambió el SUJETO
+// de este arnés (retiró el aviso del plan vacío y arregló el lector del Portal).
+// 🔒 EL ANCLA NO ES SOLO ASUNTO DE SU PROPIA TUERCA: cuando una tuerca toca lo
+// que OTRO arnés mide, hay que mover el ancla de ese otro — si no, sigue midiendo
+// un árbol que ya nadie corre, y su verde (o su rojo) habla del pasado.
+const HEAD_SHA = process.env.HEAD_SHA || '6508d2b';   // PLAN-CASE-1
+// Y el MEDIDOS de abajo gana un archivo por lo mismo: el lector del Portal es
+// ahora parte de lo que este arnés afirma (el testigo de PLAN-CASE-1).
 
 // El guardián de la trampa que esta casa paga una y otra vez: el arnés mide el
 // COMMIT, no el árbol. Copiado de mide:concilia-1 (ahí se explica entero).
 const MEDIDOS = ['netlify/functions/admin-portal-invitar.js', 'netlify/functions/_lib/invitacion-portal.js',
-                 'ACTA-MIG-1D-II.sql'];
+                 'netlify/functions/portal-mi-plan-migrado.js', 'ACTA-MIG-1D-II.sql'];
 function avisarSiSucio() {
   let sucio = '';
   try { sucio = execSync('git status --porcelain -- ' + MEDIDOS.join(' '), { cwd: RAIZ, encoding: 'utf8' }).trim(); } catch (_) { return; }
@@ -353,9 +360,15 @@ function limpiar(dir) {
   // CORREO VERIFICADO del JWT, en minúsculas, contra `viajeros_evento.correo`.
   // Corregida a la verdad — y la verdad es más estricta, porque hace que la
   // minúscula sea la llave de los CUATRO pasos, no de tres.
-  af(/viajeros_evento\?correo=eq\./.test(srcPlan) && /toLowerCase\(\)/.test(srcPlan),
-     '`portal-mi-plan-migrado` ya no busca el plan por `viajeros_evento?correo=eq.<minúsculas>`: la llave del '
-     + 'cuarto paso cambió, y con ella la razón por la que la invitación manda el correo en minúsculas');
+  // ⚠️ ACTUALIZADA POR PLAN-CASE-1: esta aserción exigía `correo=eq.` y ese `eq`
+  // era EL DEFECTO — sensible a mayúsculas, 285 filas invisibles. Lo que importa no
+  // era el operador: era que el cuarto paso case por el CORREO EN MINÚSCULAS, y eso
+  // sigue siendo cierto (ahora el `ilike` estrecha y el filtro `lower()` manda).
+  // Se actualiza a la verdad nueva, que es más estricta: se exige la pareja
+  // completa — estrechar por correo **y** comparar en minúsculas de los dos lados.
+  af(/correo=ilike\./.test(srcPlan) && /toLowerCase\(\) === correo/.test(srcPlan),
+     '`portal-mi-plan-migrado` ya no casa por el correo en MINÚSCULAS de los dos lados: la llave del cuarto '
+     + 'paso cambió, y con ella la razón por la que la invitación manda el correo en minúsculas');
 
   // ── ⚰️ EL OJO DEL PLAN VACÍO, RETIRADO POR PLAN-CASE-1 ────────────────
   // ⚠️ ESTE BLOQUE EXIGÍA LO CONTRARIO y se actualiza a la verdad nueva CON SU

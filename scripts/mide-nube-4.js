@@ -27,12 +27,30 @@ const RAIZ = path.join(__dirname, '..');
 
 let verde = 0, rojo = 0, completo = false;
 const fallos = [];
+// 🔒 [NUBE4-ARNES-1] EL MENSAJE TAMBIÉN PUEDE SER UNA FUNCIÓN, y por una razón
+// medida: `af` ya atrapaba la excepción de la CONDICIÓN, pero el `msg` se armaba
+// ANTES de llamarla — un `JSON.stringify(d.resuelto.bus)` dentro del texto
+// reventaba fuera del try y tiraba el arnés entero. Con el reloj corrido eso es
+// justo lo que pasó: `TypeError: Cannot read properties of null (reading
+// 'precio')` en la línea 213, y las secciones de abajo NO se midieron. Un arnés
+// que se cae no reporta: esconde cuál candado habría cazado el fallo.
 function af(cond, msg) {
-  let ok = false;
+  let ok = false, extra = '';
   try { ok = (typeof cond === 'function') ? !!cond() : !!cond; }
-  catch (e) { ok = false; msg = msg + '  [EXCEPCIÓN: ' + e.message + ']'; }
-  if (ok) verde++; else { rojo++; fallos.push(msg); console.log('   ✗ ' + msg); }
+  catch (e) { ok = false; extra = '  [EXCEPCIÓN: ' + e.message + ']'; }
+  if (ok) { verde++; return; }
+  let texto;
+  try { texto = (typeof msg === 'function') ? msg() : msg; }
+  catch (e) { texto = '(el mensaje de este fallo también reventó: ' + e.message + ')'; }
+  rojo++; fallos.push(texto + extra); console.log('   ✗ ' + texto + extra);
 }
+// Lectura que NUNCA lanza: para los `console.log` del recorrido, que no son
+// aserciones y por eso tirarían la corrida sin dejar ni un renglón de rojo.
+function ver(fn) {
+  try { const v = fn(); return v === undefined ? 'undefined' : JSON.stringify(v); }
+  catch (e) { return '«no se pudo leer: ' + e.message + '»'; }
+}
+const seg = (fn, pordefecto) => { try { const v = fn(); return v == null ? pordefecto : v; } catch (_) { return pordefecto; } };
 function marcador() {
   console.log('\n' + '─'.repeat(46));
   if (!completo) console.log('❌ ARNÉS CAÍDO · la corrida NO llegó al final: lo de abajo NO se midió');
@@ -48,28 +66,61 @@ function sacar(ref, etiqueta) {
 const BASE = process.env.BASE || '5b2c107';
 const HEAD_SHA = process.env.HEAD_SHA || '427c0dc';   // el commit del MERGE (#770)
 const iso = (s) => new Date(s).toISOString();
-const AHORA = Date.parse('2026-09-24T10:00:00-05:00');
+// ══ [NUBE4-ARNES-1] EL RELOJ ════════════════════════════════════
+// 🔴 `AHORA` existía —y NO SE USABA EN NINGUNA PARTE: la intención de fijar el
+// reloj se escribió y nunca se cableó, y por eso el padrón se podrió. Las fechas
+// iban TECLEADAS (22/23/24/28/30-sep) y el 1-oct la lib contestó, con toda la
+// razón, que no había nada vigente: siete rojos y una caída sobre código sano.
+// Hermana de las fechas vencidas de `flashPromo`.
+//
+// 🔒 LA RECETA: las fechas del fixture van RELATIVAS a hoy. Un fixture con
+// fechas tecleadas es una FOTO, y una foto caduca sin avisar — el día que caduca
+// no se entera nadie, porque se lee igual que un defecto del código.
+//
+// ⚠️ La lib SÍ acepta el reloj inyectado (`ahoraMs` con respaldo a `Date.now()`,
+// y su comentario dice por qué), pero aquí se entra por el HANDLER y el handler
+// no lo pasa — entrar por donde entra el cliente es la ley, así que el reloj se
+// mueve del lado del DATO, no del lado del lector.
+const AHORA = Date.now();
+const dias = (n) => new Date(AHORA + n * 86400000).toISOString();
+// El día que se le pide al historial, en el formato que usa la pantalla.
+const diaDe = (n) => new Date(AHORA + n * 86400000).toISOString().slice(0, 10);
 
 // ── EL PADRÓN FALSO · el caso que decide la tuerca ──────────────────────
 // `edc27` tiene bus propio MÁS BARATO y la general del bus es MÁS NUEVA: si la
 // herencia se resolviera por «la última capturada» en vez de por especificidad,
 // edc27 vendería el precio general. Ése es el caso que hay que ver llegar.
-const FILAS = [
-  // GENERAL (evento_id null)
-  { id: 'g1', modo: 'bus', evento_id: null, precio_pp: 2500,
-    vigente_desde: iso('2026-09-22T00:00:00-05:00'), vigente_hasta: iso('2026-09-28T23:59:00-05:00'),
-    horarios: 'Turistar · sale 9 pm, regresa 11 pm', nota: 'general', capturado_por: 'bulma@conectareynosa.mx',
-    creado_en: iso('2026-09-22T09:00:00-05:00') },
-  { id: 'g2', modo: 'avion', evento_id: null, precio_pp: 4800,
-    vigente_desde: iso('2026-09-22T00:00:00-05:00'), vigente_hasta: iso('2026-09-23T23:59:00-05:00'),
-    horarios: null, nota: 'general vencida', capturado_por: 'milk@conectareynosa.mx',
-    creado_en: iso('2026-09-22T09:05:00-05:00') },
-  // PROPIA de edc27: el bus, MÁS VIEJA que la general y más barata.
-  { id: 'e1', modo: 'bus', evento_id: 'edc27', precio_pp: 2100,
-    vigente_desde: iso('2026-09-20T00:00:00-05:00'), vigente_hasta: iso('2026-09-30T23:59:00-05:00'),
-    horarios: 'Turistar directo · sale 6 am', nota: 'directo al Autódromo', capturado_por: 'milk@conectareynosa.mx',
-    creado_en: iso('2026-09-20T08:00:00-05:00') },
-];
+// 🔒 SE ARMA CON UNA FUNCIÓN, no como literal, y por dos razones: las fechas se
+// calculan desde hoy, y el padrón se puede RE-ARMAR con un desfase para el
+// control del instrumento del bloque [V] (correr el reloj y exigir que el arnés
+// SÍ note la diferencia). Un fixture que no se puede mover no se puede controlar.
+//
+// ⚠️ LOS TRES ESTADOS DE `regiaEl` NECESITAN SU FILA. Ahora que las fechas se
+// mueven solas, la rama de «vencida» se quedaría sin medir si todo el padrón
+// fuera vigente: `g2` está vencida A PROPÓSITO, y también relativa.
+function armarFilas(desfase) {
+  const f = (n) => dias(n + (desfase || 0));
+  return [
+    // GENERAL (evento_id null) · VIGENTE hoy.
+    { id: 'g1', modo: 'bus', evento_id: null, precio_pp: 2500,
+      vigente_desde: f(-2), vigente_hasta: f(5),
+      horarios: 'Turistar · sale 9 pm, regresa 11 pm', nota: 'general', capturado_por: 'bulma@conectareynosa.mx',
+      creado_en: f(-2) },
+    // GENERAL del avión · **VENCIDA A PROPÓSITO** (murió ayer): es la fila con la
+    // que se mide el estado `vencida` y el «no hay precio de avión» de la pantalla.
+    { id: 'g2', modo: 'avion', evento_id: null, precio_pp: 4800,
+      vigente_desde: f(-9), vigente_hasta: f(-1),
+      horarios: null, nota: 'general vencida', capturado_por: 'milk@conectareynosa.mx',
+      creado_en: f(-9) },
+    // PROPIA de edc27: el bus, MÁS BARATO y capturado ANTES que la general — el
+    // caso que decide la tuerca (lo específico le gana a lo nuevo).
+    { id: 'e1', modo: 'bus', evento_id: 'edc27', precio_pp: 2100,
+      vigente_desde: f(-4), vigente_hasta: f(3),
+      horarios: 'Turistar directo · sale 6 am', nota: 'directo al Autódromo', capturado_por: 'milk@conectareynosa.mx',
+      creado_en: f(-4) },
+  ];
+}
+let FILAS = armarFilas(0);
 // Lo que el catálogo REAL contesta (se pide al árbol servido, no se teclea).
 let EVENTOS_REALES = [];
 
@@ -99,7 +150,7 @@ let EVENTOS_REALES = [];
       if (SIN_TABLA) return { ok: false, status: 404, text: async () => 'relation does not exist', json: async () => ({}) };
       if (met === 'POST') {
         const cuerpo = JSON.parse((opts && opts.body) || '{}');
-        return { ok: true, status: 201, json: async () => [Object.assign({ id: 'nueva', creado_en: iso('2026-09-24T10:00:00-05:00') }, cuerpo)], text: async () => '' };
+        return { ok: true, status: 201, json: async () => [Object.assign({ id: 'nueva', creado_en: dias(0) }, cuerpo)], text: async () => '' };
       }
       const mm = /modo=eq\.([a-z]+)/.exec(u);
       if (!mm) throw new Error('la red falsa EXIGE el filtro por modo: ' + u);
@@ -178,7 +229,7 @@ let EVENTOS_REALES = [];
   console.log('\n[H] la herencia rotulada');
   const rProp = await admin({ accion: 'listar', evento_id: 'edc27' });
   const resProp = rProp.d.resuelto || {};
-  console.log('    edc27  bus → ' + JSON.stringify(resProp.bus) + '\n           avion → ' + JSON.stringify(resProp.avion));
+  console.log('    edc27  bus → ' + ver(() => resProp.bus) + '\n           avion → ' + ver(() => resProp.avion));
   // 🔴 LO ESPECÍFICO LE GANA A LO GENERAL **AUNQUE LA GENERAL SEA MÁS NUEVA**.
   // La propia del bus de edc27 se capturó el 20 y la general el 22: si la
   // resolución fuera por «la última», edc27 vendería $2,500 en vez de $2,100.
@@ -206,28 +257,32 @@ let EVENTOS_REALES = [];
      'los horarios de la general no viajan con la herencia: ' + JSON.stringify(resHer.bus && resHer.bus.horarios));
   // 🔒 LA CONSULTA GENERAL NO PUEDE DECIR «heredado». No hay de quién heredar.
   const rGen = await admin({ accion: 'listar' });
-  console.log('    general bus → ' + JSON.stringify((rGen.d.resuelto || {}).bus));
-  af(rGen.d.resuelto && rGen.d.resuelto.bus && rGen.d.resuelto.bus.heredado === false,
+  console.log('    general bus → ' + ver(() => rGen.d.resuelto.bus));
+  af(() => rGen.d.resuelto && rGen.d.resuelto.bus && rGen.d.resuelto.bus.heredado === false,
      'la consulta GENERAL salió rotulada como heredada: la pantalla diría «hereda la general» sobre la '
-     + 'general misma. ' + JSON.stringify(rGen.d.resuelto && rGen.d.resuelto.bus));
-  af(rGen.d.resuelto.bus.precio === 2500, 'la general del bus no es $2,500: ' + JSON.stringify(rGen.d.resuelto.bus));
+     + 'general misma. ' + ver(() => rGen.d.resuelto && rGen.d.resuelto.bus));
+  // 🔴 ESTA ES LA LÍNEA QUE TIRABA EL ARNÉS: leía `.bus.precio` con `.bus` en
+  // null y reventaba FUERA del try de `af`, dejando [C], [G] y [R] sin medir.
+  // Va como pensamiento, y su mensaje también, que es la otra mitad.
+  af(() => rGen.d.resuelto.bus.precio === 2500,
+     () => 'la general del bus no es $2,500: ' + ver(() => rGen.d.resuelto.bus));
   // Y el fail-soft sigue siendo POR MODO: bus con precio, avión sin.
-  af(rGen.d.resuelto.bus && rGen.d.resuelto.avion === null,
+  af(() => rGen.d.resuelto.bus && rGen.d.resuelto.avion === null,
      'el fail-soft dejó de ser POR MODO: bus vigente con avión vencido tiene que vender el bus. '
-     + JSON.stringify(rGen.d.resuelto));
+     + ver(() => rGen.d.resuelto));
 
   // ── [E] EL ENDPOINT PÚBLICO, por evento ───────────────────────────────
   console.log('\n[E] nube-vigente?evento=');
   const pE = await publico({ evento: 'edc27' });
   const pK = await publico({ evento: 'knotfest' });
   const pG = await publico({});
-  console.log('    edc27 → ' + JSON.stringify(pE.d.bus) + '\n    knotfest → ' + JSON.stringify(pK.d.bus)
-    + '\n    (sin evento) → ' + JSON.stringify(pG.d.bus));
-  af(pE.res.statusCode === 200 && pE.d.ok === true && pE.d.bus.precio === 2100 && pE.d.bus.heredado === false,
+  console.log('    edc27 → ' + ver(() => pE.d.bus) + '\n    knotfest → ' + ver(() => pK.d.bus)
+    + '\n    (sin evento) → ' + ver(() => pG.d.bus));
+  af(() => pE.res.statusCode === 200 && pE.d.ok === true && pE.d.bus.precio === 2100 && pE.d.bus.heredado === false,
      'el endpoint público no resuelve el precio PROPIO de edc27: ' + pE.res.body.slice(0, 200));
-  af(pK.d.bus.precio === 2500 && pK.d.bus.heredado === true,
+  af(() => pK.d.bus.precio === 2500 && pK.d.bus.heredado === true,
      'el endpoint público no rotula la herencia de knotfest: ' + pK.res.body.slice(0, 200));
-  af(pG.d.bus.precio === 2500 && pG.d.bus.heredado === false,
+  af(() => pG.d.bus.precio === 2500 && pG.d.bus.heredado === false,
      'sin `?evento` el endpoint tiene que contestar la GENERAL sin rotularla heredada: ' + pG.res.body.slice(0, 200));
   af(pE.d.evento === 'edc27' && pG.d.evento === null,
      'la respuesta no dice de QUÉ evento habla, y el CDN llavea por url: sin eso nadie puede comprobar que '
@@ -248,7 +303,11 @@ let EVENTOS_REALES = [];
 
   // ── [C] COTIZAR · el evento se valida en la PUERTA ────────────────────
   console.log('\n[C] cotizar');
-  const base = { accion: 'cotizar', modo: 'bus', precio_pp: 2222, vigente_hasta: iso('2026-10-05T23:59:00-05:00') };
+  // 🔴 SEGUNDA BOMBA DE RELOJERÍA, encontrada al arreglar la primera: este
+  // `hasta` iba TECLEADO al 5-oct. Hoy (1-oct) pasa porque faltan cuatro días, y
+  // el 6-oct TODO este bloque se volvería 400 «ya pasó» — la guarda de «nace
+  // vencida» de NUBE-1 cazando al fixture en vez de al defecto. Relativa.
+  const base = { accion: 'cotizar', modo: 'bus', precio_pp: 2222, vigente_hasta: dias(14) };
   const cMal = await admin(Object.assign({}, base, { evento_id: 'no-existe-este-evento' }));
   console.log('    evento inventado → ' + cMal.res.statusCode + ' ' + (cMal.d.error || '').slice(0, 60));
   af(cMal.res.statusCode === 400,
@@ -264,7 +323,9 @@ let EVENTOS_REALES = [];
   af(cGen.res.statusCode === 200 && cGen.d.fila && cGen.d.fila.evento_id === null,
      'la cotización GENERAL (sin evento_id) tiene que guardarse con evento_id NULL: ' + JSON.stringify(cGen.d.fila));
   // Las guardas de NUBE-1 siguen en pie: nace vencida, al revés, precio cero.
-  const cVenc = await admin(Object.assign({}, base, { evento_id: 'edc27', vigente_hasta: iso('2026-09-01T00:00:00-05:00') }));
+  // Un `hasta` en el PASADO a propósito —relativo, para que siga siendo «hace un
+  // mes» y no una fecha que un día significó eso.
+  const cVenc = await admin(Object.assign({}, base, { evento_id: 'edc27', vigente_hasta: dias(-30) }));
   af(cVenc.res.statusCode === 400 && /ya pas/i.test(cVenc.d.error || ''),
      'la guarda de «nace vencida» se perdió al meter el evento: ' + cVenc.res.body.slice(0, 160));
   const cCero = await admin(Object.assign({}, base, { evento_id: 'edc27', precio_pp: 0 }));
@@ -272,23 +333,45 @@ let EVENTOS_REALES = [];
 
   // ── [G] EL HISTORIAL, por evento y con la herencia rotulada ───────────
   console.log('\n[G] historial por evento');
-  const hProp = await admin({ accion: 'historial', dia: '2026-09-24', evento_id: 'edc27' });
-  const hHer = await admin({ accion: 'historial', dia: '2026-09-24', evento_id: 'knotfest' });
-  const hAntes = await admin({ accion: 'historial', dia: '2026-09-21', evento_id: 'knotfest' });
-  console.log('    edc27 24-sep → ' + hProp.d.modos.bus.estado + '/' + (hProp.d.modos.bus.fila || {}).precio
-    + ' heredado=' + hProp.d.modos.bus.heredado);
-  console.log('    knotfest 24-sep → ' + hHer.d.modos.bus.estado + '/' + (hHer.d.modos.bus.fila || {}).precio
-    + ' heredado=' + hHer.d.modos.bus.heredado);
-  console.log('    knotfest 21-sep → ' + hAntes.d.modos.bus.estado + ' heredado=' + hAntes.d.modos.bus.heredado);
-  af(hProp.d.modos.bus.estado === 'vigente' && hProp.d.modos.bus.fila.precio === 2100 && hProp.d.modos.bus.heredado === false,
-     'el historial de edc27 no da SU precio: ' + JSON.stringify(hProp.d.modos.bus));
-  af(hHer.d.modos.bus.estado === 'vigente' && hHer.d.modos.bus.fila.precio === 2500 && hHer.d.modos.bus.heredado === true,
-     '🔒 el historial de un evento sin cotización propia tiene que contestar la GENERAL con heredado:true. '
-     + 'Decir «sin datos» sería FALSO: ese día SÍ hubo un precio. ' + JSON.stringify(hHer.d.modos.bus));
-  af(hAntes.d.modos.bus.estado !== 'vigente' && hAntes.d.modos.bus.heredado === false,
-     'el 21-sep la general del bus todavía no regía (arranca el 22): el historial tiene que decir un estado '
-     + 'que NO sea vigente y no rotularlo heredado. ' + JSON.stringify(hAntes.d.modos.bus));
+  const hProp = await admin({ accion: 'historial', dia: diaDe(0), evento_id: 'edc27' });
+  const hHer = await admin({ accion: 'historial', dia: diaDe(0), evento_id: 'knotfest' });
+  // ANTES DEL NACIMIENTO: la general del bus arranca hace 2 días, así que hace 6
+  // no había nada — ni propio ni general.
+  const hAntes = await admin({ accion: 'historial', dia: diaDe(-6), evento_id: 'knotfest' });
+  const mB = (r) => seg(() => r.d.modos.bus, {});
+  console.log('    edc27 hoy → ' + ver(() => mB(hProp).estado) + '/' + ver(() => (mB(hProp).fila || {}).precio)
+    + ' heredado=' + ver(() => mB(hProp).heredado));
+  console.log('    knotfest hoy → ' + ver(() => mB(hHer).estado) + '/' + ver(() => (mB(hHer).fila || {}).precio)
+    + ' heredado=' + ver(() => mB(hHer).heredado));
+  console.log('    knotfest hace 6 d → ' + ver(() => mB(hAntes).estado)
+    + ' general=' + ver(() => mB(hAntes).general) + ' heredado=' + ver(() => mB(hAntes).heredado));
+  af(() => mB(hProp).estado === 'vigente' && mB(hProp).fila.precio === 2100 && mB(hProp).heredado === false,
+     () => 'el historial de edc27 no da SU precio: ' + ver(() => mB(hProp)));
+  af(() => mB(hHer).estado === 'vigente' && mB(hHer).fila.precio === 2500 && mB(hHer).heredado === true,
+     () => '🔒 el historial de un evento sin cotización propia tiene que contestar la GENERAL con heredado:true. '
+     + 'Decir «sin datos» sería FALSO: ese día SÍ hubo un precio. ' + ver(() => mB(hHer)));
+  // 🔒 LOS ESTADOS SE EXIGEN POR **NOMBRE**, no por «distinto de vigente». La
+  // aserción vieja decía `estado !== 'vigente'` y eso lo cumplen TRES estados
+  // distintos (`sin_datos`, `antes_del_nacimiento`, `vencida`): un «no es A» no
+  // distingue entre B, C y D, y aquí cada uno le dice otra cosa al humano.
+  af(() => mB(hAntes).estado === 'sin_datos' && mB(hAntes).general === 'antes_del_nacimiento'
+        && mB(hAntes).heredado === false,
+     () => 'hace 6 días no había NADA (la general del bus arranca hace 2): knotfest no tiene filas propias, '
+     + 'así que su estado es `sin_datos` y la general tiene que venir como `antes_del_nacimiento` — es lo que '
+     + 'EXPLICA por qué la herencia no salvó el día. Y no se rotula heredado. ' + ver(() => mB(hAntes)));
   af(hProp.d.evento_id === 'edc27', 'la respuesta del historial no dice de qué evento habla');
+
+  // 🔒 EL TERCER ESTADO: **VENCIDA**, con su propia fila y por su nombre. `g2`
+  // (la general del avión) murió ayer a propósito, así que hoy el historial del
+  // avión tiene que decir `vencida` Y entregar la fila que murió — «vencida» sin
+  // decir cuál era el precio no sirve para explicarle nada a nadie.
+  const hAvion = await admin({ accion: 'historial', dia: diaDe(0) });
+  const mA = seg(() => hAvion.d.modos.avion, {});
+  console.log('    avión general hoy → ' + ver(() => mA.estado) + '/' + ver(() => (mA.fila || {}).precio));
+  af(() => mA.estado === 'vencida' && mA.fila && mA.fila.precio === 4800,
+     () => 'el estado `vencida` no se mide: `g2` murió ayer A PROPÓSITO y el historial del avión de hoy '
+     + 'tenía que decir `vencida` con su fila de $4,800. De los TRES estados de `regiaEl`, éste es el que se '
+     + 'quedaría sin fila si todo el padrón fuera vigente. Salió ' + ver(() => mA));
 
   // ── [R] EL CANDADO RE-FORMADO · UN dueño, CUATRO bebedores ────────────
   // 🔴 El de NUBE-3 exigía `_lib/nube.js` byte a byte. Aquí el dueño cambia DE
@@ -427,6 +510,54 @@ let EVENTOS_REALES = [];
   af(/UPDATE DELETE|UPDATE y DELETE|UPDATE\b[\s\S]{0,40}DELETE/i.test(sql),
      'el acta no dice que el trigger cubre UPDATE y DELETE (y NO INSERT): un acta que no reproduce lo que '
      + 'la base contesta manda a buscar un hueco que no existe');
+
+  // ══ [Z] CONTROL DEL INSTRUMENTO · ¿el arnés SÍ nota el reloj? ══════════
+  // 🔴 LA PREGUNTA QUE VUELVE PELIGROSO ESTE ARREGLO: unas fechas relativas
+  // pueden ARREGLAR la medición o pueden TAPARLA. Si el padrón se mueve siempre
+  // con el reloj, un arnés que ya no mira la vigencia saldría verde para siempre
+  // — verde por no estar midiendo, que es el peor verde de todos.
+  // Así que se corre el MISMO escenario con el padrón 40 días atrás (todo vencido)
+  // y se EXIGE que la respuesta cambie. Si no cambiara, estas fechas relativas
+  // habrían tapado el hoyo en vez de cerrarlo.
+  console.log('\n[Z] control del instrumento · el padrón 40 días atrás');
+  {
+    const guardado = FILAS;
+    try {
+      FILAS = armarFilas(-40);
+      const rViejo = await admin({ accion: 'listar', evento_id: 'edc27' });
+      const rVGen = await admin({ accion: 'listar' });
+      console.log('    edc27 bus → ' + ver(() => rViejo.d.resuelto.bus)
+        + '   ·   general bus → ' + ver(() => rVGen.d.resuelto.bus));
+      af(() => rViejo.d.resuelto && rViejo.d.resuelto.bus === null,
+         () => '🔴 CONTROL DEL INSTRUMENTO: con TODO el padrón vencido, edc27 siguió vendiendo un bus. '
+         + 'Entonces el arnés ya no mira la vigencia y las fechas relativas TAPARON la medición en vez de '
+         + 'arreglarla: todo lo de arriba sería verde por no estar midiendo. Salió '
+         + ver(() => rViejo.d.resuelto.bus));
+      af(() => rVGen.d.resuelto && rVGen.d.resuelto.bus === null && rVGen.d.resuelto.avion === null,
+         () => '🔴 CONTROL DEL INSTRUMENTO: con todo vencido la general tampoco puede regir: '
+         + ver(() => rVGen.d.resuelto));
+      // Y el historial de hoy, con todo muerto, tiene que decir `vencida` — no
+      // `sin_datos`: las filas EXISTEN, lo que pasó es que murieron.
+      const hV = await admin({ accion: 'historial', dia: diaDe(0) });
+      const mV = seg(() => hV.d.modos.bus, {});
+      console.log('    historial de hoy → ' + ver(() => mV.estado) + '/' + ver(() => (mV.fila || {}).precio));
+      af(() => mV.estado === 'vencida' && mV.fila && mV.fila.precio === 2500,
+         () => 'con todo vencido el historial de hoy tenía que decir `vencida` con la fila que murió, no '
+         + '`sin_datos`: las filas EXISTEN, solo que ya no rigen. Salió ' + ver(() => mV));
+    } finally {
+      // 🔒 El padrón se RESTAURA: un escenario que deja el mundo tocado hace que
+      // el ORDEN de las corridas decida el resultado.
+      FILAS = guardado;
+    }
+  }
+  // ✅ Y la vuelta: restaurado, el mundo vuelve a regir. Sin esto, el `finally`
+  // podría no haber servido de nada y nadie se enteraría.
+  {
+    const rOtra = await admin({ accion: 'listar', evento_id: 'edc27' });
+    af(() => rOtra.d.resuelto.bus.precio === 2100,
+       () => 'el padrón no quedó restaurado tras el control del instrumento: lo que midan otros bloques '
+       + 'dependería del ORDEN. Salió ' + ver(() => rOtra.d.resuelto.bus));
+  }
 
   completo = true;
   process.exitCode = rojo ? 1 : 0;

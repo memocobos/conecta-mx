@@ -256,7 +256,8 @@ está caduco antes de escribirse.
      más abajo con su censo;
   4. **Memo elige el evento, y CHICO.**
   `admin-portal-invitar` + `_lib/invitacion-portal` + `ACTA-MIG-1D-II.sql`.
-  `npm run mide:mig-1d-ii` **48**.
+  `npm run mide:mig-1d-ii` **48**, anclado al merge **557e14c** (BASE `09ac540`,
+  donde el botón no existía). Diff ADITIVO: +942 líneas, ni una borrada.
   - 🔴🔒 **`CORREOS_MODO` ESTÁ EN 'real': el primer clic escribe a gente de verdad.**
     Tres puertas, las tres de Memo: **el `seco` es el DEFAULT** (para mandar hace
     falta `seco:false` **Y** `confirmar:true` — dos gestos; el peor caso de un

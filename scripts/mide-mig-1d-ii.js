@@ -40,7 +40,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '09ac540';       // el merge de CONCILIA-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '557e14c';   // el commit del MERGE de MIG-1d-ii
 
 // El guardián de la trampa que esta casa paga una y otra vez: el arnés mide el
 // COMMIT, no el árbol. Copiado de mide:concilia-1 (ahí se explica entero).

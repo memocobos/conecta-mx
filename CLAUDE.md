@@ -248,7 +248,8 @@ está caduco antes de escribirse.
 - 🏆 **CONCILIA-1 FASE 1 (1-oct-2026): el careo CAJA ↔ CONTRATOS, con nombres y
   SIN escribir un peso.** `_lib/concilia` + `admin-concilia` (`reporte` y
   `radar`, roles del dinero) + el renglón del Radar. `npm run mide:concilia-1`
-  **71**. Cero SQL, cero escrituras.
+  **71**, anclado al merge **24c9d42** (BASE `5e1c501`). Diff 100% ADITIVO:
+  7 archivos, +1,154 líneas, ni una borrada. Cero SQL, cero escrituras.
   - 🔒 **NO ESCRIBE, Y SE MIDE EN VEZ DE PROMETERSE**: ningún `method:` en la lib
     ni en el handler, la red falsa del arnés TRUENA ante cualquier verbo que no
     sea GET, y una acción `aplicar` se rechaza en el despacho. Una guarda
@@ -297,6 +298,11 @@ está caduco antes de escribirse.
   y CONCILIA-1). `mide:concilia-1` trae el remedio: si los archivos que lee están
   sucios y se mide el HEAD actual, **la corrida se DETIENE nombrando los
   archivos**. Vale copiarlo a los demás arneses.
+  - ⚠️ **Vigila los archivos QUE SE ARCHIVAN, no el script del arnés.** Es a
+    propósito y es la distinción entera: el arnés corre **del árbol de trabajo**,
+    así que su propia suciedad no invalida nada; lo que se mide viene del commit.
+    Un guardián que también se quejara del script bloquearía cada iteración
+    legítima y lo apagaría alguien al tercer intento.
   - Hermano: **el éxito vacío también habla.** Con cero aserciones el marcador
     imprimía «✅ VERDE · 0 en verde», que se lee igual que una corrida sana y es lo
     contrario. Ahora dice «NADA MEDIDO · esto NO es un verde».

@@ -67,7 +67,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5e1c501';      // el merge de NUBE4-ARNES-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD'; // se re-ancla al merge
+const HEAD_SHA = process.env.HEAD_SHA || '24c9d42'; // el commit del MERGE de CONCILIA-1
 
 // ══ EL GUARDIÁN DE LA TRAMPA QUE ESTA CASA PAGA UNA Y OTRA VEZ ═══════════
 // 🔴 El arnés mide ÁRBOLES ARCHIVADOS (`git archive`), así que mide el **COMMIT**

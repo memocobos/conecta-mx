@@ -194,6 +194,16 @@ function parsearLibro(filas) {
       nombre, clave: normalizarNombre(nombre),
       abonado: mapa.dinero.reduce((a, c) => a + leerDinero(f[c]), 0),
       boletos: 1,
+      // ── [CAREO-ZONA-1b] EL ROJO DEL LIBRO TAMBIÉN CANCELA ─────────────────
+      // Regla firmada de Memo (1-oct-2026): «Numerología y Conecta 2026: el rojo
+      // significa cancelado en cualquiera de los dos.»
+      // 🔒 AQUÍ SOLO SE ARRASTRA LA MARCA — el UMBRAL no vive en este archivo y
+      // no puede: `excel-careo-correr` ya requiere a este lib, así que pedirle
+      // su constante sería un require circular. El DUEÑO del umbral marca
+      // `__roja` sobre las filas crudas antes de llamar aquí, y este parser la
+      // lleva con la persona. Un umbral copiado serían dos listas que todavía
+      // no divergen — y la de aquí decidiría cancelaciones.
+      roja: !!f.__roja,
       evento_libro: bloqueActual ? bloqueActual.titulo : '',
       // Solo si el bloque TIENE columna de fecha. En los 10 de «Codigo» esto
       // queda vacío, que es lo correcto: esa gente no trae fecha, no trae
@@ -311,6 +321,24 @@ function fundirNumerologia(personasPestana, personasLibro) {
   for (const n of (personasLibro || [])) {
     const ya = out.get(n.clave);
     if (ya) {
+      // ── [CAREO-ZONA-1b] EL CASO FINO QUE DECIDE EL DISEÑO ──────────────────
+      // Una persona VIVA en la pestaña cuya compra del LIBRO está roja.
+      // Cancelarla ENTERA por una fila del libro sería demasiado: el libro es la
+      // venta directa de boletos CHEAP de Memo, y que ESA compra se cancele no
+      // dice nada de su viaje con paquete.
+      // 🔒 LO QUE SE HACE: la fila roja del libro cancela **ESA COMPRA** — su
+      // dinero y sus boletos NO se suman al careo— y la persona queda marcada
+      // para que el plan la saque como **AVISO, no como baja**. Que la cancele
+      // entera lo decide un humano.
+      if (n.roja) {
+        ya.libro_rojo = (ya.libro_rojo || 0) + 1;
+        ya.libro_rojo_monto = (ya.libro_rojo_monto || 0) + Number(n.abonado || 0);
+        if (!ya.fuentes.includes('numerologia')) ya.fuentes.push('numerologia');
+        // ⚠️ NO se suma el abonado, NO se incrementa `filas`, NO se cuentan sus
+        // boletos: una compra cancelada no es dinero que cobrar ni boleto que
+        // ocupar. Sumarla y luego «descontarla» habría sido dos verdades.
+        continue;
+      }
       ya.abonado += Number(n.abonado || 0);
       ya.filas = (ya.filas || 0) + 1;
       ya.boletos_numerologia = (ya.boletos_numerologia || 0) + Number(n.boletos || 0);
@@ -338,6 +366,9 @@ function fundirNumerologia(personasPestana, personasLibro) {
       total: (n.costo_publico == null) ? null : Number(n.costo_publico),
       boletos_numerologia: Number(n.boletos || 0),
       pestanas: [], fuentes: ['numerologia'],
+      // [CAREO-ZONA-1b] Si NO existe en ninguna pestaña, su fila roja del libro
+      // SÍ es una baja completa: no hay otra compra que la sostenga.
+      roja: !!n.roja,
     });
   }
   return [...out.values()];

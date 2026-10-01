@@ -46,7 +46,14 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'ae1ea3a';
-const HEAD_SHA = process.env.HEAD_SHA || '12fef09';   // el commit del MERGE
+const HEAD_SHA = process.env.HEAD_SHA || '4a437f3';   // CAREO-ZONA-1b
+// 🔒 [CAREO-ZONA-1b] **DOS BASES, porque hay dos generaciones de aserciones.**
+// `ae1ea3a` es el antes de CAREO-ZONA-1 (no sabe de montones) y sirve al control
+// positivo de aquella. Pero para 1b ese árbol fallaría por la razón equivocada:
+// no tiene bajas EN ABSOLUTO, así que «no re-propone la baja» saldría verde en
+// vacío. El control positivo de 1b necesita el árbol que SÍ propone bajas y
+// TODAVÍA no es idempotente — el merge de CAREO-ZONA-1.
+const BASE_1B = process.env.BASE_1B || '12fef09';
 
 // ── LA PESTAÑA · encabezado REAL, enteros ───────────────────────────────
 // Copiado de la medición de CUADRE-1a (ocho pestañas reales por
@@ -102,16 +109,30 @@ const FILAS_GENTE = [
   filaExcel({ Nombre: 'Zona Inventada Perez', Paquete: 'CHEAP', Boleto: 'Palco Fantasma', Total: '$1,000' }),
   // Un RESALTADO de UNA celda: NO es una cancelación (control del umbral).
   filaExcel({ Nombre: 'Resaltada Una Celda', Paquete: 'CHEAP', Boleto: 'Platino', Total: '$3,000' }),
+  // [CAREO-ZONA-1b] Su fila SIGUE ROJA en la pestaña y el sistema YA la tiene
+  // bajada: es el caso de la idempotencia — lo que la frena es la guarda, no
+  // que el rojo haya desaparecido.
+  filaExcel({ Nombre: 'Ya Bajada Lopez', Paquete: 'PLUS', Boleto: 'VIP A', Total: '$9,200' }),
+  // 🔒 [CAREO-ZONA-1b] EL CASO FINO VA EN SU PROPIA PERSONA, y esto es el
+  // arreglo de un rojo: primero le colgué el libro rojo a MONSERRAT, que ya era
+  // la fixture de la MEZCLA (1 Platino + 1 «-») de CAREO-ZONA-1 — y al volverse
+  // un aviso del caso fino dejó de salir en el montón de boletos, así que la
+  // aserción del «-» cayó en rojo midiendo código correcto. Un papel nuevo
+  // encima de una fixture vieja la calla: cada caso con su gente.
+  // VIVA en la pestaña (su fila NO va roja) y con su compra del LIBRO en rojo.
+  filaExcel({ Nombre: 'Viva Con Libro Rojo', Paquete: 'PLUS', Boleto: 'Platino', Total: '$9,200' }),
 ];
 const PESTANA = [...PRELUDIO, CAB, ...FILAS_GENTE];
 // Los fondos de la pestaña: el preludio y el encabezado en blanco, y en la
 // gente solo Diana Marlene pintada ENTERA y «Resaltada» con UNA celda.
 const IDX_MARLENE = PRELUDIO.length + 1 + 9;
 const IDX_RESALTADA = PRELUDIO.length + 1 + 15;
+const IDX_YABAJADA = PRELUDIO.length + 1 + 16;
 function fondosPestana() {
   const out = fondos(PESTANA.length, {});
   for (let c = 0; c < CAB.length; c++) out[IDX_MARLENE][c] = '#ea9999';   // fila entera
   out[IDX_RESALTADA][3] = '#ff0000';                                      // UNA celda
+  for (let c = 0; c < CAB.length; c++) out[IDX_YABAJADA][c] = '#cc0000';  // sigue roja
   return out;
 }
 // Cuántas celdas rojas por fila, como las contaría el .gs.
@@ -126,6 +147,59 @@ function rojasDe(fondosMat) {
     return r >= 0.45 && g <= 0.70 && b <= 0.70 && (r - g) >= 0.20 && (r - b) >= 0.20;
   };
   return fondosMat.map((f) => f.filter(esRojo).length);
+}
+
+// ── [CAREO-ZONA-1b] EL LIBRO DE NUMEROLOGÍA ─────────────────────────────
+// Su rejilla es otra: bloques con título y su propio encabezado. Copiada de la
+// medición del 20-sep, con las filas rojas de ~20 celdas que se midieron el
+// 30-sep en la pestaña «Boletos».
+// 🔒 LOS RÓTULOS SON LOS DE LA HOJA REAL, NO LOS QUE YO SUPONGA. La primera
+// vez me inventé dos columnas que la hoja no tiene, y las 3 filas del libro
+// cayeron enteras a `descartes.fueraDeBloque`: un bloque se reconoce por tener
+// **las dos** celdas de `CELDAS_DE_BLOQUE` (`costo al publico` + `separo`), y
+// sin bloque `mapa` se queda en null. Y el dinero sale de `Separo` + `Pago N`,
+// así que mi columna inventada no sumaba por ninguna parte. Una base de
+// mentira que inventa nombres mide su propia invención.
+// ⚠️ Y EL **ANCHO** TAMBIÉN ES DEL MUNDO REAL: el brief pide «las filas de ~20
+// celdas rojas del libro medidas el 30-sep». Con mi rejilla angosta de 7 la fila
+// roja daba 7 celdas — por encima del umbral, sí, pero midiendo una hoja que no
+// existe. Todos los rótulos son de los que `mapearColumnasLibro` nombra; lo
+// único aproximado es CUÁNTOS «Pago N» hay, y eso es justo lo que da el ancho.
+const CAB_LIBRO = ['Nombre', 'Fecha', 'Codigo', 'Tipo de Boleto', 'Vendedor',
+  'Costo al Publico', 'Separo', 'Total',
+  'Pago 1', 'Pago 2', 'Pago 3', 'Pago 4', 'Pago 5', 'Pago 6',
+  'Pago 7', 'Pago 8', 'Pago 9', 'Pago 10', 'Pago 11', 'Pago 12'];
+const filaLibro = (v) => {
+  const f = new Array(CAB_LIBRO.length).fill('');
+  for (const [c, x] of Object.entries(v)) {
+    const i = CAB_LIBRO.indexOf(c);
+    if (i < 0) throw new Error('el fixture del libro nombra una columna que no existe: ' + c);
+    f[i] = x;
+  }
+  return f;
+};
+const LIBRO = [
+  filaLibro({ Nombre: 'Natanael Cano - 27 de Noviembre' }),   // el título: UNA celda llena
+  CAB_LIBRO,
+  // VIVA en la pestaña Y con su compra del libro ROJA → el CASO FINO: AVISO.
+  filaLibro({ Nombre: 'Viva Con Libro Rojo', Fecha: '27 de Noviembre', 'Tipo de Boleto': 'Platino',
+              'Costo al Publico': '3000', Separo: '1500' }),
+  // SOLO en el libro y ROJA → baja completa: no hay otra compra que la sostenga.
+  filaLibro({ Nombre: 'Solo Libro Rojita', Fecha: '27 de Noviembre', 'Tipo de Boleto': 'Platino',
+              'Costo al Publico': '3000', Separo: '500', 'Pago 1': '2500' }),
+  // SOLO en el libro y VIVA → sigue entrando normal (control de que no se barre todo).
+  filaLibro({ Nombre: 'Solo Libro Viva', Fecha: '27 de Noviembre', 'Tipo de Boleto': 'Platino',
+              'Costo al Publico': '3000', Separo: '500', 'Pago 1': '2500' }),
+];
+const IDX_LIBRO_VCL = 2;   // la del caso fino
+const IDX_LIBRO_SOLA  = 3;
+function fondosLibro() {
+  const out = LIBRO.map(() => new Array(CAB_LIBRO.length).fill(BLANCO));
+  for (let c = 0; c < CAB_LIBRO.length; c++) {
+    out[IDX_LIBRO_VCL][c] = '#cc0000';     // la fila entera, como el 30-sep
+    out[IDX_LIBRO_SOLA][c]  = '#cc0000';
+  }
+  return out;
 }
 
 // ── EL LADO DEL SISTEMA · el «antes» del 30-sep ─────────────────────────
@@ -145,6 +219,13 @@ const VIAJEROS = [
   V('v-plr', 'Plus Repartido Ramirez', 'VIP A', 1, 'PLUS'),
   V('v-inv', 'Zona Inventada Perez', 'Luneta A', 1, 'CHEAP'),
   V('v-res', 'Resaltada Una Celda', 'Platino', 1, 'CHEAP'),
+  // [CAREO-ZONA-1b] Los del libro.
+  V('v-slr', 'Solo Libro Rojita', 'Platino', 1, 'CHEAP'),
+  V('v-slv', 'Solo Libro Viva', 'Platino', 1, 'CHEAP'),
+  // Y una que YA ESTÁ BAJADA: la idempotencia se mide con ella.
+  V('v-vcl', 'Viva Con Libro Rojo', 'Platino', 1, 'PLUS'),
+  V('v-yab', 'Ya Bajada Lopez', null, 0, 'PLUS',
+    { notas: 'CANCELADA (fila roja del Excel) 2026-10-01: venía con 1 boleto(s) de «VIP A»' }),
 ];
 // Las zonas de la ficha. 🔒 «Palco Fantasma» NO está: es el caso de la zona que
 // la puerta tiene que rechazar.
@@ -164,7 +245,16 @@ function armarRed(dir, { sinColores = false, saboteado = false, sinCatalogo = fa
     viajeros_evento: VIAJEROS,
     stock_ajustes: [],
     abonos_viajero: [],
-    numerologia_eventos: [],
+    // [CAREO-ZONA-1b] SEMBRADO, o `traerNumerologia` se sale con `sin_siembra`
+    // y el libro NO se lee — el bloque del rojo del libro pasaría en vacío.
+      // 🔒 Y LA FECHA DE LA SIEMBRA ES LA DE LA **FUNCIÓN**, no la de la compra.
+    // La inventé al revés la primera vez —le puse a cada fila una fecha de compra
+    // distinta y a la siembra `null`— y `mapearLibro` mandó las 3 a `sinMapeo`:
+    // con la fecha NO vacía no se intentan los respaldos (zona, y luego ''), así
+    // que ninguna llave casaba. El libro dice «Karol G» + «7 de noviembre» y la
+    // siembra traduce ESO a un slug; es lo que desambigua un multifecha.
+    numerologia_eventos: [{ nombre_libro: 'Natanael Cano - 27 de Noviembre',
+                            fecha_libro: '27 de Noviembre', evento_id: 'natanael', activa: true }],
   };
   return { escrituras, filasRojas, fetchFalso: async (url, opts) => {
     const met = (opts && opts.method) || 'GET';
@@ -177,6 +267,15 @@ function armarRed(dir, { sinColores = false, saboteado = false, sinCatalogo = fa
       if (!cuerpo.pestana) {
         return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, pestanas: ['Natanael Cano - 27 de Noviembre'] }) };
       }
+      // [CAREO-ZONA-1b] EL LIBRO de Numerología, con sus filas rojas REALES:
+      // medido el 30-sep, las canceladas van con ~20 celdas pintadas.
+      if (cuerpo.pestana === 'Boletos') {
+        return { ok: true, status: 200, text: async () => JSON.stringify({
+          ok: true, pestana: 'Boletos', filas: LIBRO,
+          rojas: sinColores ? undefined : rojasDe(fondosLibro()),
+          colores_leidos: !sinColores, pestanas: ['Boletos'],
+        }) };
+      }
       return { ok: true, status: 200, text: async () => JSON.stringify({
         ok: true, pestana: cuerpo.pestana, filas: PESTANA,
         rojas: sinColores ? undefined : filasRojas,
@@ -188,8 +287,21 @@ function armarRed(dir, { sinColores = false, saboteado = false, sinCatalogo = fa
       const u = new URL(url);
       const tabla = u.pathname.replace('/rest/v1/', '');
       if (met !== 'GET') {
-        escrituras.push({ tabla, met, cuerpo: (() => { try { return JSON.parse(opts.body); } catch (_) { return null; } })() });
-        return { ok: true, status: 201, json: async () => [], text: async () => '' };
+        const cuerpoW = (() => { try { return JSON.parse(opts.body); } catch (_) { return null; } })();
+        escrituras.push({ tabla, met, cuerpo: cuerpoW, url: String(url) });
+        // 🔒 [CAREO-ZONA-1b] LA RED FALSA RESPETA EL FILTRO `or=` DEL PATCH, y es
+        // la mitad sin la cual el candado de la carrera pasaría EN VACÍO: si
+        // siempre contesta «1 fila tocada», una escritura que la base habría
+        // rehusado se lee como aplicada. Se le pide ser MÁS estricta que la de
+        // verdad, no menos.
+        if (met === 'PATCH' && tabla === 'viajeros_evento' && /or=\(boletos\.neq\.0/.test(String(url))) {
+          const mId = /id=eq\.([^&]+)/.exec(String(url));
+          const vid = mId ? decodeURIComponent(mId[1]) : null;
+          const fila = (BASE_DB.viajeros_evento || []).find((f) => f.id === vid);
+          const yaBajada = fila && Number(fila.boletos) === 0 && (fila.zona_boleto == null || String(fila.zona_boleto).trim() === '');
+          if (yaBajada) return { ok: true, status: 200, json: async () => [], text: async () => '' };
+        }
+        return { ok: true, status: 201, json: async () => [cuerpoW], text: async () => '' };
       }
       if (saboteado && tabla === 'viajeros_evento') escrituras.push({ tabla, met: 'PATCH', cuerpo: null });
       let filas = BASE_DB[tabla] || [];
@@ -213,6 +325,12 @@ async function correr(dir, opciones, cuerpo) {
   const red = armarRed(dir, opciones);
   process.env.EXCEL_SCRIPT_URL = 'https://script.test/exec';
   process.env.EXCEL_SCRIPT_TOKEN = 't';
+  // [CAREO-ZONA-1b] Y LAS DEL LIBRO: son OTRO despliegue del mismo .gs, con sus
+  // propias env vars. Sin ellas `cosechar` se sale con SIN_CONFIG antes de
+  // tocar la red y el libro NO se lee — las aserciones del rojo del libro
+  // pasarían EN VACÍO, verdes por no haberse ejercitado.
+  process.env.NUMEROLOGIA_SCRIPT_URL = 'https://script.test/num/exec';
+  process.env.NUMEROLOGIA_SCRIPT_TOKEN = 't';
   process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'k';
   process.env.URL = 'https://conectareynosa.mx';
   delete process.env.DEPLOY_PRIME_URL;
@@ -237,6 +355,31 @@ async function correr(dir, opciones, cuerpo) {
   return { res, d: JSON.parse(res.body || '{}'), escrituras: red.escrituras, filasRojas: red.filasRojas };
 }
 const de = (plan, monton, nombre) => ((plan && plan[monton]) || []).find((x) => String(x.nombre).includes(nombre));
+
+// [CAREO-ZONA-1b] La SEGUNDA pasada: el mismo mundo, pero con Diana Marlene ya
+// bajada — como queda después de la primera. Se muta el viajero en vez de
+// re-correr de verdad, porque lo que se mide es si el plan la re-propone y si la
+// escritura la rehusaría: dos hechos, no una secuencia.
+async function correrConBajada(dir) {
+  const guardado = VIAJEROS.map((v) => ({ ...v }));
+  // 🔒 SE BAJAN **LAS DOS** que la 1ra pasada baja, no solo una. Con solo Diana
+  // bajada, «Solo Libro Rojita» seguía legítimamente pendiente y el bloque la
+  // leía como una re-propuesta: el rojo era del fixture, no del código. El mundo
+  // de la 2da pasada tiene que ser el que deja la 1ra, o no es una 2da pasada.
+  for (const [id, zona] of [['v-dma', 'VIP A'], ['v-slr', 'Platino']]) {
+    const f = VIAJEROS.find((v) => v.id === id);
+    f.boletos = 0; f.zona_boleto = null;
+    f.notas = `CANCELADA (fila roja del Excel) 2026-10-01: venía con 1 boleto(s) de «${zona}»`;
+  }
+  try {
+    return await correr(dir, {}, { confirmar: true });
+  } finally {
+    // El fixture se restaura: un escenario que deja el mundo tocado hace que el
+    // ORDEN de las corridas decida el resultado.
+    VIAJEROS.length = 0;
+    guardado.forEach((v) => VIAJEROS.push(v));
+  }
+}
 
 (async function main() {
   process.on('exit', marcador);
@@ -472,11 +615,160 @@ const de = (plan, monton, nombre) => ((plan && plan[monton]) || []).find((x) => 
   console.log('    ' + JSON.stringify({ colores_leidos: det2.colores_leidos, filas_rojas: det2.filas_rojas,
     umbral: det2.umbral_rojas, histograma: det2.histograma_rojas }));
   af(det2.colores_leidos === true, 'el detalle de la pestaña no dice que los colores se leyeron');
-  af(det2.filas_rojas === 1, 'el conteo de filas rojas no es 1 (solo Diana Marlene): ' + det2.filas_rojas);
+  // ⏳ Actualizado en CAREO-ZONA-1b: ahora la pestaña trae DOS filas rojas —
+  // Diana Marlene y «Ya Bajada», que sigue roja a propósito para medir la
+  // idempotencia. El conteo sube a 2 con su razón, no se silencia.
+  af(det2.filas_rojas === 2, 'el conteo de filas rojas no es 2 (Diana Marlene y Ya Bajada): ' + det2.filas_rojas);
   af(det2.umbral_rojas === 3, 'el umbral no viaja con el detalle: sin él nadie sabe contra qué se midió');
-  af(det2.histograma_rojas && det2.histograma_rojas['1'] === 1 && det2.histograma_rojas[String(CAB.length)] === 1,
+  af(det2.histograma_rojas && det2.histograma_rojas['1'] === 1 && det2.histograma_rojas[String(CAB.length)] === 2,
      '🔴 el HISTOGRAMA no viaja o no dice la verdad: es lo único con lo que el umbral se puede corregir con '
      + 'datos en vez de con una opinión. Salió ' + JSON.stringify(det2.histograma_rojas));
+
+  // ── [0] IDEMPOTENCIA DE LA BAJA ───────────────────────────────────────
+  // Medido en el barrido del 1-oct: 116 bajas aplicadas, 0 errores — y **18
+  // filas con la nota DOS VECES** (alvarodiaz 13, youngmiko 4, badgyal 1).
+  // 🔒 «Ya Bajada» SIGUE ROJA en la pestaña: lo que la frena es la guarda, no que
+  // el rojo haya desaparecido. Si el fixture le quitara el rojo, este bloque
+  // pasaría en vacío.
+  console.log('\n[0] idempotencia: una baja ya aplicada no se re-propone');
+  const yab = de(P, 'bajas', 'Ya Bajada');
+  console.log('    «Ya Bajada» en el montón de bajas: ' + !!yab
+    + '   ·   su fila sigue roja: ' + (rH.filasRojas[IDX_YABAJADA] === CAB.length));
+  af(rH.filasRojas[IDX_YABAJADA] === CAB.length,
+     'PREMISA: la fila de «Ya Bajada» tiene que seguir ROJA, o la guarda no es lo que la frena y este '
+     + 'bloque pasa en vacío. Salió ' + rH.filasRojas[IDX_YABAJADA]);
+  af(!yab,
+     '🔴 una persona con `boletos=0` y `zona_boleto NULL` volvió al montón de bajas: el montón es para '
+     + 'las que FALTAN, y re-proponerla engorda `notas` en cada careo diario — 18 filas ya lo traen dos veces');
+  af(!de(P, 'zonas', 'Ya Bajada') && !de(P, 'boletos', 'Ya Bajada'),
+     'a una persona ya bajada se le propone además zona o conteo: su fila roja la saca de todo');
+
+  // 🔴 Y APLICAR DOS VECES, que es lo que el brief pide medir.
+  // ⚠️ LA CAUSA, CORREGIDA: primero escribí que los 18 dobles los produjo la
+  // carrera del reintento de CAREO-RETRY-1. **No es eso lo que reproduce.** Lo
+  // que reproduce es que `leerBase` sube un `boletos: 0` a **1**, así que la
+  // guarda de idempotencia no podía dispararse y el plan los re-proponía en
+  // cada careo — una guarda inalcanzable, no una carrera. El filtro de la
+  // escritura se queda igual: es un segundo candado legítimo y barato, pero no
+  // es el que explica los 18. Aquí se miden los DOS: el plan (no re-propone) y
+  // la escritura (la base rehusa).
+  console.log('\n[0b] aplicar DOS veces');
+  const c1 = await correr(h.dir, {}, { confirmar: true });
+  const esc1 = c1.escrituras.filter((e) => e.met === 'PATCH' && e.cuerpo && e.cuerpo.boletos === 0 && e.cuerpo.zona_boleto === null);
+  const res1 = c1.d.resultado || {};
+  console.log('    1ra: PATCH de baja ×' + esc1.length + ' · aplicadas ' + ((res1.bajas || []).length)
+    + ' · ya estaban ' + ((res1.bajas_ya_estaban || []).length));
+  // ⚠️ ERAN DOS, NO UNA, y esta aserción decía UNA porque se escribió cuando solo
+  // cancelaba la pestaña. Con el rojo del libro dentro, la verdad nueva es: Diana
+  // Marlene (roja en la pestaña) y Solo Libro Rojita (roja en el libro, sin otra
+  // compra que la sostenga). Se actualiza a la verdad nueva CON SU RAZÓN — y se
+  // exige por NOMBRE, no por conteo: un número que cuadra puede cuadrar con la
+  // gente equivocada.
+  const nom1 = (res1.bajas || []).map((x) => x.nombre).sort();
+  af(esc1.length === 2 && nom1.length === 2
+     && nom1.some((x) => /Diana Marlene/.test(x)) && nom1.some((x) => /Solo Libro Rojita/.test(x)),
+     'la 1ra pasada no aplicó las DOS bajas que toca (Diana Marlene por la pestaña y Solo Libro Rojita '
+     + 'por el libro): ' + JSON.stringify({ patch: esc1.length, aplicadas: nom1 }));
+  af((res1.bajas_ya_estaban || []).length === 0,
+     'la 1ra pasada reporta bajas «que ya estaban» y no debería: ' + JSON.stringify(res1.bajas_ya_estaban));
+  // 🔒 LA SEGUNDA, con el mundo YA bajado: cero escrituras nuevas.
+  const c2 = await correrConBajada(h.dir);
+  const esc2 = c2.escrituras.filter((e) => e.met === 'PATCH' && e.cuerpo && e.cuerpo.boletos === 0);
+  console.log('    2da (con Diana ya bajada): PATCH de baja ×' + esc2.length
+    + ' · en el plan ' + ((c2.d.plan || {}).bajas || []).length);
+  af((((c2.d.plan || {}).bajas) || []).length === 0,
+     '🔴 la SEGUNDA pasada vuelve a proponer la baja: ' + JSON.stringify(((c2.d.plan || {}).bajas || []).map((x) => x.nombre)));
+  af(esc2.length === 0,
+     '🔴 la SEGUNDA pasada ESCRIBIÓ otra vez: cada careo diario engordaría `notas` sin fin. '
+     + JSON.stringify(esc2.map((e) => e.cuerpo && e.cuerpo.notas)));
+
+  // ── [N] EL ROJO DEL LIBRO DE NUMEROLOGÍA ─────────────────────────────
+  // Regla firmada de Memo (1-oct): «el rojo significa cancelado en cualquiera de
+  // los dos.» El cosechador ya mandaba el arreglo y el parser lo tiraba al piso.
+  console.log('\n[N] el rojo del libro');
+  const fino = de(P, 'avisos_zonas', 'Viva Con Libro Rojo');
+  const sola = de(P, 'bajas', 'Solo Libro Rojita');
+  const viva = de(P, 'bajas', 'Solo Libro Viva');
+  console.log('    pestaña viva + libro rojo → ' + (fino ? 'AVISO' : (de(P, 'bajas', 'Viva Con Libro Rojo') ? '❌ BAJA' : 'nada')));
+  console.log('    solo libro + rojo        → ' + (sola ? 'BAJA (origen ' + sola.origen_rojo + ')' : 'nada'));
+  console.log('    solo libro + viva        → ' + (viva ? '❌ BAJA' : 'intacta'));
+  // 🔴 EL CASO FINO: viva en la pestaña + libro rojo = AVISO, no baja.
+  af(!de(P, 'bajas', 'Viva Con Libro Rojo'),
+     '🔴 una persona VIVA en la pestaña se canceló ENTERA por una fila roja del LIBRO: el libro es la '
+     + 'venta directa de boletos CHEAP, y que esa compra se cancele no dice nada de su viaje con paquete');
+  af(fino && /libro de Numerolog/i.test(fino.motivo),
+     'el caso fino no sale como AVISO con su motivo: ' + JSON.stringify(fino && fino.motivo));
+  af(fino && fino.libro_rojo === 1, 'el aviso no dice CUÁNTAS compras rojas: ' + JSON.stringify(fino && fino.libro_rojo));
+  // Y su dinero rojo NO se sumó al careo.
+  const pFino = ((careo && careo.personas) || []).find((x) => /Viva Con Libro Rojo/.test(x.nombre));
+  af(pFino && Number(pFino.libro_rojo_monto) === 1500,
+     'el dinero de la compra roja no viaja aparte: tiene que quedar FUERA del abonado, no sumarse y luego '
+     + 'descontarse. Salió ' + JSON.stringify(pFino && pFino.libro_rojo_monto));
+  // 🔒 Y la que SOLO existe en el libro con su compra roja SÍ es baja completa.
+  af(sola, '🔴 una persona que solo existe en el libro, con su compra ROJA, no salió como baja: no hay otra '
+     + 'compra que la sostenga');
+  af(sola && sola.origen_rojo === 'libro',
+     'la baja del libro no dice de dónde vino el rojo: «cancelada» sin decir en qué hoja manda a buscar en la '
+     + 'equivocada. Salió ' + JSON.stringify(sola && sola.origen_rojo));
+  af(!viva, 'una persona del libro SIN rojo salió como baja: el barrido se llevó a quien no debía');
+
+  // ── [1B] CONTROL POSITIVO DE 1b · el árbol que SÍ propone bajas y no es idempotente ─
+  // 🔒 Ley grande de la casa: toda aserción «HEAD arregla X» necesita la que exige
+  // que BASE SÍ falle. Y el BASE de arriba (`ae1ea3a`) NO sirve para esto: no tiene
+  // montones, así que «no re-propone la baja» saldría verde por no tener bajas.
+  // Este bloque entra por `BASE_1B` = el merge de CAREO-ZONA-1.
+  console.log('\n[1B] control positivo de 1b · BASE_1B ' + BASE_1B);
+  const b1 = sacar(BASE_1B, 'cz-base1b');
+  const rB1 = await correr(b1.dir, {});
+  const PB1 = rB1.d.plan || {};
+  af(rB1.res.statusCode === 200, 'BASE_1B no contestó 200: ' + rB1.res.body.slice(0, 200));
+  af((PB1.bajas || []).length > 0,
+     'PREMISA de este bloque: BASE_1B tiene que proponer bajas (si no, no es el árbol que creo). '
+     + 'Salió ' + JSON.stringify((PB1.bajas || []).map((x) => x.nombre)));
+  // (0) En BASE_1B, «Ya Bajada» SÍ vuelve al montón: eso es el defecto que 1b cierra.
+  console.log('    BASE_1B bajas: ' + (PB1.bajas || []).map((x) => x.nombre).join(' | '));
+  af(!!de(PB1, 'bajas', 'Ya Bajada'),
+     'CONTROL POSITIVO: en BASE_1B una persona YA BAJADA tenía que volver al montón — es el defecto '
+     + 'que 1b cierra. Si ahí ya no aparecía, el verde de [0] no dice nada.');
+  // Y la SEGUNDA pasada de BASE_1B escribe otra vez: el doble, reproducido.
+  const cB2 = await correrConBajada(b1.dir);
+  const escB2 = cB2.escrituras.filter((e) => e.met === 'PATCH' && e.cuerpo && e.cuerpo.boletos === 0);
+  console.log('    BASE_1B 2da pasada: PATCH de baja ×' + escB2.length);
+  af(escB2.length > 0,
+     'CONTROL POSITIVO: en BASE_1B la segunda pasada tenía que ESCRIBIR otra vez (los 18 dobles). '
+     + 'Si no escribía, el candado de [0b] se mide contra un defecto que no existía.');
+  // (1) Y en BASE_1B el rojo del LIBRO no cancelaba nada.
+  console.log('    BASE_1B «solo libro + rojo»: ' + (de(PB1, 'bajas', 'Solo Libro Rojita') ? 'baja' : 'nada')
+    + '   ·   aviso del caso fino: ' + (de(PB1, 'avisos_zonas', 'Viva Con Libro Rojo') ? 'sí' : 'no'));
+  af(!de(PB1, 'bajas', 'Solo Libro Rojita'),
+     'CONTROL POSITIVO: en BASE_1B el rojo del LIBRO no podía cancelar a nadie (el parser tiraba la '
+     + 'bandera al piso). Si ya cancelaba, 1b no agrega eso y el verde de [N] no dice nada.');
+  af(!de(PB1, 'avisos_zonas', 'Viva Con Libro Rojo'),
+     'CONTROL POSITIVO: en BASE_1B el caso fino no existía como aviso');
+  // 🔒 EL UMBRAL ES **UNO**: el del libro y el de las pestañas tienen que ser el
+  // mismo número y venir del mismo sitio.
+  const fuenteCorrer = fs.readFileSync(path.join(h.dir, 'netlify/functions/_lib/excel-careo-correr.js'), 'utf8');
+  const fuenteNum = fs.readFileSync(path.join(h.dir, 'netlify/functions/_lib/numerologia.js'), 'utf8');
+  const sinCom = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const cuantos = (sinCom(fuenteCorrer).match(/ROJAS_MIN_CELDAS\s*=/g) || []).length;
+  console.log('    el umbral se DECLARA ' + cuantos + ' vez(ces) · numerologia.js lo menciona: '
+    + /ROJAS_MIN/.test(sinCom(fuenteNum)));
+  af(cuantos === 1, 'el umbral se declara ' + cuantos + ' veces: tiene que haber UNO y un dueño');
+  af(!/ROJAS_MIN/.test(sinCom(fuenteNum)),
+     '🔴 `numerologia.js` tiene su propia copia del umbral: no puede pedirle la constante a '
+     + '`excel-careo-correr` — sería circular— así que el DUEÑO marca y el parser arrastra. Dos umbrales '
+     + '«iguales» son dos listas que todavía no divergen, y la del libro decidiría cancelaciones');
+  // Y el histograma del LIBRO viaja igual que el de las pestañas.
+  const detLibro = (careo && careo.numerologia) || {};
+  console.log('    histograma del libro: ' + JSON.stringify({ colores: detLibro.colores_leidos,
+    rojas: detLibro.filas_rojas, umbral: detLibro.umbral_rojas, histo: detLibro.histograma_rojas }));
+  af(detLibro.colores_leidos === true && detLibro.umbral_rojas === 3,
+     'el detalle del libro no dice el estado del color ni su umbral: ' + JSON.stringify(detLibro));
+  af(detLibro.filas_rojas === 2,
+     'el libro tiene DOS filas rojas en el fixture (Monserrat y Solo Libro Rojita): ' + detLibro.filas_rojas);
+  af(detLibro.histograma_rojas && detLibro.histograma_rojas[String(CAB_LIBRO.length)] === 2,
+     'el histograma del libro no viaja: es con lo que se calibra su umbral. '
+     + JSON.stringify(detLibro.histograma_rojas));
 
   completo = true;
   process.exitCode = mal ? 1 : 0;

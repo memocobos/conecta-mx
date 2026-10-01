@@ -82,6 +82,10 @@ const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
 // (`ZONA_NO_ES_ZONA`) eran la misma escrita dos veces, y la de aquí solo se
 // consultaba en UN sitio — por eso «-» se contaba como boleto. El dueño es el
 // parser, que es quien ve las filas.
+// Pesos para los motivos. Se escribe aquí y no se importa de la pantalla: este
+// lib corre en el servidor y la pantalla no es su dueño.
+const _mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
+
 function zonaUtil(z) {
   const t = String(z == null ? '' : z).trim();
   return esZonaUtil(t) ? t : '';
@@ -233,15 +237,53 @@ function planear(careo, opciones) {
     // con `boletos 0` y zona en NULL. Una baja no es una devolución.
     // ⚠️ Y va ANTES que todo lo demás: a una persona cancelada no se le propone
     // cambiarle la zona ni partirle la fila.
+    // 🔒 [CAREO-ZONA-1b] IDEMPOTENCIA: quien YA está bajada no vuelve al montón.
+    // Medido en el barrido del 1-oct: 116 bajas aplicadas, 0 errores — y 18
+    // filas con la nota DOS VECES. El montón es para las que FALTAN; sin esto,
+    // cada careo diario las re-aplicaría engordando `notas` sin fin.
+    // 🔒 SE MIRA EL **CRUDO**, no el normalizado: `leerBase` convierte un
+    // `boletos = 0` en **1** (su respaldo contra el null, que es correcto para
+    // la sincronía), así que preguntarle al normalizado dejaba esta guarda
+    // INALCANZABLE — y las bajas se re-proponían en cada careo. Cuando el crudo
+    // no viene (un llamador viejo), se cae al normalizado: así el candado
+    // degrada en vez de tronar.
+    const boletosReales = (v.boletos_crudo != null) ? Number(v.boletos_crudo) : Number(v.boletos);
+    const yaBaja = boletosReales === 0 && !String(v.zona || '').trim();
+
+    // ── [CAREO-ZONA-1b] EL ROJO DEL LIBRO, Y SU CASO FINO ──────────────────
+    // Regla firmada de Memo (1-oct): el rojo cancela en los DOS libros. Pero
+    // una persona VIVA en la pestaña cuya compra del LIBRO está roja NO es una
+    // baja: la fila roja cancela ESA compra CHEAP — su dinero y sus boletos ya
+    // quedaron fuera en `fundirNumerologia` — y la persona sigue viajando con su
+    // paquete. Cancelarla entera por una fila del libro sería demasiado, así
+    // que sale como AVISO y lo decide un humano.
+    // ⚠️ El orden importa: esto va ANTES de la baja, porque una persona con
+    // pestaña viva y libro rojo NO debe caer en `p.roja` por el libro.
+    if (p.libro_rojo && (p.pestanas || []).length) {
+      avisosZonas.push({ nombre: p.nombre, viajero_id: v.id, zonas: p.zonasReales || p.zonas || {},
+        de: String(v.zona || '') || null, libro_rojo: p.libro_rojo,
+        motivo: `tiene ${p.libro_rojo} compra(s) ROJA(S) en el libro de Numerología `
+              + `(${p.libro_rojo_monto ? _mxn(p.libro_rojo_monto) + ' que NO se suman' : 'sin dinero'}) `
+              + `pero SIGUE VIVA en la pestaña «${(p.pestanas || [])[0]}»: la fila roja cancela esa compra, `
+              + 'no a la persona — lo decide un humano.' });
+      continue;
+    }
+
     if (p.roja) {
-      const yaBaja = (Number(v.boletos) === 0) && !String(v.zona || '').trim();
       if (!yaBaja && quiere('bajas') && elegida(p.clave)) {
         bajas.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
           de_zona: String(v.zona || '') || null, de_boletos: Number(v.boletos || 1),
-          abonado: Number(v.abonado_previo || 0) || null, notas_previas: v.notas || '' });
+          abonado: Number(v.abonado_previo || 0) || null, notas_previas: v.notas || '',
+          // De dónde vino el rojo: la pestaña o el libro. La nota lo dirá, porque
+          // «cancelada» sin decir dónde manda a buscar en la hoja equivocada.
+          origen_rojo: (p.pestanas || []).length ? 'pestana' : 'libro' });
       }
       continue;
     }
+    // Y una persona que SOLO existe en el libro, con su compra roja: baja
+    // completa — no hay otra compra que la sostenga. `fundirNumerologia` le pone
+    // `roja` a esas, así que entra por el `if (p.roja)` de arriba y este
+    // comentario existe para que no parezca un caso olvidado.
 
     // ── 2.5b LA ZONA DE LA FILA, Y LAS FILAS «-» ───────────────────────────
     // 🔴 LAS ZONAS SE CUENTAN POR SU FORMA NORMALIZADA, NO POR LA CADENA
@@ -555,7 +597,10 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
   // se lee, no de dónde.
   const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [],
                       // [CAREO-ZONA-1]
-                      zonas: [], partidas: [], bajas: [], errores: [] };
+                      zonas: [], partidas: [], bajas: [],
+                      // [CAREO-ZONA-1b] Las que la base rehusó porque ya estaban
+                      // bajadas. Viajan APARTE de `bajas`: no se escribieron.
+                      bajas_ya_estaban: [], errores: [] };
   // La nota se AGREGA, nunca pisa: el historial de una fila es su rastro.
   const _nota = (previas, txt) => {
     const p0 = String(previas == null ? '' : previas).trim();
@@ -703,16 +748,42 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
   for (let i = 0; i < (plan.bajas || []).length; i += TANDA) {
     const tanda = plan.bajas.slice(i, i + TANDA);
     await Promise.all(tanda.map(async (x) => {
-      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+      // 🔴 [CAREO-ZONA-1b] LA ESCRITURA ES CONDICIONAL, y no es paranoia: la
+      // guarda de `planear` hace que una baja YA aplicada no se re-proponga,
+      // pero eso no basta. Medido el 1-oct: 116 bajas aplicadas y **18 filas
+      // con la nota DOS VECES**. La causa no es el plan — es CAREO-RETRY-1: una
+      // tanda que da 504 se reintenta con el MISMO `desde`, y si el reintento
+      // arranca antes de que la primera pasada aterrice, los DOS planes se
+      // calcularon con la persona aún viva y los dos escriben.
+      // 🔒 EL FILTRO LO CIERRA EN LA BASE: el PATCH solo casa con filas que
+      // **todavía no están bajadas**. La segunda escritura casa 0 filas y no
+      // engorda la nota. Es el único sitio donde dos planes en vuelo no pueden
+      // pisarse — una guarda en el plan siempre llega tarde a una carrera.
+      // ⚠️ VA CON `or=`, NO con `boletos=neq.0` a secas: un `boletos` en NULL no
+      // casa con `neq.0` — un NOT contra NULL traga filas, en SQL y en PostgREST—
+      // y esa fila se habría quedado sin bajar en silencio. El `or` la salva por
+      // la otra rama.
+      const filtro = `id=eq.${encodeURIComponent(x.viajero_id)}`
+        + '&or=(boletos.neq.0,zona_boleto.not.is.null)';
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?${filtro}`, {
         method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
         body: JSON.stringify({ boletos: 0, zona_boleto: null,
           notas: _nota(x.notas_previas,
-            `CANCELADA (fila roja del Excel) ${hoy}: venía con ${x.de_boletos} boleto(s) de `
-            + `«${x.de_zona || 'sin zona'}» · el abonado NO se toca`) }),
+            `CANCELADA (fila roja del ${x.origen_rojo === 'libro' ? 'libro de Numerología' : 'Excel'}) ${hoy}: `
+            + `venía con ${x.de_boletos} boleto(s) de «${x.de_zona || 'sin zona'}» · el abonado NO se toca`) }),
       });
       if (!r.ok) { resultado.errores.push({ paso: 'bajas', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
+      // 🔒 CERO FILAS CASADAS = YA ESTABA BAJADA, y se dice en vez de contarla
+      // como aplicada: un conteo que suma lo que no escribió es un número que
+      // miente, y aquí el número se le enseña a Bulma.
+      const filasTocadas = await r.json().catch(() => []);
+      if (Array.isArray(filasTocadas) && filasTocadas.length === 0) {
+        resultado.bajas_ya_estaban.push({ nombre: x.nombre, viajero_id: x.viajero_id });
+        return;
+      }
       resultado.bajas.push({ nombre: x.nombre, viajero_id: x.viajero_id,
-        de_zona: x.de_zona, de_boletos: x.de_boletos, abonado_intacto: x.abonado });
+        de_zona: x.de_zona, de_boletos: x.de_boletos, abonado_intacto: x.abonado,
+        origen_rojo: x.origen_rojo || 'pestana' });
     }));
   }
 

@@ -60,8 +60,9 @@ exports.handler = async (event) => {
   if (solo && !MONTONES_APLICABLES.includes(solo)) {
     return { statusCode: 400, headers, body: JSON.stringify({
       error: `«${solo}» no se aplica desde aquí. Se puede: ${MONTONES_APLICABLES.join(', ')}.`
-           + ' Las BAJAS y los AMBIGUOS no se aplican nunca: una baja es una persona y espera firma,'
-           + ' y elegir entre dos homónimos sería inventar el dato que falta.',
+           + ' Los AMBIGUOS no se aplican nunca: elegir entre dos homónimos sería inventar el dato'
+           + ' que falta. Las BAJAS sí se aplican desde CAREO-ZONA-1, y como todo lo demás:'
+           + ' solo con `confirmar:true`, nombrando a cada quien.',
       codigo: 'MONTON_NO_APLICABLE' }) };
   }
   const claves = Array.isArray(body.claves) ? body.claves.map(String).slice(0, 2000) : null;

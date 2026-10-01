@@ -30,7 +30,11 @@
 //      blanca que impide que un `solo:'bajas'` encuentre puerta.
 // =============================================================================
 
-const { normalizarNombre, TOLERANCIA_MXN } = require('./excel-careo');
+const { normalizarNombre, TOLERANCIA_MXN, esZonaUtil } = require('./excel-careo');
+// [CAREO-ZONA-1] La parte PURA de la puerta de zonas. La lista canónica la trae
+// el careo (`careo.zonasCanonicas`): aquí no se pide el catálogo, para que
+// `planear` siga siendo síncrono y puro.
+const { resolverZonaFicha } = require('./zona-ficha');
 // [DISPO-NORM-1] El dueño de «¿son la misma zona?» — el montón `fuera` empareja
 // chatarra↔base por zona normalizada, jamás por cadena exacta.
 const { normalizarZona } = require('./normalizar-zona');
@@ -41,7 +45,22 @@ const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
 
 // 🔒 LISTA BLANCA. Lo que no está aquí NO TIENE PUERTA, y por eso `bajas` y
 // `ambiguos` no aparecen: un `solo:'bajas'` se rehúsa antes de tocar nada.
-const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera'];
+// [CAREO-ZONA-1] Tres puertas nuevas: `zonas` (el cambio de zona de la fila),
+// `partidas` (el CHEAP repartido entre varias zonas) y `bajas` (la fila ROJA).
+//
+// 🔴 OJO, HAY **DOS COSAS LLAMADAS «BAJAS»** Y SOLO UNA TIENE PUERTA:
+//   · `montones.bajas` del CAREO  = gente que está en el sistema y NO en la
+//     pestaña. Sigue SIN puerta, y debe seguir: que alguien no aparezca este mes
+//     puede ser una pestaña nueva, un nombre mal escrito o una pestaña que no se
+//     pudo cosechar. Eso espera firma.
+//   · `plan.bajas` de AQUÍ           = gente cuya fila del Excel está **ROJA**.
+//     Ésa sí tiene puerta, porque la firma ya existe: «todo lo marcado en rojo
+//     son cancelaciones» (Memo, 30-sep).
+// 🔒 Este montón se llena SOLO de `p.roja` y JAMÁS de `M.bajas` — cablearlos
+// convertiría «no vino en la pestaña» en «cancelado» y borraría lugares de gente
+// que sí viaja. `ambiguos` sigue sin puerta a propósito.
+const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
+                             'zonas', 'partidas', 'bajas'];
 
 // 🔒 UN GUION NO ES UNA ZONA. En la pestaña, «-» es como las chicas escriben
 // «nada» —no un valor—, y la diferencia importa justo aquí: `viajero_migrar`
@@ -59,10 +78,13 @@ const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera'];
 // mexicano corriente — habría borrado a cualquier «Ana Matamoros» de verdad.
 // El hecho que distingue al placeholder no es cómo se llama, es que no tiene
 // zona.
-const ZONA_VACIA = ['', '-', '--', '---', 'n/a', 'na', 'sin zona'];
+// [CAREO-ZONA-1] ⚠️ LA LISTA SE PIDE, NO SE REPITE. Esta lista y la del parser
+// (`ZONA_NO_ES_ZONA`) eran la misma escrita dos veces, y la de aquí solo se
+// consultaba en UN sitio — por eso «-» se contaba como boleto. El dueño es el
+// parser, que es quien ve las filas.
 function zonaUtil(z) {
   const t = String(z == null ? '' : z).trim();
-  return ZONA_VACIA.includes(normalizarNombre(t)) ? '' : t;
+  return esZonaUtil(t) ? t : '';
 }
 
 // Fecha de hoy en Reynosa. `America/Matamoros`, NO Monterrey ni Cancún, y
@@ -180,43 +202,204 @@ function planear(careo, opciones) {
     porNombreBase.get(k).push(v);
   }
   const avisosBoletos = [];
+  // ── [CAREO-ZONA-1] LOS TRES MONTONES NUEVOS ───────────────────────────────
+  // `zonas`    → la zona de la fila difiere de `zona_boleto` → se propone el cambio.
+  // `partidas` → un CHEAP con boletos en VARIAS zonas → una fila por zona.
+  // `bajas`    → la fila está ROJA en el Excel → cancelación.
+  // `avisosZonas` → lo que NO se aplica, con nombre: zona que la ficha no
+  //                 conoce, catálogo ilegible, PLUS repartido, pestaña con
+  //                 `regla_zona`. La puerta decide igual que en compras:
+  //                 **canonizada se aplica y SE DICE, desconocida NO se aplica
+  //                 y se nombra.**
+  const zonasPlan = [], partidas = [], bajas = [], avisosZonas = [];
+  const CANON = Array.isArray(careo.zonasCanonicas) ? careo.zonasCanonicas : null;
+  // La zona de la pestaña, pasada por la puerta. Sin catálogo no se canoniza
+  // NADA y se dice — fingir que se validó es el hoyo de DISPO-NORM-1.
+  const porLaPuerta = (zc) => {
+    if (!CANON) return { estado: 'sin-catalogo', zona: String(zc || '').trim() };
+    return resolverZonaFicha(CANON, zc);
+  };
   for (const p of (careo.personas || [])) {
     const mismos = porNombreBase.get(p.clave) || [];
     if (mismos.length !== 1) continue;          // los ambiguos ya salen en su montón
     const v = mismos[0];
-    // 🔴 LOS BOLETOS SE CUENTAN DE `zonas`, NO DE `filas`. Y la diferencia NO es
-    // cosmética: `filas` lo incrementan las DOS fuentes del lado-Excel, y
-    // medido contra producción el 20-sep, 15 personas de Soy Luna están en las
-    // dos — con el libro de Memo repitiendo EXACTAMENTE los mismos boletos que
-    // la pestaña (Camila: 2 renglones en la pestaña y 2 filas en el libro, los
-    // mismos 2 boletos anotados dos veces). Con `filas` se le habrían escrito
-    // 4, y el stock habría cerrado zonas que sí tienen lugar.
-    //
-    // `zonas` solo lo llena `parsearPestana`, que es la fuente de verdad que la
-    // tuerca nombra: un renglón de pestaña = un boleto.
-    const enPestana = Object.values(p.zonas || {}).reduce((a, b) => a + b, 0);
+
+    // ── 2.5a LA FILA ROJA ES UNA CANCELACIÓN ────────────────────────────────
+    // Regla firmada de Memo (30-sep): «todo lo marcado en rojo en el Excel son
+    // cancelaciones». Se propone la BAJA: `boletos = 0` y `zona_boleto = NULL`,
+    // que es lo que libera el lugar.
+    // 🔒 EL ABONADO NO SE TOCA. El dinero cobrado queda registrado —
+    // precedente medido: Diana Marlene y Nohemi (karolg#1) conservan sus $5,500
+    // con `boletos 0` y zona en NULL. Una baja no es una devolución.
+    // ⚠️ Y va ANTES que todo lo demás: a una persona cancelada no se le propone
+    // cambiarle la zona ni partirle la fila.
+    if (p.roja) {
+      const yaBaja = (Number(v.boletos) === 0) && !String(v.zona || '').trim();
+      if (!yaBaja && quiere('bajas') && elegida(p.clave)) {
+        bajas.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
+          de_zona: String(v.zona || '') || null, de_boletos: Number(v.boletos || 1),
+          abonado: Number(v.abonado_previo || 0) || null, notas_previas: v.notas || '' });
+      }
+      continue;
+    }
+
+    // ── 2.5b LA ZONA DE LA FILA, Y LAS FILAS «-» ───────────────────────────
+    // 🔴 LAS ZONAS SE CUENTAN POR SU FORMA NORMALIZADA, NO POR LA CADENA
+    // CRUDA — y esto es el caso Karla de `juniorh`, que el brief nombra: sus dos
+    // filas dicen «3ER NIVEL CENTRAL» y «3er Nivel Central», que son LA MISMA
+    // zona escrita de dos formas. Contando crudo salían DOS zonas y el plan le
+    // proponía PARTIR la fila: una fila nueva por una mayúscula. No es un
+    // cambio de zona ni un reparto — **es solo el conteo** (2 boletos).
+    // La pregunta «¿son la misma?» se le hace al dueño de siempre; aquí solo se
+    // AGRUPA con su respuesta, conservando una ortografía para que la puerta
+    // tenga qué canonizar.
+    // 🔴 SI `zonasReales` NO VIENE, SE DERIVA DE `zonas` — y esto lo cazó el
+    // careo de Numerología, no una lectura. `zonasReales` lo pone
+    // `parsearPestana`, pero NO todos los productores pasan por ahí: las
+    // personas que solo existen en el libro las arma `fundirNumerologia`, y
+    // cualquier llamador que construya una persona a mano tampoco lo trae. Sin
+    // esta caída, su conteo se volvía 0 **en silencio** y la persona se saltaba
+    // entera: un boleto que deja de contarse cierra zonas que sí tienen lugar.
+    // ⚠️ La caída FILTRA igual (una zona «-» sigue sin contar), así que degrada al
+    // comportamiento viejo sin heredar su hoyo.
+    const brutas = (p.zonasReales && Object.keys(p.zonasReales).length) ? p.zonasReales
+      : Object.fromEntries(Object.entries(p.zonas || {}).filter(([zc]) => esZonaUtil(zc)));
+    const reales = {};
+    const crudaDe = {};
+    for (const [zc, n] of Object.entries(brutas)) {
+      const k = normalizarNombre(zc);
+      if (!(k in crudaDe)) crudaDe[k] = zc;
+      reales[crudaDe[k]] = (reales[crudaDe[k]] || 0) + (Number(n) || 0);
+    }
+    const realesK = Object.keys(reales);
+    const enPestana = Object.values(reales).reduce((a, b) => a + b, 0);
+    // Los guiones, igual: si el productor no los contó, se derivan de `zonas`.
+    const guiones = (p.guiones != null) ? Number(p.guiones)
+      : Object.entries(p.zonas || {}).filter(([zc]) => !esZonaUtil(zc))
+              .reduce((a, [, n]) => a + (Number(n) || 0), 0);
+    const zonaSis = String(v.zona || '').trim();
+    const paqCheap = String(p.paquete || v.paquete || '').trim().toLowerCase() === 'cheap';
+
+    // ⚠️ PESTAÑA CON `regla_zona`: la columna Boleto es el selector del EVENTO
+    // (el día de Corona), no el asiento. No es un cambio de zona.
+    if (p.reglaZona) {
+      if (realesK.length && zonaSis && normalizarNombre(realesK[0]) !== normalizarNombre(zonaSis)) {
+        avisosZonas.push({ nombre: p.nombre, viajero_id: v.id, zonas: reales, de: zonaSis,
+          motivo: `su pestaña se reparte por zona (regla «${p.reglaZona}»), así que la columna Boleto es `
+                + 'el DÍA del evento y no el asiento: un cambio de zona aquí sería proponer el día.' });
+      }
+      continue;
+    }
+
+    // TODAS sus filas en «-» → no tiene boleto de ninguna zona. Se propone
+    // `zona_boleto = NULL`, que es lo que libera el lugar (el caso Ximena
+    // Ocañas: el index decía AGOTADO con 1 libre).
+    // ⚠️ NO se propone `boletos`: una fila «-» no cuenta como boleto, así que no
+    // hay número que escribir — y el estado aplicado el 30-sep dejó `boletos`
+    // como estaba. Inventar un 0 aquí sería una decisión que nadie tomó.
+    if (!realesK.length && guiones > 0) {
+      if (zonaSis && quiere('zonas') && elegida(p.clave)) {
+        zonasPlan.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
+          de: zonaSis, a: null, estado_puerta: 'sin-zona', notas_previas: v.notas || '',
+          motivo: `sus ${guiones} fila(s) del Excel traen Boleto «-»: no ocupa boleto de ninguna zona.` });
+      }
+      continue;
+    }
+
+    // 🔴 LOS BOLETOS SE CUENTAN DE LAS ZONAS **REALES**, NO DE `filas` — y
+    // desde CAREO-ZONA-1, tampoco de `zonas` a secas: una fila «-» no cuenta
+    // como boleto (el caso Monserrat: 1 Platino + 1 «-» son UN boleto, no dos).
+    // Lo de `filas` sigue valiendo y es la razón original: lo incrementan las
+    // DOS fuentes del lado-Excel, y medido contra producción el 20-sep, 15
+    // personas de Soy Luna están en las dos — el libro de Memo repitiendo los
+    // MISMOS boletos que la pestaña. Con `filas` se habrían escrito 4 donde hay 2.
     if (!enPestana) continue;
     const actual = Number(v.boletos || 1);
+
+    // ── 2.5c EL CHEAP REPARTIDO → UNA FILA POR ZONA ─────────────────────────
+    // Regla de Memo (30-sep, caso Diana Loredo en natanael): un CHEAP son SOLO
+    // boletos, así que sus filas pueden repartirse entre 2+ zonas. El sistema
+    // tiene UNA fila, y repartir los boletos dentro de ella era imposible: por
+    // eso esto era un AVISO. Hoy se PARTE.
+    // 🔒 EL DINERO SE QUEDA ENTERO EN LA FILA PRINCIPAL — la de MÁS boletos, y
+    // a empate la primera. Las filas nuevas nacen en 0 con una nota que apunta
+    // a ella. Repartir el dinero entre zonas sería inventar cuánto pagó por
+    // cada boleto, y el precedente aplicado el 30-sep es exactamente éste:
+    // Diana Loredo conserva sus $4,200 en Tercer Nivel y su fila de Segundo
+    // Nivel nació en total 0 / abonado 0.
+    // ⚠️ SOLO CHEAP. Un PLUS con dos zonas lleva hotel y transporte dentro: eso
+    // sigue siendo aviso para ojo humano.
+    if (realesK.length > 1) {
+      if (!paqCheap) {
+        avisosBoletos.push({ nombre: p.nombre, viajero_id: v.id, de: actual, a: enPestana,
+          zonas: reales,
+          motivo: `sus ${enPestana} boletos están repartidos entre ${realesK.length} zonas `
+                + `(${realesK.join(', ')}) y NO es CHEAP: partir un paquete con hotel y transporte `
+                + 'pide ojo humano.' });
+        continue;
+      }
+      // Las zonas, por la puerta. Si ALGUNA es desconocida no se parte nada: una
+      // fila nueva con una zona que la ficha no tiene es el hoyo de DISPO-NORM-1
+      // naciendo otra vez.
+      const vistas = realesK.map((zc) => ({ zc, v: porLaPuerta(zc), n: reales[zc] }));
+      const mala = vistas.find((x) => x.v.estado !== 'exacta' && x.v.estado !== 'canonizada');
+      if (mala) {
+        avisosZonas.push({ nombre: p.nombre, viajero_id: v.id, zonas: reales, de: zonaSis,
+          motivo: `no se parte: la zona «${mala.zc}» ${mala.v.estado === 'sin-catalogo'
+            ? 'no se pudo validar (el catálogo no se leyó)'
+            : 'no existe en la ficha'} — escribirla creaba una zona que el sitio no conoce.` });
+        continue;
+      }
+      if (!quiere('partidas') || !elegida(p.clave)) continue;
+      // La PRINCIPAL: la de más boletos; a empate, la primera que apareció.
+      let principal = vistas[0];
+      for (const x of vistas) if (x.n > principal.n) principal = x;
+      partidas.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
+        paquete: 'cheap', notas_previas: v.notas || '',
+        principal: { zona: principal.v.zona, boletos: principal.n, capturada: principal.zc },
+        nuevas: vistas.filter((x) => x !== principal)
+                      .map((x) => ({ zona: x.v.zona, boletos: x.n, capturada: x.zc })),
+        de_zona: zonaSis || null, de_boletos: actual,
+        canonizadas: vistas.filter((x) => x.v.estado === 'canonizada').map((x) => x.zc) });
+      continue;
+    }
+
+    // ── 2.5d UNA SOLA ZONA REAL: la zona y el conteo, en la MISMA pasada ─────
+    // Hoy esto eran DOS avisos que se bloqueaban entre sí: el conteo no se
+    // aplicaba porque la zona no coincidía, y la zona no se tocaba nunca. Ese
+    // empate dejó 28 personas con boletos de menos el 30-sep.
+    const unica = realesK[0];
+    const puerta = porLaPuerta(unica);
+    const mismaZona = zonaSis && normalizarNombre(unica) === normalizarNombre(zonaSis);
+    if (!mismaZona) {
+      if (puerta.estado !== 'exacta' && puerta.estado !== 'canonizada') {
+        avisosZonas.push({ nombre: p.nombre, viajero_id: v.id, zonas: reales, de: zonaSis,
+          a_capturada: unica, estado_puerta: puerta.estado,
+          motivo: `la pestaña lo pone en «${unica}» y ${puerta.estado === 'sin-catalogo'
+            ? 'el catálogo no se pudo leer para validarla'
+            : 'la ficha no tiene esa zona'}: el careo no escribe una zona que el sitio no conoce.` });
+        continue;
+      }
+      if (quiere('zonas') && elegida(p.clave)) {
+        zonasPlan.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
+          notas_previas: v.notas || '',
+          de: zonaSis || null, a: puerta.zona, capturada: unica,
+          estado_puerta: puerta.estado,
+          boletos_de: actual, boletos_a: enPestana,
+          guiones: guiones || undefined });
+      }
+      // El conteo viaja DENTRO del cambio de zona: son la misma pasada, y
+      // escribirlos por separado dejaría la fila un instante con la zona nueva
+      // y el conteo viejo.
+      continue;
+    }
     if (enPestana === actual) continue;         // ya cuadra
-    const zonas = Object.keys(p.zonas || {});
-    const zonaFila = String(v.zona || '').trim();
-    if (zonas.length > 1) {
-      avisosBoletos.push({ nombre: p.nombre, viajero_id: v.id, de: actual, a: enPestana,
-        zonas: p.zonas,
-        motivo: `sus ${enPestana} boletos están repartidos entre ${zonas.length} zonas (${zonas.join(', ')}) `
-              + `y en el sistema tiene UNA fila en «${zonaFila || 'sin zona'}»: repartirlos sería inventar en cuál va cada uno.` });
-      continue;
-    }
-    if (zonas.length === 1 && normalizarNombre(zonas[0]) !== normalizarNombre(zonaFila)) {
-      avisosBoletos.push({ nombre: p.nombre, viajero_id: v.id, de: actual, a: enPestana,
-        zonas: p.zonas,
-        motivo: `la pestaña lo pone en la zona «${zonas[0]}» y su fila dice «${zonaFila || 'sin zona'}»: `
-              + 'primero hay que saber en cuál está.' });
-      continue;
-    }
     if (!quiere('boletos') || !elegida(p.clave)) continue;
     boletos.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
-      de: actual, a: enPestana, zona: zonaFila });
+      de: actual, a: enPestana, zona: zonaSis,
+      // Las filas «-» se REPORTAN aunque no cuenten: el caso Monserrat (1
+      // Platino + 1 «-») tiene que poder leerse sin abrir el Excel.
+      guiones: guiones || undefined });
   }
 
   // ── 2.6 [BOLETOS-1 adenda] LA CHATARRA → `vendidos_fuera` ─────────────────
@@ -329,7 +512,14 @@ function planear(careo, opciones) {
       pestanas: p.pestanas || [] });
   }
 
-  return { abonos, totales, altas, negativas, saltados, boletos, fuera, avisos_boletos: avisosBoletos };
+  return { abonos, totales, altas, negativas, saltados, boletos, fuera,
+           avisos_boletos: avisosBoletos,
+           // [CAREO-ZONA-1]
+           zonas: zonasPlan, partidas, bajas, avisos_zonas: avisosZonas,
+           // ⚠️ Se DICE cuando el catálogo no se pudo leer: sin él la puerta no
+           // canoniza nada y los montones de zona salen vacíos — un vacío sin
+           // razón se lee como «no había nada que cambiar».
+           zonas_sin_catalogo: CANON ? false : true };
 }
 
 
@@ -363,7 +553,14 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
   // ⚠️ `quien` llega POR PARÁMETRO y sale del TOKEN en el handler — nunca del
   // cliente. El anti-spoofing no se relajó al mudarse: se movió el sitio donde
   // se lee, no de dónde.
-  const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [], errores: [] };
+  const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [],
+                      // [CAREO-ZONA-1]
+                      zonas: [], partidas: [], bajas: [], errores: [] };
+  // La nota se AGREGA, nunca pisa: el historial de una fila es su rastro.
+  const _nota = (previas, txt) => {
+    const p0 = String(previas == null ? '' : previas).trim();
+    return p0 ? (p0 + ' · ' + txt) : txt;
+  };
 
   // ── 1. LOS ABONOS, EN UN SOLO INSERT ──────────────────────────────────────
   // Un arreglo en un POST: una sola ida y vuelta para todos. Sin `on_conflict`
@@ -421,6 +618,101 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
       });
       if (!r.ok) { resultado.errores.push({ paso: 'boletos', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
       resultado.boletos.push({ nombre: x.nombre, viajero_id: x.viajero_id, de: x.de, a: x.a });
+    }));
+  }
+
+  // ── 2.5a [CAREO-ZONA-1] LA ZONA, Y EL CONTEO EN EL MISMO PATCH ────────────
+  // 🔒 UN SOLO PATCH POR PERSONA. La zona y el conteo son la MISMA verdad de la
+  // pestaña; escribirlos en dos pasos dejaría la fila un instante con la zona
+  // nueva y el conteo viejo — y si el segundo falla, queda así. El empate entre
+  // los dos avisos es justo lo que dejó 28 personas sin corregir el 30-sep.
+  // ⚠️ `a: null` es el caso Ximena (todas sus filas en «-»): se limpia la zona y
+  // NO se toca `boletos`, porque una fila «-» no es un número que escribir.
+  for (let i = 0; i < (plan.zonas || []).length; i += TANDA) {
+    const tanda = plan.zonas.slice(i, i + TANDA);
+    await Promise.all(tanda.map(async (x) => {
+      const cuerpo = { zona_boleto: x.a };
+      if (x.boletos_a != null && x.boletos_a !== x.boletos_de) cuerpo.boletos = x.boletos_a;
+      const nota = x.a == null
+        ? `Careo zonas ${hoy}: sus filas del Excel traen Boleto «-» — zona liberada (no ocupa boleto)`
+        : `Careo zonas ${hoy}: ${x.de ? `«${x.de}» → ` : ''}«${x.a}» según la pestaña`
+          + (x.estado_puerta === 'canonizada' ? ` (escrita «${x.capturada}», canonizada a la ficha)` : '')
+          + (cuerpo.boletos != null ? ` · boletos ${x.boletos_de}→${x.boletos_a}` : '')
+          + (x.guiones ? ` · ${x.guiones} fila(s) en «-» no cuentan` : '');
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify({ ...cuerpo, notas: _nota(x.notas_previas, nota) }),
+      });
+      if (!r.ok) { resultado.errores.push({ paso: 'zonas', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
+      resultado.zonas.push({ nombre: x.nombre, viajero_id: x.viajero_id, de: x.de, a: x.a,
+                             boletos: cuerpo.boletos != null ? `${x.boletos_de}→${x.boletos_a}` : null,
+                             canonizada: x.estado_puerta === 'canonizada' ? x.capturada : null });
+    }));
+  }
+
+  // ── 2.5b [CAREO-ZONA-1] EL CHEAP REPARTIDO: UNA FILA POR ZONA ─────────────
+  // 🔒 EL ORDEN IMPORTA Y NO ES CAPRICHO: primero se CORRIGE la principal
+  // (zona + boletos) y solo si eso salió bien se INSERTAN las nuevas. Al revés,
+  // un fallo a media partida dejaría boletos DUPLICADOS — la fila vieja con su
+  // conteo entero más las nuevas— y el stock cerraría zonas que sí tienen lugar.
+  // 🔒 EL DINERO NO SE REPARTE: la principal conserva `total_contrato` y
+  // `abonado_previo` intactos (no se nombran, así que no se pisan) y las nuevas
+  // nacen en 0. Repartirlo sería inventar cuánto pagó por cada boleto.
+  for (const x of (plan.partidas || [])) {
+    const rP = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+      method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+      body: JSON.stringify({
+        zona_boleto: x.principal.zona, boletos: x.principal.boletos,
+        notas: _nota(x.notas_previas,
+          `Fila partida ${hoy}: CHEAP repartido — se queda con ${x.principal.boletos} boleto(s) de `
+          + `«${x.principal.zona}» y el DINERO entero; sus otros boletos salieron a fila(s) aparte`),
+      }),
+    });
+    if (!rP.ok) {
+      resultado.errores.push({ paso: 'partidas', nombre: x.nombre, detalle: (await rP.text()).slice(0, 200) });
+      continue;      // ← sin tocar las nuevas: no se duplican boletos
+    }
+    const nuevas = [];
+    for (const n of x.nuevas) {
+      const rN = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
+        method: 'POST', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify([{
+          evento_id: eventoId, nombre: x.nombre, zona_boleto: n.zona, boletos: n.boletos,
+          tipo_paquete: 'cheap', tipo_viajero: 'cliente',
+          // 🔒 EN CERO, Y DICHO: el dinero vive en la fila principal.
+          total_contrato: 0, abonado_previo: 0,
+          notas: `Fila partida ${hoy}: su(s) ${n.boletos} boleto(s) de «${n.zona}» `
+               + `(el dinero vive en su fila de «${x.principal.zona}»)`,
+        }]),
+      });
+      if (!rN.ok) { resultado.errores.push({ paso: 'partidas', nombre: x.nombre, detalle: (await rN.text()).slice(0, 200) }); continue; }
+      nuevas.push({ zona: n.zona, boletos: n.boletos });
+    }
+    resultado.partidas.push({ nombre: x.nombre, viajero_id: x.viajero_id,
+      principal: x.principal, nuevas, canonizadas: x.canonizadas });
+  }
+
+  // ── 2.5c [CAREO-ZONA-1] LA FILA ROJA: LA BAJA ─────────────────────────────
+  // Regla firmada de Memo (30-sep): «todo lo marcado en rojo en el Excel son
+  // cancelaciones». `boletos = 0` y `zona_boleto = NULL`, que es lo que libera
+  // el lugar.
+  // 🔒 EL ABONADO **NO SE NOMBRA**, así que no se pisa: el dinero cobrado queda
+  // registrado. Precedente medido en la base — Diana Marlene y Nohemi
+  // (karolg#1) conservan sus $5,500 con boletos 0 y zona NULL. Una baja no es
+  // una devolución, y el careo no decide dinero que nadie le pidió decidir.
+  for (let i = 0; i < (plan.bajas || []).length; i += TANDA) {
+    const tanda = plan.bajas.slice(i, i + TANDA);
+    await Promise.all(tanda.map(async (x) => {
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${encodeURIComponent(x.viajero_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify({ boletos: 0, zona_boleto: null,
+          notas: _nota(x.notas_previas,
+            `CANCELADA (fila roja del Excel) ${hoy}: venía con ${x.de_boletos} boleto(s) de `
+            + `«${x.de_zona || 'sin zona'}» · el abonado NO se toca`) }),
+      });
+      if (!r.ok) { resultado.errores.push({ paso: 'bajas', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
+      resultado.bajas.push({ nombre: x.nombre, viajero_id: x.viajero_id,
+        de_zona: x.de_zona, de_boletos: x.de_boletos, abonado_intacto: x.abonado });
     }));
   }
 

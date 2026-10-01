@@ -53,6 +53,21 @@ function _hoja() {
     : SpreadsheetApp.getActiveSpreadsheet();
 }
 
+// [CAREO-ZONA-1] ¿Este fondo es ROJO? Umbral declarado, pendiente de medición
+// contra la pestaña de Karol 7-nov. Acepta '#rrggbb' y '#rgb'; cualquier otra
+// cosa (incluido 'white', que es lo que Sheets devuelve para el default) es NO.
+function _esRojo(hex) {
+  var h = String(hex || '').trim().toLowerCase();
+  if (h.charAt(0) !== '#') return false;            // 'white' y los nombrados: no
+  if (h.length === 4) h = '#' + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2) + h.charAt(3) + h.charAt(3);
+  if (h.length !== 7) return false;
+  var r = parseInt(h.substr(1, 2), 16) / 255;
+  var g = parseInt(h.substr(3, 2), 16) / 255;
+  var b = parseInt(h.substr(5, 2), 16) / 255;
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+  return r >= 0.45 && g <= 0.70 && b <= 0.70 && (r - g) >= 0.20 && (r - b) >= 0.20;
+}
+
 function _responder(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
@@ -95,8 +110,48 @@ function doPost(e) {
 
     var rango = hoja.getDataRange();
     var filas = rango ? rango.getDisplayValues() : [];
+    // ── [CAREO-ZONA-1] EL COLOR DE FONDO, PARA LAS CANCELACIONES ────────────
+    // Regla firmada de Memo (30-sep-2026): «todo lo marcado en rojo en el Excel
+    // son cancelaciones.» El cosechador NO interpretaba colores, así que esa
+    // regla era invisible para el sistema.
+    //
+    // 🔒 ESTE SCRIPT NO DECIDE QUIÉN ESTÁ CANCELADO: devuelve el HECHO (qué
+    // celdas son rojas y cuántas) y el careo decide. Un script que interpreta
+    // es un script que hay que depurar a ciegas desde otro lado — la misma
+    // razón por la que las celdas van como texto mostrado y no parseadas.
+    //
+    // ⚠️ EL UMBRAL ESTÁ DECLARADO AQUÍ Y **ESPERA MEDICIÓN** contra las filas
+    // rojas REALES de la pestaña de Karol 7-nov (el fixture vivo que nombra el
+    // encargo). Se eligió conservador: rojo dominante y con saturación, para no
+    // marcar un rosa pálido de formato ni el blanco por defecto.
+    //   r >= 0.45  ·  g <= 0.70  ·  b <= 0.70  ·  r−g >= 0.20  ·  r−b >= 0.20
+    // 🔴 EL TECHO DE `g`/`b` NO SOBRA, y lo cacé al probarlo: sin él, el
+    // **#f4cccc** de la paleta de Sheets («rojo claro 3», un rosa pálido de
+    // formato) pasaba el filtro — r−g da 0.157, suficiente para un umbral que
+    // solo mirara dominancia. Lo que distingue un rosa de un rojo es que su
+    // verde y su azul están ALTOS, cerca del blanco.
+    // Con estos números, la paleta de Sheets cae así:
+    //   SÍ  #ff0000 (rojo) · #cc0000 (rojo oscuro 1) · #e06666 (rojo claro 1)
+    //       · #ea9999 (rojo claro 2)
+    //   NO  #f4cccc (rojo claro 3, el rosa de formato) · #ffcccc · #ffffff
+    //       · #cccccc · 'white' (el default, que Sheets devuelve por nombre)
+    // 🔒 Y SE DEVUELVE LA CUENTA DE CELDAS ROJAS POR FILA, no solo un booleano:
+    // así el umbral se puede corregir con datos en vez de con opiniones, y se
+    // ve si el humano pinta la fila entera o solo una celda.
+    var fondos = [];
+    try { fondos = rango ? rango.getBackgrounds() : []; } catch (e0) { fondos = []; }
+    var rojas = filas.map(function (f, i) {
+      var fila = fondos[i] || [];
+      var n = 0;
+      for (var c = 0; c < fila.length; c++) if (_esRojo(fila[c])) n++;
+      return n;
+    });
     return _responder({
       ok: true, pestana: nombre, filas: filas, n_filas: filas.length,
+      // `rojas[i]` = cuántas celdas rojas tiene la fila i. El careo decide con
+      // esto; si `getBackgrounds` falla, viaja un arreglo VACÍO y el careo lo
+      // lee como «no sé», no como «ninguna roja».
+      rojas: rojas, colores_leidos: fondos.length > 0,
       pestanas: pestanas, leido_en: new Date().toISOString(),
     });
   } catch (err) {

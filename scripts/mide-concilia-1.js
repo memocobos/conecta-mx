@@ -20,7 +20,7 @@
 //
 // Se corre:  npm run mide:concilia-1
 // ══════════════════════════════════════════════════════════════════════════
-const fs = require('fs'), os = require('os'), path = require('path');
+const fs = require('fs'), os = require('os'), path = require('path'), vm = require('vm');
 const { execSync } = require('child_process');
 const RAIZ = path.join(__dirname, '..');
 
@@ -39,8 +39,26 @@ function ver(fn) { try { const v = fn(); return v === undefined ? 'undefined' : 
 function marcador() {
   console.log('\n' + '─'.repeat(46));
   if (!completo) console.log('❌ ARNÉS CAÍDO · la corrida NO llegó al final: lo de abajo NO se midió');
+  // 🔒 EL ÉXITO VACÍO TAMBIÉN HABLA. Con cero aserciones, un «✅ VERDE · 0 en
+  // verde» se lee igual que una corrida sana — y es justo lo contrario: no se
+  // midió nada. Esta casa ya pagó que «agotar lo ya agotado era mudo».
+  if (verde + rojo === 0) { console.log('⚠️  NADA MEDIDO · cero aserciones corrieron: esto NO es un verde'); return; }
   console.log((rojo ? '❌ ROJO · ' : '✅ VERDE · ') + verde + ' en verde, ' + rojo + ' en rojo');
   fallos.slice(0, 20).forEach((f) => console.log('  · ' + f));
+}
+// Rebana una función del archivo servido. ⚠️ El `async` va ADELANTE del ancla y
+// un `indexOf` se lo come: la rebanada sale SIN async y el vm truena en el
+// primer await. El prefijo se re-mira hacia atrás en vez de suponerse.
+function funcionDe(src, nombre) {
+  let i = src.indexOf('function ' + nombre + '(');
+  if (i < 0) return null;
+  if (src.slice(Math.max(0, i - 6), i) === 'async ') i -= 6;
+  let d = 0;
+  for (let k = src.indexOf('{', i); k < src.length; k++) {
+    if (src[k] === '{') d++;
+    if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); }
+  }
+  return null;
 }
 function sacar(ref, etiqueta) {
   const sha = execSync('git rev-parse ' + ref, { cwd: RAIZ, encoding: 'utf8' }).trim();
@@ -50,6 +68,36 @@ function sacar(ref, etiqueta) {
 }
 const BASE = process.env.BASE || '5e1c501';      // el merge de NUBE4-ARNES-1
 const HEAD_SHA = process.env.HEAD_SHA || 'HEAD'; // se re-ancla al merge
+
+// ══ EL GUARDIÁN DE LA TRAMPA QUE ESTA CASA PAGA UNA Y OTRA VEZ ═══════════
+// 🔴 El arnés mide ÁRBOLES ARCHIVADOS (`git archive`), así que mide el **COMMIT**
+// — nunca lo que acabas de escribir. Un cambio sin commitear sale en ROJO
+// contra código correcto, y el rojo se lee como un defecto del código. En una
+// sola sesión del 1-oct se pagó CUATRO veces (CAREO-ZONA-1b, 1c, CAREO-RED-1 y
+// aquí). Así que en vez de volver a pagarla, se NOMBRA: si los archivos que este
+// arnés lee del árbol tienen cambios pendientes y se está midiendo el HEAD
+// actual, la corrida se detiene diciendo exactamente eso.
+const MEDIDOS = ['netlify/functions/_lib/concilia.js', 'netlify/functions/admin-concilia.js',
+                 'kamehouse-radar.js', 'kamehouse.html'];
+function avisarSiSucio() {
+  let sucio = '';
+  try {
+    sucio = execSync('git status --porcelain -- ' + MEDIDOS.join(' '), { cwd: RAIZ, encoding: 'utf8' }).trim();
+  } catch (_) { return; }
+  if (!sucio) return;
+  let mismo = false;
+  try {
+    mismo = execSync('git rev-parse ' + HEAD_SHA, { cwd: RAIZ, encoding: 'utf8' }).trim()
+         === execSync('git rev-parse HEAD', { cwd: RAIZ, encoding: 'utf8' }).trim();
+  } catch (_) { mismo = false; }
+  if (!mismo) return;   // midiendo otro commit a propósito: es asunto de quien corre
+  console.log('\n⚠️  EL ARNÉS MIDE EL COMMIT, NO TU ÁRBOL DE TRABAJO.');
+  console.log('   Estos archivos tienen cambios SIN COMMITEAR y por eso NO se están midiendo:');
+  sucio.split('\n').forEach((l) => console.log('     ' + l));
+  console.log('   Committea y vuelve a correr — o pasa HEAD_SHA=<sha> si de verdad quieres medir otro árbol.');
+  console.log('   (Se corta aquí a propósito: seguir daría rojos contra código correcto.)\n');
+  process.exit(2);
+}
 
 // ── EL RELOJ, RELATIVO ──────────────────────────────────────────────────────
 const AHORA = Date.now();
@@ -164,6 +212,7 @@ function limpiar(dir) {
 
 (async function main() {
   process.on('exit', marcador);
+  avisarSiSucio();
   const b = sacar(BASE, 'cc-base'), h = sacar(HEAD_SHA, 'cc-head');
   console.log('BASE ' + b.sha.slice(0, 7) + '   HEAD ' + h.sha.slice(0, 7));
   if (b.sha === h.sha) { console.log('❌ BASE y HEAD son el MISMO commit.'); process.exit(1); }
@@ -192,8 +241,15 @@ function limpiar(dir) {
   console.log('    métodos que el código nombra: lib=' + ver(() => metodos(srcLib)) + ' handler=' + ver(() => metodos(srcHan)));
   af(metodos(srcLib).every((m) => m === 'GET') && metodos(srcHan).every((m) => m === 'GET'),
      () => '🔴 la fase 1 NOMBRA un método de escritura: ' + ver(() => [...metodos(srcLib), ...metodos(srcHan)]));
-  af(!/\bPATCH\b|\bDELETE\b|method:\s*'POST'/.test(srcLib),
-     'la lib menciona PATCH/DELETE/POST: la fase 1 no escribe un peso');
+  // 🔴 ESTA ASERCIÓN SE CAZABA SOLA: prohibía las palabras PATCH/POST/DELETE y
+  // el COMENTARIO de la lib que explica que no hay ninguna las NOMBRA. Es la ley
+  // de la casa — el comentario que explica por qué X no está CONTIENE X — y van
+  // tres veces en esta sesión. Se caza el HECHO: una opción `method:` en una
+  // llamada, que es lo único con lo que se escribe. La lib solo lee, así que no
+  // debe nombrar ninguna.
+  af(!/method\s*:/.test(srcLib),
+     () => '🔴 la lib trae una opción `method:`: solo lee, así que no debería nombrar ninguna. '
+     + ver(() => (srcLib.match(/.{0,40}method\s*:.{0,20}/g) || [])));
   // Y el despacho conoce sus acciones (ley de RAD-FIX-CAMINO).
   af(/const ACCIONES = \['reporte', 'radar'\]/.test(srcHan),
      'las acciones no están en `ACCIONES`: tres tuercas llegaron rotas a prod por eso');
@@ -237,8 +293,15 @@ function limpiar(dir) {
   console.log('\n[K] los que casan · y dos personas con el mismo monto');
   const t = r.d.totales || {};
   console.log('    totales: ' + ver(() => t));
-  af(t.casados_filas === 4,
-     () => 'tenían que casar CUATRO (Jorge $2,000 y los dos de $700... y nadie más): ' + ver(() => t));
+  // ⚠️ SON **TRES**, y mi primera aserción dijo cuatro: Parcial Perez es un
+  // movimiento de CAJA sin abono — no puede casar con nada, por definición sale
+  // en el montón inverso. El rojo era de la aserción, no del código. Se nombran
+  // los tres, porque un conteo que cuadra puede cuadrar con la gente equivocada.
+  af(t.casados_filas === 3, () => 'tenían que casar TRES: ' + ver(() => t));
+  const nomCasados = (r.d.casados || []).map((x) => x.nombre).sort();
+  af(nomCasados.length === 3 && nomCasados.some((x) => /Jorge/.test(x))
+     && nomCasados.filter((x) => /Mismo Monto/.test(x)).length === 2,
+     () => 'los casados no son Jorge y los DOS de $700: ' + ver(() => nomCasados));
   // 🔒 LA LEY DEL `Map` POR LLAVE NO ÚNICA: los dos de $700 son personas
   // distintas y las dos casan. Si el casamiento colapsara por llave, una se
   // quedaría sin pareja y saldría como descuadre — un descuadre INVENTADO.
@@ -253,8 +316,13 @@ function limpiar(dir) {
   af(t.sin_nombre_contratos === 1 && !sc.some((x) => x.monto === 500),
      () => 'el abono cuyo viajero no existe tenía que ir a `sin_nombre`, no al montón de descuadres: '
      + 'inflaría la diferencia con lo que en realidad es un hueco de datos. ' + ver(() => t));
-  af(r.d.diferencia === 1200 - 1500,
-     () => 'la diferencia no es (solo contratos − solo caja) = 1200 − 1500: ' + ver(() => r.d.diferencia));
+  // ⚠️ −1,300, no −300: el lado CAJA lleva a Sofía ($1,500) **y** el parcial de
+  // Parcial Perez ($1,000), que yo mismo sembré y luego olvidé al escribir la
+  // cuenta. Otra vez la aserción, no el código.
+  af(r.d.diferencia === 1200 - 2500,
+     () => 'la diferencia no es (solo contratos − solo caja) = 1200 − 2500 = −1300: ' + ver(() => r.d.diferencia));
+  af(t.solo_caja_filas === 2 && t.solo_caja_monto === 2500,
+     () => 'el montón de caja no trae a Sofía Y al parcial: ' + ver(() => t));
   af(r.d.cuadra === false, 'con dos montones llenos `cuadra` no puede ser true');
 
   // ── [A] AUD-1 · EL SALDO SE LO CONTESTA EL DUEÑO ──────────────────────
@@ -355,6 +423,119 @@ function limpiar(dir) {
   af(Array.isArray(rr.d.muestra_contratos),
      'el radar no manda una MUESTRA con nombres: «hay diferencia» sin un nombre manda a buscar');
   af(rr.d.solo_lectura === true, 'el radar no dice que esto es solo lectura');
+
+  // ── [S] HABLA CUANDO HAY QUE HABLAR, Y **SE CALLA** CUANDO NO ────────
+  // La ley de NUBE: un aviso permanente se vuelve parte del mueble y deja de
+  // avisar. ⚠️ Y se mide con `reporte` sobre DOS periodos, no con `radar`: el
+  // mes del Radar depende del CALENDARIO — las fechas del fixture son relativas
+  // a hoy, así que según el día caen dentro o fuera del mes corriente. Asertar
+  // `cuadra` ahí habría sido una bomba de relojería en mi propio arnés, que es
+  // justo lo que acabé de arreglar en mide:nube-4.
+  console.log('\n[S] habla con descuadre, calla sin nada');
+  af(r.d.cuadra === false, 'con descuadre `cuadra` tiene que ser false (el renglón HABLA)');
+  {
+    // Un periodo donde no pasó nada: hace un año.
+    const vacio = await pedir({ accion: 'reporte', desde: dia(-400), hasta: dia(-395) });
+    const tv = vacio.d.totales || {};
+    console.log('    periodo vacío → ' + vacio.res.statusCode + ' cuadra=' + ver(() => vacio.d.cuadra)
+      + ' diferencia=' + ver(() => vacio.d.diferencia) + ' ' + ver(() => tv));
+    af(vacio.res.statusCode === 200 && vacio.d.se_pudo_carear === true,
+       () => 'el periodo vacío no se pudo carear, y sí se pudo: no hay nada, que es distinto de no poder '
+       + 'mirar. ' + vacio.res.body.slice(0, 200));
+    af(vacio.d.cuadra === true && vacio.d.diferencia === 0,
+       () => 'sin nada que decir el renglón tiene que poder CALLARSE (cuadra true, diferencia 0): '
+       + ver(() => ({ cuadra: vacio.d.cuadra, dif: vacio.d.diferencia })));
+    // 🔒 Y EL SILENCIO ES **GANADO**, NO HEREDADO: la respuesta tiene que dejar
+    // ver que no había renglones, para que «todo cuadró» y «no hubo nada» no se
+    // lean igual. Esta casa ya pagó que «agotar lo ya agotado era mudo».
+    af(tv.casados_filas === 0 && tv.solo_contratos_filas === 0 && tv.solo_caja_filas === 0,
+       () => 'el periodo vacío no reporta sus CEROS por separado: «3 casados y 0 descuadres» y «0 de todo» '
+       + 'son cosas distintas y el cero las vuelve iguales. ' + ver(() => tv));
+  }
+
+  // ── [X] EL RENGLÓN DEL RADAR, CABLEADO Y CORRIENDO ────────────────
+  // 🔒 «EXISTE» NO ES «SE VE», y una función que nadie llama es código muerto con
+  // careo en verde. Se mide el CABLE (contenedor + llamada) y además se CORRE la
+  // función real en sus tres ramas, con un `document` y un `khAdminFetch` falsos
+  // — entrar por donde entra el cliente, un salto más adentro.
+  console.log('\n[X] el renglón del Radar · cableado y corriendo');
+  const html = fs.readFileSync(path.join(h.dir, 'kamehouse.html'), 'utf8');
+  const srcRad = fs.readFileSync(path.join(h.dir, 'kamehouse-radar.js'), 'utf8');
+  const srcKh = fs.readFileSync(path.join(h.dir, 'kamehouse.js'), 'utf8');
+  af(/id="rdr-concilia-aviso"[^>]*display:none/.test(html),
+     'el contenedor del renglón no existe o no nace OCULTO: un aviso que nace visible y vacío es un hueco');
+  af(/_radarConciliaAviso\(\);/.test(srcRad),
+     '🔴 nadie LLAMA a `_radarConciliaAviso`: una función que nadie llama es código muerto, y el careo '
+     + 'de la función sola saldría verde igual');
+  af(/loadRadarAlertas\(\)\s*\{[\s\S]{0,800}_radarConciliaAviso\(\)/.test(srcRad),
+     'la llamada no cuelga de `loadRadarAlertas`, que es la puerta por la que el Radar se pinta');
+  // 🔒 LA FIRMA SE LEE, NO SE INVENTA. Primero usé un `_radEsc` que NO EXISTE
+  // en ninguna parte — el renglón habría tronado al primer descuadre, y en el
+  // lugar donde se ve el dinero. Se afirma que el escapador que usa EXISTE.
+  const usados = [...new Set((funcionDe(srcRad, '_radarConciliaAviso') || '').match(/_[A-Za-z][A-Za-z0-9]*(?=\()/g) || [])];
+  console.log('    ayudantes que invoca: ' + ver(() => usados));
+  for (const f of usados) {
+    af(new RegExp('function ' + f + '\\(').test(srcRad) || new RegExp('function ' + f + '\\(').test(srcKh),
+       () => '🔴 `' + f + '` NO EXISTE en kamehouse-radar.js ni en kamehouse.js: una firma inventada '
+       + 'truena en vivo justo cuando hay algo que avisar');
+  }
+  // Y NO escribe: no mete una fila en `radar_alertas` (sería una escritura, y
+  // además un id falso con un «marcar como vista» que no significa nada).
+  af(!/radar_alertas/.test(funcionDe(srcRad, '_radarConciliaAviso') || ''),
+     'el renglón mete una fila en `radar_alertas`: es un letrero VIVO, no una alerta guardada');
+
+  // ── Y AHORA SE CORRE, de verdad, en sus tres ramas ──────────────────────
+  const fnRenglon = funcionDe(srcRad, '_radarConciliaAviso');
+  af(!!fnRenglon, '`_radarConciliaAviso` no se pudo rebanar del archivo: lo de abajo no se puede correr');
+  const correrRenglon = async (respuesta, status) => {
+    if (!fnRenglon) return { style: { display: '(no se pudo rebanar)' }, innerHTML: '' };
+    const caja = { style: { display: 'none' }, innerHTML: '' };
+    const ctx = vm.createContext({
+      document: { getElementById: (id) => (id === 'rdr-concilia-aviso' ? caja : null) },
+      khAdminFetch: async () => ({ ok: status === 200, status, json: async () => respuesta }),
+      _escNotif: (x) => String(x == null ? '' : x),
+      JSON, Math, Number, String, Object, Array, Promise, Error, Date,
+    });
+    vm.runInContext(funcionDe(srcRad, '_radarConciliaAviso'), ctx);
+    await vm.runInContext('_radarConciliaAviso', ctx)();
+    return caja;
+  };
+  // (a) CUADRA → se CALLA. La ley de NUBE: un aviso permanente se vuelve mueble.
+  const cA = await correrRenglon({ ok: true, cuadra: true, diferencia: 0, totales: {}, periodo: { desde: HOY, hasta: HOY } }, 200);
+  console.log('    cuadra  → display=' + ver(() => cA.style.display) + ' html=' + cA.innerHTML.length + ' chars');
+  af(cA.style.display === 'none' && cA.innerHTML === '',
+     () => '🔴 con la diferencia en CERO el renglón se pintó: un aviso permanente se vuelve parte del '
+     + 'mueble y deja de avisar. ' + ver(() => cA.innerHTML.slice(0, 120)));
+  // (b) DESCUADRE → habla, CON NOMBRES y con la consecuencia.
+  const cB = await correrRenglon({ ok: true, cuadra: false, diferencia: -1300, hoy: HOY,
+    periodo: { desde: DESDE, hasta: HASTA },
+    totales: { solo_contratos_filas: 1, solo_contratos_monto: 1200, solo_caja_filas: 2, solo_caja_monto: 2500, sin_nombre_contratos: 1, sin_nombre_caja: 0 },
+    muestra_contratos: [{ nombre: 'Laura Mendez Rios', monto: 1200, fecha: dia(-2), evento_id: 'karolg#1' }],
+    muestra_caja: [{ nombre: 'Sofia Caja Sola', monto: 1500, fecha: dia(-3), cuenta: 'Efectivo' }] }, 200);
+  console.log('    descuadre → display=' + ver(() => cB.style.display));
+  af(cB.style.display === '' && /Laura Mendez Rios/.test(cB.innerHTML),
+     () => '🔴 con descuadre el renglón no habla o no trae NOMBRES: «$1,300 de diferencia» manda a '
+     + 'buscar; «los $1,200 de Laura» se resuelve. ' + ver(() => cB.innerHTML.slice(0, 200)));
+  af(/Sofia Caja Sola/.test(cB.innerHTML) && /Efectivo/.test(cB.innerHTML),
+     'el renglón no dice en qué CUBETA buscar el movimiento sin contrato');
+  af(/solo reporta|no se aplica/i.test(cB.innerHTML),
+     'el renglón no dice que esta fase SOLO REPORTA: invitaría a buscar un botón que no existe');
+  af(/hueco de datos/.test(cB.innerHTML),
+     'los renglones sin nombre no se dicen APARTE: sumarlos al descuadre lo infla con lo que es un hueco');
+  // (c) 502 → **NO se calla**, y aquí está la diferencia con el de la nube.
+  const cC = await correrRenglon({ ok: false, se_pudo_carear: false, motivo: 'No se pudo leer el lado CAJA: Supabase rechazó la consulta de pagos' }, 502);
+  console.log('    502      → display=' + ver(() => cC.style.display));
+  af(cC.style.display === '' && /NO SE PUDO/i.test(cC.innerHTML),
+     () => '🔴 con un lado caído el renglón se CALLÓ, y callarse se ve EXACTAMENTE igual que «todo '
+     + 'cuadra». Lo que no se pudo leer es el DINERO. ' + ver(() => cC.innerHTML.slice(0, 160)));
+  af(/no quiere decir que cuadre/i.test(cC.innerHTML),
+     'el renglón no aclara que «no se pudo» NO es «cuadra»: un cero ahí sería la mentira más cara');
+  // (d) Y el 403 SÍ se calla: es PERMISO, no un descuadre.
+  const cD = await correrRenglon({ error: 'Rol sin permiso' }, 403);
+  console.log('    403      → display=' + ver(() => cD.style.display));
+  af(cD.style.display === 'none',
+     'con 403 el renglón tiene que CALLARSE: el rol que no ve dinero no tiene que ver este aviso, y '
+     + 'alarmarlo por algo que no le toca es la ley de ses-1 (el 403 nunca es la sesión)');
 
   // ── [B] CONTROL POSITIVO · en BASE esto NO EXISTÍA ────────────────────
   console.log('\n[B] control positivo · BASE');

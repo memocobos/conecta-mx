@@ -225,6 +225,24 @@ está caduco antes de escribirse.
     cuando es la de la **función**; y le colgó el libro rojo a **Monserrat**, que
     ya era la fixture de la MEZCLA — un papel nuevo encima de una fixture vieja
     la calla.
+- 🏆 **CAREO-ZONA-1c (1-oct-2026): la baja deja SALDO 0.** Regla de Memo: el
+  dinero de un cancelado es ganancia, no se reembolsa. La baja escribe
+  `total_contrato = lo cobrado` en el MISMO PATCH que `boletos=0` y la zona.
+  `mide:careo-zona-1` **87**, bloque `[1C]` con su control positivo.
+  - 🔒 **ES `v.abonado` (previo + Σ abonos), NO `v.abonado_previo`.** El fixture
+    los SEPARA a propósito: Diana Marlene lleva $5,500 de previo más un abono de
+    $1,200 → cobrado **$6,700**, distinto de 5500 y de su contrato viejo 9200.
+    Con `abonos_viajero` vacío —como estaba— la aserción pasaba IGUAL con la
+    implementación equivocada: un fixture donde dos cantidades coinciden no
+    distingue dos implementaciones.
+  - Sin `|| null`: un cobrado de $0 es un NÚMERO (contrato a cero), no un hueco.
+  - ⚠️ **Una aserción vieja metía «el dinero» en un solo saco** y prohíbe hoy lo
+    correcto: `total_contrato` SÍ se mueve, `abonado`/`abonado_previo` NO. Se
+    actualizó a la verdad nueva y la mitad que seguía siendo cierta quedó con
+    dientes — no se silenció.
+  - La nota cuenta las DOS escrituras («total $9,200 → $6,700 · saldo 0») y el
+    reporte lleva `total_de`/`total_a`: una nota que menciona media escritura
+    esconde la otra mitad, y un número pelado no se audita.
 
 - 🏆 **CUATRO TUERCAS DEL 28-SEP EN MAIN LOCAL — ⏳ PENDIENTE `git push` DE MEMO**
   (el sandbox no tiene credenciales de GitHub; hasta el push, el sitio servido
@@ -2110,6 +2128,18 @@ está caduco antes de escribirse.
   el 1-oct: pestañas es proyecto SUELTO (lleva `SPREADSHEET_ID` tecleado —
   el repo lo trae vacío, al re-desplegar hay que reponerlo del historial del
   proyecto), Numerología es ATADO (vacío correcto).
+  🔒 **EL DINERO DE UN CANCELADO ES GANANCIA (regla de Memo, 1-oct): NO se
+  reembolsa.** La fuente del monto: CHEAP manda **Numerología**; PLUS/STAY/RIDE
+  manda **la pestaña de Conecta 2026** (así entran ya por construcción: los
+  abonos CHEAP los escribe el careo del libro y los demás el de pestañas).
+  Recalculado el 1-oct sobre los 116 bajados: `total_contrato = lo abonado`
+  (saldo 0, nada por cobrar ni devolver) — **$123,874 quedan como ganancia**,
+  con nota por persona. ✅ **El careo de bajas nuevas YA lo hace (CAREO-ZONA-1c):**
+  la baja escribe `total_contrato = abonado_previo + Σ abonos` en el mismo PATCH.
+  ⚠️ ES LO **COBRADO**, no el `abonado_previo` a secas — con el previo pelado,
+  quien traiga abonos encima se queda con saldo, y sería saldo A FAVOR del
+  cliente. El abonado NUNCA se toca: el contrato es lo que se DEBE y moverlo no
+  da ni quita un peso; el abonado es lo que el cliente PAGÓ.
 - 🔒 **«ROCK 9» ES UNA AGENCIA — es el NOMBRE del comprador, no un código ni un
   error. NO SE VUELVE A PREGUNTAR (Memo ya lo explicó varias veces, 30-sep).**
   Le separa boletos CHEAP del Corona y sus pagos viven en Numerología; sus

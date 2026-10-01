@@ -245,6 +245,59 @@ está caduco antes de escribirse.
   - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
     podía ni expresar el defecto — un guión que solo sabe devolver status mide la
     mitad del mundo.
+- 🏆 **PLAN-CASE-1 (1-oct-2026): el plan migrado deja de ser ciego a las
+  MAYÚSCULAS.** `portal-mi-plan-migrado` casaba con `correo=eq.<JWT en minúsculas>` y
+  el `eq` de PostgREST distingue mayúsculas: **285 filas · 244 personas** veían un plan
+  VACÍO o INCOMPLETO. `npm run mide:plan-case-1` **18**. Cero SQL, cero escrituras.
+  - 🔒 **QUIEN DESAMBIGUA ES EL LECTOR, NO LOS DATOS** (la forma de ROL-HIST-PADRE).
+    CERO UPDATEs a `viajeros_evento`: 285 filas de datos de gente no se tocan para
+    arreglar un lector — y el crudo del correo es justo el dato que delata el
+    problema (la ley de `boletos_crudo`).
+  - **LA IMPLEMENTACIÓN, ELEGIDA CON MEDICIONES CONTRA LA BASE VIVA:** `ilike` sin
+    comodín para ESTRECHAR + comparación `lower()` en el handler como AUTORIDAD.
+    - `correo` **NO TIENE ÍNDICE** (los únicos son `evento_id` y la pk), así que el
+      `eq` de hoy YA era un Seq Scan. El plan de los dos es **idéntico**:
+      cost `0.00..187.85`, buffers `hit=156` en los dos. No se pierde índice alguno.
+    - 2,550 filas / 1,512 kB; el `~~*` cuesta ~1.4 ms más. Y el `ilike` encontró
+      **2 filas donde el `eq` encontraba 1** sobre datos reales.
+    - La alternativa —traer por otro filtro y comparar aquí— **no tiene otro filtro**:
+      el cliente solo sabe su correo. Sería traerse las 2,550 filas por visita: el
+      mismo barrido en la base más cientos de KB por la red. Estrictamente peor.
+  - 🔴🔒 **EL COMODÍN ESCONDIDO, Y POR QUÉ FILTRAR DESPUÉS BASTA.** En ILIKE `_` casa
+    CUALQUIER carácter: **94 filas / 73 personas tienen `_` en su correo** (medido), así
+    que `maria_lopez@x` como patrón casaría `mariaXlopez@x`. Hoy **0 de los 73** pescan
+    filas ajenas — pero eso es SUERTE, no diseño. El candado: el patrón solo puede
+    **SOBRE**-pescar (un comodín casa más, nunca menos), así que el filtro exacto del
+    handler es COMPLETO. **Esa asimetría es la razón de que el diseño sea seguro**: si
+    el `ilike` pudiera sub-pescar, filtrar después no bastaría.
+    - ⚠️ Y los comodines **NO se escapan a propósito**: un escape mal interpretado por
+      PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar.
+  - 🔴 **EL BARRIDO DE COLISIONES que Jane pidió — no salió cero, y el detalle importa:**
+    - 1,284 correos únicos. **122** los comparten personas con primer nombre distinto
+      (un buzón, varios viajeros: estructural en este negocio).
+    - **120 de esos 122 YA están expuestos hoy**: los dos nombres conviven dentro de la
+      misma ortografía, así que el `eq` ya los devuelve juntos.
+    - El arreglo une **2** grupos nuevos, y los dos se miraron uno por uno:
+      `victorgael2929` es la **MISMA persona** («victor» en calle24 vs «víctor» en
+      alvarodiaz#0 — un acento): el arreglo la cura, ve sus dos viajes en vez de uno.
+      `kelinygm` son **dos personas** («keliyn» y «andrea», las dos en arjona) con un
+      correo común — se verían entre sí, **igual que los 120 de hoy**.
+    - 🔒 Conclusión dicha, no escondida: el arreglo **no introduce** la exposición de
+      buzón compartido — ya existía en 120 grupos—; la extiende a 2. Si Memo quiere
+      cerrar ESO, es otra tuerca y no la decide un lector.
+  - `saldoMigrado` sigue siendo el dueño del dinero: careo **byte a byte** de que
+    `_lib/cuenta-evento` no se movió. ⚠️ Y hay un efecto que conviene ver: en BASE el
+    caso de «todo en mayúsculas» salía VACÍO, así que esa aritmética **nunca corría
+    para él**. El arreglo no solo lo hace visible — hace que su dinero se CUENTE.
+  - ⚰️ **`ojo_plan_vacio` de MIG-1d-ii RETIRADO, no silenciado**: arreglado el lector,
+    esas filas dejaron de ser invisibles y el aviso mentiría — mandaría a arreglar a
+    mano 244 filas sanas y frenaría el primer envío por nada. Queda **siempre vacío**,
+    se conserva el CONTEO como dato (sirve para re-medir el padrón) y su bloque del
+    arnés se convirtió en **TESTIGO**: exige que el casamiento insensible siga vivo.
+    El día que alguien revierta el lector, el testigo cae y el aviso tiene que volver.
+  - 🔒 **EL ANCLA NO ES SOLO ASUNTO DE SU PROPIA TUERCA**: PLAN-CASE-1 cambió el
+    SUJETO de `mide:mig-1d-ii`, así que ese arnés se re-ancló TAMBIÉN. Con el ancla
+    vieja seguía midiendo un árbol que ya nadie corre, y su rojo hablaba del pasado.
 - 🔨⏳ **MIG-1d-ii EN MAIN (1-oct-2026): el botón que INVITA al Portal, por evento.
   🔴🔒 ESTAR MERGEADA **NO MANDA NADA**** — el código vive en main y no ha salido ni
   un correo. El primer envío real sigue detrás de **CUATRO LLAVES**, y ninguna es mía:
@@ -252,8 +305,8 @@ está caduco antes de escribirse.
      correr `enviar` en seco sobre el evento que él elija);
   2. **el SQL de Jane** para `invitaciones_portal` (`ACTA-MIG-1D-II.sql`) — sin la
      tabla el botón se rinde con 502 a propósito;
-  3. **PLAN-CASE-1** (nombrada por Jane): el hoyo del `eq` sensible a mayúsculas,
-     más abajo con su censo;
+  3. ✅ **PLAN-CASE-1 — HECHA** (1-oct, su acta arriba): el lector del Portal ya no es
+     ciego a las mayúsculas. Esta llave queda ABIERTA.
   4. **Memo elige el evento, y CHICO.**
   `admin-portal-invitar` + `_lib/invitacion-portal` + `ACTA-MIG-1D-II.sql`.
   `npm run mide:mig-1d-ii` **48**, anclado al merge **557e14c** (BASE `09ac540`,

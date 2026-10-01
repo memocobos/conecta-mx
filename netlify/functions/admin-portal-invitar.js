@@ -155,12 +155,18 @@ exports.handler = async (event) => {
       recibirian: quien.invitar.length,
       ya_invitados: quien.ya_invitados.length,
       saltados: quien.saltados.length,
+      ojo_plan_vacio: (quien.ojo_plan_vacio || []).length,
       reenviar,
     };
 
     const comun = {
       ok: true, accion, seco, resumen,
       invitar: quien.invitar, ya_invitados: quien.ya_invitados, saltados: quien.saltados,
+      // 🔴 EL MONTÓN QUE HAY QUE MIRAR ANTES DEL PRIMER ENVÍO REAL: gente cuya
+      // fila guarda el correo con MAYÚSCULAS. `portal-mi-plan-migrado` la busca con
+      // un `eq` exacto en minúsculas, así que su plan saldría vacío — y el correo
+      // que acabamos de mandarle dice «ya puedes ver tu plan».
+      ojo_plan_vacio: quien.ojo_plan_vacio,
       // El render viaja SIEMPRE, también en la vista previa: es el objeto del
       // visto de Memo. Si no se pudo armar, se dice con su motivo.
       render: render.error ? null : { subject: render.subject, html: render.html, muestra_de: muestraPara.correo },

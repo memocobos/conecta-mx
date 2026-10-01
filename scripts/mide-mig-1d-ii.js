@@ -348,8 +348,47 @@ function limpiar(dir) {
      'el puente y la invitación no usan la MISMA `llaveCorreo`: dos reglas de correo esperando a divergir');
   af(/toLowerCase\(\)/.test(srcRecl),
      '`portal-reclamar-cuenta` ya no enlaza por el correo en minúsculas: la llave del flujo cambió');
-  af(/portal_cliente_id/.test(srcPlan),
-     '`portal-mi-plan-migrado` ya no lee por `portal_cliente_id`: el último paso del flujo se rompió');
+  // ⚠️ MI PRIMERA ASERCIÓN AQUÍ ASUMIÓ EL MECANISMO en vez de leerlo: dije que el
+  // último paso enlaza por `portal_cliente_id` y **no es así**. Resuelve por el
+  // CORREO VERIFICADO del JWT, en minúsculas, contra `viajeros_evento.correo`.
+  // Corregida a la verdad — y la verdad es más estricta, porque hace que la
+  // minúscula sea la llave de los CUATRO pasos, no de tres.
+  af(/viajeros_evento\?correo=eq\./.test(srcPlan) && /toLowerCase\(\)/.test(srcPlan),
+     '`portal-mi-plan-migrado` ya no busca el plan por `viajeros_evento?correo=eq.<minúsculas>`: la llave del '
+     + 'cuarto paso cambió, y con ella la razón por la que la invitación manda el correo en minúsculas');
+
+  // ── 🔴 EL HOYO QUE SALIÓ DE LEERLO: el `eq` es SENSIBLE A MAYÚSCULAS ────
+  // Una fila guardada como «Laura@Correo.com» no la encuentra un JWT
+  // «laura@correo.com». La persona se registra, el Portal la enlaza y su plan sale
+  // VACÍO — con nuestro correo diciendo «ya puedes ver tu plan». Esta tuerca no lo
+  // arregla (es un UPDATE a datos de gente) pero NO PUEDE CALLARLO.
+  console.log('\n[¡] el ojo del plan vacío · el correo con mayúsculas en la fila');
+  const ojo = (vp.d.ojo_plan_vacio || []);
+  console.log('    marcados: ' + ver(() => ojo.map((x) => x.correo + ' — ' + (x.ojo_plan_vacio || '').slice(0, 50))));
+  af(ojo.length === 1 && /laura/.test(ojo[0].correo),
+     () => '🔴 Laura tiene UNA fila guardada como «Laura@Correo.com» y el reporte no la marca. '
+     + '`portal-mi-plan-migrado` busca con `eq` EXACTO en minúsculas: esa fila es invisible para ella, así que '
+     + 'vería su viaje incompleto — y el correo que le mandamos dice que ya puede verlo. Salió ' + ver(() => ojo));
+  af(ojo.length === 1 && Array.isArray(ojo[0].filas_invisibles) && ojo[0].filas_invisibles.includes('v1'),
+     () => 'no se NOMBRA la fila invisible: sin el id, el humano no sabe cuál arreglar. ' + ver(() => ojo[0]));
+  af(ojo.length === 1 && /incompleto/i.test(ojo[0].ojo_plan_vacio || ''),
+     () => 'Laura tiene UNA fila buena y UNA mala, así que su caso es «vería su viaje INCOMPLETO», no «plan '
+     + 'vacío»: los dos casos se arreglan igual pero NO se explican igual. ' + ver(() => ojo[0].ojo_plan_vacio));
+  af(vp.d.resumen && vp.d.resumen.ojo_plan_vacio === 1,
+     () => 'el resumen no cuenta el montón del ojo: es lo que Memo mira antes del primer envío. ' + ver(() => vp.d.resumen));
+  {
+    // 🔒 CONTROL: si TODAS las filas de alguien están en mayúsculas, el aviso
+    // tiene que decir «VACÍO», no «incompleto». Dos casos, dos frases.
+    const guardado = VIAJEROS.slice();
+    VIAJEROS.push({ id: 'vM', nombre: 'Todo Mayus Perez', correo: 'TODO@Correo.com', portal_cliente_id: 'cM' });
+    const vpM = await pedir({ accion: 'vista_previa', evento_id: 'karolg#1' });
+    VIAJEROS.length = 0; guardado.forEach((v) => VIAJEROS.push(v));
+    const soloMayus = (vpM.d.ojo_plan_vacio || []).find((x) => /todo@correo/.test(x.correo));
+    console.log('    todo en mayúsculas → ' + ver(() => soloMayus && soloMayus.ojo_plan_vacio.slice(0, 60)));
+    af(soloMayus && /VACÍO/.test(soloMayus.ojo_plan_vacio),
+       () => 'con TODAS sus filas en mayúsculas el aviso tenía que decir que su plan saldría VACÍO: '
+       + ver(() => soloMayus && soloMayus.ojo_plan_vacio));
+  }
   {
     const { llaveCorreo } = require(path.join(h.dir, 'netlify/functions/_lib/correo-forma.js'));
     af(llaveCorreo('Laura@Correo.com') === 'laura@correo.com',

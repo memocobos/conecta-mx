@@ -55,15 +55,41 @@ function aQuienInvitar(viajeros, yaInvitados) {
       continue;
     }
     if (!grupos.has(k)) grupos.set(k, { correo: k, nombre: v.nombre, filas: [], portal_cliente_id: v.portal_cliente_id });
-    grupos.get(k).filas.push({ id: v.id, nombre: v.nombre });
+    // ⚠️ EL CRUDO VIAJA AL LADO de la llave: la llave ya está normalizada, así que
+    // con ella sola es IMPOSIBLE saber si la fila guardada tiene mayúsculas — y eso
+    // es justo lo que decide si su plan va a salir vacío. La misma forma que
+    // `boletos_crudo` en el careo: la normalización no puede borrar el único dato
+    // que otro lector necesita.
+    grupos.get(k).filas.push({ id: v.id, nombre: v.nombre, correoCrudo: v.correo });
   }
   const invitar = [], yaEstaban = [];
   for (const g of grupos.values()) {
-    const fila = { correo: g.correo, nombre: g.nombre, filas: g.filas.length, portal_cliente_id: g.portal_cliente_id };
+    const fila = { correo: g.correo, nombre: g.nombre, filas: g.filas.length, portal_cliente_id: g.portal_cliente_id,
+                   // 🔴 OJO MEDIDO AL CONSTRUIR ESTA TUERCA: `portal-mi-plan-migrado`
+                   // busca el plan con `viajeros_evento?correo=eq.<correo del JWT en
+                   // minúsculas>`, y el `eq` de PostgREST es SENSIBLE A MAYÚSCULAS. Una
+                   // fila guardada como «Laura@Correo.com» NO se encuentra: la persona se
+                   // registra, el Portal la enlaza —`clientes.correo` sí está en
+                   // minúsculas, lo normalizó el puente— y su plan sale **VACÍO**.
+                   // Invitarla sería mandarle un correo que dice «ya puedes ver tu plan»
+                   // hacia una pantalla en blanco.
+                   // ⚠️ NO SE SALTA SOLA: se REPORTA, y la decisión es de un humano —
+                   // arreglar la fila es un UPDATE a datos de gente y eso no lo hace un
+                   // botón de invitar. Lo que esta pieza no puede hacer es callarlo.
+                   filas_invisibles: g.filas.filter((f) => f.correoCrudo != null
+                      && String(f.correoCrudo) !== String(f.correoCrudo).toLowerCase()).map((f) => f.id) };
+    fila.ojo_plan_vacio = fila.filas_invisibles.length > 0 ? (fila.filas_invisibles.length === fila.filas
+        ? 'TODAS sus filas tienen el correo con mayúsculas: `portal-mi-plan-migrado` las busca con un `eq` '
+          + 'exacto en minúsculas, así que su plan saldría VACÍO. Arreglar la fila primero.'
+        : 'alguna de sus filas tiene el correo con mayúsculas: esa NO aparecerá en su plan (el `eq` es '
+          + 'sensible a mayúsculas). Vería su viaje incompleto.')
+      : null;
     if (yaInvitados.has(g.correo)) yaEstaban.push({ ...fila, motivo: 'ya se le invitó (está en la bitácora)' });
     else invitar.push(fila);
   }
-  return { invitar, ya_invitados: yaEstaban, saltados, personas: grupos.size };
+  return { invitar, ya_invitados: yaEstaban, saltados, personas: grupos.size,
+           // El montón que Memo tiene que mirar ANTES del primer envío real.
+           ojo_plan_vacio: invitar.filter((x) => x.ojo_plan_vacio) };
 }
 
 // ── EL RENDER ────────────────────────────────────────────────────────────────

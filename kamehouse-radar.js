@@ -1340,6 +1340,88 @@ async function _radarNubeAviso() {
   caja.style.display = '';
 }
 
+// ── [CONCILIA-1] EL RENGLÓN DEL CAREO CAJA ↔ CONTRATOS ──────────────────────
+// Gemelo del de la nube, y por la misma ley: **se CALLA cuando la diferencia es
+// cero**. Un aviso permanente se vuelve parte del mueble y deja de avisar.
+//
+// 🔒 TAMPOCO SE METE EN LA LISTA DE ALERTAS. Ésas son filas GUARDADAS, con su
+// id, su «vista» y su destino; ésta es un letrero VIVO. Darle un id falso y un
+// «marcar como vista» que no significa nada sería peor que no tenerlo. (Y de
+// paso: insertar una fila sería ESCRIBIR, y la fase 1 no escribe.)
+//
+// 🔒 FAIL-SOFT **NO** CALLADO, al revés que el de la nube — y la diferencia
+// importa. Si la nube no se puede leer, el Radar se calla porque no es el dueño
+// de ese dato y una cotización ilegible no cuesta dinero hoy. Aquí lo que no se
+// pudo leer es EL DINERO: callarse se vería EXACTAMENTE igual que «todo cuadra»,
+// y esta casa ya pagó un «Cobrado $0» con $136,391 cobrados. El servidor
+// contesta 502 a propósito cuando un lado no se pudo leer, y el renglón lo DICE.
+async function _radarConciliaAviso() {
+  const caja = document.getElementById('rdr-concilia-aviso');
+  if (!caja) return;
+  const callar = () => { caja.style.display = 'none'; caja.innerHTML = ''; };
+  let d = null, noSePudo = null;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-concilia', {
+      method: 'POST', body: JSON.stringify({ accion: 'radar' }),
+    });
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d || d.ok === false) {
+      // Un 403 es PERMISO, no un descuadre: el rol que no ve dinero no tiene que
+      // ver este renglón, y pintarle «no se pudo carear» sería alarmarlo por algo
+      // que no le toca. (La ley de ses-1: el 403 nunca es la sesión.)
+      noSePudo = (r.status === 403 || r.status === 401) ? null : ((d && d.motivo) || 'no se pudo leer');
+      d = null;
+    }
+  } catch (_) { noSePudo = 'no se pudo leer'; d = null; }
+
+  if (!d) {
+    if (!noSePudo) return callar();
+    caja.innerHTML = '<div class="rdr-alert sev-media no-vista">'
+      + '<div class="dot"></div><div class="body">'
+      + '<div class="titulo">El careo caja ↔ contratos NO SE PUDO hacer</div>'
+      + '<div class="mensaje">' + _escNotif(noSePudo) + '<br>'
+      + '<b>Esto no quiere decir que cuadre</b> — quiere decir que no se pudo mirar. '
+      + 'Un cero aquí sería una mentira.</div>'
+      + '</div><div class="meta"><span class="tipo">concilia_ilegible</span></div></div>';
+    caja.style.display = '';
+    return;
+  }
+
+  // 🔒 EL SILENCIO SE GANA: cuadra Y sin renglones sueltos de ningún lado.
+  const t = d.totales || {};
+  if (d.cuadra === true) return callar();
+
+  const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
+  // Los NOMBRES, que son el punto: «$8,400 de diferencia» manda a buscar; «los
+  // $1,200 de Laura del 8-nov no están en caja» se resuelve.
+  const muestra = (arr, sufijo) => (arr || []).map((x) =>
+    '<b>' + _escNotif(x.nombre) + '</b> ' + mxn(x.monto) + ' (' + _escNotif(x.fecha || '—') + ')'
+    + (sufijo && x.cuenta ? (' · ' + _escNotif(x.cuenta)) : '')).join(' · ');
+  const falta = (t.solo_contratos_filas || 0), sobra = (t.solo_caja_filas || 0);
+  const linea = [];
+  if (falta) linea.push('<b>' + falta + '</b> en contratos y no en caja (' + mxn(t.solo_contratos_monto) + ')');
+  if (sobra) linea.push('<b>' + sobra + '</b> en caja y no en contratos (' + mxn(t.solo_caja_monto) + ')');
+  // Los que NO se pudieron ni intentar: no son descuadres, y se dicen aparte
+  // para no inflar la cifra con lo que en realidad es un hueco de datos.
+  const huecos = (t.sin_nombre_contratos || 0) + (t.sin_nombre_caja || 0);
+
+  caja.innerHTML = '<div class="rdr-alert sev-alta no-vista">'
+    + '<div class="dot"></div><div class="body">'
+    + '<div class="titulo">La caja y los contratos NO cuadran en ' + _escNotif((d.periodo || {}).desde || '')
+    + ' → ' + _escNotif((d.periodo || {}).hasta || '') + ': ' + mxn(d.diferencia) + '</div>'
+    + '<div class="mensaje">' + linea.join(' · ') + '.'
+    + (falta ? ('<br>Faltan en caja: ' + muestra(d.muestra_contratos, false)
+        + (falta > (d.muestra_contratos || []).length ? (' y ' + (falta - (d.muestra_contratos || []).length) + ' más') : '')) : '')
+    + (sobra ? ('<br>Sin contrato: ' + muestra(d.muestra_caja, true)
+        + (sobra > (d.muestra_caja || []).length ? (' y ' + (sobra - (d.muestra_caja || []).length) + ' más') : '')) : '')
+    + (huecos ? ('<br>Y <b>' + huecos + '</b> renglón(es) sin nombre que NO se pudieron carear: '
+        + 'no son un descuadre, son un hueco de datos.') : '')
+    + '<br>Esta fase <b>solo reporta</b>: no se aplica nada sola.</div>'
+    + '</div><div class="meta">' + _escNotif(d.hoy || '')
+    + '<br><span class="tipo">concilia_descuadre</span></div></div>';
+  caja.style.display = '';
+}
+
 async function loadRadarAlertas(){
   _radarCache.alertas = await khRadar.alertasListar(); // [sec-radar-wl]
   renderAlertasFiltered('all');
@@ -1348,6 +1430,9 @@ async function loadRadarAlertas(){
   // No se espera (`await`) a propósito: si esa lectura tarda, las alertas de
   // verdad ya están pintadas — el aviso aparece cuando llegue.
   _radarNubeAviso();
+  // [CONCILIA-1] Tampoco se espera: si el careo del dinero tarda, las alertas
+  // de verdad ya están pintadas y este renglón aparece cuando llegue.
+  _radarConciliaAviso();
 }
 function renderAlertasFiltered(filtro){
   const arr = (_radarCache.alertas || []).filter(a => {

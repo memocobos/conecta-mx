@@ -245,6 +245,65 @@ está caduco antes de escribirse.
   - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
     podía ni expresar el defecto — un guión que solo sabe devolver status mide la
     mitad del mundo.
+- 🏆 **CONCILIA-1 FASE 1 (1-oct-2026): el careo CAJA ↔ CONTRATOS, con nombres y
+  SIN escribir un peso.** `_lib/concilia` + `admin-concilia` (`reporte` y
+  `radar`, roles del dinero) + el renglón del Radar. `npm run mide:concilia-1`
+  **71**. Cero SQL, cero escrituras.
+  - 🔒 **NO ESCRIBE, Y SE MIDE EN VEZ DE PROMETERSE**: ningún `method:` en la lib
+    ni en el handler, la red falsa del arnés TRUENA ante cualquier verbo que no
+    sea GET, y una acción `aplicar` se rechaza en el despacho. Una guarda
+    prometida en un comentario y nunca medida es la familia que ya se pagó.
+  - 🔒 **AUD-1 donde de verdad muerde**: el saldo de una persona se le PREGUNTA a
+    `saldoMigrado`; aquí no se suma un abono. Y el fixture **SEPARA las dos
+    implementaciones**: Laura lleva $5,000 de previo + $1,200 del periodo + $800
+    de hace 40 días = **$7,000**, y un reduce del periodo daría $6,200. Con el
+    fixture fácil los dos números coinciden y el verde no dice nada.
+  - ⚠️ **Lo que SÍ se calcula aquí, rotulado**: el TAMAÑO del montón que el reporte
+    enseña. No es un saldo — no afirma nada sobre el negocio, es la suma de los
+    renglones que van a salir nombrados. Esa distinción va escrita en el código.
+  - 🔒 **UN CERO ES UNA AFIRMACIÓN**: con un lado caído → **502**,
+    `se_pudo_carear:false`, `diferencia: null` (NO cero) y el motivo diciendo CUÁL
+    lado. Un 200 con ceros habría callado al renglón del Radar —que es lo que hace
+    cuando todo cuadra— y el descuadre real quedaría invisible el día que la base
+    tose.
+  - 🔒 **EL FAIL-SOFT DEL RENGLÓN ES AL REVÉS QUE EL DE LA NUBE**, y la diferencia
+    es el punto: la nube ilegible se calla (no es su dueño y no cuesta dinero
+    hoy); el DINERO ilegible **habla**, porque callarse se vería idéntico a «todo
+    cuadra». El 403 sí se calla: es permiso, no descuadre (ley de ses-1).
+  - Cuatro candados de mordidas viejas: el casamiento guarda una **COLA** por
+    llave (dos personas pueden pagar lo mismo el mismo día; un `Map` por llave no
+    única descarta en silencio — aquí INVENTARÍA un descuadre) · `monto_pagado`
+    manda sobre `monto` (un parcial leído como completo acusa a la caja de un
+    faltante falso) · el periodo se valida ANTES de consultar («2026-13-45» sale
+    como la CADENA "Invalid Date", truthy) · el mes del Radar se calcula en
+    `America/Matamoros` (el 30 a las 11 pm un `toISOString()` pide el mes que viene).
+  - Dos montones que **NO son descuadres** y se cuentan aparte: abono sin viajero y
+    movimiento de caja sin cliente. Tirarlos sería un descuadre invisible;
+    sumarlos inflaría la diferencia con un hueco de datos.
+  - ⏳ **PENDIENTE DICHO: la columna `fuente` de `abonos_viajero` NO EXISTE.** La
+    fuente se DERIVA de la nota y viaja rotulada (`fuente_derivada:true`).
+    Formalizarla es **SQL de Jane** más un cambio de ESCRITURA en el careo, y esta
+    fase no escribe. Mientras no exista, lo que no casa no se adivina: `manual` si
+    hay nota, `sin-nota` si no — un montón «manual» que en realidad es «no supe»
+    mandaría a buscar a quien no capturó nada.
+  - 🔴 **Y una FIRMA INVENTADA cazada por su propia aserción**: escribí `_radEsc`
+    siete veces y esa función no existe — el renglón habría tronado al primer
+    descuadre, en la pantalla del dinero. Va `_escNotif` (el que sí existe) y el
+    arnés AFIRMA que todo ayudante que el renglón invoca existe de verdad.
+- 🔴🔒 **EL ARNÉS MIDE EL COMMIT, NO TU ÁRBOL — y ya tiene GUARDIÁN.** Los arneses
+  archivan con `git archive`, así que miden el **commit**: un cambio sin commitear
+  sale ROJO contra código correcto, y el rojo se lee como defecto del código.
+  **Se pagó CUATRO veces en la sesión del 1-oct** (CAREO-ZONA-1b, 1c, CAREO-RED-1
+  y CONCILIA-1). `mide:concilia-1` trae el remedio: si los archivos que lee están
+  sucios y se mide el HEAD actual, **la corrida se DETIENE nombrando los
+  archivos**. Vale copiarlo a los demás arneses.
+  - Hermano: **el éxito vacío también habla.** Con cero aserciones el marcador
+    imprimía «✅ VERDE · 0 en verde», que se lee igual que una corrida sana y es lo
+    contrario. Ahora dice «NADA MEDIDO · esto NO es un verde».
+- 🔴⏳ **`mide:color-tema` está ROJO (14/1) y NO es de nadie de hoy**: ya lo estaba
+  en `5e1c501`. Su rojo es una queja **del propio instrumento** — «ningún elemento
+  SORDA depende del tema: el control no prueba nada»—, o sea un control positivo
+  que no controla. No se tocó aquí: es su propia chiquita.
 - 🏆 **NUBE4-ARNES-1 (1-oct-2026): `mide:nube-4` vuelve a medir.** Estaba en
   «10 verde, 7 rojo» y de hecho se CAÍA (`TypeError` leyendo `.precio` de null);
   hoy **73 en verde, 0 en rojo**. 100% del arnés: el diff es UN archivo y

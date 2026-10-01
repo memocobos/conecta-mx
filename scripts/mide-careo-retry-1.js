@@ -47,7 +47,13 @@ function sacar(ref, etiqueta) {
 }
 // 🔒 Re-anclado tras mergear (la ley del ancla).
 const BASE = process.env.BASE || 'e7a7494';        // el merge de ITIN-NOBUS-1
-const HEAD_SHA = process.env.HEAD_SHA || 'cd4fc96'; // el merge de esta tuerca
+const HEAD_SHA = process.env.HEAD_SHA || 'ea3c122'; // CAREO-RED-1
+// 🔒 [CAREO-RED-1] UNA SEGUNDA BASE, por lo mismo que en careo-zona-1b: el
+// BASE de arriba es ANTERIOR a `khExcelRecorrer` — ahí la función no existe, así
+// que no puede servir de control para una tuerca que la cambia. El control de
+// esta chiquita necesita el árbol que SÍ la tiene y TODAVÍA no atrapa la
+// excepción: el último main antes de CAREO-RED-1.
+const BASE_RED = process.env.BASE_RED || 'af63cb0';
 
 // Corta una función por NOMBRE CON PARÉNTESIS y balance de llaves.
 function funcionDe(src, nombre) {
@@ -77,6 +83,12 @@ function armar(fnSrc, extras, guion) {
       peticiones.push({ url: String(url).replace(/^.*functions\//, ''), ...cuerpo });
       const paso = guion[Math.min(g++, guion.length - 1)];
       const r = typeof paso === 'function' ? paso(cuerpo) : paso;
+      // 🔒 [CAREO-RED-1] UN PASO PUEDE **REVENTAR**, no solo contestar mal. Sin
+      // esto el arnés no podía ni expresar el defecto: un `fetch` que lanza no
+      // tiene `status`, y un guión que solo sabe devolver status mide únicamente
+      // la mitad del mundo. ⚠️ La petición se APUNTA ANTES de lanzar: lo que se
+      // quiere afirmar es que el intento se hizo con el MISMO `desde`.
+      if (r && r.revienta) throw new Error(r.revienta);
       return { ok: r.status === 200, status: r.status, json: async () => (r.d || {}) };
     },
   });
@@ -194,6 +206,111 @@ const t200 = (d) => ({ status: 200, d: { ok: true, ...d } });
                     personas: [], viajeros: [{ id: 'v1', nombre: 'Ana' }], chatarraPorZona: {}, ajustes: [] };
     const p = ap.planear(careo, {});
     af(p.abonos.length === 0, 'diferencia 0 → cero abonos nuevos: el segundo confirmar no puede duplicar');
+  }
+
+  // ══ [CAREO-RED-1] EL FETCH QUE REVIENTA ════════════════════════
+  // ── [E] LA EXCEPCIÓN ENTRA A LA MISMA ESCALERA ───────────────────
+  console.log('[E] el fetch revienta dos veces y el recorrido TERMINA');
+  {
+    const { ctx, peticiones } = armar(fnH, esperar, [
+      { revienta: 'Failed to fetch' },
+      { revienta: 'Failed to fetch' },
+      t200({ eventos: [{ evento_id: 'a', plan: {} }], total: 1, hecho: true, siguiente: 2 }),
+    ]);
+    const r = await vm.runInContext('khExcelRecorrer', ctx)(false, null);
+    const sec = JSON.stringify(peticiones.map((p) => [p.desde, p.tanda]));
+    console.log('    {desde,tanda}: ' + sec);
+    af(r.eventos.length === 1, 'el recorrido TERMINA a pesar de dos reventones de red');
+    // 🔒 LA MISMA SECUENCIA QUE EL 504, literalmente — es lo que significa
+    // «misma escalera». Si fuera otra, habría dos escaleras.
+    af(sec === '[[0,10],[0,5],[0,2]]',
+       '10 → 5 → 2 con el MISMO desde, igual que ante un 504: ' + sec);
+  }
+
+  // ── [E2] SI NO PARA, CORTA — Y DICE QUE FUE LA RED Y DÓNDE QUEDÓ ──────
+  console.log('[E2] red muerta: corta diciendo de qué murió y dónde');
+  {
+    // Primero una tanda buena, para que `desde` y `total` NO sean los de
+    // arranque: un mensaje que dice «desde el evento 0» cuando siempre diría 0
+    // no prueba que diga dónde quedó.
+    const { ctx, peticiones } = armar(fnH, esperar, [
+      t200({ eventos: [{ evento_id: 'a', plan: {} }], total: 57, hecho: false, siguiente: 10 }),
+      { revienta: 'NetworkError: DNS' },
+    ]);
+    let e = null;
+    try { await vm.runInContext('khExcelRecorrer', ctx)(false, null); } catch (x) { e = x; }
+    console.log('    mensaje: ' + (e && e.message));
+    af(!!e, 'con la red muerta para siempre el recorrido tiene que CORTAR, no girar en vacío');
+    af(e && /desde el evento 10 de 57/.test(e.message),
+       '🔴 el corte no dice DÓNDE quedó (desde el evento 10 de 57), que es con lo que se retoma: '
+       + JSON.stringify(e && e.message));
+    af(e && /red/i.test(e.message) && /DNS/.test(e.message),
+       '🔴 el corte no dice que fue LA RED ni trae el error original: «el servidor siguió fallando» '
+       + 'manda a revisar Google cuando el problema es el wifi. Salió ' + JSON.stringify(e && e.message));
+    // Y la escalera se agotó de verdad: 1 buena + 6 reventones, nunca infinito.
+    const sec = peticiones.map((p) => [p.desde, p.tanda]);
+    console.log('    intentos: ' + JSON.stringify(sec));
+    af(sec.length === 7 && sec.slice(1).every((x) => x[0] === 10),
+       'la escalera no se agotó como ante un 5xx (1 buena + 6 intentos, todos con el MISMO desde 10): '
+       + JSON.stringify(sec));
+  }
+
+  // ── [E3] EL REINTENTO EN SERIE: su catch YA contaba el intento ────────
+  // ⚠️ El brief pedía VERIFICAR que la cuenta de intentos no se saltara la
+  // excepción. Se verificó y **ya estaba bien**: el `catch` vive DENTRO del
+  // `for (intento...)`, así que un reventón consume intento y el error original
+  // se conserva. No se tocó nada; se le pone aserción para que siga siendo cierto.
+  console.log('[E3] el reintento en serie aguanta el reventón (2 intentos, error intacto)');
+  {
+    const { ctx, peticiones } = armar(fnH, esperar, [
+      t200({ eventos: [{ evento_id: 'google', nombre: 'G', error: { codigo: 'NO_ES_JSON', mensaje: 'una página' } }],
+             total: 1, hecho: true, siguiente: 1 }),
+      { revienta: 'Failed to fetch' },
+      { revienta: 'Failed to fetch' },
+    ]);
+    const r = await vm.runInContext('khExcelRecorrer', ctx)(false, null);
+    const retry = peticiones.filter((p) => /admin-excel-aplicar/.test(p.url));
+    console.log('    intentos del reintento: ' + retry.length);
+    af(retry.length === 2,
+       'el reventón del reintento en serie tiene que CONSUMIR intento (2 y para), no saltarse la cuenta '
+       + 'ni insistir sin fin. Salió ' + retry.length);
+    const g = r.eventos.find((x) => x.evento_id === 'google');
+    af(g && g.error && g.error.codigo === 'NO_ES_JSON',
+       'el error ORIGINAL se conserva cuando el reintento no pudo: ' + JSON.stringify(g && g.error));
+    af(g && g.reintentado !== true, 'y no se rótula como reintentado algo que no se logró');
+  }
+
+  // ── [ER] CONTROL POSITIVO DE CAREO-RED-1 · el árbol que SÍ tiene al dueño ─
+  // 🔒 El BASE de [B] no sirve: ahí `khExcelRecorrer` no existe. Este entra por
+  // `BASE_RED`, el último main antes de esta chiquita.
+  console.log('[ER] control positivo · BASE_RED ' + BASE_RED);
+  {
+    const br = sacar(BASE_RED, 'cr-base-red');
+    const khBR = fs.readFileSync(path.join(br.dir, 'kamehouse.js'), 'utf8');
+    const fnBR = funcionDe(khBR, 'khExcelRecorrer');
+    af(!!fnBR, 'PREMISA: BASE_RED tiene que TRAER khExcelRecorrer, o no es el árbol que creo');
+    // Que SÍ aguanta un 504 — así se sabe que lo que falla es el reventón y no el árbol.
+    {
+      const { ctx } = armar(fnBR, esperar, [
+        { status: 504, d: {} },
+        t200({ eventos: [{ evento_id: 'a', plan: {} }], total: 1, hecho: true, siguiente: 2 }),
+      ]);
+      let e = null;
+      try { await vm.runInContext('khExcelRecorrer', ctx)(false, null); } catch (x) { e = x; }
+      af(!e, 'PREMISA: BASE_RED ya aguantaba el 504 (si tronara, el control de abajo no probaría nada)');
+    }
+    const { ctx, peticiones } = armar(fnBR, esperar, [
+      { revienta: 'Failed to fetch' },
+      t200({ eventos: [{ evento_id: 'a', plan: {} }], total: 1, hecho: true, siguiente: 2 }),
+    ]);
+    let e = null;
+    try { await vm.runInContext('khExcelRecorrer', ctx)(false, null); } catch (x) { e = x; }
+    console.log('    BASE_RED ante el reventón: ' + (e ? 'se escapa (' + e.message + ')' : 'lo aguanta'));
+    af(!!e && /Failed to fetch/.test(e.message),
+       'CONTROL POSITIVO: en BASE_RED la excepción tenía que ESCAPARSE del bucle y tirar el recorrido '
+       + 'entero — es el defecto que esta chiquita cierra. Si ahí ya lo aguantaba, el verde de [E] no dice nada.');
+    af(peticiones.length === 1,
+       'y se escapaba al PRIMER reventón, sin usar la escalera: ' + peticiones.length + ' intento(s)');
   }
 
   // ── [B] EL CONTROL POSITIVO: BASE TRONABA ───────────────────────────────

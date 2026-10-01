@@ -187,11 +187,11 @@ está caduco antes de escribirse.
     histograma por pestaña para poder moverlo con datos si hace falta.
     ⚠️ Si `rojas` llegara null (un `.gs` viejo), nadie sale como baja y el careo
     lo DICE (`colores_leidos:false`) — el fail-soft sigue dicho, nunca mudo.
-  - ⏳ **Beyond de alvarodiaz#0**: quedó sin ajustar el 30-sep a propósito
-    (propuesta 1→14 daba disponibilidad −10; 42 con nombre contra 35 en la
-    pestaña, que olían a filas rojas invisibles). El barrido del 1-oct **sí** le
-    aplicó sus 13 bajas; **no he vuelto a medir su disponibilidad**, así que esto
-    se cierra cuando alguien la mire — no lo doy por cerrado desde aquí.
+  - ✅ **Beyond de alvarodiaz#0: CERRADO (medido 1-oct, post-merge de 1b/1c).**
+    Tras las 13 bajas rojas: 46 compradas − 33 de viajeros − 2 de la casa =
+    **11 libres = el Restan 11 del Excel, exacto**. La propuesta vieja de
+    «fuera 1→14» murió sola: esas filas eran los cancelados, no boletos de la
+    casa. Y la disponibilidad servida ya no lo marca ni agotado ni en pocas.
 - 🏆 **CAREO-ZONA-1b (1-oct-2026): la idempotencia de las bajas y el rojo del
   LIBRO.** `npm run mide:careo-zona-1` **EXTENDIDO a 79** (no arnés nuevo), con
   **DOS bases**: `ae1ea3a` para el control positivo de la 1 y `BASE_1B=12fef09`
@@ -225,6 +225,34 @@ está caduco antes de escribirse.
     cuando es la de la **función**; y le colgó el libro rojo a **Monserrat**, que
     ya era la fixture de la MEZCLA — un papel nuevo encima de una fixture vieja
     la calla.
+- 🏆 **CAREO-RED-1 (1-oct-2026): el fetch que TRUENA entra a la misma escalera.**
+  Deuda anotada de CAREO-RETRY-1, pagada. Un `fetch` que revienta (red caída,
+  «Failed to fetch», DNS, CORS raro) **no es un status**: es una excepción, y se
+  escapaba del bucle de `khExcelRecorrer` tirando el recorrido ENTERO.
+  `mide:careo-retry-1` **33** (eran 20), re-anclado al merge.
+  - 🔒 **UNA SOLA ESCALERA**, y el arnés lo afirma comparando la secuencia letra
+    por letra con la del 504: las dos dan `[[0,10],[0,5],[0,2]]`. Dos escaleras
+    serían dos listas que todavía no divergen, y la de la red decidiría cuándo se
+    abandona un recorrido de 100+ eventos.
+  - ⚠️ **EL ORDEN DEL `if` ES PARTE DEL ARREGLO**: `revento` se pregunta PRIMERO y
+    corta el `||`, porque con el fetch reventado `r` es null y un `!r.ok` sería un
+    TypeError — el recorrido moriría por el arreglo en vez de por la red.
+  - Al cortar se dice DE QUÉ murió (el error original) y DÓNDE quedó: «el servidor
+    siguió fallando» con la red caída manda a revisar Google cuando es el wifi.
+  - ✅ **El segundo sitio se VERIFICÓ y no se tocó**: el `catch` del reintento en
+    serie vive DENTRO del `for (intento...)`, así que un reventón consume intento y
+    el error original se conserva. Se le puso aserción para que siga siendo cierto.
+  - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
+    podía ni expresar el defecto — un guión que solo sabe devolver status mide la
+    mitad del mundo.
+- 🔴⏳ **`mide:nube-4` ESTÁ ROJO (10/7) Y ES EL ARNÉS, NO EL CÓDIGO** (visto el
+  1-oct, ya lo estaba antes de CAREO-RED-1). Su padrón falso es una **FOTO
+  VENCIDA**: las tres filas traen `vigente_hasta` 28-sep, 23-sep y **30-sep**, así
+  que desde el 1-oct la lib contesta `resuelto: null` porque de verdad no hay nada
+  vigente. La de `edc27` venció **el día anterior**, que es por qué asomó justo
+  ahora. Hermana de las fechas de `flashPromo`. ⚠️ **NO dice que la función NUBE-4
+  esté rota — dice que su arnés dejó de medir.** El arreglo es su propia chiquita:
+  las fechas del fixture van RELATIVAS a hoy, no tecleadas.
 - 🏆 **CAREO-ZONA-1c (1-oct-2026): la baja deja SALDO 0.** Regla de Memo: el
   dinero de un cancelado es ganancia, no se reembolsa. La baja escribe
   `total_contrato = lo cobrado` en el MISMO PATCH que `boletos=0` y la zona.

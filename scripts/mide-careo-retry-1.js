@@ -47,7 +47,7 @@ function sacar(ref, etiqueta) {
 }
 // 🔒 Re-anclado tras mergear (la ley del ancla).
 const BASE = process.env.BASE || 'e7a7494';        // el merge de ITIN-NOBUS-1
-const HEAD_SHA = process.env.HEAD_SHA || 'ea3c122'; // CAREO-RED-1
+const HEAD_SHA = process.env.HEAD_SHA || '47a74d2'; // el commit del MERGE de CAREO-RED-1
 // 🔒 [CAREO-RED-1] UNA SEGUNDA BASE, por lo mismo que en careo-zona-1b: el
 // BASE de arriba es ANTERIOR a `khExcelRecorrer` — ahí la función no existe, así
 // que no puede servir de control para una tuerca que la cambia. El control de

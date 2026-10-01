@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'ae1ea3a';
-const HEAD_SHA = process.env.HEAD_SHA || '9c92ecd';
+const HEAD_SHA = process.env.HEAD_SHA || '12fef09';   // el commit del MERGE
 
 // ── LA PESTAÑA · encabezado REAL, enteros ───────────────────────────────
 // Copiado de la medición de CUADRE-1a (ocho pestañas reales por

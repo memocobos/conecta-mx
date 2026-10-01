@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || 'ae1ea3a';
-const HEAD_SHA = process.env.HEAD_SHA || '4a437f3';   // CAREO-ZONA-1b
+const HEAD_SHA = process.env.HEAD_SHA || '9332554';   // CAREO-ZONA-1b
 // 🔒 [CAREO-ZONA-1b] **DOS BASES, porque hay dos generaciones de aserciones.**
 // `ae1ea3a` es el antes de CAREO-ZONA-1 (no sabe de montones) y sirve al control
 // positivo de aquella. Pero para 1b ese árbol fallaría por la razón equivocada:

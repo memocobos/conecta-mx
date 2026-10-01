@@ -245,14 +245,40 @@ está caduco antes de escribirse.
   - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
     podía ni expresar el defecto — un guión que solo sabe devolver status mide la
     mitad del mundo.
-- 🔴⏳ **`mide:nube-4` ESTÁ ROJO (10/7) Y ES EL ARNÉS, NO EL CÓDIGO** (visto el
-  1-oct, ya lo estaba antes de CAREO-RED-1). Su padrón falso es una **FOTO
-  VENCIDA**: las tres filas traen `vigente_hasta` 28-sep, 23-sep y **30-sep**, así
-  que desde el 1-oct la lib contesta `resuelto: null` porque de verdad no hay nada
-  vigente. La de `edc27` venció **el día anterior**, que es por qué asomó justo
-  ahora. Hermana de las fechas de `flashPromo`. ⚠️ **NO dice que la función NUBE-4
-  esté rota — dice que su arnés dejó de medir.** El arreglo es su propia chiquita:
-  las fechas del fixture van RELATIVAS a hoy, no tecleadas.
+- 🏆 **NUBE4-ARNES-1 (1-oct-2026): `mide:nube-4` vuelve a medir.** Estaba en
+  «10 verde, 7 rojo» y de hecho se CAÍA (`TypeError` leyendo `.precio` de null);
+  hoy **73 en verde, 0 en rojo**. 100% del arnés: el diff es UN archivo y
+  `_lib/nube.js` quedó byte a byte igual. Re-anclado al merge.
+  - 🔴 **LA CAUSA ERA UNA FOTO VENCIDA** (`vigente_hasta` 28-sep / 23-sep /
+    **30-sep**, y la de `edc27` murió el día anterior: por eso asomó justo ese
+    día). **NUNCA dijo que la función NUBE-4 estuviera rota — dijo que su arnés
+    dejó de medir.** Son dos afirmaciones distintas y conviene no mezclarlas.
+  - 🔴 **Y HABÍA UNA PISTA A LA VISTA: `AHORA` estaba DECLARADO Y SIN USAR.** La
+    intención de fijar el reloj se escribió y nunca se cableó; una constante
+    muerta es una promesa que nadie cumplió.
+  - 🔴 **SEGUNDA BOMBA, desarmada al pasar**: el `vigente_hasta` del bloque de
+    captura iba tecleado al **5-oct**. Pasaba por cuatro días de suerte; el 6-oct
+    todo ese bloque se habría vuelto 400 «ya pasó», con la guarda de NUBE-1
+    cazando al fixture en vez de al defecto.
+  - ✅ **El arnés deja de CAERSE**: `af` ya atrapaba la excepción de la CONDICIÓN,
+    pero el **mensaje** se armaba ANTES de llamarla, así que un `JSON.stringify`
+    de algo nulo reventó fuera del try y dejó `[C]`, `[G]` y `[R]` sin medir. Hoy
+    el mensaje también puede ser función y las lecturas en cadena van por
+    `ver()`/`seg()`, que nunca lanzan.
+  - ✅ **Los TRES estados de `regiaEl`, cada uno con su fila y por su NOMBRE.** La
+    aserción vieja decía `estado !== 'vigente'` — y eso lo cumplen TRES estados
+    distintos: un «no es A» no distingue entre B, C y D. `g2` muere AYER a
+    propósito para que `vencida` tenga su fila.
+  - 🔒 **CONTROL DEL INSTRUMENTO `[Z]`:** unas fechas relativas pueden ARREGLAR la
+    medición o **TAPARLA** — si el padrón se mueve siempre con el reloj, un arnés
+    que ya no mira la vigencia sale verde para siempre, y ese es el peor verde de
+    todos. Así que se re-corre con el padrón **40 días atrás** y se EXIGE que la
+    respuesta cambie. Más una aserción de que el padrón quedó RESTAURADO: sin
+    ella el `finally` podría no servir de nada y nadie se enteraría.
+  - ⚠️ **El verde que reporté al mergear NUBE-4 no se pudo reproducir**: hoy sale
+    rojo contra los DOS lados de su propio merge. O no estaba verde entonces, o
+    lo verifiqué de una forma que no volvió a reproducir. **No sé cuál de las dos
+    y no lo adivino** — queda dicho así.
 - 🏆 **CAREO-ZONA-1c (1-oct-2026): la baja deja SALDO 0.** Regla de Memo: el
   dinero de un cancelado es ganancia, no se reembolsa. La baja escribe
   `total_contrato = lo cobrado` en el MISMO PATCH que `boletos=0` y la zona.
@@ -2168,6 +2194,21 @@ está caduco antes de escribirse.
   quien traiga abonos encima se queda con saldo, y sería saldo A FAVOR del
   cliente. El abonado NUNCA se toca: el contrato es lo que se DEBE y moverlo no
   da ni quita un peso; el abonado es lo que el cliente PAGÓ.
+- 🔴🔒 **UNA FECHA TECLEADA SOLO ES UNA BOMBA CUANDO ALGO LA COMPARA CONTRA EL
+  RELOJ REAL** (medido el 1-oct en los cuatro arneses de la Nube). Las fechas de
+  un fixture van **RELATIVAS a hoy** — o se le **INYECTA el reloj** al código que
+  las lee. Lo que NO se puede es teclear las fechas y preguntarle «¿qué rige
+  AHORA?»: esa mezcla mata, y mató a `mide:nube-4`.
+  - `mide-nube-4` tenía fechas fijas y preguntaba por el AHORA → se podrió.
+  - `mide-nube-3` tiene **8 vigencias tecleadas y NO se va a podrir**, porque
+    inyecta su propio `ahora`: es un mundo cerrado. ⚠️ **Avisar de nube-3 habría
+    sido mandar a buscar un hoyo que no existe** — el barrido por la CADENA
+    «fecha tecleada» la acusa; el barrido por el HECHO la absuelve.
+  - `mide-nube-5` nació con fechas relativas: la receta **no faltaba en el repo**,
+    se ignoró en un solo sitio.
+  - 🔒 Y el corolario del instrumento: al volver relativas las fechas, hay que
+    exigir que el arnés **SÍ note el reloj** (correrlo con todo vencido y ver que
+    la respuesta cambia). Si no, las fechas relativas taparon la medición.
 - 🔒 **«ROCK 9» ES UNA AGENCIA — es el NOMBRE del comprador, no un código ni un
   error. NO SE VUELVE A PREGUNTAR (Memo ya lo explicó varias veces, 30-sep).**
   Le separa boletos CHEAP del Corona y sus pagos viven en Numerología; sus

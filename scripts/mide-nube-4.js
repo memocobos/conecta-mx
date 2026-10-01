@@ -64,7 +64,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5b2c107';
-const HEAD_SHA = process.env.HEAD_SHA || '427c0dc';   // el commit del MERGE (#770)
+const HEAD_SHA = process.env.HEAD_SHA || '356449e';   // el merge de NUBE4-ARNES-1
 const iso = (s) => new Date(s).toISOString();
 // ══ [NUBE4-ARNES-1] EL RELOJ ════════════════════════════════════
 // 🔴 `AHORA` existía —y NO SE USABA EN NINGUNA PARTE: la intención de fijar el

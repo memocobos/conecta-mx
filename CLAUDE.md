@@ -167,6 +167,83 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **CAREO-ZONA-1 EN PROD (30-sep-2026, merge 12fef09, re-ancla 654342c): el
+  careo diario aprende ZONAS, FILAS PARTIDAS y FILAS ROJAS.**
+  `npm run mide:careo-zona-1` (**54**, anclado al merge), construida por CC y
+  verificada con corrida propia antes del merge (los 6 vecinos en verde).
+  - La zona de la fila VIAJA: canonizada por `_lib/zona-ficha`, desconocida se
+    nombra sin escribirse. Boletos = filas con zona real; «-» no es un boleto.
+  - **CHEAP con boletos en 2+ zonas se PARTE en filas** (el dinero entero en la
+    principal). Un PLUS repartido sigue siendo aviso. Precedente: Diana Loredo.
+  - 🔒 **FILA ROJA = CANCELACIÓN (regla firmada de Memo, 30-sep)**: baja con
+    `boletos=0, zona NULL`, **el abonado NO se toca** (Diana Marlene y Nohemi
+    conservan sus $5,500). ⚠️ **HAY DOS «BAJAS» Y JAMÁS SE CABLEAN**: la del
+    careo («no vino en la pestaña») sigue SIN puerta; la del plan es SOLO
+    `p.roja`. Vigilado en mide:cuadre-aplicar.
+  - ✅ **DESPLEGADO Y CALIBRADO (1-oct).** Los dos `.gs` ya están arriba y el
+    umbral (r−g/r−b con techo, **3 celdas = fila**) se midió contra las rojas
+    REALES: **cazó exacto las 2 de Karol 7-nov y las 13 de Álvaro 3-oct**, y el
+    barrido global aplicó **116 bajas, 0 errores**. El careo sigue devolviendo el
+    histograma por pestaña para poder moverlo con datos si hace falta.
+    ⚠️ Si `rojas` llegara null (un `.gs` viejo), nadie sale como baja y el careo
+    lo DICE (`colores_leidos:false`) — el fail-soft sigue dicho, nunca mudo.
+  - ⏳ **Beyond de alvarodiaz#0**: quedó sin ajustar el 30-sep a propósito
+    (propuesta 1→14 daba disponibilidad −10; 42 con nombre contra 35 en la
+    pestaña, que olían a filas rojas invisibles). El barrido del 1-oct **sí** le
+    aplicó sus 13 bajas; **no he vuelto a medir su disponibilidad**, así que esto
+    se cierra cuando alguien la mire — no lo doy por cerrado desde aquí.
+- 🏆 **CAREO-ZONA-1b (1-oct-2026): la idempotencia de las bajas y el rojo del
+  LIBRO.** `npm run mide:careo-zona-1` **EXTENDIDO a 79** (no arnés nuevo), con
+  **DOS bases**: `ae1ea3a` para el control positivo de la 1 y `BASE_1B=12fef09`
+  para el de la 1b — el árbol viejo no sirve de control para la chiquita porque
+  no propone bajas EN ABSOLUTO, así que «no la re-propone» saldría verde en vacío.
+  - 🔴🔒 **LA GUARDA DE IDEMPOTENCIA ERA INALCANZABLE, y la razón no es la
+    que yo escribí primero.** No fue la carrera del reintento de CAREO-RETRY-1: es
+    que `leerBase` sube un `boletos: 0` a **1** (su respaldo contra el null, que
+    es CORRECTO para la sincronía), así que `boletos === 0` no podía ser cierto
+    jamás. Una normalización deliberada de más arriba dejó muerta la guarda de
+    otro lector. El respaldo NO se tocó: se añadió `boletos_crudo` al lado.
+    Reproducido en el control positivo: `12fef09` escribe **2 PATCH** en la
+    segunda pasada; con 1b escribe **0**.
+  - Segundo candado independiente: el PATCH de la baja va condicionado
+    (`or=(boletos.neq.0,zona_boleto.not.is.null)` — el `or=` porque un NOT contra
+    NULL traga filas). La red falsa del arnés RESPETA ese filtro, o pasaría en vacío.
+  - 🔒 **El caso fino:** pestaña VIVA + libro ROJO = **AVISO** con su motivo y su
+    monto, NO baja — la fila roja cancela esa compra CHEAP, no a la persona.
+    Quien SOLO vive en el libro y viene roja sí baja completa, y la nota dice de
+    qué hoja vino (`origen_rojo`), porque «cancelada» a secas manda a buscar en
+    la equivocada.
+  - El umbral sigue teniendo **UN** dueño (`ROJAS_MIN_CELDAS`): el parser del
+    libro solo ARRASTRA la marca, porque `numerologia.js` no puede pedirle la
+    constante a quien ya lo requiere (sería un require circular).
+  - Y un letrero que sobrevivía a su causa: el error de `admin-excel-aplicar`
+    decía «las BAJAS no se aplican nunca» cuando la 1 ya las aplica.
+  - ⚠️ **CUATRO ROJOS DEL ARNÉS, los cuatro míos** y vale la pena el renglón: el
+    arnés estaba anclado a `12fef09` y midió el árbol SIN 1b toda la corrida; el
+    fixture del libro inventó rótulos («Anticipo» en vez de `Separo`) y las 3
+    filas caían a `fueraDeBloque`; le puso a `fecha_libro` la fecha de la COMPRA
+    cuando es la de la **función**; y le colgó el libro rojo a **Monserrat**, que
+    ya era la fixture de la MEZCLA — un papel nuevo encima de una fixture vieja
+    la calla.
+- 🏆 **CAREO-ZONA-1c (1-oct-2026): la baja deja SALDO 0.** Regla de Memo: el
+  dinero de un cancelado es ganancia, no se reembolsa. La baja escribe
+  `total_contrato = lo cobrado` en el MISMO PATCH que `boletos=0` y la zona.
+  `mide:careo-zona-1` **87**, bloque `[1C]` con su control positivo.
+  - 🔒 **ES `v.abonado` (previo + Σ abonos), NO `v.abonado_previo`.** El fixture
+    los SEPARA a propósito: Diana Marlene lleva $5,500 de previo más un abono de
+    $1,200 → cobrado **$6,700**, distinto de 5500 y de su contrato viejo 9200.
+    Con `abonos_viajero` vacío —como estaba— la aserción pasaba IGUAL con la
+    implementación equivocada: un fixture donde dos cantidades coinciden no
+    distingue dos implementaciones.
+  - Sin `|| null`: un cobrado de $0 es un NÚMERO (contrato a cero), no un hueco.
+  - ⚠️ **Una aserción vieja metía «el dinero» en un solo saco** y prohíbe hoy lo
+    correcto: `total_contrato` SÍ se mueve, `abonado`/`abonado_previo` NO. Se
+    actualizó a la verdad nueva y la mitad que seguía siendo cierta quedó con
+    dientes — no se silenció.
+  - La nota cuenta las DOS escrituras («total $9,200 → $6,700 · saldo 0») y el
+    reporte lleva `total_de`/`total_a`: una nota que menciona media escritura
+    esconde la otra mitad, y un número pelado no se audita.
+
 - 🏆 **CUATRO TUERCAS DEL 28-SEP EN MAIN LOCAL — ⏳ PENDIENTE `git push` DE MEMO**
   (el sandbox no tiene credenciales de GitHub; hasta el push, el sitio servido
   NO las trae). Las siembras de base SÍ ya viven. Merges: 6ca49aa · ee4c0ef ·
@@ -2041,6 +2118,28 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **FILA ROJA = CANCELACIÓN, EN LOS DOS EXCELES** (palabra de Memo, 1-oct):
+  en las pestañas de Conecta 2026 Y en el libro de Numerología. El careo ya lo
+  aplica en pestañas (barrido del 1-oct: 116 bajas, 0 errores; umbral 3 celdas
+  calibrado contra Karol 7-nov y Álvaro 3-oct, exacto). El abonado NUNCA se
+  toca en una baja. ✅ **Las dos chiquitas de `CAREO-ZONA-1B-BRIEF.md` quedaron
+  (CAREO-ZONA-1b):** el rojo del LIBRO ya cancela y una baja aplicada ya NO se
+  re-propone. ⚠️ Los `.gs` desplegados
+  el 1-oct: pestañas es proyecto SUELTO (lleva `SPREADSHEET_ID` tecleado —
+  el repo lo trae vacío, al re-desplegar hay que reponerlo del historial del
+  proyecto), Numerología es ATADO (vacío correcto).
+  🔒 **EL DINERO DE UN CANCELADO ES GANANCIA (regla de Memo, 1-oct): NO se
+  reembolsa.** La fuente del monto: CHEAP manda **Numerología**; PLUS/STAY/RIDE
+  manda **la pestaña de Conecta 2026** (así entran ya por construcción: los
+  abonos CHEAP los escribe el careo del libro y los demás el de pestañas).
+  Recalculado el 1-oct sobre los 116 bajados: `total_contrato = lo abonado`
+  (saldo 0, nada por cobrar ni devolver) — **$123,874 quedan como ganancia**,
+  con nota por persona. ✅ **El careo de bajas nuevas YA lo hace (CAREO-ZONA-1c):**
+  la baja escribe `total_contrato = abonado_previo + Σ abonos` en el mismo PATCH.
+  ⚠️ ES LO **COBRADO**, no el `abonado_previo` a secas — con el previo pelado,
+  quien traiga abonos encima se queda con saldo, y sería saldo A FAVOR del
+  cliente. El abonado NUNCA se toca: el contrato es lo que se DEBE y moverlo no
+  da ni quita un peso; el abonado es lo que el cliente PAGÓ.
 - 🔒 **«ROCK 9» ES UNA AGENCIA — es el NOMBRE del comprador, no un código ni un
   error. NO SE VUELVE A PREGUNTAR (Memo ya lo explicó varias veces, 30-sep).**
   Le separa boletos CHEAP del Corona y sus pagos viven en Numerología; sus

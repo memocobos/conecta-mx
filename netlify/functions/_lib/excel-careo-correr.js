@@ -98,6 +98,16 @@ async function leerBase(eventoId, sb) {
     // NOT NULL DEFAULT 1 en la base; el respaldo se escribe igual porque un
     // null aquí haría que la sincronía «corrigiera» filas que ya estaban bien.
     boletos: (parseInt(v.boletos, 10) > 0) ? parseInt(v.boletos, 10) : 1,
+    // 🔴 [CAREO-ZONA-1b] Y EL CRUDO AL LADO, porque el respaldo de arriba
+    // BORRA el único valor que distingue a una persona ya BAJADA: un `0` de la
+    // base sale de aquí como **1**, así que la guarda de idempotencia de las
+    // bajas —`boletos === 0`— **no podía dispararse jamás**. Es la guarda
+    // inalcanzable otra vez, y esta vez la volvió inalcanzable una normalización
+    // DELIBERADA de más arriba: el respaldo es correcto para la sincronía y
+    // destruye el dato para el otro lector.
+    // Medido el 1-oct: 116 bajas aplicadas y 18 filas con la nota DOS VECES.
+    // ⚠️ El respaldo NO se toca — su razón sigue en pie—; el crudo se AÑADE.
+    boletos_crudo: v.boletos == null ? null : Number(v.boletos),
   })) };
 }
 
@@ -436,6 +446,26 @@ async function traerNumerologia(eventoId, sb) {
       error: { codigo: c.codigo, mensaje: c.mensaje, pista: c.pista } };
   }
 
+  // ── [CAREO-ZONA-1b] EL ROJO DEL LIBRO, CON EL **MISMO** UMBRAL ───────────
+  // Regla firmada de Memo (1-oct-2026): «Numerología y Conecta 2026: el rojo
+  // significa cancelado en cualquiera de los dos.» El cosechador YA mandaba el
+  // arreglo `rojas` del libro —medido el 30-sep: filas con ~20 celdas rojas en
+  // la pestaña «Boletos»— y el parser lo tiraba al piso.
+  //
+  // 🔒 EL UMBRAL ES UNO Y SE MARCA AQUÍ, no en `numerologia.js`: ese lib no
+  // puede pedirle la constante a este archivo porque este archivo YA lo
+  // requiere — sería un require circular. Así que el DUEÑO del umbral marca y
+  // el parser arrastra, que es la misma forma que ya corre para las pestañas.
+  // Un umbral copiado serían dos listas que todavía no divergen, y la del libro
+  // decidiría cancelaciones.
+  const rojasLibro = Array.isArray(c.rojas) ? c.rojas : null;
+  const histoLibro = {};
+  if (rojasLibro) {
+    for (const n of rojasLibro) { const k = String(Number(n || 0)); histoLibro[k] = (histoLibro[k] || 0) + 1; }
+    for (let i = 0; i < c.filas.length; i++) {
+      if (Number(rojasLibro[i] || 0) >= ROJAS_MIN_CELDAS && c.filas[i]) c.filas[i].__roja = true;
+    }
+  }
   // El libro, leído con su propio parser (medido de la rejilla real el 20-sep).
   const libro = parsearLibro(c.filas);
   const m = mapearLibro(libro.personas, lista, eventoId);
@@ -443,7 +473,14 @@ async function traerNumerologia(eventoId, sb) {
     personas: m.personas, sin_mapeo: m.sinMapeo,
     filas_libro: Array.isArray(c.filas) ? c.filas.length : 0,
     bloques: libro.bloques.length, personas_libro: libro.personas.length,
-    descartes: libro.descartes, mapeos: lista.length };
+    descartes: libro.descartes, mapeos: lista.length,
+    // [CAREO-ZONA-1b] El estado del color del LIBRO, con su histograma — igual
+    // que el de las pestañas, y por lo mismo: el umbral se calibra con datos.
+    colores_leidos: c.colores_leidos === true,
+    filas_rojas: rojasLibro
+      ? rojasLibro.filter((n) => Number(n || 0) >= ROJAS_MIN_CELDAS).length : null,
+    histograma_rojas: rojasLibro ? histoLibro : null,
+    umbral_rojas: ROJAS_MIN_CELDAS };
 }
 
 module.exports = { correrCareo, leerBase, SB_URL };

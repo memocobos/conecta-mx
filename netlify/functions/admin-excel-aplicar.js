@@ -86,7 +86,18 @@ exports.handler = async (event) => {
       ok: true, evento_id: eventoId, pestanas: pestanaNombre, confirmado: false, plan,
       resumen: { abonos: plan.abonos.length, monto_abonos: plan.abonos.reduce((a, x) => a + x.monto, 0),
                  totales: plan.totales.length, altas: plan.altas.length,
-                 negativas: plan.negativas.length, saltados: plan.saltados.length } }) };
+                 negativas: plan.negativas.length, saltados: plan.saltados.length,
+                 // [CAREO-ZONA-1] Los tres montones nuevos, con su conteo — la forma
+                 // de CUADRE-1a: el conteo en `resumen`, el montón con su nombre
+                 // dentro de `plan`. Un montón sin conteo no se ve en la pantalla.
+                 zonas: (plan.zonas || []).length,
+                 partidas: (plan.partidas || []).length,
+                 bajas: (plan.bajas || []).length,
+                 avisos_zonas: (plan.avisos_zonas || []).length,
+                 // ⚠️ Y se DICE cuando el catálogo no se pudo leer: con él en null la
+                 // puerta no canoniza nada y los montones de zona salen vacíos.
+                 // Un vacío sin razón se lee como «no había nada que cambiar».
+                 zonas_sin_catalogo: plan.zonas_sin_catalogo === true } }) };
   }
 
   const resultado = await ejecutarPlan({
@@ -101,5 +112,11 @@ exports.handler = async (event) => {
     resumen: { abonos: resultado.abonos.length, monto_abonos: resultado.abonos.reduce((a, x) => a + x.monto, 0),
                totales: resultado.totales.length, altas: resultado.altas.length,
                negativas: plan.negativas.length, saltados: plan.saltados.length,
+               // [CAREO-ZONA-1] Lo APLICADO, no lo planeado: si un PATCH falla, el
+               // conteo de aquí tiene que decir la verdad y no la intención.
+               zonas: (resultado.zonas || []).length,
+               partidas: (resultado.partidas || []).length,
+               bajas: (resultado.bajas || []).length,
+               avisos_zonas: (plan.avisos_zonas || []).length,
                errores: resultado.errores.length } }) };
 };

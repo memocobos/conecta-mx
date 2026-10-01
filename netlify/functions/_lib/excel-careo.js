@@ -22,6 +22,21 @@
 const { normalizarZona: _formaNorm } = require('./normalizar-zona');
 function normalizarNombre(s) { return _formaNorm(s); }
 
+// ── [CAREO-ZONA-1] LA CELDA QUE NO ES UNA ZONA ─────────────────────────────
+// Regla de Memo (30-sep-2026): **una fila con Boleto «-» NO cuenta como
+// boleto.** El caso Ximena Ocañas (alvarodiaz#0): sus DOS filas decían «-», el
+// parser las contaba como la zona «-» y el sistema la tenía ocupando un Perfil
+// — el index decía AGOTADO con 1 lugar libre.
+//
+// ⚠️ ESTA LISTA YA EXISTÍA en `excel-aplicar` (`ZONA_VACIA`) y se usaba en UN
+// solo sitio: el placeholder de los apartados. Al contar boletos nadie la
+// consultaba. Sube aquí —al parser, que es quien ve las filas— y allá se le
+// pide, para que no sean dos listas que todavía no divergen.
+const ZONA_NO_ES_ZONA = ['', '-', '--', '---', 'n/a', 'na', 'sin zona'];
+function esZonaUtil(z) {
+  return !ZONA_NO_ES_ZONA.includes(normalizarNombre(z));
+}
+
 // La chatarra: filas que no son viajeros sino reventa o control interno. Se
 // mira sobre el nombre YA normalizado, porque en el Excel viene de todas las
 // formas («Vendido Memo», «VENDIDO», «Coordi Sofía»).
@@ -224,6 +239,10 @@ function parsearPestana(filas, encabezado, reglaZona) {
       // solo— de «boletos repartidos», que hay que preguntar: repartirlos entre
       // zonas sin fila sería inventar, y ya mordió con Angel.
       if (zona) ya.zonas[zona] = (ya.zonas[zona] || 0) + 1;
+      // [CAREO-ZONA-1] El reparto REAL y los guiones, por separado.
+      if (zona && esZonaUtil(zona)) ya.zonasReales[zona] = (ya.zonasReales[zona] || 0) + 1;
+      else if (zona) ya.guiones += 1;
+      if (f.__roja) ya.roja = true;
       // Dos boletos de la misma persona: los totales se SUMAN, igual que el
       // abonado. Pero si a UNA de las filas le falta el total, la suma de las
       // otras es un número que MIENTE por defecto — se marca incompleta y la
@@ -240,6 +259,14 @@ function parsearPestana(filas, encabezado, reglaZona) {
     } else {
       out.set(clave, {
         nombre: nombreCrudo, clave, abonado, filas: 1, zona,
+        // [CAREO-ZONA-1] Las zonas que SÍ son zonas, y las filas «-» contadas
+        // aparte. `zonas` NO se toca — tiene consumidores (CUADRE-5/6) y
+        // cambiarle la forma sería otra tuerca; esto se AÑADE al lado.
+        zonasReales: esZonaUtil(zona) && zona ? { [zona]: 1 } : {},
+        guiones: (zona && !esZonaUtil(zona)) ? 1 : 0,
+        // La bandera del rojo viaja por fila y se queda en `true` si CUALQUIERA
+        // de las filas de la persona lo está: una cancelación es de la persona.
+        roja: !!f.__roja,
         // ⚠️ `zona` (la primera) SE QUEDA: hay consumidores que la leen y
         // cambiarla sería otra tuerca. `zonas` se AÑADE al lado.
         zonas: zona ? { [zona]: 1 } : {},
@@ -576,7 +603,7 @@ function carear(personasExcel, viajerosBase, opciones) {
            } };
 }
 
-module.exports = { normalizarNombre, esChatarra, leerDinero, mapearColumnas,
+module.exports = { normalizarNombre, esChatarra, leerDinero, mapearColumnas, esZonaUtil,
                    parsearPestana, carear, agruparBase, esDerivado,
                    reglaCeroTecleado, CUADRE5_FECHA,
                    CHATARRA, TOLERANCIA_MXN };

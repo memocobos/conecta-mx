@@ -155,6 +155,11 @@ async function cosechar({ pestana, fuente } = {}, fetchImpl) {
 
   if (FUENTES[fuente || 'pestanas'].exigeEncabezado === false) {
     return { ok: true, pestana, filas, n_filas: filas.length, encabezado: null,
+             // [CAREO-ZONA-1] El color viaja TAL CUAL: cuántas celdas rojas tiene
+             // cada fila, y si los colores se pudieron leer. Este lib no decide
+             // quién está cancelado — lo pasa.
+             rojas: Array.isArray(json.rojas) ? json.rojas : null,
+             colores_leidos: json.colores_leidos === true,
              fuente: fuente || 'pestanas',
              pestanas: Array.isArray(json.pestanas) ? json.pestanas : [], leido_en: json.leido_en };
   }
@@ -168,6 +173,9 @@ async function cosechar({ pestana, fuente } = {}, fetchImpl) {
   }
 
   return { ok: true, pestana, filas, n_filas: filas.length, encabezado,
+           // [CAREO-ZONA-1] idem: el hecho del color, sin interpretar.
+           rojas: Array.isArray(json.rojas) ? json.rojas : null,
+           colores_leidos: json.colores_leidos === true,
            pestanas: Array.isArray(json.pestanas) ? json.pestanas : [], leido_en: json.leido_en };
 }
 

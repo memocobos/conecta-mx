@@ -29,6 +29,13 @@ const { normalizarZona } = require('./normalizar-zona');
 // ortografía de la ficha antes de que `planear` las compare con la base.
 const { zonasCanonicasDe, resolverZonaFicha } = require('./zona-ficha');
 
+// [CAREO-ZONA-1] Cuántas celdas rojas hacen una fila roja. ⚠️ DECLARADO Y
+// PENDIENTE DE MEDICIÓN contra las filas rojas reales de la pestaña de Karol
+// 7-nov: el careo devuelve el HISTOGRAMA por pestaña justo para poder moverlo
+// con datos. Tres es el mínimo con el que un resaltado suelto no se vuelve una
+// baja — y una baja borra el lugar de una persona.
+const ROJAS_MIN_CELDAS = 3;
+
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 
 // El lado del sistema: los viajeros del evento con su abonado ya sumado.
@@ -126,13 +133,34 @@ async function correrCareo(eventoId) {
       return { error: { status: 502, codigo: c.codigo, pestana: m.pestana, pestanas: c.pestanas,
         mensaje: `No pude cosechar la pestaña "${m.pestana}": ${c.mensaje}` } };
     }
+    // ── [CAREO-ZONA-1] LA FILA ROJA SE MARCA ANTES DE PARSEAR ───────────────
+    // El cosechador devuelve CUÁNTAS celdas rojas tiene cada fila; la decisión
+    // de «esta fila es una cancelación» es de aquí, no del script.
+    // 🔒 SI LOS COLORES NO SE PUDIERON LEER, NADIE ES ROJO: `rojas` viaja en
+    // null y ninguna fila se marca. «No sé» no puede volverse «nadie canceló» en
+    // silencio, así que el detalle de la pestaña lo DICE.
+    const rojasFila = Array.isArray(c.rojas) ? c.rojas : null;
+    const histoRojas = {};
+    if (rojasFila) {
+      for (const n of rojasFila) { const k = String(Number(n || 0)); histoRojas[k] = (histoRojas[k] || 0) + 1; }
+      for (let i = 0; i < c.filas.length; i++) {
+        if (Number(rojasFila[i] || 0) >= ROJAS_MIN_CELDAS && c.filas[i]) c.filas[i].__roja = true;
+      }
+    }
     const p = parsearPestana(c.filas, c.encabezado, m.regla_zona);
     for (const zc in (p.chatarraPorZona || {})) {
       chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + p.chatarraPorZona[zc];
     }
     detallePestanas.push({ pestana: m.pestana, regla_zona: m.regla_zona || null,
                            personas: p.personas.length, descartes: p.descartes,
-                           mapa: p.mapa, notas: m.notas || null });
+                           mapa: p.mapa, notas: m.notas || null,
+                           // [CAREO-ZONA-1] El estado del color, SIEMPRE dicho — y el
+                           // histograma con el que se corrige el umbral con datos.
+                           colores_leidos: c.colores_leidos === true,
+                           filas_rojas: rojasFila
+                             ? rojasFila.filter((n) => Number(n || 0) >= ROJAS_MIN_CELDAS).length : null,
+                           histograma_rojas: rojasFila ? histoRojas : null,
+                           umbral_rojas: ROJAS_MIN_CELDAS });
     // Dos pestañas del mismo evento (Pa'l Norte) se FUNDEN por nombre, con el
     // dinero sumado — la misma regla que dos filas dentro de una pestaña.
     for (const per of p.personas) {
@@ -152,11 +180,24 @@ async function correrCareo(eventoId) {
         // la misma persona entre dos pestañas del mismo evento.
         ya.zonas = ya.zonas || {};
         for (const zz in (per.zonas || {})) ya.zonas[zz] = (ya.zonas[zz] || 0) + per.zonas[zz];
+        // [CAREO-ZONA-1] Lo nuevo se funde con la MISMA regla que `zonas`.
+        ya.zonasReales = ya.zonasReales || {};
+        for (const zz in (per.zonasReales || {})) ya.zonasReales[zz] = (ya.zonasReales[zz] || 0) + per.zonasReales[zz];
+        ya.guiones = (ya.guiones || 0) + (per.guiones || 0);
+        // Una cancelación es de la PERSONA: si alguna de sus filas está roja, lo está.
+        if (per.roja) ya.roja = true;
         if (!ya.paquete && per.paquete) ya.paquete = per.paquete;
         if (!ya.talla && per.talla) ya.talla = per.talla;
         ya.pestanas.push(m.pestana);
+        if (m.regla_zona && !ya.reglaZona) ya.reglaZona = m.regla_zona;
       } else {
-        personas.set(per.clave, { ...per, pestanas: [m.pestana] });
+        // ⚠️ [CAREO-ZONA-1] `reglaZona` VIAJA CON LA PERSONA, y es el candado del
+        // caso Corona: cuando una pestaña se reparte entre varios eventos por
+        // zona, **la columna Boleto es el selector del EVENTO (el día), no el
+        // asiento** — `parsearPestana` filtra justamente por ella. Proponer ahí
+        // un «cambio de zona» sería proponer el día como zona. Se le PREGUNTA al
+        // mapeo, que ya lo sabe, en vez de adivinarlo por la forma del texto.
+        personas.set(per.clave, { ...per, pestanas: [m.pestana], reglaZona: m.regla_zona || null });
       }
     }
   }
@@ -216,8 +257,14 @@ async function correrCareo(eventoId) {
   // que la ficha no tiene («-», la fila sin zona de la pestaña) viaja tal cual:
   // la chatarra es un contador, no una venta, y borrarle el renglón raro sería
   // esconder boletos. Si dos ortografías colapsan a la misma canónica, se SUMAN.
+  // [CAREO-ZONA-1] Las canónicas se calculan UNA vez y VIAJAN con el careo, para
+  // que `planear` use la parte PURA de la puerta (`resolverZonaFicha`) sin
+  // volverse asíncrono ni pedirle el catálogo por su cuenta.
+  // ⚠️ `null` significa «no se pudo leer el catálogo» y NO «ninguna zona»: con
+  // null el plan NO propone cambios de zona y lo DICE.
+  const zonasCanonicas = evCat ? zonasCanonicasDe(evCat) : null;
   if (evCat) {
-    const canonicas = zonasCanonicasDe(evCat);
+    const canonicas = zonasCanonicas;
     const canonizada = {};
     for (const zc in chatarraPorZona) {
       const v = resolverZonaFicha(canonicas, zc);
@@ -341,7 +388,7 @@ async function correrCareo(eventoId) {
   if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
 
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
-           viajeros: base.viajeros, montones, numerologia,
+           viajeros: base.viajeros, montones, numerologia, zonasCanonicas,
            chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };
 }
 

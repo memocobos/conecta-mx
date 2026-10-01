@@ -844,9 +844,41 @@ function _excelAplicarPreviaHtml(d, alcance) {
         `${_evtEsc(x.nombre)}${x.numerologia ? ` <span data-chip="numerologia" style="font-size:10px;color:var(--tp);border:1px solid currentColor;border-radius:3px;padding:0 4px">Numerología${x.numerologia_por === 'nota' ? ' (por la nota del 19-sep)' : ''}</span>` : ''}`,
         `${_evtMxn(x.sistema)} vs Excel ${_evtMxn(x.excel)} <b style="color:var(--red)">${_evtMxn(x.diferencia)}</b>`), 'var(--red)')}
     ${grupo('se saltan, con su motivo', p.saltados || [], (x) => fila(_evtEsc(x.nombre), `<span style="font-size:11px;color:var(--ts)">${_evtEsc(x.motivo)}</span>`), 'var(--ts)')}
+    <!-- ── [CAREO-ZONA-1] LOS TRES MONTONES NUEVOS ──────────────────────────
+         El conteo vive en el resumen y el montón trae su nombre, la forma de
+         CUADRE-1a. Cada renglón dice NOMBRES: un conteo pelón no se confirma. -->
+    ${grupo('zonas a corregir', p.zonas || [], (x) => fila(
+        `${_evtEsc(x.nombre)}${x.estado_puerta === 'canonizada'
+          ? ` <span style="font-size:10px;color:var(--ts)">escrita «${_evtEsc(x.capturada)}»</span>` : ''}`,
+        x.a == null
+          ? `<span style="color:var(--orange)">${_evtEsc(x.de || 'sin zona')} → SIN ZONA</span> <span style="font-size:11px;color:var(--ts)">(sus filas traen «-»)</span>`
+          : `${_evtEsc(x.de || 'sin zona')} → <b style="color:var(--green)">${_evtEsc(x.a)}</b>`
+            + (x.boletos_a != null && x.boletos_a !== x.boletos_de
+               ? ` <span style="font-size:11px;color:var(--ts)">· boletos ${x.boletos_de}→${x.boletos_a}</span>` : '')
+            + (x.guiones ? ` <span style="font-size:11px;color:var(--ts)">· ${x.guiones} en «-»</span>` : '')), 'var(--green)')}
+    ${grupo('filas a PARTIR (CHEAP en varias zonas)', p.partidas || [], (x) => fila(
+        _evtEsc(x.nombre) + ' <span style="font-size:10px;color:var(--ts)">el dinero se queda en la principal</span>',
+        `<b>${_evtEsc(x.principal.zona)}</b> ×${x.principal.boletos}`
+        + (x.nuevas || []).map((n) => ` <span style="color:var(--green)">+ fila nueva ${_evtEsc(n.zona)} ×${n.boletos}</span>`).join('')), 'var(--green)')}
+    ${grupo('BAJAS por fila ROJA del Excel', p.bajas || [], (x) => fila(
+        _evtEsc(x.nombre),
+        `${_evtEsc(x.de_zona || 'sin zona')} ×${x.de_boletos} → <b style="color:var(--red)">CANCELADA</b>`
+        + (x.abonado ? ` <span style="font-size:11px;color:var(--ts)">· conserva ${_evtMxn(x.abonado)}</span>` : '')), 'var(--red)')}
+    ${grupo('zonas que NO se tocan, con su motivo', p.avisos_zonas || [], (x) => fila(
+        _evtEsc(x.nombre), `<span style="font-size:11px;color:var(--ts)">${_evtEsc(x.motivo)}</span>`), 'var(--orange)')}
+    ${p.zonas_sin_catalogo ? `<div style="font-size:12px;color:var(--orange);margin-top:8px">
+      <b>El catálogo no se pudo leer</b>, así que NINGUNA zona se validó ni se propone: los montones de
+      zona salen vacíos por eso y no porque no hubiera nada que cambiar.</div>` : ''}
     <div style="font-size:11px;color:var(--ts);margin:10px 0">
-      <b style="color:var(--tp)">Las BAJAS y los AMBIGUOS no se aplican nunca</b> — ni desde aquí ni por renglón.
-      Una baja es una persona y espera firma; elegir entre dos homónimos sería inventar el dato que falta.
+      <!-- ⏳ [CAREO-ZONA-1] ESTA FRASE SE CORRIGIÓ, no se dejó mintiendo: decía
+           «las BAJAS y los AMBIGUOS no se aplican nunca», y desde esta tuerca las
+           bajas SÍ tienen puerta — pero solo la de la FILA ROJA, que es una regla
+           firmada de Memo, y solo al confirmar. Los AMBIGUOS siguen sin
+           puerta. Un letrero que sobrevive a su causa miente. -->
+      <b style="color:var(--tp)">Los AMBIGUOS no se aplican nunca</b> — elegir entre dos homónimos sería
+      inventar el dato que falta. Las <b>BAJAS</b> que se ven arriba son solo las de <b>fila ROJA del
+      Excel</b> (regla firmada de Memo): se aplican con este botón, nombrando a cada quien, y
+      <b style="color:var(--tp)">el abonado NO se toca</b> — una baja no es una devolución.
       Al confirmar, el servidor <b>vuelve a correr el careo</b> y escribe sobre ese resultado, no sobre esta lista.
     </div>
     <button class="btn btn-primary" id="excel-aplicar-ok"
@@ -854,7 +886,10 @@ function _excelAplicarPreviaHtml(d, alcance) {
             onclick="excelAplicarConfirmar(this)">
       ${unRenglon
         ? `Sí, aplicar solo a ${_evtEsc(alcance.claves[0])}`
-        : `Sí, aplicar: ${r.abonos} abono(s) por ${_evtMxn(r.monto_abonos)} · ${r.totales} total(es) · ${r.altas} alta(s)`}
+        : `Sí, aplicar: ${r.abonos} abono(s) por ${_evtMxn(r.monto_abonos)} · ${r.totales} total(es) · ${r.altas} alta(s)`
+          + (r.zonas ? ` · ${r.zonas} zona(s)` : '')
+          + (r.partidas ? ` · ${r.partidas} partida(s)` : '')
+          + (r.bajas ? ` · ${r.bajas} BAJA(S)` : '')}
     </button>
   </div>`;
 }

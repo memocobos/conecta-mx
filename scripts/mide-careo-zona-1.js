@@ -244,7 +244,12 @@ function armarRed(dir, { sinColores = false, saboteado = false, sinCatalogo = fa
     excel_pestanas: [{ evento_id: 'natanael', pestana: 'Natanael Cano - 27 de Noviembre', regla_zona: null, activa: true, notas: null }],
     viajeros_evento: VIAJEROS,
     stock_ajustes: [],
-    abonos_viajero: [],
+    // 🔒 [CAREO-ZONA-1c] UN ABONO ENCIMA DE DIANA MARLENE, a propósito: con la
+    // tabla vacía, `abonado_previo` y «lo cobrado» valen lo MISMO, y la aserción
+    // de «total = cobrado» pasaría igual con la implementación equivocada (la que
+    // usa `abonado_previo`). Con esto, cobrado = 5500 + 1200 = **6700** y las dos
+    // implementaciones se separan.
+    abonos_viajero: [{ viajero_id: 'v-dma', monto: 1200 }],
     // [CAREO-ZONA-1b] SEMBRADO, o `traerNumerologia` se sale con `sin_siembra`
     // y el libro NO se lee — el bloque del rojo del libro pasaría en vacío.
       // 🔒 Y LA FECHA DE LA SIEMBRA ES LA DE LA **FUNCIÓN**, no la de la compra.
@@ -671,6 +676,47 @@ async function correrConBajada(dir) {
      + 'por el libro): ' + JSON.stringify({ patch: esc1.length, aplicadas: nom1 }));
   af((res1.bajas_ya_estaban || []).length === 0,
      'la 1ra pasada reporta bajas «que ya estaban» y no debería: ' + JSON.stringify(res1.bajas_ya_estaban));
+
+  // ── [1C] EL DINERO DE UN CANCELADO ES GANANCIA · saldo 0 ────────────────
+  // Regla de Memo (1-oct): al bajar, `total_contrato` se iguala a LO COBRADO.
+  // 🔒 Diana Marlene trae un abono de $1,200 sobre su `abonado_previo` de $5,500,
+  // así que lo cobrado es **6700** — ni 5500 (el previo, la implementación
+  // equivocada) ni 9200 (su contrato viejo). Los tres números son distintos a
+  // propósito: es lo que hace que este verde signifique algo.
+  console.log('\n[1C] el dinero del cancelado es ganancia (saldo 0)');
+  const pDma = esc1.find((e) => /v-dma/.test(e.url));
+  const rDma = (res1.bajas || []).find((x) => /Diana Marlene/.test(x.nombre));
+  console.log('    PATCH de Diana Marlene: ' + JSON.stringify(pDma && {
+    boletos: pDma.cuerpo.boletos, zona: pDma.cuerpo.zona_boleto, total: pDma.cuerpo.total_contrato }));
+  af(pDma, 'PREMISA: no hay PATCH de baja para Diana Marlene (v-dma), así que este bloque mediría en vacío');
+  af(pDma && pDma.cuerpo.total_contrato === 6700,
+     '🔴 la baja no dejó el contrato en LO COBRADO ($5,500 previo + $1,200 de abono = $6,700), así que '
+     + 'el saldo no queda en 0. Si salió 5500 es que se usó `abonado_previo` y se le olvidaron los abonos — '
+     + 'y el saldo quedaría A FAVOR del cliente. Salió ' + JSON.stringify(pDma && pDma.cuerpo.total_contrato));
+  // 🔒 Y EL ABONADO SIGUE SIN TOCARSE: lo que se mueve es el contrato, no el dinero.
+  af(pDma && !('abonado_previo' in pDma.cuerpo) && !('abonado' in pDma.cuerpo),
+     '🔴 la baja tocó el ABONADO: el dinero cobrado queda registrado — precedente Diana Marlene y Nohemi '
+     + 'con sus $5,500. Salió ' + JSON.stringify(pDma && Object.keys(pDma.cuerpo)));
+  // La nota dice las DOS cosas: una nota que solo menciona la mitad esconde la otra.
+  af(pDma && /saldo 0/.test(pDma.cuerpo.notas) && /\$9,200/.test(pDma.cuerpo.notas)
+     && /\$6,700/.test(pDma.cuerpo.notas),
+     'la nota no cuenta el movimiento del contrato ($9,200 → $6,700, saldo 0): una nota que menciona solo '
+     + 'media escritura esconde la otra mitad. Salió ' + JSON.stringify(pDma && pDma.cuerpo.notas));
+  af(rDma && rDma.total_de === 9200 && rDma.total_a === 6700,
+     'el reporte no dice de dónde a dónde se movió el contrato: ' + JSON.stringify(rDma));
+  // 🔴 CONTROL POSITIVO: en BASE_1B la baja NO tocaba el contrato.
+  // Su propio árbol: el de [1B] nace más abajo y este bloque va antes.
+  const b1c = sacar(BASE_1B, 'cz-base1c');
+  const cB1 = await correr(b1c.dir, {}, { confirmar: true });
+  const pDmaB = cB1.escrituras.find((e) => e.met === 'PATCH' && /v-dma/.test(e.url)
+    && e.cuerpo && e.cuerpo.boletos === 0);
+  console.log('    BASE_1B el mismo PATCH: ' + JSON.stringify(pDmaB && {
+    total: pDmaB.cuerpo.total_contrato, llaves: Object.keys(pDmaB.cuerpo) }));
+  af(pDmaB, 'PREMISA del control positivo: BASE_1B tampoco bajó a Diana Marlene');
+  af(pDmaB && !('total_contrato' in pDmaB.cuerpo),
+     'CONTROL POSITIVO: en BASE_1B la baja NO podía tocar `total_contrato` — si ya lo tocaba, esta regla '
+     + 'no la agrega esta tuerca y el verde de arriba no dice nada. Salió '
+     + JSON.stringify(pDmaB && pDmaB.cuerpo.total_contrato));
   // 🔒 LA SEGUNDA, con el mundo YA bajado: cero escrituras nuevas.
   const c2 = await correrConBajada(h.dir);
   const esc2 = c2.escrituras.filter((e) => e.met === 'PATCH' && e.cuerpo && e.cuerpo.boletos === 0);

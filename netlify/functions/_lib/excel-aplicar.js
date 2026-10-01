@@ -274,6 +274,18 @@ function planear(careo, opciones) {
         bajas.push({ clave: p.clave, nombre: p.nombre, viajero_id: v.id,
           de_zona: String(v.zona || '') || null, de_boletos: Number(v.boletos || 1),
           abonado: Number(v.abonado_previo || 0) || null, notas_previas: v.notas || '',
+          // 🔒 [CAREO-ZONA-1c] EL DINERO DE UN CANCELADO ES GANANCIA (regla de
+          // Memo, 1-oct): la baja iguala el contrato a LO COBRADO para que el
+          // saldo quede en 0. ⚠️ Es `v.abonado`, **no** `v.abonado_previo`: lo
+          // cobrado es `abonado_previo + Σ abonos_viajero` (la regla de oro del
+          // saldo de un migrado, VJ-3). Con el `abonado_previo` a secas, quien
+          // tenga abonos encima se quedaría con saldo — y sería saldo A FAVOR
+          // del cliente, el error que sí se cobra caro.
+          // Y SIN `|| null`: un cobrado de $0 es un NÚMERO (contrato a cero),
+          // no un hueco — el mismo hoyo de CUADRE-1a. El `abonado` de arriba lo
+          // lleva porque ahí es un dato de reporte; aquí decide una escritura.
+          cobrado: Number(v.abonado || 0),
+          de_total: v.total_contrato == null ? null : Number(v.total_contrato),
           // De dónde vino el rojo: la pestaña o el libro. La nota lo dirá, porque
           // «cancelada» sin decir dónde manda a buscar en la hoja equivocada.
           origen_rojo: (p.pestanas || []).length ? 'pestana' : 'libro' });
@@ -767,10 +779,18 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
         + '&or=(boletos.neq.0,zona_boleto.not.is.null)';
       const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?${filtro}`, {
         method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
-        body: JSON.stringify({ boletos: 0, zona_boleto: null,
+        // 🔒 [CAREO-ZONA-1c] `total_contrato` = LO COBRADO, para que el saldo
+        // quede en 0: el dinero de un cancelado es GANANCIA (regla de Memo,
+        // 1-oct, sellada en CLAUDE.md). El ABONADO sigue sin tocarse — lo que
+        // se mueve es el contrato, no el dinero— y la nota tiene que decir las
+        // DOS cosas: una nota que solo menciona la mitad de la escritura es un
+        // letrero que esconde lo otro.
+        body: JSON.stringify({ boletos: 0, zona_boleto: null, total_contrato: x.cobrado,
           notas: _nota(x.notas_previas,
             `CANCELADA (fila roja del ${x.origen_rojo === 'libro' ? 'libro de Numerología' : 'Excel'}) ${hoy}: `
-            + `venía con ${x.de_boletos} boleto(s) de «${x.de_zona || 'sin zona'}» · el abonado NO se toca`) }),
+            + `venía con ${x.de_boletos} boleto(s) de «${x.de_zona || 'sin zona'}» · el abonado NO se toca`
+            + ` · total ${x.de_total == null ? 'sin fijar' : _mxn(x.de_total)} → ${_mxn(x.cobrado)} `
+            + '(lo cobrado es ganancia: saldo 0)') }),
       });
       if (!r.ok) { resultado.errores.push({ paso: 'bajas', nombre: x.nombre, detalle: (await r.text()).slice(0, 200) }); return; }
       // 🔒 CERO FILAS CASADAS = YA ESTABA BAJADA, y se dice en vez de contarla
@@ -783,6 +803,9 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
       }
       resultado.bajas.push({ nombre: x.nombre, viajero_id: x.viajero_id,
         de_zona: x.de_zona, de_boletos: x.de_boletos, abonado_intacto: x.abonado,
+        // [CAREO-ZONA-1c] De dónde a dónde se movió el contrato: un número pelado
+        // no se audita, y esta escritura la firma un humano.
+        total_de: x.de_total, total_a: x.cobrado,
         origen_rojo: x.origen_rojo || 'pestana' });
     }));
   }

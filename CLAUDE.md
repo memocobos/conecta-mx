@@ -351,10 +351,15 @@ está caduco antes de escribirse.
       ⚠️ Con el censo de Jane encima, ese montón **no es informativo: es el FRENO**.
       La vista previa del evento que Memo elija va a traerlo lleno, y eso es la señal
       de parar — no un detalle que se lee y se sigue de largo.
-    - 🔴🔒 **MEDIDO POR JANE CONTRA LA BASE VIVA DE KH (1-oct): 285 FILAS con el
-      correo en mayúsculas · 244 PERSONAS DISTINTAS — ~1 de cada 5 de las que tienen
-      correo.** Yo no lo pude medir (este entorno no tiene llaves) y lo dejé escrito
-      como hipótesis razonada; **el número es de ella**. No es un caso raro: es la
+    - 🔴🔒 **MEDIDO POR EL VERIFICADOR CONTRA LA BASE VIVA DE KH (1-oct): 285 FILAS
+      con el correo en mayúsculas · 244 PERSONAS DISTINTAS — ~1 de cada 5 de las que
+      tienen correo.** ⚠️ **ATRIBUCIÓN CORREGIDA** (cierre del 1-oct): aquí decía
+      «medido por Jane» y no fue Jane — lo midió el VERIFICADOR. El número no cambia;
+      el autor sí, y eso importa: una firma equivocada vuelve un dato intocable por
+      una razón falsa, y al siguiente que lo dispute lo manda a discutir con quien
+      no lo midió. Yo no lo pude medir cuando lo escribí (creía no tener llaves) y
+      lo dejé como hipótesis razonada; **lo reproduje después, en PLAN-CASE-1, con
+      mi propia consulta: 285 / 244 exactos**. No es un caso raro: es la
       quinta parte del padrón, y por eso es una LLAVE del primer envío (PLAN-CASE-1)
       y no una nota al pie. Invitar antes de arreglarlo le mandaría a ~244 personas
       un correo que dice «ya puedes ver tu plan» hacia una pantalla en blanco.

@@ -45,7 +45,11 @@ const BASE = process.env.BASE || '09ac540';       // el merge de CONCILIA-1
 // 🔒 EL ANCLA NO ES SOLO ASUNTO DE SU PROPIA TUERCA: cuando una tuerca toca lo
 // que OTRO arnés mide, hay que mover el ancla de ese otro — si no, sigue midiendo
 // un árbol que ya nadie corre, y su verde (o su rojo) habla del pasado.
-const HEAD_SHA = process.env.HEAD_SHA || '6508d2b';   // PLAN-CASE-1
+// ⚠️ Y al MERGE, no al commit de la rama donde se quedó primero: un ancla en un
+// commit de rama sobrevive al borrado de la rama (el objeto queda alcanzable desde
+// el merge) pero apunta a un árbol que NADIE corre — su verde habla de un estado
+// intermedio que nunca fue main.
+const HEAD_SHA = process.env.HEAD_SHA || 'ee98b57';   // el MERGE de PLAN-CASE-1
 // Y el MEDIDOS de abajo gana un archivo por lo mismo: el lector del Portal es
 // ahora parte de lo que este arnés afirma (el testigo de PLAN-CASE-1).
 

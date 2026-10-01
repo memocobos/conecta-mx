@@ -43,7 +43,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '0619600';   // el merge de MIG-1d-ii: ahí el `eq` era ciego
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || 'ee98b57';   // el commit del MERGE
 const MEDIDOS = ['netlify/functions/portal-mi-plan-migrado.js'];
 function avisarSiSucio() {
   let sucio = '';

@@ -245,6 +245,75 @@ está caduco antes de escribirse.
   - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
     podía ni expresar el defecto — un guión que solo sabe devolver status mide la
     mitad del mundo.
+- 🔨⏳ **MIG-1d-ii EN MAIN (1-oct-2026): el botón que INVITA al Portal, por evento.
+  🔴🔒 ESTAR MERGEADA **NO MANDA NADA**** — el código vive en main y no ha salido ni
+  un correo. El primer envío real sigue detrás de **CUATRO LLAVES**, y ninguna es mía:
+  1. **el visto de Memo al render REAL del seco** (no a un ejemplo: el que salga de
+     correr `enviar` en seco sobre el evento que él elija);
+  2. **el SQL de Jane** para `invitaciones_portal` (`ACTA-MIG-1D-II.sql`) — sin la
+     tabla el botón se rinde con 502 a propósito;
+  3. **PLAN-CASE-1** (nombrada por Jane): el hoyo del `eq` sensible a mayúsculas,
+     más abajo con su censo;
+  4. **Memo elige el evento, y CHICO.**
+  `admin-portal-invitar` + `_lib/invitacion-portal` + `ACTA-MIG-1D-II.sql`.
+  `npm run mide:mig-1d-ii` **48**.
+  - 🔴🔒 **`CORREOS_MODO` ESTÁ EN 'real': el primer clic escribe a gente de verdad.**
+    Tres puertas, las tres de Memo: **el `seco` es el DEFAULT** (para mandar hace
+    falta `seco:false` **Y** `confirmar:true` — dos gestos; el peor caso de un
+    olvido es ver el render otra vez) · **exige `evento_id`, no existe «invitar a
+    todos»** (dalemix metería ~156 de golpe) · **tope de 60 por clic**, y el rechazo
+    dice cuántos son.
+  - 🔒 **EL ARNÉS CORRE CON `CORREOS_MODO='real'` A PROPÓSITO**, que es como está
+    producción. Ponerlo en `'prueba'` habría medido un mundo que no existe: el cero
+    de envíos tiene que salir del SECO, no de un desvío — «no mandó» y «mandó a
+    otro buzón» son cosas distintas. Y el contador de envíos tiene **control
+    positivo**: se manda de verdad contra la red falsa y se exige que los VEA,
+    porque un contador ciego da cero siempre y su cero no probaría nada.
+  - 🔒 **SIN BITÁCORA NO SE INVITA A NADIE** (502, no «0 enviados, ok»): «no sé a
+    quién ya invité» no es «a nadie», y la diferencia son correos repetidos que no
+    se deshacen. La tabla `invitaciones_portal` **la crea Jane** — el SQL está en
+    `ACTA-MIG-1D-II.sql` y el mensaje de error manda ahí. Su UNIQUE va sobre
+    `(evento_id, correo)` NOT NULL, con CHECK de minúsculas, y el acta incluye
+    cómo comprobar que los candados **muerden**, no solo que existen.
+  - 🔒 La bitácora se asienta **DESPUÉS** del envío, una por una. Asentar antes
+    dejaría a alguien marcado como invitado sin haber recibido nada, y la
+    idempotencia le cerraría la puerta para siempre en silencio. Si el asiento
+    falla se REPORTA: el correo ya salió y el próximo clic se lo mandaría otra vez.
+  - El render se **DERIVA** del catálogo (PROMO-DERIVA) y el arnés lo comprueba
+    MOVIENDO el catálogo: si el render no se mueve, el texto estaba tecleado. Sin
+    catálogo **no se manda** — un «tu viaje» sin decir a qué se lee como spam.
+  - 🔴🔒 **EL HOYO QUE SALIÓ DE LEER EL CUARTO PASO** (y que mi primera aserción
+    se perdió por ASUMIR el mecanismo): `portal-mi-plan-migrado` no busca por
+    `portal_cliente_id` — busca `viajeros_evento?correo=eq.<correo del JWT en
+    minúsculas>`, y **el `eq` de PostgREST es SENSIBLE A MAYÚSCULAS**. Una fila
+    guardada como «Laura@Correo.com» es INVISIBLE para su propia dueña: se
+    registra, el Portal la enlaza (`clientes.correo` sí está en minúsculas, lo
+    normalizó el puente) y su plan sale **VACÍO** — con nuestro correo diciendo
+    «ya puedes ver tu plan».
+    - La invitación **no lo arregla** (sería un UPDATE a datos de gente) pero **no
+      lo calla**: sale el montón `ojo_plan_vacio` en la vista previa, con el id de
+      cada fila invisible. Y distingue DOS frases porque son dos cosas: «TODAS sus
+      filas → plan VACÍO» vs «alguna → vería su viaje INCOMPLETO».
+      ⚠️ Con el censo de Jane encima, ese montón **no es informativo: es el FRENO**.
+      La vista previa del evento que Memo elija va a traerlo lleno, y eso es la señal
+      de parar — no un detalle que se lee y se sigue de largo.
+    - 🔴🔒 **MEDIDO POR JANE CONTRA LA BASE VIVA DE KH (1-oct): 285 FILAS con el
+      correo en mayúsculas · 244 PERSONAS DISTINTAS — ~1 de cada 5 de las que tienen
+      correo.** Yo no lo pude medir (este entorno no tiene llaves) y lo dejé escrito
+      como hipótesis razonada; **el número es de ella**. No es un caso raro: es la
+      quinta parte del padrón, y por eso es una LLAVE del primer envío (PLAN-CASE-1)
+      y no una nota al pie. Invitar antes de arreglarlo le mandaría a ~244 personas
+      un correo que dice «ya puedes ver tu plan» hacia una pantalla en blanco.
+      Para re-contarlo cuando se arregle:
+      `select count(*) from viajeros_evento where correo is not null and correo <> lower(correo);`
+    - ⚠️ Y el TAMAÑO cambia la forma del arreglo, así que queda dicho sin decidirlo:
+      con 244 personas, «que un humano arregle la fila» ya no es un camino. PLAN-CASE-1
+      tendrá que elegir entre **normalizar las filas de una vez** (UPDATE a datos de
+      gente) o **volver la búsqueda insensible a mayúsculas donde se lee**. 🔒 **No lo
+      elijo yo**: toca datos de clientes y el camino del dinero.
+    - 🔒 Y el corolario: el crudo del correo VIAJA al lado de la llave, porque la
+      llave normalizada borra el único dato que delata el problema — la misma
+      forma que `boletos_crudo` en el careo.
 - 🏆 **CONCILIA-1 FASE 1 (1-oct-2026): el careo CAJA ↔ CONTRATOS, con nombres y
   SIN escribir un peso.** `_lib/concilia` + `admin-concilia` (`reporte` y
   `radar`, roles del dinero) + el renglón del Radar. `npm run mide:concilia-1`

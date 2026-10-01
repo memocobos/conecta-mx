@@ -47,8 +47,18 @@ const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
 // `ambiguos` no aparecen: un `solo:'bajas'` se rehúsa antes de tocar nada.
 // [CAREO-ZONA-1] Tres puertas nuevas: `zonas` (el cambio de zona de la fila),
 // `partidas` (el CHEAP repartido entre varias zonas) y `bajas` (la fila ROJA).
-// ⚠️ `bajas` ya existía como MONTÓN del careo y nadie lo llenaba; ahora tiene
-// contenido Y puerta. `ambiguos` sigue sin puerta a propósito.
+//
+// 🔴 OJO, HAY **DOS COSAS LLAMADAS «BAJAS»** Y SOLO UNA TIENE PUERTA:
+//   · `montones.bajas` del CAREO  = gente que está en el sistema y NO en la
+//     pestaña. Sigue SIN puerta, y debe seguir: que alguien no aparezca este mes
+//     puede ser una pestaña nueva, un nombre mal escrito o una pestaña que no se
+//     pudo cosechar. Eso espera firma.
+//   · `plan.bajas` de AQUÍ           = gente cuya fila del Excel está **ROJA**.
+//     Ésa sí tiene puerta, porque la firma ya existe: «todo lo marcado en rojo
+//     son cancelaciones» (Memo, 30-sep).
+// 🔒 Este montón se llena SOLO de `p.roja` y JAMÁS de `M.bajas` — cablearlos
+// convertiría «no vino en la pestaña» en «cancelado» y borraría lugares de gente
+// que sí viaja. `ambiguos` sigue sin puerta a propósito.
 const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
                              'zonas', 'partidas', 'bajas'];
 
@@ -243,16 +253,30 @@ function planear(careo, opciones) {
     // La pregunta «¿son la misma?» se le hace al dueño de siempre; aquí solo se
     // AGRUPA con su respuesta, conservando una ortografía para que la puerta
     // tenga qué canonizar.
+    // 🔴 SI `zonasReales` NO VIENE, SE DERIVA DE `zonas` — y esto lo cazó el
+    // careo de Numerología, no una lectura. `zonasReales` lo pone
+    // `parsearPestana`, pero NO todos los productores pasan por ahí: las
+    // personas que solo existen en el libro las arma `fundirNumerologia`, y
+    // cualquier llamador que construya una persona a mano tampoco lo trae. Sin
+    // esta caída, su conteo se volvía 0 **en silencio** y la persona se saltaba
+    // entera: un boleto que deja de contarse cierra zonas que sí tienen lugar.
+    // ⚠️ La caída FILTRA igual (una zona «-» sigue sin contar), así que degrada al
+    // comportamiento viejo sin heredar su hoyo.
+    const brutas = (p.zonasReales && Object.keys(p.zonasReales).length) ? p.zonasReales
+      : Object.fromEntries(Object.entries(p.zonas || {}).filter(([zc]) => esZonaUtil(zc)));
     const reales = {};
     const crudaDe = {};
-    for (const [zc, n] of Object.entries(p.zonasReales || {})) {
+    for (const [zc, n] of Object.entries(brutas)) {
       const k = normalizarNombre(zc);
       if (!(k in crudaDe)) crudaDe[k] = zc;
       reales[crudaDe[k]] = (reales[crudaDe[k]] || 0) + (Number(n) || 0);
     }
     const realesK = Object.keys(reales);
     const enPestana = Object.values(reales).reduce((a, b) => a + b, 0);
-    const guiones = Number(p.guiones || 0);
+    // Los guiones, igual: si el productor no los contó, se derivan de `zonas`.
+    const guiones = (p.guiones != null) ? Number(p.guiones)
+      : Object.entries(p.zonas || {}).filter(([zc]) => !esZonaUtil(zc))
+              .reduce((a, [, n]) => a + (Number(n) || 0), 0);
     const zonaSis = String(v.zona || '').trim();
     const paqCheap = String(p.paquete || v.paquete || '').trim().toLowerCase() === 'cheap';
 

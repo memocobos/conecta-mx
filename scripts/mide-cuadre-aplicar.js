@@ -640,13 +640,29 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
   if (!baja.falta) {
     console.log('    pedir `bajas` → ' + baja.res.statusCode + ' [' + (baja.d.codigo || '') + '] · escrituras ' + baja.escrituras.length);
     af(baja.escrituras.length === 0, 'pedir bajas por renglón ESCRIBIÓ: ' + JSON.stringify(baja.escrituras.map((e) => e.tabla)));
-    // 🔒 Y SE REHÚSA CON NOMBRE. No basta con que no escriba: si el montón
-    // entrara a la lista blanca, el plan saldría vacío y la pantalla diría
-    // «listo, nada que hacer» sobre una orden que NUNCA debe tener puerta.
-    // Callar y rehusar se ven igual desde el lado del que no escribió.
-    af(baja.res.statusCode === 400, 'pedir bajas contestó ' + baja.res.statusCode + ', se esperaba 400');
-    af(baja.d.codigo === 'MONTON_NO_APLICABLE', 'pedir bajas no trae el código del rehúse: ' + JSON.stringify(baja.d.codigo));
-    af(/firma/i.test(String(baja.d.error || '')), 'el rehúse no dice POR QUÉ una baja espera firma');
+    // ⏳ ACTUALIZADO EN CAREO-ZONA-1 (30-sep-2026), con su razón escrita: este
+    // bloque exigía un **400** porque `bajas` no estaba en la lista blanca. Hoy
+    // SÍ tiene puerta, y la firma que le faltaba ya existe: «todo lo marcado en
+    // rojo en el Excel son cancelaciones» (regla firmada de Memo).
+    //
+    // 🔴 PERO SON **DOS COSAS DISTINTAS CON EL MISMO NOMBRE**, y eso es lo que
+    // este bloque pasa a vigilar:
+    //   · `montones.bajas` del CAREO = no vino en la pestaña → sigue sin tocarse
+    //   · `plan.bajas`               = su fila está ROJA     → ésa es la que se aplica
+    // Zulema está en el PRIMER grupo, así que la orden se acepta y ella NO se
+    // toca. Ésa es la aserción que de verdad protege el dinero — la del 400
+    // protegió lo mismo mientras no hubo firma, y hoy mentiría.
+    af(baja.res.statusCode === 200,
+       'pedir bajas contestó ' + baja.res.statusCode + ': desde CAREO-ZONA-1 el montón tiene puerta (solo '
+       + 'las de FILA ROJA). Si vuelve a dar 400, alguien le quitó la puerta — lee la nota de arriba');
+    af(baja.d.codigo !== 'MONTON_NO_APLICABLE',
+       'el montón se sigue rehusando por lista blanca: ' + JSON.stringify(baja.d.codigo));
+    // 🔒 Y LO QUE NO PUEDE PASAR NUNCA: que una baja del CAREO se aplique. Zulema
+    // no tiene fila roja —no tiene fila en la pestaña, es justo eso— así que el
+    // plan no puede traerla.
+    af(!((baja.d.plan && baja.d.plan.bajas) || []).some((x) => /zulema/i.test(String(x.nombre))),
+       '🔴 una baja del CAREO (no vino en la pestaña) entró al plan de bajas: eso convertiría «no '
+       + 'apareció este mes» en «cancelada» y le borraría el lugar a alguien que sí viaja');
     const zul = (baja.tablas.viajeros_evento || []).find((v) => v.id === 'v-h');
     af(zul && zul.abonado_previo === 3000, 'tocaron a la baja por la puerta del renglón');
   }

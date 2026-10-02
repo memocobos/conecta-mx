@@ -543,17 +543,30 @@ const MAPEOS = () => ([
   console.log('\n[4e] una persona en LAS DOS fuentes');
   try {
     const { planear } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-aplicar.js'));
+    // ⚠️ [CUADRE-FUENTE-1b] CAMILA PASÓ DE 'PLUS' A **CHEAP**, y es un arreglo del
+    // fixture, no una concesión: desde la regla acotada de Memo el libro es SOLO
+    // venta CHEAP, así que una persona que de verdad vive en las dos fuentes es
+    // CHEAP — el fixture decía PLUS y era inconsistente con la regla (algo que
+    // antes no se notaba porque la regla no estaba escrita).
+    // 🔒 Y EL CANDADO SIGUE GUARDANDO LO MISMO, ahora donde el riesgo SÍ vive:
+    // con la acotación, las filas del libro de un PLUS ya no inflan `filas`, pero
+    // las de un CHEAP SÍ — que es el caso real de Camila. Dejarlo en PLUS habría
+    // vuelto el candado letra muerta: pasaría verde por no poder ocurrir.
+    // ⚠️ Y el dinero del libro se pone en $1,000 × 2 = los mismos $2,000 de la
+    // pestaña, para que la acotación no meta ruido de dinero en un bloque que mide
+    // BOLETOS. Con el 0 de antes, el abonado habría caído a cero y este bloque
+    // estaría midiendo dos cosas a la vez.
     const dePestana = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 2000, total: 4000,
-      filas: 2, zonas: { 'Balcón': 2 }, zona: 'Balcón', paquete: 'PLUS', talla: '', pestanas: ['P'] }];
-    const delLibro = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 },
-                      { nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 }];
-    const fundidas = N.fundirNumerologia(dePestana, delLibro);
+      filas: 2, zonas: { 'Balcón': 2 }, zona: 'Balcón', paquete: 'CHEAP', talla: '', pestanas: ['P'] }];
+    const delLibro = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 1000, boletos: 1, zona: 'Balcon', costo_publico: 4000 },
+                      { nombre: 'Camila Dos', clave: 'camila dos', abonado: 1000, boletos: 1, zona: 'Balcon', costo_publico: 4000 }];
+    const fundidas = N.fundirNumerologia(dePestana, delLibro, new Map([['camila dos', ['CHEAP']]]));
     const cam = fundidas[0];
     console.log('    tras fundir: filas=' + cam.filas + ' · zonas=' + JSON.stringify(cam.zonas));
     af(cam.filas > 2, 'el fixture no reproduce el caso: `filas` tiene que inflarse (' + cam.filas + ') o el candado de abajo no prueba nada');
     const careoFalso = {
       personas: fundidas,
-      viajeros: [{ id: 'v1', nombre: 'Camila Dos', zona: 'Balcón', paquete: 'plus', abonado: 2000,
+      viajeros: [{ id: 'v1', nombre: 'Camila Dos', zona: 'Balcón', paquete: 'cheap', abonado: 2000,
         abonado_previo: 2000, total_contrato: 4000, notas: '', boletos: 1 }],
       montones: { pagos: [], totales_contrato: [], nuevos: [], apartados: [], bajas: [], ambiguos: [], iguales: [] },
       ajustes: [], chatarraPorZona: {},
@@ -564,6 +577,13 @@ const MAPEOS = () => ([
     af(pb && pb.a === 2,
        'el plan le escribiría ' + (pb && pb.a) + ' boletos y la PESTAÑA le cuenta 2: '
        + 'el libro repite los mismos boletos, contarlos dos veces cierra zonas que sí tienen lugar');
+    // 🔒 Y el dinero no mete ruido en este bloque: el libro suma los mismos $2,000
+    // que la pestaña, así que no hay abono ni negativa que distraiga del conteo.
+    af(cam.abonado === 2000,
+       'el abonado de Camila salió ' + cam.abonado + ' y el fixture lo puso igual a propósito ($1,000×2 en el '
+       + 'libro = los $2,000 de la pestaña): si cambia, este bloque está midiendo dinero además de boletos');
+    af((plan.abonos || []).length === 0,
+       'el bloque de BOLETOS produjo un abono: estaría midiendo dos cosas a la vez');
   } catch (e) { af(false, 'la sección de las dos fuentes se CAYÓ: ' + e.message); }
 
   // ── [4c] EL RELOJ: no se trae el libro si no hay nada que mapear ──────────

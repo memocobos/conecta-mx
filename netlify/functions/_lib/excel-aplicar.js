@@ -60,7 +60,7 @@ const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
 // convertiría «no vino en la pestaña» en «cancelado» y borraría lugares de gente
 // que sí viaja. `ambiguos` sigue sin puerta a propósito.
 const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
-                             'zonas', 'partidas', 'bajas'];
+                             'zonas', 'partidas', 'bajas', 'sellos'];
 
 // 🔒 UN GUION NO ES UNA ZONA. En la pestaña, «-» es como las chicas escriben
 // «nada» —no un valor—, y la diferencia importa justo aquí: `viajero_migrar`
@@ -85,6 +85,30 @@ const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
 // Pesos para los motivos. Se escribe aquí y no se importa de la pantalla: este
 // lib corre en el servidor y la pantalla no es su dueño.
 const _mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
+
+// ══ [CHATARRA-SELLO-1] EL SELLO DE «VERIFICADA EL…» ═══════════════════
+// 🔴 EL HUECO QUE CIERRA, medido el 1-oct contra la base viva: 98 ajustes con
+// chatarra en 59 eventos, **89 con fecha de careo anterior a CAREO-ZONA-1 (264
+// boletos, 57 eventos)** — y NO HABÍA FORMA DE SABER si seguían siendo verdad.
+// El careo solo escribe cuando el conteo CAMBIA, así que «la pestaña sigue diciendo
+// 2» y «nadie ha vuelto a mirar» se veían **exactamente igual**: el silencio del
+// que cuadra es indistinguible del silencio del que no corrió. Es la familia de
+// «un cero es una afirmación» y del «éxito vacío también habla».
+//
+// 🔒 SE ANEXA, JAMÁS SE PISA. La nota original es la PROCEDENCIA («Chatarra
+// contada del careo Excel 2026-09-22», o las notas de migración de Jane con el
+// nombre de quien compró por fuera) y eso es un dato, no un adorno.
+//
+// ⚠️ PERO EL SELLO SE **REEMPLAZA**, NO SE APILA. Un sello por corrida haría una
+// nota que crece sin fin — esta casa ya pagó exactamente eso con las bajas
+// («engordando `notas` sin fin», 18 filas con la nota dos veces). Así que se
+// recorta el sello anterior y se pone el nuevo: la procedencia queda, la fecha
+// avanza, el largo no crece.
+const RE_SELLO = /\s*·\s*verificada\s+\d{4}-\d{2}-\d{2}\s*$/;
+function sellarNota(nota, hoy) {
+  const base = String(nota == null ? '' : nota).replace(RE_SELLO, '').trim();
+  return (base ? base + ' · ' : '') + 'verificada ' + hoy;
+}
 
 function zonaUtil(z) {
   const t = String(z == null ? '' : z).trim();
@@ -466,8 +490,13 @@ function planear(careo, opciones) {
   // pero la razón se dice aquí porque es la que ordena todo: `stock_ajustes`
   // SUMA por diseño y tiene UNIQUE en (evento_id, zona). Un sync que sumara
   // convertiría cada clic en boletos de más: es la mordida de CREA-1.
-  const fuera = [];
-  if (quiere('fuera')) {
+  const fuera = [], sellos = [];
+  // La fecha del sello, en REYNOSA: `toISOString()` nunca es «hoy» en México
+  // pasadas las 6 de la tarde, y en esta casa se trabaja de noche.
+  const hoySello = hoyReynosa();
+  // ⚠️ El lazo de abajo está bajo `quiere('fuera')`, así que con `solo:'sellos'`
+  // no se visitaría ninguna zona. Se entra si se quiere CUALQUIERA de los dos.
+  if (quiere('fuera') || quiere('sellos')) {
     // [DISPO-NORM-1] 🔒 EL EMPAREJAMIENTO ES POR ZONA **NORMALIZADA**, no por
     // cadena exacta. Con el emparejamiento exacto, una llave del Excel escrita
     // distinto a la de la base («GENERAL» vs «General») salía como DOS
@@ -495,10 +524,37 @@ function planear(careo, opciones) {
       const ch = contadoPorNorm.get(k);
       const contado = Number((ch && ch.n) || 0);
       const actual = Number((fila && fila.vendidos_fuera) || 0);
-      if (contado === actual) continue;
+      if (contado === actual) {
+        // 🔒 [CHATARRA-SELLO-1] AQUÍ es donde el careo SABÍ A que cuadra y se
+        // callaba. Se sella, y solo aquí: sellar en la rama del cambio sería
+        // redundante (esa fila ya queda con su nota nueva) y sellar fuera del
+        // lazo sería sellar filas que este careo NO comparó.
+        // ⚠️ Tres condiciones, y las tres importan:
+        //   · hay FILA en la base (no se sella lo que no existe);
+        //   · tiene chatarra > 0 (sellar un cero no dice nada útil);
+        //   · el careo LEYÓ la pestaña — garantizado porque `correrCareo` devuelve
+        //     `{error}` si la cosecha falla y entonces `planear` no llega a correr,
+        //     pero se exige explícitamente: un sello sobre una cosecha que no
+        //     ocurrió sería una MENTIRA firmada con fecha, peor que no tener sello.
+        if (quiere('sellos') && fila && Number(fila.vendidos_fuera) > 0
+            && Array.isArray(careo.pestanas) && careo.pestanas.length) {
+          const nueva = sellarNota(fila.nota, hoySello);
+          // Si la nota ya dice hoy, no se escribe: una escritura que no cambia
+          // nada es ruido en el libro de la base y un renglón falso en el reporte.
+          if (nueva !== String(fila.nota == null ? '' : fila.nota)) {
+            sellos.push({ zona: (fila.zona || ''), ajuste_id: fila.id,
+                          vendidos_fuera: Number(fila.vendidos_fuera),
+                          nota_antes: fila.nota || null, nota: nueva });
+          }
+        }
+        continue;
+      }
       const zEscribe = (fila && String(fila.zona).trim()) || (ch && ch.zona) || '';
       if (!zEscribe) continue;
       if (claves && !claves.has(normalizarNombre(zEscribe))) continue;
+      // ⚠️ El permiso de `fuera` se re-pregunta AQUÍ: el lazo ahora también corre
+      // para los sellos, y sin esto un `solo:'sellos'` escribiría conteos.
+      if (!quiere('fuera')) continue;
       fuera.push({ zona: zEscribe, de: actual, a: contado, ajuste_id: (fila && fila.id) || null });
     }
   }
@@ -566,7 +622,7 @@ function planear(careo, opciones) {
       pestanas: p.pestanas || [] });
   }
 
-  return { abonos, totales, altas, negativas, saltados, boletos, fuera,
+  return { abonos, totales, altas, negativas, saltados, boletos, fuera, sellos,
            avisos_boletos: avisosBoletos,
            // [CAREO-ZONA-1]
            zonas: zonasPlan, partidas, bajas, avisos_zonas: avisosZonas,
@@ -607,7 +663,7 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
   // ⚠️ `quien` llega POR PARÁMETRO y sale del TOKEN en el handler — nunca del
   // cliente. El anti-spoofing no se relajó al mudarse: se movió el sitio donde
   // se lee, no de dónde.
-  const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [],
+  const resultado = { abonos: [], totales: [], altas: [], boletos: [], fuera: [], sellos: [],
                       // [CAREO-ZONA-1]
                       zonas: [], partidas: [], bajas: [],
                       // [CAREO-ZONA-1b] Las que la base rehusó porque ya estaban
@@ -870,8 +926,53 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
         via: 'viajero_migrar', aviso_doble_descuento: c2.aviso_doble_descuento || null });
     }
   }
+
+  // ══ 2.7 [CHATARRA-SELLO-1] EL SELLO · SE ESCRIBE **SOLO LA NOTA** ════════
+  // 🔒 EL CUERPO LLEVA `nota` Y NADA MÁS. No `vendidos_fuera` —sellar jamás
+  // puede mover un boleto— y no `updated_at`, por una razón medida:
+  //
+  // ⚠️ `stock_ajustes` NO TIENE TRIGGER (verificado en la base el 1-oct: cero
+  // triggers no-internos) y su `default now()` solo aplica al INSERT. Así que un
+  // PATCH que no nombra `updated_at` **no la mueve**. Por eso sellar NO cambia el
+  // significado de esa columna para quien la lea.
+  // 🔴 Y de paso quedó medido un desnivel que ya existía: `admin-compras` y
+  // `admin-coordi-asignaciones` SÍ ponen `updated_at` a mano en sus PATCH, y el
+  // CAREO nunca lo hizo. O sea que hoy esa columna significa cosas distintas
+  // según quién escribió — el careo no la mueve ni la movía. Este sello NO
+  // empeora eso ni lo arregla; se deja dicho porque quien lea «actualizado el…»
+  // en la casilla del Palacio está leyendo «cuándo lo tocó un HUMANO».
+  //
+  // El único lector de `updated_at` de ajustes es `_lib/disponibilidad`, que lo
+  // lleva a la pantalla como metadato (`ajuste.updated_at`); **nadie DECIDE con
+  // ella** — ningún orden, ninguna comparación (barrido del 1-oct).
+  if ((plan.sellos || []).length) {
+    await Promise.all(plan.sellos.map(async (x) => {
+      const r = await fetch(`${SB_URL}/rest/v1/stock_ajustes?id=eq.${encodeURIComponent(x.ajuste_id)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
+        body: JSON.stringify({ nota: x.nota }),
+      });
+      if (!r.ok) {
+        resultado.errores.push({ paso: 'sellos', zona: x.zona, detalle: (await r.text()).slice(0, 200) });
+        return;
+      }
+      // 🔒 SE AFIRMA CONTRA LO QUE LA BASE DEVOLVIÓ, no contra lo que se mandó:
+      // si el conteo se movió (no debería poder), se REPORTA en vez de darlo por
+      // bueno. Un sello que silenciosamente tocara boletos sería el peor defecto
+      // posible en esta pieza, porque va firmado con fecha.
+      const vuelta = (await r.json().catch(() => []))[0] || null;
+      const movio = vuelta && Number(vuelta.vendidos_fuera) !== Number(x.vendidos_fuera);
+      if (movio) {
+        resultado.errores.push({ paso: 'sellos', zona: x.zona,
+          detalle: `🔴 el sello MOVIÓ el conteo (${x.vendidos_fuera} → ${vuelta.vendidos_fuera}): `
+                 + 'sellar escribe NOTA y nada más' });
+        return;
+      }
+      resultado.sellos.push({ zona: x.zona, ajuste_id: x.ajuste_id,
+        vendidos_fuera: x.vendidos_fuera, nota: x.nota });
+    }));
+  }
   return resultado;
 }
 
-module.exports = { planear, hoyReynosa, porQueVaAdelante, ejecutarPlan,
+module.exports = { planear, hoyReynosa, porQueVaAdelante, ejecutarPlan, sellarNota,
                    MONTONES_APLICABLES, PAQUETES_MIGRAR };

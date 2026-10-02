@@ -245,6 +245,45 @@ está caduco antes de escribirse.
   - El guión del `khAdminFetch` falso aprendió a **REVENTAR**: sin eso el arnés no
     podía ni expresar el defecto — un guión que solo sabe devolver status mide la
     mitad del mundo.
+- 🏆 **CHATARRA-SELLO-1 (1-oct-2026): el careo SELLA la chatarra que verifica,
+  aunque el conteo no cambie.** `npm run mide:chatarra-sello-1` **27**.
+  Escritura de **NOTA**, jamás de boletos. Cero SQL.
+  - 🔴 **EL HUECO**: el careo solo escribía cuando el conteo CAMBIABA, así que
+    «la pestaña sigue diciendo 2» y «nadie ha vuelto a mirar» se veían EXACTAMENTE
+    igual. Medido contra la base viva: **98 ajustes con chatarra en 59 eventos, 89
+    con fecha anterior a CAREO-ZONA-1 (264 boletos, 57 eventos)** y ninguna forma
+    de saber cuáles seguían siendo verdad. Familia de «un cero es una afirmación».
+  - 🔒 **SE ANEXA, JAMÁS SE PISA**: la nota original es la PROCEDENCIA (de qué careo
+    salió el conteo, o las notas de migración de Jane con el nombre de quien compró
+    por fuera). ⚠️ Pero el sello **se REEMPLAZA, no se apila**: un sello por corrida
+    haría una nota que crece sin fin — esta casa ya pagó eso con las bajas.
+  - 🔒 **NO SE SELLA**: un ajuste en CERO (no dice nada), uno cuyo conteo CAMBIA
+    (ésa ya queda con nota nueva), ni nada si el careo no leyó pestaña — un sello
+    sobre una cosecha que no ocurrió sería **una mentira firmada con fecha**.
+  - 🔴🔒 **LA PREGUNTA DE `updated_at`, CONTESTADA MIDIENDO** (Jane la levantó):
+    `stock_ajustes` **NO TIENE TRIGGER** (cero triggers no-internos en la base) y su
+    `default now()` solo aplica al INSERT. Así que un PATCH que no nombra
+    `updated_at` **no la mueve**: sellar NO cambia el significado de esa columna.
+    Su único lector es `_lib/disponibilidad`, que la lleva a la pantalla como
+    metadato de la casilla del Palacio — **nadie DECIDE con ella** (ningún orden,
+    ninguna comparación).
+    - ⚠️ Y de paso quedó medido un **desnivel que ya existía**: `admin-compras` y
+      `admin-coordi-asignaciones` **sí** ponen `updated_at` a mano en sus PATCH y el
+      **CAREO nunca lo hizo**. O sea que esa columna hoy significa «cuándo lo tocó un
+      HUMANO», no «cuándo cambió el conteo». Este sello no lo empeora ni lo arregla.
+    - 🔴 **CORRECCIÓN A MI PROPIO REPORTE de CUADRE-STOCK-1**: inferí que «Balcón no
+      se tocó el 1-oct porque su `updated_at` es del 23-sep». **Esa inferencia NO
+      ERA VÁLIDA** — el careo nunca mueve esa columna. La conclusión se sostiene por
+      el otro argumento, que no depende de ella: los cuatro viajeros existen desde
+      AGOSTO, tres semanas antes del careo del 22-sep.
+  - ⚠️ **LA GUARDA DE IDEMPOTENCIA DE `mide:cuadre-aplicar`, ACTUALIZADA A SU
+    INTENCIÓN.** Decía «el 2º clic escribe CERO veces» y el sello la puso en rojo con
+    razón: el segundo clic sella lo que el primero acabó de cuadrar. Medido, los dos
+    únicos escritos son `{nota:…}` y `vendidos_fuera` queda idéntico. Ahora se mira
+    **QUÉ** escribe, columna por columna: ninguna de dinero/boletos, y cualquier
+    escritura que no sea un sello de solo-nota tumba el careo. **Es más estricta que
+    contar**: con el «cero», una escritura futura que SÍ moviera algo se habría
+    podido «arreglar» subiendo el número.
 - 🏆 **PLAN-CASE-1 (1-oct-2026): el plan migrado deja de ser ciego a las
   MAYÚSCULAS.** `portal-mi-plan-migrado` casaba con `correo=eq.<JWT en minúsculas>` y
   el `eq` de PostgREST distingue mayúsculas: **285 filas · 244 personas** veían un plan

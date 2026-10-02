@@ -192,9 +192,21 @@ const LIBRO = [
   console.log('    (c) CHEAP sin libro     : ' + ver(() => n('cheap_sin_libro')));
   af(JSON.stringify(n('libro_no_cheap')) === JSON.stringify(['Plus En Libro']),
      () => '(a) no nombra al PLUS que aparece en el libro: el libro es SOLO venta CHEAP por regla. ' + ver(() => n('libro_no_cheap')));
-  af(JSON.stringify(n('pestana_sobre_separo')) === JSON.stringify(['Cheap Sobre Separo']),
-     () => '(b) no nombra a quien traía MÁS que el separo en la pestaña: ese dinero deja de contarse y eso '
-     + 'NO se hace en silencio. ' + ver(() => n('pestana_sobre_separo')));
+  // ⚠️ MI ASERCIÓN ESPERABA **UN** NOMBRE Y SALIERON DOS — y el segundo no es un
+  // error del código: es un HALLAZGO. «Plus En Libro» es PLUS con $5,000 en la
+  // pestaña y $3,000 en el libro; bajo la regla nueva su abonado pasa a $3,000, o
+  // sea que **$5,000 de dinero PLUS dejan de contarse** — y la pestaña es la dueña
+  // del dinero PLUS por la misma regla de Memo. Pertenece a (b) con todo derecho,
+  // y de hecho es el caso MÁS urgente de los tres.
+  // 🔒 Se exige que salga en LOS DOS avisos, porque es la combinación peligrosa:
+  // (a) dice «este PLUS no debería estar en el libro» y (b) dice «y por eso se le
+  // dejó de contar dinero». Nombrarlo en uno solo contaría media historia.
+  af(JSON.stringify(n('pestana_sobre_separo')) === JSON.stringify(['Cheap Sobre Separo', 'Plus En Libro']),
+     () => '(b) no nombra a los DOS a quienes se les deja de contar dinero de la pestaña: ' + ver(() => n('pestana_sobre_separo')));
+  af(n('libro_no_cheap').includes('Plus En Libro') && n('pestana_sobre_separo').includes('Plus En Libro'),
+     () => '🔴 el PLUS que aparece en el libro tiene que salir en LOS DOS avisos: (a) porque rompe la '
+     + 'premisa de la regla (el libro es solo CHEAP) y (b) porque la regla le quita $5,000 de dinero que la '
+     + 'pestaña sí posee. Nombrarlo en uno solo cuenta media historia.');
   af(JSON.stringify(n('cheap_sin_libro')) === JSON.stringify(['Cheap Sin Libro']),
      () => '(c) no nombra al CHEAP con dinero y sin fila en el libro: su pago no tiene dueño que lo respalde. '
      + ver(() => n('cheap_sin_libro')));
@@ -251,7 +263,15 @@ const LIBRO = [
       ...PESTANA.map((p) => fila(p.nombre, p.paquete, p.abonado, p.total))];
     const CABL = ['Nombre', 'Fecha', 'Tipo de Boleto', 'Costo al Publico', 'Separo'];
     const filaL = (nombre, costo, sep) => { const f = new Array(CABL.length).fill(''); f[0] = nombre; f[1] = '27 de Noviembre'; f[2] = 'Platino'; f[3] = String(costo); f[4] = String(sep); return f; };
-    const LIB = [filaL('Natanael Cano - 27 de Noviembre', '', ''), CABL,
+    // ⚠️ LA FILA DE TÍTULO LLEVA **UNA SOLA** CELDA LLENA. `filaL` fija `Fecha` y
+    // `Tipo de Boleto` siempre, así que usándola para el título salían 3 celdas
+    // llenas — `parsearLibro` exige `llenas === 1` para leerla como título, así
+    // que caía a `fueraDeBloque`, el bloque quedaba «(sin título)» y las personas
+    // iban todas a `sinMapeo`: el libro NO se fundía y los tres avisos medían en
+    // vacío (el (c) nombraba a TODOS los CHEAP, que fue la pista).
+    const titulo = new Array(CABL.length).fill('');
+    titulo[0] = 'Natanael Cano - 27 de Noviembre';
+    const LIB = [titulo, CABL,
       ...LIBRO.map((l) => filaL(l.nombre, l.costo_publico, l.abonado))];
     const EV = { id: 'natanael', a: 'Natanael Cano', f: '27 Nov', ds: '2026-11-27', v: 'Arena Monterrey, MTY',
                  st: '', zonas: [{ n: 'Platino', p: 3800 }, { n: 'VIP A', p: 9200 }], inc: ['Boleto'], sep: 500, sepCheap: 500 };

@@ -167,6 +167,90 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **LA AUDITORÍA DE LOS 141 SOBREPAGADOS: CERRADA (2-oct-2026).** Era el
+  punto 3 de CUADRE-FUENTE-1 y llevaba días **bloqueada por llaves**; Memo pasó
+  `NUMEROLOGIA_SCRIPT_URL` y `NUMEROLOGIA_SCRIPT_TOKEN` y se pudo hacer como la orden
+  exigía: **reconstruyendo la fuente desde la COSECHA REAL**, no desde la nota ni desde
+  inferencias de la base. **Cero escrituras.**
+
+  🔒 **LA POBLACIóN SE REPRODUJO AL PESO ANTES DE CLASIFICAR NADA: 141 personas ·
+  $214,233 · 28 eventos**, exacto contra lo que reportaba CUADRE-FUENTE-1. Y el camino
+  para volver a sacarla queda dicho, porque **el filtro es la mitad del número**:
+  `cobrado > contrato` **Y `contrato > 0`** **Y no es baja** (`boletos=0 ∧ zona NULL`).
+  ⚠️ Sin el `contrato > 0` salen **1,282 personas y $6,007,926** — porque **1,140
+  tienen contrato en CERO**, y un contrato en cero no es un sobrepago: es un contrato
+  **sin capturar**. Esa es la ley de *un cero es una afirmación* aplicada al revés, y
+  confundirlas infla el problema 28 veces.
+
+  **LA CLASIFICACIÓN (suma exacta a los $214,233 — candado de cardinalidad):**
+
+      DOBLE_CONTEO      39 personas   $122,536   57% del dinero
+      CONTRATO_CORTO    50 personas   $ 88,518
+      REDONDEO          48 personas   $  1,644   promedio $34
+      SIN_EXPLICAR       4 personas   $  1,535   nombradas, no adivinadas
+      ─────────────────────────────────────────
+      TOTAL            141 personas   $214,233
+
+  Presencia en las fuentes: **libro 51 · pestaña 138 · LAS DOS 48 · NINGUNA 0.**
+  - **DOBLE CONTEO — 38 CHEAP + 1 PLUS, en 13 eventos** (arjona, badgyal, enjambre,
+    karolg#0, karolg#1, louist, morat#0, morat#1, neighbourhood, straykids#0,
+    straykids#1, tini, warped). Es **exactamente** lo que Memo describió: el libro trae
+    el dinero y encima se sumó el de la pestaña, que es **reflejo**. El único PLUS es
+    la cara de la opción B — ahí manda la pestaña y la fila del libro es anomalía.
+  - **CONTRATO CORTO**: el dinero casa con UNA fuente y el contrato va materialmente
+    abajo. El caso extremo son contratos que traen **solo el separo** ($1,000) contra
+    cobros de $8,000-$14,000.
+  - **REDONDEO**: 48 personas por $1,644 **en total**. No es deuda de nadie y no se
+    persigue.
+
+  🔴🔒 **DOS DEFECTOS MÍOS QUE CAZÓ EL CANDADO DEL INSTRUMENTO, y el primero habría
+  invertido el reporte entero:**
+  1. **`en la pestaña: 0` de 141.** Le pasé a `parsearPestana` el **mapa de columnas**
+     de `mapearColumnas` cuando espera un objeto con **`.fila`** (el ÍNDICE de la fila
+     del encabezado): `filas[undefined]` daba cabecera vacía, todos los índices en
+     −1 y **CERO personas en las 28 pestañas**. Con ese brazo muerto el reporte decía
+     **DOBLE_CONTEO = 0** y mandaba 82 personas a «sin explicar». **El encabezado lo
+     DA la cosecha (`r.encabezado`), como hace el runner real** — el hecho viene del
+     lado que yo no controlo. Hoy el careo **se detiene** si alguna pestaña parsea en
+     vacío: *antes de creerle una AUSENCIA a un instrumento, que conteste algo que sí
+     existe*.
+  2. **Mi regla de doble conteo era demasiado estrecha**: exigía que el libro fuera
+     ≈ el contrato **o** que la pestaña fuera ≈ el separo, y así dejó **SIETE** casos
+     en «sin explicar» cuyo `cobrado` era **`libro + pestaña` exacto al peso**. La
+     esencia del doble conteo es **LA SUMA**; que el monto sea el separo es
+     descripción, no prueba. Generalizada: 33 → **39** personas, $107,548 → $122,536.
+  - ⚠️ Y un tercer error de orden, menos grave pero que habría dado un montón
+    inservible: mi primera versión mandaba a CONTRATO_CORTO diferencias de **$2**.
+    Cierto de letra, falso de uso. **El orden de las reglas es parte de la
+    clasificación**: doble conteo primero (es estructural a cualquier monto), redondeo
+    después, contrato corto solo cuando es material.
+
+  ⚠️ **LOS 4 SIN EXPLICAR, nombrados y NO adivinados:** **Rock 9** (la agencia — su
+  estado es el esperado y *se deja en paz*, Memo ya lo explicó varias veces) y **tres
+  personas de karolg#0 con los MISMOS números** (pestaña $7,450 · total $6,950 ·
+  cobrado $7,425: $25 de diferencia). Al ser idénticos los tres, es **un patrón de
+  captura, no tres errores independientes**.
+
+  🔒 **EL DETALLE CON NOMBRES NO SE VERSIONA, Y ES A PROPÓSITO.** El reporte por
+  persona son datos financieros de 141 clientes y **este repo se publica en
+  conectareynosa.mx**: lo versionado queda descargable. El acta lleva **agregados y
+  método**; la lista nominal se entregó en el reporte y vive fuera del repo. Es la
+  misma ley del `git add -A`, aplicada a un entregable en vez de a un descuido.
+
+  ⏳ **LO QUE SIGUE PENDIENTE Y NO LO DECIDO YO:** qué se hace con cada montón. El
+  doble conteo **no se corrige restando** a ciegas —*jamás se resta dinero*— y el
+  contrato corto se arregla moviendo el **contrato**, no el abonado. Son escrituras al
+  dinero de gente y piden palabra de Memo montón por montón.
+
+  🔴⏳ **Y UNA PREGUNTA QUE ESTAS LLAVES VUELVEN URGENTE, dicha sin afirmarla:
+  ¿están `NUMEROLOGIA_SCRIPT_URL` y `NUMEROLOGIA_SCRIPT_TOKEN` en NETLIFY?** Hoy solo
+  las tengo en mi `.env` local. `_lib/cosecha-excel` las lee de `process.env`, así que
+  **si no están arriba, el careo diario nunca ha leído el libro** y la regla que Memo
+  firmó en CUADRE-FUENTE-1 —«el libro manda el dinero del CHEAP»— estaría **inerte en
+  producción**: la hermana exacta de *la guarda inalcanzable*. **No pude medirlo** (el
+  lector de Netlify que tengo no devuelve variables de entorno) y **no lo adivino**; se
+  comprueba en el panel. Si faltan, se ponen con esos dos nombres exactos.
+
 - 🔨⏳ **ZONA-EXCEL-MANDA-1 · FASE 1 EN MAIN (2-oct-2026, merge 4d90a24): la FICHA
   obedece la ortografía del Excel.** Regla firmada de Memo, citada: *«NO cambio el
   Excel: tú cámbialo en el index. Si dice 1er Nivel regútalo a Primer Nivel

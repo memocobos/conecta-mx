@@ -2429,8 +2429,50 @@ está caduco antes de escribirse.
   proyecto), Numerología es ATADO (vacío correcto).
   🔒 **EL DINERO DE UN CANCELADO ES GANANCIA (regla de Memo, 1-oct): NO se
   reembolsa.** La fuente del monto: CHEAP manda **Numerología**; PLUS/STAY/RIDE
-  manda **la pestaña de Conecta 2026** (así entran ya por construcción: los
-  abonos CHEAP los escribe el careo del libro y los demás el de pestañas).
+  manda **la pestaña de Conecta 2026**.
+  🔴🔒 **ESTA REGLA ERA CIERTA A MEDIAS Y ESO COSTÓ $214,233** (corregida por
+  CUADRE-FUENTE-1, 1-oct). Decía que «los abonos CHEAP los escribe el careo del
+  libro y los demás el de pestañas» — y **no decía qué pasa cuando la MISMA
+  persona trae dinero en las DOS**. Ahí vivía el doble conteo. **Palabra de Memo
+  (1-oct-2026), citada:**
+  > «Numerología es SOLO venta CHEAP y lleva los pagos COMPLETOS. La pestaña de
+  > Conecta 2026 lleva los pagos de PLUS/STAY/RIDE. El CHEAP en la pestaña aparece
+  > a veces sin saldo o solo con el separo — ese separo es REFLEJO, NO es dinero
+  > adicional.»
+
+  **La regla completa, como queda:**
+  - en las **DOS** fuentes → el abonado lo manda **EL LIBRO, SOLO**. El dinero de
+    la pestaña (separo incluido) **no se suma**. Varias filas del libro SÍ suman
+    entre sí: dos compras CHEAP son dos ventas, no un reflejo.
+  - solo en la **pestaña** → como siempre. Solo en el **libro** → como siempre
+    (CUADRE-2c). Fila **roja** del libro → exactamente como CAREO-ZONA-1b.
+  - 🔒 **El TOTAL, la zona y los boletos siguen siendo de la pestaña**: «el libro
+    jamás pisa a la pestaña» no cambió. Lo único que cambió es **de quién es el
+    dinero**.
+  - ⚠️ **Y POR ESO ALGUNAS FILAS QUE «CUADRABAN» AHORA SUENAN.** El careo cuadraba
+    con su propio error: el sistema traía el doble conteo escrito y el careo volvía
+    a sumar lo mismo, así que se daba la razón a sí mismo. Ahora suenan como
+    **negativas** — que **no se aplican jamás** («jamás se resta dinero»): salen al
+    montón donde un humano las mira. Eso **es la detección**, no una regresión.
+  - **Tres avisos nuevos, que NOMBRAN y no adivinan** (viven en `correrCareo`,
+    porque preguntan por el paquete de la BASE que la fusión no conoce):
+    (a) `libro_no_cheap` — en el libro con paquete NO-CHEAP en la base;
+    (b) `pestana_sobre_separo` — en las dos y la pestaña traía más que el separo,
+        **con los DOS montos**: un dinero que deja de contarse no se calla;
+    (c) `cheap_sin_libro` — CHEAP con dinero solo en la pestaña: su pago no tiene
+        dueño que lo respalde, hay que completar el libro, no inventar la fila.
+  - 🔴 **LA PREGUNTA QUE DEJO ABIERTA, PORQUE ES DE MEMO Y NO MÍA**: un **PLUS que
+    aparece en el libro** cae en (a) **y** en (b) a la vez, y la regla tal como está
+    firmada le quita el dinero de la pestaña — que es dinero que la pestaña SÍ
+    posee por esta misma regla. La apliqué **tal como se firmó** (en las dos fuentes
+    manda el libro) y la consecuencia sale NOMBRADA en los dos avisos; si la regla
+    debe limitarse a los CHEAP, eso lo decide Memo, no un lector.
+  ⏳ **LA AUDITORÍA DE LOS 141 SIGUE PENDIENTE Y ESTÁ BLOQUEADA POR LLAVES**: clasificar
+  cada sobrepagado en doble conteo / contrato corto / legítimo exige la COSECHA real
+  (la fuente se reconstruye de la cosecha, **no de la nota** — los abonos existentes
+  dicen «Careo Excel…» aunque su dinero viniera del libro). Las llaves del cosechador
+  **no están en este entorno** (`.env` trae una sola línea, `AIRTABLE_TOKEN`, del
+  13-abr). 🔒 **No se sustituye con inferencias desde la base** — orden expresa.
   Recalculado el 1-oct sobre los 116 bajados: `total_contrato = lo abonado`
   (saldo 0, nada por cobrar ni devolver) — **$123,874 quedan como ganancia**,
   con nota por persona. ✅ **El careo de bajas nuevas YA lo hace (CAREO-ZONA-1c):**

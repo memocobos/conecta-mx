@@ -242,6 +242,36 @@ console.log('\n[E] las zonas que NO entran al lote');
 }
 
 // ═══ [F] LA CARDINALIDAD DEL LOTE ══════════════════════════════════════════
+// ═══ [G] 🔴 UN PAR VIVE EN SU FICHA, JAMÁS EN UNA LISTA GLOBAL ════════
+// Casi reporté una regresión falsa por esto: pregunté «¿quedan nombres viejos?»
+// con los pares de los TRES eventos en una sola lista, y me contestó que trueno
+// tenía 4 viejas vivas. Mentira: `Perfil` es el nombre **NUEVO** de trueno y a la
+// vez el **VIEJO** de caifanes, y `Perfil D` es viejo en caifanes y LEGÍTIMO en
+// trueno (ahí no se renombra). La misma cadena significa cosas opuestas según la
+// ficha. Hermana de «dos caminos, una columna».
+// 🔒 Y no es solo un error de consulta: un renombre GLOBAL sobre estas tablas
+// le cambiaría el nombre a zonas sanas de otro evento. El candado se queda.
+console.log('\n[G] la misma cadena, significados opuestos según la ficha');
+{
+  const viejaDe = (ficha) => LOTE.filter((r) => r.ficha === ficha).map((r) => r.vieja);
+  const nuevaDe = (ficha) => LOTE.filter((r) => r.ficha === ficha).map((r) => r.nueva);
+  af(() => viejaDe('caifanes').includes('Perfil'), 'premisa: «Perfil» es el nombre VIEJO de caifanes');
+  af(() => nuevaDe('trueno').includes('Perfil'), 'premisa: «Perfil» es el nombre NUEVO de trueno');
+  // El cruce, dicho en voz alta: lo que en una ficha hay que BORRAR, en la otra
+  // hay que DEJAR. Una lista global no puede expresar eso.
+  const cruce = viejaDe('caifanes').filter((v) => nuevaDe('trueno').includes(v));
+  console.log('    cadenas que son VIEJA en caifanes y NUEVA en trueno: ' + JSON.stringify(cruce));
+  af(() => cruce.length > 0,
+     '\u{1F534} el cruce desapareció: si ninguna cadena es vieja aquí y nueva allá, este candado dejó de medir algo real y hay que releerlo, no borrarlo');
+  // Y «Perfil D» sobrevive en trueno a propósito, aunque en caifanes se renombre.
+  const finTrueno = (() => { let t = FICHA.trueno; for (const r of LOTE) if (r.ficha === 'trueno') t = renombrar(t, r.vieja, r.nueva); return nombres(t); })();
+  af(() => finTrueno.includes('Perfil D'),
+     '\u{1F534} a trueno se le fue «Perfil D»: en caifanes se renombra, en trueno NO — el Excel de trueno no la escribe y la ficha la conserva');
+  af(() => !finTrueno.includes('Perfiles D'), '\u{1F534} a trueno le apareció «Perfiles D»: ese renombre es de caifanes, no suyo');
+  // El mismo cruce al revés: `Perfiles D` NO debe existir en trueno ni `Perfil A` en caifanes.
+  af(() => !nombres(FICHA.caifanes).includes('Perfil A'), 'premisa: caifanes no tiene «Perfil A» (es de trueno)');
+}
+
 console.log('\n[F] el lote, en números');
 {
   const sitios = LOTE.reduce((a, r) => a + r.sitios, 0);

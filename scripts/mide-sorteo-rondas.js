@@ -525,6 +525,49 @@ console.log('\n[RF] la ronda final de un re-giro es el ganador de ESTE giro');
      'con el ganador ausente se cayó a un folio: tenía que quedar en null («no sé»), no en el de otra persona');
   af(() => finDe(incoh).folio !== 97,
      '🔴 con el ganador ausente se mostró a Carolina: caer al `orden[0]` es exactamente el defecto');
+
+  // ══ [HOTFIX-DOS-GANADOR] «LOS DOS» TIENEN QUE INCLUIR AL GANADOR ════════
+  // 🔴 ESTA ES LA ASERCIÓN QUE FALTABA, y su ausencia costó un segundo falso
+  // «ya está». Arreglé la ronda final y NO barrí la familia: «quién ganó» se
+  // suponía de `orden[0]` en DOS sitios, y el otro era el gateo de «los dos».
+  // Medido en navegador real contra producción: con `orden[0]` (Carolina, 97) como
+  // ganador, Lucero (144) caía en `perdedores` y el gateo la APAGABA. La rejilla
+  // final quedaba con 97 y 104, y la página marcaba «la única viva».
+  // ⚠️ Y el bit guardado `primero` lo empeoraba: se calculó para el giro ORIGINAL,
+  // donde el ganador de hoy era perdedor, así que nombraba a Lucero.
+  {
+    const ordenR = [
+      { id: 'r97',  folio: 97,  nombre: 'Carolina Denisse Castro Ramirez' },
+      { id: 'r104', folio: 104, nombre: 'Ana Lopez Garza' },
+      { id: 'r144', folio: 144, nombre: 'Lucero Vargas Bermudez' },
+    ];
+    for (let i = 0; i < 21; i++) ordenR.push({ id: 'q' + i, folio: 300 + i, nombre: 'Relleno Uno Dos' });
+    // `primero` NOMBRA AL GANADOR DE HOY, como el dato real del intento 1.
+    const rR = { escalones: [24, 12, 6, 3, 1], orden: ordenR, primero: 'r144' };
+    const com = { rondas: rR, momentos: MOM, margenMs: MAR, transcurridoMs: 9e9,
+                  fotoDeId: () => null, momentoDosMs: MOM[MOM.length - 2] };
+    const sinHecho = ESC.proyectarRondas(com);
+    const conHecho = ESC.proyectarRondas(Object.assign({}, com, { ganadorId: 'r144' }));
+    console.log('    dos sin el hecho: ' + JSON.stringify(sinHecho.dos)
+      + '   ·   con el hecho: ' + JSON.stringify(conHecho.dos));
+    // CONTROL POSITIVO: sin el hecho, el ganador NO está en los dos.
+    af(() => Array.isArray(sinHecho.dos) && sinHecho.dos.indexOf(144) === -1,
+       'CONTROL POSITIVO: sin `ganadorId`, «los dos» tenían que EXCLUIR al ganador (144) — es el defecto. '
+       + 'Salió ' + JSON.stringify(sinHecho.dos));
+    // 🔒 LA INVARIANTE: el ganador SIEMPRE está en «los dos». Si no, la rejilla
+    // final se queda sin su ficha y la página marca a otra persona.
+    af(() => Array.isArray(conHecho.dos) && conHecho.dos.indexOf(144) !== -1,
+       '🔴 «LOS DOS» NO INCLUYEN AL GANADOR: ' + JSON.stringify(conHecho.dos) + '. La rejilla final se '
+       + 'queda sin su ficha y la página marca «la única viva» — la cara equivocada bajo el nombre correcto.');
+    af(() => conHecho.dos.length === 2, 'los dos no son DOS: ' + JSON.stringify(conHecho.dos));
+    // 🔒 Y el que muere es un PERDEDOR de verdad, aunque el bit guardado nombre
+    // al ganador de hoy (es del otro giro).
+    af(() => conHecho.dos.indexOf(97) !== -1 || conHecho.dos.indexOf(104) !== -1,
+       'el que sobrevive junto al ganador no es uno de los finalistas: ' + JSON.stringify(conHecho.dos));
+    // Y la ronda final sigue siendo el ganador (las dos reglas, juntas).
+    af(() => finDe(conHecho).folio === 144,
+       'con el gateo arreglado la ronda final dejó de ser el ganador: ' + finDe(conHecho).folio);
+  }
 }
 
 const x2p = chi2(posG, POSN / 24);

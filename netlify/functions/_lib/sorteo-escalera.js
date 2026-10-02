@@ -329,7 +329,18 @@ function proyectarRondas(o) {
     const liberaDos = Math.max(0, o.momentoDosMs - margen);
     if (t >= liberaDos) {
       const tres = orden.slice(0, esc[esc.length - 2]);       // los 3 finalistas
-      const ganadorId = String((orden[0] || {}).id);
+      // 🔴 [HOTFIX-DOS-GANADOR] EL GANADOR SALE DEL HECHO, NO DE `orden[0]`.
+      // Esto decía `String((orden[0]||{}).id)` y en un RE-GIRO `orden[0]` es el
+      // ganador del giro HEREDADO. Medido en navegador real contra producción el
+      // 2-oct: en Karol G intento 2, `orden[0]` era Carolina (97), así que **Lucero
+      // (144) quedaba en `perdedores`** y el gateo de «los dos» la apagaba. La
+      // rejilla final se quedaba con 97 y 104 y la página marcaba «la única viva»:
+      // la cara equivocada bajo el nombre correcto.
+      //
+      // ⚠️ ES EL MISMO DEFECTO QUE LA RONDA FINAL, EN UN SEGUNDO SITIO. Arreglé la
+      // ronda y NO barrí la familia — «quién ganó» se suponía de `orden[0]` en dos
+      // lugares. Por eso ahora el hecho entra UNA vez y lo usan los dos.
+      const ganadorId = (o && o.ganadorId != null) ? String(o.ganadorId) : String((orden[0] || {}).id);
       const perdedores = tres.filter((r) => String(r.id) !== ganadorId);
       // 🔒 DEL BIT GUARDADO, no del folio. Ver `primeroEnMorir`: por folio la
       // posición del que caía era una función del ganador (la izquierda NUNCA
@@ -338,6 +349,13 @@ function proyectarRondas(o) {
       // ⚠️ El respaldo por folio se queda SOLO para las escaleras guardadas
       // antes de que `primero` existiera —las del ensayo— para que un show a
       // medias no se quede sin su clímax. No es el camino.
+      // 🔴 Y EL BIT GUARDADO TAMPOCO VALE TAL CUAL EN UN RE-GIRO: `primero` se
+      // calculó para el giro ORIGINAL, donde el ganador de HOY era un perdedor — en
+      // Karol G `primero` nombraba a Lucero. El `find` sobre `perdedores` ya la
+      // protege (con el `ganadorId` correcto ella no está en esa lista), pero se
+      // deja dicho porque el bit sigue siendo del otro giro y el siguiente que lo
+      // lea tiene que saberlo. Si `primero` nombra al ganador de hoy, no casa con
+      // nadie y se cae al respaldo por folio ENTRE LOS PERDEDORES, que es correcto.
       const muere = perdedores.find((r) => String(r.id) === String(rondas.primero))
         || perdedores.slice().sort((a, b) => (Number(b.folio) || 0) - (Number(a.folio) || 0))[0];
       if (muere) {

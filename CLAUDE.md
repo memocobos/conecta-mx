@@ -2494,6 +2494,12 @@ está caduco antes de escribirse.
     no inflan `filas`, así que ese candado habría pasado VERDE **por no poder
     ocurrir** — letra muerta. Camila es CHEAP (que es lo que de verdad sería) y el
     candado vuelve a guardar donde el riesgo vive.
+  🔒 **ANCLAS**: `mide:cuadre-fuente-1` quedó anclado al merge **2f65547** (BASE
+  `55b5ee6`, donde la regla no existía). ⚠️ **`mide:cuadre-numerologia` NO ESTÁ
+  ANCLADO** — como `mide:cuadre-aplicar`, carga de `RAIZ` (el árbol de trabajo), así
+  que no hay ancla que mover aunque esta tuerca le cambió el sujeto: no sufre la
+  trampa del commit, y en cambio no puede traer control positivo por commit porque
+  no tiene BASE. Queda dicho dentro de los dos arneses, no solo aquí.
   ⏳ **LA AUDITORÍA DE LOS 141 SIGUE PENDIENTE Y ESTÁ BLOQUEADA POR LLAVES**: clasificar
   cada sobrepagado en doble conteo / contrato corto / legítimo exige la COSECHA real
   (la fuente se reconstruye de la cosecha, **no de la nota** — los abonos existentes

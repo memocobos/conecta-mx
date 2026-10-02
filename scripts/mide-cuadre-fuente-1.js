@@ -46,7 +46,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '55b5ee6';   // el main con CHATARRA-SELLO-1
-const HEAD_SHA = process.env.HEAD_SHA || 'HEAD';
+const HEAD_SHA = process.env.HEAD_SHA || '2f65547';   // el commit del MERGE
 // El guardián del árbol sucio, copiado de mide:concilia-1 (ahí vive su razón).
 const MEDIDOS = ['netlify/functions/_lib/numerologia.js', 'netlify/functions/_lib/excel-careo-correr.js'];
 function avisarSiSucio() {

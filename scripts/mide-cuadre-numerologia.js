@@ -22,6 +22,14 @@
 
 const path = require('path');
 const RAIZ = path.join(__dirname, '..');
+// ⚠️ ESTE ARNÉS **NO ESTÁ ANCLADO A COMMITS** (como `mide:cuadre-aplicar`): carga
+// los módulos de `RAIZ`, o sea del ÁRBOL DE TRABAJO. Dicho porque se pidió
+// re-anclarlo al merge de CUADRE-FUENTE-1 y **no hay ancla que mover**:
+//   · ✅ no sufre la trampa del commit — mide lo que acabas de escribir, así que
+//     cuando otra tuerca le cambia el sujeto basta correrlo;
+//   · ⚠️ y NO tiene BASE, así que no puede traer control positivo por commit: sus
+//     candados son positivos por construcción (sembrar el caso y verlo caer).
+// Si algún día se le pone ancla, hay que darle BASE a la vez.
 
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };

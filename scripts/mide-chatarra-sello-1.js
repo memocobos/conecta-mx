@@ -162,10 +162,19 @@ function armarRed(baseAjustes) {
   // dos, porque «avanza siempre» y «avanza cuando toca» no son lo mismo.
   console.log('\n[+] control positivo · el sello avanza, y no se apila');
   const pYa = apH.planear(mundo('Chatarra contada del careo Excel 2026-09-22 · verificada ' + HOY), {});
-  console.log('    2da corrida el MISMO día → sellos: ' + ver(() => (pYa.sellos || []).length));
-  af((pYa.sellos || []).length === 0,
-     () => 'el mismo día volvió a proponer el sello: sería una escritura que no cambia nada, ruido en el libro '
-     + 'de la base y un renglón falso en el reporte. ' + ver(() => (pYa.sellos || []).map((x) => x.nota)));
+  console.log('    2da corrida el MISMO día → sellos: ' + ver(() => (pYa.sellos || []).map((x) => x.zona)));
+  // ⚠️ ESTA ASERCIÓN DECÍA «CERO SELLOS» Y ERA MI FIXTURE EL EQUIVOCADO: `mundo()`
+  // solo parametriza la nota de **Balcón**, así que Doritos sigue SIN sellar y el
+  // careo —con razón— propone sellarla. Corregida a lo que de verdad hay que
+  // exigir, que además es MÁS estricto: la decisión es **por fila**, no global.
+  // Balcón (ya sellada hoy) NO vuelve; Doritos (sin sellar) SÍ. Con el «cero»
+  // original, un código que dejara de sellar a TODOS habría pasado en verde.
+  af(!(pYa.sellos || []).some((x) => x.zona === 'Balcón'),
+     () => 'la ya sellada HOY volvió a proponerse: sería una escritura que no cambia nada, ruido en el libro '
+     + 'de la base y un renglón falso en el reporte. ' + ver(() => (pYa.sellos || []).map((x) => x.zona)));
+  af((pYa.sellos || []).some((x) => x.zona === 'Doritos'),
+     () => 'la que NO estaba sellada dejó de proponerse: el sello se decide por FILA, y saltarse las demás '
+     + 'porque una ya estaba al día dejaría 264 boletos sin sello para siempre. ' + ver(() => (pYa.sellos || []).map((x) => x.zona)));
   const pAyer = apH.planear(mundo('Chatarra contada del careo Excel 2026-09-22 · verificada ' + AYER), {});
   const avanzado = (pAyer.sellos || []).find((x) => x.zona === 'Balcón');
   console.log('    sellada AYER → ' + ver(() => avanzado && avanzado.nota));

@@ -456,11 +456,23 @@ const MAPEOS = () => ([
     af(r2.statusCode === 200 && d2.ok, 'el careo con la tercera fuente no dio 200: ' + JSON.stringify(d2).slice(0, 200));
     af(n.configurada === true, 'con las vars puestas, la fuente sigue diciéndose no configurada');
 
-    // (a) DE PUNTA A PUNTA: la negativa esperada se volvió CERO.
+    // (a) DE PUNTA A PUNTA, POR EL HANDLER REAL: la fila SUENA a −1,000.
+    // ⚠️ Decía «la negativa esperada se volvió CERO» — la regla vieja. Es el MISMO
+    // caso del bloque [2] pero entrando por donde entra el cliente, así que la
+    // actualización es la misma y por la misma razón: el sistema trae el doble
+    // conteo del 19-sep y ahora el careo lo DELATA en vez de cuadrar con él.
+    // 🔒 Y se exige por EL HANDLER, no solo por la función: tres tuercas llegaron
+    // rotas a producción con su careo en verde porque el camino real no pasaba.
     const sigue = (d2.pagos || []).find((x) => /Esmeralda/.test(x.nombre));
-    console.log('    Esmeralda: ' + (sigue ? `sigue sonando ${sigue.diferencia}` : 'CUADRA ✓')
-      + ' · fuentes=' + JSON.stringify(((d2.iguales || []).find((x) => /Esmeralda/.test(x.nombre)) || {}).nombre ? 'iguales' : '?'));
-    af(!sigue, 'por el handler, la fila SIGUE sonando: ' + (sigue ? sigue.diferencia : ''));
+    console.log('    Esmeralda por el handler: ' + (sigue ? `suena ${sigue.diferencia}` : 'CUADRA'));
+    af(sigue && sigue.diferencia === -1000,
+       'por el handler la fila tenía que sonar a −1000: es la detección del doble conteo ya aplicado. '
+       + 'Salió ' + (sigue ? sigue.diferencia : 'nada'));
+    // 🔒 Y SIGUE SIENDO UNA NEGATIVA, O SEA QUE **NO SE APLICA**: «jamás se resta
+    // dinero». La corrección de los sobrepagados es fase aparte, con firma de Memo.
+    af(!(d2.abonos || []).some((x) => /Esmeralda/.test(x.nombre)),
+       '🔴 el careo PROPUSO un abono sobre una fila sobrepagada: una diferencia negativa no se aplica '
+       + 'jamás, y menos ésta, que es dinero de más');
 
     // (b) 🔒 UNA FILA DEL LIBRO SIN MAPEO NO PRODUCE NI NUEVO NI PAGO.
     const sm = n.sin_mapeo || [];

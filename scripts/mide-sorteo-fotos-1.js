@@ -42,7 +42,7 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '7b6410e';   // el main con el defecto vivo
-const HEAD_SHA = process.env.HEAD_SHA || '6aa5d42';   // el commit del MERGE
+const HEAD_SHA = process.env.HEAD_SHA || 'bb44faa';   // se re-ancla al merge
 const MEDIDOS = ['sorteo.html', 'netlify/functions/giveaway-estado.js'];
 function avisarSiSucio() {
   let sucio = '';

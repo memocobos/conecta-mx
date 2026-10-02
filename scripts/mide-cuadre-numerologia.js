@@ -108,7 +108,13 @@ const MAPEOS = () => ([
        + 'y el corte tiene que vivir en la siembra de numerologia_eventos');
   }
 
-  // ── [2] LA FUSIÓN: el dinero se SUMA, la procedencia viaja ────────────────
+  // ── [2] LA FUSIÓN: el dinero tiene UN DUEÑO, la procedencia viaja ──────
+  // ⚠️ ESTE BLOQUE DECÍA «el dinero se SUMA» y era la regla VIEJA. CUADRE-FUENTE-1
+  // (regla firmada de Memo, 1-oct) la cambió: para quien vive en las DOS fuentes
+  // el abonado lo manda **EL LIBRO, SOLO** — el separo de la pestaña es un REFLEJO
+  // del pago que el libro ya trae completo, y sumarlos contaba el mismo dinero dos
+  // veces (141 personas, $214,233 en producción). Se actualiza a la verdad nueva
+  // CON SU RAZÓN, no se silencia.────
   console.log('\n[2] la fusión de las dos fuentes del lado-Excel');
   if (N) {
     const dePestana = [
@@ -119,9 +125,17 @@ const MAPEOS = () => ([
     const f = N.fundirNumerologia(dePestana, delLibro);
     const por = (re) => f.find((p) => re.test(p.nombre));
     f.forEach((p) => console.log(`    ${p.nombre.slice(0, 34).padEnd(34)} abonado=${p.abonado} total=${JSON.stringify(p.total)} fuentes=${JSON.stringify(p.fuentes)}`));
-    // [a] LAS DOS FUENTES: 1,000 de la pestaña + 2,000 del libro = 3,000.
+    // [a] LAS DOS FUENTES: el abonado es el DEL LIBRO (2,000). Los $1,000 de la
+    // pestaña NO se suman — Esmeralda es CHEAP y el libro lleva sus pagos
+    // completos. 🔒 Y los $1,000 no se pierden de vista: salen nombrados en el
+    // aviso `pestana_sobre_separo` de `correrCareo` con los DOS montos.
     const esm = por(/Esmeralda/);
-    af(esm && esm.abonado === 3000, 'Esmeralda: abonado ' + (esm && esm.abonado) + ', se esperaban 3000 (1,000 pestaña + 2,000 libro)');
+    af(esm && esm.abonado === 2000,
+       'Esmeralda: abonado ' + (esm && esm.abonado) + ', se esperaban 2000 (el LIBRO manda, los $1,000 de la '
+       + 'pestaña NO se suman: CUADRE-FUENTE-1). Si salió 3000, volvió el doble conteo.');
+    af(esm && esm.abonado_pestana === 1000 && esm.abonado_libro === 2000,
+       'Esmeralda no carga los dos montos por separado: sin ellos el aviso no puede decir qué dinero se '
+       + 'deja de contar. ' + JSON.stringify(esm && { p: esm.abonado_pestana, l: esm.abonado_libro }));
     // 🔒 LA REGLA INTACTA, Y AHORA CON DIENTES: EL LIBRO JAMÁS PISA A LA
     // PESTAÑA. Antes esto se cumplía solo porque el libro no traía total; hoy
     // SÍ lo trae ($4,000 en el fixture) y aun así manda el de la pestaña
@@ -316,11 +330,33 @@ const MAPEOS = () => ([
     const delLibro = N.mapearLibro(LIBRO(), MAPEOS(), EVENTO).personas;
     const conLibro = carear(N.fundirNumerologia(dePestana, delLibro), sistema);
     const sigueSonando = (conLibro.pagos || []).find((x) => /Esmeralda/.test(x.nombre));
-    console.log('    con el libro → ' + (sigueSonando ? `sigue sonando: ${sigueSonando.diferencia}` : 'CUADRA (0 diferencias) ✓'));
-    af(!sigueSonando, 'con el libro dentro la fila SIGUE sonando (' + (sigueSonando ? sigueSonando.diferencia : '')
-       + '): el descuadre esperado tenía que volverse cuadre');
-    af((conLibro.iguales || []).some((x) => /Esmeralda/.test(x.nombre)),
-       'la fila no cayó en `iguales`: cuadrar es aparecer como igual, no desaparecer del careo');
+    console.log('    con el libro → ' + (sigueSonando ? `suena: ${sigueSonando.diferencia}` : 'CUADRA (0 diferencias)'));
+    // 🔴🔒 ESTE ERA EL CASO QUE MÁS CLARO ESCONDÍA EL DEFECTO, y la actualización
+    // lo vuelve del revés. El SISTEMA de este fixture trae `abonado: 3000` porque
+    // eso es **lo que la aplicación del 19-sep le escribió sumando las dos fuentes**
+    // — o sea, es uno de los 141. Con la regla vieja el careo volvía a sumar 1,000 +
+    // 2,000 = 3,000 y **cuadraba con su propio error**: el doble conteo era
+    // invisible porque el careo se daba la razón a sí mismo.
+    //
+    // Con CUADRE-FUENTE-1 el lado-Excel dice 2,000 y el sistema 3,000, así que la
+    // fila SUENA a **−1,000**: el sistema tiene mil pesos de más. Eso no es una
+    // regresión — **es la DETECCIÓN**, y es exactamente para lo que la tuerca
+    // existe. La aserción se da la vuelta con su razón escrita.
+    //
+    // ⚠️ Y por ser NEGATIVA, el careo no la aplica: «jamás se resta dinero» sigue
+    // en pie. Sale al montón de negativas, que es dónde un humano la mira.
+    af(sigueSonando && sigueSonando.diferencia === -1000,
+       'con el libro dentro la fila tenía que SONAR a −1000 (lado-Excel 2,000 vs sistema 3,000): es la '
+       + 'DETECCIÓN de un doble conteo ya aplicado. Salió ' + (sigueSonando ? sigueSonando.diferencia : 'nada'));
+    af(!(conLibro.iguales || []).some((x) => /Esmeralda/.test(x.nombre)),
+       'la fila cayó en `iguales`: con el sistema sobrepagado NO puede cuadrar, o el defecto seguiría '
+       + 'invisible');
+    // 🔒 CONTROL DEL SENTIDO: la diferencia es NEGATIVA (el sistema tiene de más),
+    // no positiva. Un signo al revés haría que el careo propusiera ABONAR más, que
+    // es justo lo contrario de lo que hace falta.
+    af(sigueSonando && sigueSonando.diferencia < 0,
+       'la diferencia salió POSITIVA: con el sistema sobrepagado, un signo al revés haría que el careo '
+       + 'propusiera abonar todavía más. Salió ' + (sigueSonando ? sigueSonando.diferencia : 'nada'));
     // 🔒 Y NO SE SILENCIÓ: el dinero del sistema no se tocó para lograrlo.
     af(sistema[0].abonado === 3000 && sistema[0].abonado_previo === 3000,
        'el careo movió el dinero del sistema para hacerlo cuadrar');
@@ -420,11 +456,23 @@ const MAPEOS = () => ([
     af(r2.statusCode === 200 && d2.ok, 'el careo con la tercera fuente no dio 200: ' + JSON.stringify(d2).slice(0, 200));
     af(n.configurada === true, 'con las vars puestas, la fuente sigue diciéndose no configurada');
 
-    // (a) DE PUNTA A PUNTA: la negativa esperada se volvió CERO.
+    // (a) DE PUNTA A PUNTA, POR EL HANDLER REAL: la fila SUENA a −1,000.
+    // ⚠️ Decía «la negativa esperada se volvió CERO» — la regla vieja. Es el MISMO
+    // caso del bloque [2] pero entrando por donde entra el cliente, así que la
+    // actualización es la misma y por la misma razón: el sistema trae el doble
+    // conteo del 19-sep y ahora el careo lo DELATA en vez de cuadrar con él.
+    // 🔒 Y se exige por EL HANDLER, no solo por la función: tres tuercas llegaron
+    // rotas a producción con su careo en verde porque el camino real no pasaba.
     const sigue = (d2.pagos || []).find((x) => /Esmeralda/.test(x.nombre));
-    console.log('    Esmeralda: ' + (sigue ? `sigue sonando ${sigue.diferencia}` : 'CUADRA ✓')
-      + ' · fuentes=' + JSON.stringify(((d2.iguales || []).find((x) => /Esmeralda/.test(x.nombre)) || {}).nombre ? 'iguales' : '?'));
-    af(!sigue, 'por el handler, la fila SIGUE sonando: ' + (sigue ? sigue.diferencia : ''));
+    console.log('    Esmeralda por el handler: ' + (sigue ? `suena ${sigue.diferencia}` : 'CUADRA'));
+    af(sigue && sigue.diferencia === -1000,
+       'por el handler la fila tenía que sonar a −1000: es la detección del doble conteo ya aplicado. '
+       + 'Salió ' + (sigue ? sigue.diferencia : 'nada'));
+    // 🔒 Y SIGUE SIENDO UNA NEGATIVA, O SEA QUE **NO SE APLICA**: «jamás se resta
+    // dinero». La corrección de los sobrepagados es fase aparte, con firma de Memo.
+    af(!(d2.abonos || []).some((x) => /Esmeralda/.test(x.nombre)),
+       '🔴 el careo PROPUSO un abono sobre una fila sobrepagada: una diferencia negativa no se aplica '
+       + 'jamás, y menos ésta, que es dinero de más');
 
     // (b) 🔒 UNA FILA DEL LIBRO SIN MAPEO NO PRODUCE NI NUEVO NI PAGO.
     const sm = n.sin_mapeo || [];
@@ -495,17 +543,30 @@ const MAPEOS = () => ([
   console.log('\n[4e] una persona en LAS DOS fuentes');
   try {
     const { planear } = require(path.join(RAIZ, 'netlify/functions/_lib/excel-aplicar.js'));
+    // ⚠️ [CUADRE-FUENTE-1b] CAMILA PASÓ DE 'PLUS' A **CHEAP**, y es un arreglo del
+    // fixture, no una concesión: desde la regla acotada de Memo el libro es SOLO
+    // venta CHEAP, así que una persona que de verdad vive en las dos fuentes es
+    // CHEAP — el fixture decía PLUS y era inconsistente con la regla (algo que
+    // antes no se notaba porque la regla no estaba escrita).
+    // 🔒 Y EL CANDADO SIGUE GUARDANDO LO MISMO, ahora donde el riesgo SÍ vive:
+    // con la acotación, las filas del libro de un PLUS ya no inflan `filas`, pero
+    // las de un CHEAP SÍ — que es el caso real de Camila. Dejarlo en PLUS habría
+    // vuelto el candado letra muerta: pasaría verde por no poder ocurrir.
+    // ⚠️ Y el dinero del libro se pone en $1,000 × 2 = los mismos $2,000 de la
+    // pestaña, para que la acotación no meta ruido de dinero en un bloque que mide
+    // BOLETOS. Con el 0 de antes, el abonado habría caído a cero y este bloque
+    // estaría midiendo dos cosas a la vez.
     const dePestana = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 2000, total: 4000,
-      filas: 2, zonas: { 'Balcón': 2 }, zona: 'Balcón', paquete: 'PLUS', talla: '', pestanas: ['P'] }];
-    const delLibro = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 },
-                      { nombre: 'Camila Dos', clave: 'camila dos', abonado: 0, boletos: 1, zona: 'Balcon', costo_publico: 4000 }];
-    const fundidas = N.fundirNumerologia(dePestana, delLibro);
+      filas: 2, zonas: { 'Balcón': 2 }, zona: 'Balcón', paquete: 'CHEAP', talla: '', pestanas: ['P'] }];
+    const delLibro = [{ nombre: 'Camila Dos', clave: 'camila dos', abonado: 1000, boletos: 1, zona: 'Balcon', costo_publico: 4000 },
+                      { nombre: 'Camila Dos', clave: 'camila dos', abonado: 1000, boletos: 1, zona: 'Balcon', costo_publico: 4000 }];
+    const fundidas = N.fundirNumerologia(dePestana, delLibro, new Map([['camila dos', ['CHEAP']]]));
     const cam = fundidas[0];
     console.log('    tras fundir: filas=' + cam.filas + ' · zonas=' + JSON.stringify(cam.zonas));
     af(cam.filas > 2, 'el fixture no reproduce el caso: `filas` tiene que inflarse (' + cam.filas + ') o el candado de abajo no prueba nada');
     const careoFalso = {
       personas: fundidas,
-      viajeros: [{ id: 'v1', nombre: 'Camila Dos', zona: 'Balcón', paquete: 'plus', abonado: 2000,
+      viajeros: [{ id: 'v1', nombre: 'Camila Dos', zona: 'Balcón', paquete: 'cheap', abonado: 2000,
         abonado_previo: 2000, total_contrato: 4000, notas: '', boletos: 1 }],
       montones: { pagos: [], totales_contrato: [], nuevos: [], apartados: [], bajas: [], ambiguos: [], iguales: [] },
       ajustes: [], chatarraPorZona: {},
@@ -516,6 +577,13 @@ const MAPEOS = () => ([
     af(pb && pb.a === 2,
        'el plan le escribiría ' + (pb && pb.a) + ' boletos y la PESTAÑA le cuenta 2: '
        + 'el libro repite los mismos boletos, contarlos dos veces cierra zonas que sí tienen lugar');
+    // 🔒 Y el dinero no mete ruido en este bloque: el libro suma los mismos $2,000
+    // que la pestaña, así que no hay abono ni negativa que distraiga del conteo.
+    af(cam.abonado === 2000,
+       'el abonado de Camila salió ' + cam.abonado + ' y el fixture lo puso igual a propósito ($1,000×2 en el '
+       + 'libro = los $2,000 de la pestaña): si cambia, este bloque está midiendo dinero además de boletos');
+    af((plan.abonos || []).length === 0,
+       'el bloque de BOLETOS produjo un abono: estaría midiendo dos cosas a la vez');
   } catch (e) { af(false, 'la sección de las dos fuentes se CAYÓ: ' + e.message); }
 
   // ── [4c] EL RELOJ: no se trae el libro si no hay nada que mapear ──────────

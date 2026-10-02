@@ -167,6 +167,119 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **LA EMERGENCIA DEL SORTEO DE KAROL G, CERRADA EN TRES CAPAS
+  (2-oct-2026). Durante TODO el show no salió ni una foto y la tarjeta final
+  mostraba a OTRA PERSONA.** Ganó **Lucero Vargas Bermúdez** (folio 144,
+  `karolg-bbva-2026`, intento 2, `acepto`) y la pantalla pintaba la cara de
+  **Carolina (folio 97)** bajo el nombre de Lucero. Tres defectos distintos, cada
+  uno con su hotfix: **6aa5d42** (la página PIDE las fotos) · **b17ac8f** (la
+  ronda final del re-giro, más el arranque en frío de las fotos) · **6db1fc6**
+  («los dos»). Suite del sorteo **1,575 en verde**:
+  `mide:sorteo-rondas` **1294** · `sorteo-maquina` 147 · `ganador-b` 53 ·
+  `ganador-quieto` 65 · `sorteo-fotos-1` 16. **Cero SQL, cero escrituras.**
+
+  🔴🔒 **LA LEY GRANDE, Y ME LA COBRÓ MEMO CON LA PANTALLA ENFRENTE:
+  VERIFICAR LA RESPUESTA DEL ENDPOINT NO ES VERIFICAR LO QUE PINTA EL NAVEGADOR.**
+  Reporté «arreglado» dos veces sobre la respuesta de `giveaway-estado`, y las dos
+  veces Memo abrió `/sorteo` en incógnito y seguía roto. Sus palabras: *«Tu
+  verificación fue sobre la respuesta de giveaway-estado, no sobre lo que pinta el
+  navegador. Mide en un navegador REAL (Playwright) contra producción, no el
+  preview … y hasta entonces no me digas que está.»* Es la hermana de **probar el
+  camino, no la función**, un piso más arriba: el servidor puede contestar
+  perfecto y la página pintar otra cosa. **Para una tuerca que se VE, el
+  instrumento es el navegador contra PRODUCCIÓN.**
+
+  **1 · LAS FOTOS: `sorteo.html` NUNCA PEDÍA `?fotos=1`.** La firma por lotes, el
+  bucket y el `service_role` **siempre estuvieron bien** (159/159 paths casan con
+  objetos reales, cero huérfanos). El careo estaba VERDE porque medía el
+  **SERVIDOR** con la bandera escrita a mano y **nadie afirmaba que la PÁGINA la
+  mandara**. `mide:sorteo-fotos-1` entra hoy **por el constructor de URL de la
+  página** (rebana `refrescar` de `sorteo.html` y lo corre en un `vm`), con control
+  positivo: BASE arma `?rodillos=1`, HEAD `?rodillos=1&fotos=1`.
+  - Las fotos se piden **al dibujar el mosaico y se cachean por su vigencia**
+    (firma 1800 s, re-pedido a los **1500 s** — por dentro—, reintento 30 s):
+    jamás en cada latido, que es cada 4 s durante 82 s.
+  - 🔒 **Y SI LA FIRMA FALLA, SE GRITA Y SE DEGRADA A INICIALES SIN ROMPER
+    NADA.** Había **DOS tragadas silenciosas** (`rs.ok ? … : []` y un `catch`
+    pelado) más **el éxito vacío** (paths pedidos, cero urls devueltas, que se
+    leía igual que «no hacía falta»). `console.error` pasó de **1 a 7**.
+  - ⚠️ **El arranque en frío**: `tocaPedirFotos` se rehusaba con `estado` aún
+    nulo, así que la primera pintada —la que el público ve— salía sin fotos.
+
+  **2 · LA RONDA FINAL DE UN RE-GIRO PROYECTABA AL GANADOR DEL GIRO HEREDADO.**
+  Medido en la base por Memo: el intento 2 tiene `registro_id` de Lucero,
+  `resultado: acepto`, **`rondas` en NULL** y `origen_sorteo_id` del intento 1 —
+  **el dato estaba bien; la proyección no**. `proyectarRondas` recibe hoy el
+  `ganadorId` y **la ronda final es SIEMPRE el ganador del giro ACTUAL**, con la
+  aserción «para todo re-giro, `rondas[último] == registro_id`». Si el ganador no
+  está en el `orden` heredado se arma su ficha con lo que se sabe y sale
+  **`ganador_incoherente: true`**, que `giveaway-estado` **GRITA** — un ganador que
+  no aparece en su propio padrón no se arregla en silencio.
+
+  **3 · EL GATEO DE «LOS DOS» TRATABA AL GANADOR COMO PERDEDOR — y éste era el
+  que pintaba la cara equivocada.** Decía `const ganadorId = String((orden[0]||{}).id)`
+  y en un re-giro `orden[0]` es el ganador HEREDADO (Carolina, 97): Lucero caía en
+  `perdedores` y el gateo la **apagaba**. La rejilla final se quedaba con 97 y 104
+  y la página marcaba «la única viva».
+
+      VIEJA → dos: [97,104] · final folio 97
+      NUEVA → dos: [97,144] · final folio 144
+
+  🔴🔒 **ARREGLÉ UN SITIO Y NO BARRÍ LA FAMILIA, Y ESO COSTÓ UN «YA ESTÁ»
+  FALSO.** «Quién ganó» se suponía de `orden[0]` en **DOS** lugares; arreglé la
+  ronda final (capa 2), reporté y el otro seguía ahí. Hoy el hecho entra **UNA**
+  vez y lo usan los dos. **La señal era la propia página, gritándolo, y no la
+  leí:** `[sorteo] la ficha del folio 144 no está en la rejilla (hay 2, vivas 1:
+  97,104). Se marca la única viva.` — el `console.error` de GANADOR-QUIETO-2
+  nombró el defecto exacto y había que mirar la consola, no el diff.
+  - ⚠️ **Y el bit guardado `primero` lo EMPEORABA**: se calculó para el giro
+    ORIGINAL, donde el ganador de hoy era perdedor, así que **nombraba a Lucero**.
+    El `find` sobre `perdedores` ya la protege con el `ganadorId` correcto, y queda
+    ESCRITO que el bit es de otro giro. (Hermana de *ausencia en llave nacida a
+    media historia*: un bit guardado conserva la verdad **del día que se guardó**.)
+  - 🔒 **LA INVARIANTE QUE FALTABA**, y su ausencia es la razón de que la capa 2
+    se reportara como completa: **«los dos» CONTIENEN al ganador**. Con su control
+    positivo —sin el hecho lo EXCLUYEN— y el fixture real (orden heredado cuyo
+    `[0]` es el folio 97 y `primero` nombrando al ganador). 1289 → **1294**.
+
+  ✅ **VERIFICADO EN NAVEGADOR REAL CONTRA PRODUCCIÓN, con captura** (420×980, el
+  botón **REAL** `#repetir` —se destapa `#panel` solo en ese navegador porque sin
+  token mide 0×0— y los 82 s esperados): mosaico con **8 de 8 fotos** antes de
+  girar; a t=50 s las tres finalistas eran Carolina / otra / **Lucero**; y la
+  tarjeta final con `src` de **`a3c0afd1…`** (Lucero) y **no** `7c859c46…`
+  (Carolina), placa «Lucero Vargas Bermudez · Reynosa · Folio #144».
+  🔒 **La identidad se mide por el UUID EN CUALQUIER PARTE de la url**: leí los
+  últimos 44 caracteres creyendo que eran la ruta y **son el token de la firma** —
+  reportaba «otra» en falso.
+  - **El punto 3 de Memo, contestado: NO era caché del CDN.** El HTML servido
+    traía el código nuevo (`tocaPedirFotos`, `arranqueFrio`) con
+    `cache-control: public, max-age=0, must-revalidate`. ⚠️ Y casi reporté un
+    «desplegado» falso: `grep -c "fotos=1"` daba 1 **por un comentario
+    preexistente** — el ancla tiene que ser única del código nuevo.
+  - 🔒 **El testigo del deploy fue la respuesta PÚBLICA**, no el panel de Netlify:
+    producción reproducía el defecto en su propio JSON (`dos: [97,104]` con la
+    ronda final ya en `[144]`), así que se espera a que `dos` traiga **144**.
+
+  ⚠️ **ANCLAS, dicho y no supuesto:** `mide:sorteo-fotos-1` se queda en
+  **b17ac8f** porque su sujeto (`sorteo.html`) es **byte a byte el mismo** en el
+  merge (sha1 `0f955d45c7b3` en los dos) — comprobado, no asumido. Y
+  `mide:sorteo-rondas`, que es quien mide el lib que SÍ se movió, **no tiene
+  ancla**: carga del árbol de trabajo, así que mide lo que acabas de escribir y
+  en cambio no puede traer control positivo por commit.
+
+  ⏳ **PENDIENTE, bloqueado por llave:** el **PNG vertical de la story de
+  Lucero** que Memo pidió para hoy necesita bajar su foto del bucket privado con
+  `PORTAL_SUPABASE_SERVICE_KEY`, y **Memo se negó expresamente a pasarla** (*«No
+  te paso la service key: el camino es arreglar y desplegar»*). Queda NOMBRADO,
+  sin sustituirse por nada. Y la aserción del careo **contra el bucket real**
+  sigue igual: nombrada como pendiente de llave, **no escrita en verde**.
+
+  ⚠️ **`mide:giveaway-karolg` trae 10 ROJOS PREEXISTENTES y no son de aquí**:
+  los diez dicen «El registro ya cerró» porque su `CIERRE` es
+  `2026-10-01T20:00:00-05:00` y hoy es el 2-oct. Es la familia del **fixture
+  vencido** de NUBE4-ARNES-1 — fechas tecleadas careadas contra el reloj real.
+  Es su propia chiquita.
+
 - 🏆 **CAREO-ZONA-1 EN PROD (30-sep-2026, merge 12fef09, re-ancla 654342c): el
   careo diario aprende ZONAS, FILAS PARTIDAS y FILAS ROJAS.**
   `npm run mide:careo-zona-1` (**54**, anclado al merge), construida por CC y

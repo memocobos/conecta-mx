@@ -151,8 +151,17 @@ exports.handler = async (event) => {
       const rf = await fetch(`${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${slugQ}`
         + `&foto_estado=eq.aprobada&id=in.(${ids.map(encodeURIComponent).join(',')})`
         + `&select=id,foto_path`, { headers: G.sbHeaders() });
+      if (!rf.ok) {
+        console.error('[giveaway-estado] no pude leer los registros para firmar fotos: '
+          + rf.status + ' ' + (await rf.text().catch(() => '')).slice(0, 200));
+      }
       regs = rf.ok ? (await rf.json().catch(() => [])) : [];
-    } catch (e) { return url; }
+    } catch (e) {
+      // 🔴 [HOTFIX-SORTEO-FOTOS] ANTES ESTO ERA UN `return url` MUDO. El show de
+      // Karol G corrió entero sin fotos y no hubo una sola línea en los logs.
+      console.error('[giveaway-estado] excepción leyendo registros para firmar fotos: ' + e.message);
+      return url;
+    }
     const conRuta = (Array.isArray(regs) ? regs : []).filter(r => r && r.foto_path);
     if (!conRuta.length) return url;
     try {
@@ -163,13 +172,31 @@ exports.handler = async (event) => {
         method: 'POST', headers: G.sbHeaders(),
         body: JSON.stringify({ expiresIn: 1800, paths: conRuta.map(r => r.foto_path) }),
       });
+      // 🔴 [HOTFIX-SORTEO-FOTOS] LOS DOS SITIOS QUE SE LO TRAGABAN, AHORA GRITAN.
+      // Degradar a iniciales sigue siendo lo correcto — no se rompe la transmisión—
+      // pero hacerlo EN SILENCIO es lo que dejó pasar un show completo sin una foto.
+      if (!rs.ok) {
+        console.error('[giveaway-estado] la firma en LOTE del bucket giveaway-fotos falló: '
+          + rs.status + ' ' + (await rs.text().catch(() => '')).slice(0, 300)
+          + ' · ' + conRuta.length + ' ruta(s) pedidas. Las tarjetas van a salir con INICIALES.');
+      }
       const firmas = rs.ok ? (await rs.json().catch(() => [])) : [];
       const porRuta = {};
       (Array.isArray(firmas) ? firmas : []).forEach(f => {
         if (f && f.path && f.signedURL) porRuta[f.path] = `${G.SB_URL}/storage/v1${f.signedURL}`;
+        else if (f) console.error('[giveaway-estado] una ruta volvió sin firma: '
+          + JSON.stringify({ path: f.path || null, error: f.error || null }));
       });
       conRuta.forEach(r => { if (porRuta[r.foto_path]) url[String(r.id)] = porRuta[r.foto_path]; });
-    } catch (e) { /* iniciales: degradar, no romper */ }
+      // ⚠️ Y EL ÉXITO VACÍO TAMBIÉN HABLA: se pidieron rutas y no salió ninguna URL.
+      if (conRuta.length && !Object.keys(url).length) {
+        console.error('[giveaway-estado] se pidieron ' + conRuta.length + ' firma(s) y NINGUNA salió con URL. '
+          + 'Respuesta cruda: ' + JSON.stringify(firmas).slice(0, 300));
+      }
+    } catch (e) {
+      console.error('[giveaway-estado] excepción firmando fotos: ' + e.message
+        + ' · ' + conRuta.length + ' ruta(s). Las tarjetas van a salir con INICIALES.');
+    }
     return url;
   }
 

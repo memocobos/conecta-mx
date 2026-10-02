@@ -27,6 +27,18 @@
 
 const path = require('path');
 const RAIZ = path.join(__dirname, '..');
+// ⚠️ ESTE ARNÉS **NO ESTÁ ANCLADO A COMMITS**, y es a propósito dejarlo dicho:
+// carga los módulos de `RAIZ`, o sea del ÁRBOL DE TRABAJO. Dos consecuencias que
+// conviene no confundir con las de los arneses anclados:
+//   · ✅ NO sufre la trampa del commit — mide lo que acabas de escribir, sin
+//     necesidad de commitear ni de re-anclar. Cuando una tuerca le cambia el
+//     sujeto (CHATARRA-SELLO-1 lo hizo), basta correrlo: no hay ancla que mover.
+//   · ⚠️ Y NO tiene BASE, así que **no puede traer control positivo por commit**:
+//     no hay un «antes» contra el que exigir que el defecto existía. Sus candados
+//     tienen que ser positivos por construcción (sembrar el caso y verlo caer),
+//     que es como están escritos.
+// Si alguna vez se le pone ancla, hay que darle BASE a la vez: una ancla de HEAD
+// sin BASE es un arnés que mide el pasado sin poder compararlo con nada.
 
 let ok = 0, mal = 0; const fallos = [];
 const af = (c, e) => { if (c) ok++; else { mal++; fallos.push(e); } };

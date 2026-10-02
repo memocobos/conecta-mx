@@ -2943,12 +2943,68 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
     return !(estado && estado.rodillos) || (Date.now() - rodillosAl) > RODILLOS_CADA_MS;
   }
 
+  // ══ [HOTFIX-SORTEO-FOTOS] LAS FOTOS SE PIDEN ═══════════════════════
+  // 🔴 EL DEFECTO QUE ESTO CIERRA, medido en producción el 2-oct: esta página
+  // construía la URL con `?rodillos=1` y **jamás con `?fotos=1`**, y el servidor
+  // hace `if (!quiereFotos) return {}`. O sea que en TODO el show de Karol G no se
+  // firmó ni una foto — ni en el mosaico ni en la tarjeta de la ganadora— y no
+  // hubo error que registrar porque nada falló: las fotos nunca se pidieron.
+  // Medido contra producción: con la bandera, 46 objetos traen URL firmada y una
+  // de ellas carga (http 200, image/jpeg, 238 KB). La firma en lote, el bucket y
+  // la service_role **siempre estuvieron bien**.
+  //
+  // 🔒 PERO NO EN CADA LATIDO: el servidor avisa que son «24 firmas por visitante
+  // cada 4 segundos». Con 500 espectadores eso serían ~12,000 firmas por minuto.
+  // Así que las fotos tienen su PROPIA cadencia, como los rodillos.
+  // ⚠️ Y SE RENUEVAN **ANTES** DE CADUCAR: el servidor firma con `expiresIn: 1800`,
+  // así que refrescar justo a los 1800 s dejaría imágenes rotas en los últimos
+  // segundos — en cámara. 25 minutos deja 5 de margen.
+  var FOTOS_VIGENCIA_MS   = 1800000;   // lo que el servidor firma
+  var FOTOS_CADA_MS       = 1500000;   // 25 min: por dentro de la vigencia
+  var FOTOS_REINTENTO_MS  = 30000;     // si no llegaron, se reintenta sin machacar
+  var fotosAl = 0, fotosPedidoAl = 0;
+  function tocaPedirFotos(){
+    // Girando no se pide nada: el giro no espera una consulta.
+    if (girando) return false;
+    // 🔒 Y NO ANTES DEL GIRO: sin giro el servidor no firma nada (regla de
+    // privacidad), así que pedirlo sería un viaje en vacío. Se pide cuando hay
+    // mosaico que dibujar — que es cuando hay giro.
+    if (!(estado && estado.ultimo) && !SHOW) return false;
+    if ((Date.now() - fotosPedidoAl) < FOTOS_REINTENTO_MS) return false;
+    return (Date.now() - fotosAl) > FOTOS_CADA_MS;
+  }
+  // ¿Llegaron de verdad? Se mira el DATO, no el hecho de haberlas pedido: si la
+  // firma fallara del lado del servidor, marcar «ya las tengo» dejaría la pantalla
+  // 25 minutos sin fotos y sin reintentar.
+  function trajoFotos(j){
+    var rondas = (j && j.ultimo && j.ultimo.rondas) || [];
+    for (var i = 0; i < rondas.length; i++){
+      var ms = rondas[i].miembros || [];
+      for (var k = 0; k < ms.length; k++) if (ms[k] && ms[k].foto) return true;
+    }
+    return false;
+  }
+
   function refrescar(){
     // Girando NO se piden: la lista ya está en memoria y el giro no puede
     // quedarse esperando una consulta.
     var conRodillos = !girando && tocaPedirRodillos();
-    return api('giveaway-estado' + (conRodillos ? '?rodillos=1' : ''), { method: 'GET' }).then(function(res){
+    var conFotos = tocaPedirFotos();
+    if (conFotos) fotosPedidoAl = Date.now();
+    var qs = [];
+    if (conRodillos) qs.push('rodillos=1');
+    if (conFotos) qs.push('fotos=1');
+    return api('giveaway-estado' + (qs.length ? '?' + qs.join('&') : ''), { method: 'GET' }).then(function(res){
       if (!res.j || res.j.ok !== true) return;
+      // 🔒 El reloj de la caché avanza solo si las fotos LLEGARON. Y si se
+      // pidieron y no vinieron, se GRITA: el show entero pasó sin fotos
+      // precisamente porque nadie se enteró de que faltaban.
+      if (conFotos){
+        if (trajoFotos(res.j)) fotosAl = Date.now();
+        else console.error('[sorteo] se pidieron las fotos (?fotos=1) y la respuesta no trajo ninguna '
+          + 'URL firmada. Las tarjetas van a salir con INICIALES. Revisa la firma del bucket '
+          + 'giveaway-fotos en giveaway-estado (foto_estado=aprobada y foto_path).');
+      }
       // La respuesta sin rodillos NO trae la lista: se conserva la que ya
       // teníamos en vez de dejarla en undefined y vaciar la máquina.
       var rodillosPrevios = (estado && estado.rodillos) || null;

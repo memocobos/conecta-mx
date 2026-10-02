@@ -284,6 +284,19 @@ está caduco antes de escribirse.
     escritura que no sea un sello de solo-nota tumba el careo. **Es más estricta que
     contar**: con el «cero», una escritura futura que SÍ moviera algo se habría
     podido «arreglar» subiendo el número.
+  - 🔒 **Y UN DATO DE ANCLAS QUE CONVIENE NO CONFUNDIR**: `mide:chatarra-sello-1`
+    quedó anclado al merge **3e6d068** (BASE `d549183`, donde el montón `sellos` no
+    existía). Pero **`mide:cuadre-aplicar` NO ESTÁ ANCLADO A COMMITS** — cero
+    `git archive`, cero `HEAD_SHA`, cero `BASE`: carga de `RAIZ`, o sea del ÁRBOL DE
+    TRABAJO. Dos consecuencias que no son la misma cosa:
+    - ✅ **no hay ancla que mover** cuando otra tuerca le cambia el sujeto, y no
+      sufre la trampa del commit: mide lo que acabas de escribir;
+    - ⚠️ **no puede traer control positivo por commit**, porque no tiene BASE contra
+      la que exigir que el defecto existía. Sus candados son positivos por
+      construcción (sembrar el caso y verlo caer).
+    🔒 Si algún día se le pone ancla, hay que darle **BASE a la vez**: una ancla de
+    HEAD sin BASE es un arnés que mide el pasado sin poder compararlo con nada.
+    (Queda escrito también DENTRO del arnés, no solo aquí.)
 - 🏆 **PLAN-CASE-1 (1-oct-2026): el plan migrado deja de ser ciego a las
   MAYÚSCULAS.** `portal-mi-plan-migrado` casaba con `correo=eq.<JWT en minúsculas>` y
   el `eq` de PostgREST distingue mayúsculas: **285 filas · 244 personas** veían un plan

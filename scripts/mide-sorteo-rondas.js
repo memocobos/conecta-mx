@@ -458,6 +458,75 @@ for (let i = 0; i < POSN; i++) {
                                    transcurridoMs: 0, fotoDeId: () => null });
   posG[p1.rondas[0].miembros.findIndex((m) => m.folio === e.orden[0].folio)]++;
 }
+// ═══ [HOTFIX-REGIRO-RONDA-FINAL] LA RONDA FINAL ES **ESTE** GIRO ═══════════
+// 🔴 EL CASO REAL DE KAROL G, 2-oct: el intento 2 (re-giro) HEREDA la escalera
+// del intento 1, cuyo `orden[0]` es Carolina (folio 97) porque ella ganó AQUEL
+// giro. La ronda final salía de `orden.slice(0,1)` → revelaba a Carolina con el
+// nombre de Lucero (folio 144) encima. El dato de la base estaba bien; la
+// proyección no. Y era INVISIBLE mientras no había fotos: la tarjeta salía con
+// iniciales, así que el hotfix de las fotos lo convirtió en una cara equivocada.
+//
+// 🔒 EL CONTROL POSITIVO VA **POR CONSTRUCCIÓN**, y se dice por qué: este arnés
+// no está anclado a commits (carga de `RAIZ`), así que no hay un «antes» contra
+// el que medir. Pero llamar a `proyectarRondas` SIN `ganadorId` es exactamente el
+// comportamiento viejo —el parámetro no existía—, así que la pareja de llamadas
+// separa las dos implementaciones de verdad.
+console.log('\n[RF] la ronda final de un re-giro es el ganador de ESTE giro');
+{
+  // La escalera heredada del intento 1: los 3 del escalón traen a Lucero, y el
+  // orden[0] es Carolina porque ella ganó ese giro.
+  const ordenHer = [
+    { id: 'r97',  folio: 97,  nombre: 'Carolina Denisse Castro Ramirez' },
+    { id: 'r104', folio: 104, nombre: 'Ana Lopez Garza' },
+    { id: 'r144', folio: 144, nombre: 'Lucero Vargas Bermudez' },
+  ];
+  for (let i = 0; i < 21; i++) ordenHer.push({ id: 'h' + i, folio: 200 + i, nombre: 'Relleno Uno Dos' });
+  const rHer = { escalones: [24, 12, 6, 3, 1], orden: ordenHer };
+  const comun = { rondas: rHer, momentos: MOM, margenMs: MAR, transcurridoMs: 9e9, fotoDeId: () => null };
+  const vieja = ESC.proyectarRondas(comun);
+  const nueva = ESC.proyectarRondas(Object.assign({}, comun, {
+    ganadorId: 'r144', ganadorNombre: 'Lucero Vargas Bermudez' }));
+  const finDe = (p) => ((p.rondas[p.rondas.length - 1] || {}).miembros || [])[0] || {};
+  console.log('    sin el hecho (lo viejo) → folio ' + finDe(vieja).folio + ' · ' + finDe(vieja).corto);
+  console.log('    con el hecho (lo nuevo) → folio ' + finDe(nueva).folio + ' · ' + finDe(nueva).corto);
+  // 🔴 CONTROL POSITIVO: sin el hecho sale la persona EQUIVOCADA. Si aquí saliera
+  // 144, el fixture no ejercita el defecto y el verde de abajo no dice nada.
+  af(() => finDe(vieja).folio === 97,
+     'CONTROL POSITIVO: sin `ganadorId` la ronda final tenía que salir con el folio 97 (Carolina, la '
+     + 'ganadora del giro HEREDADO). Salió ' + finDe(vieja).folio);
+  // Y la invariante que Memo firmó: para TODO giro, rondas[último] == su registro.
+  af(() => finDe(nueva).folio === 144,
+     '🔴 la ronda final NO es el ganador de ESTE giro: con `ganadorId=r144` tenía que salir el folio 144 '
+     + '(Lucero) y salió ' + finDe(nueva).folio + '. Es la tarjeta y la story de la ganadora.');
+  af(() => /Lucero/.test(finDe(nueva).corto || ''), 'el nombre de la ronda final no es el de la ganadora');
+  // 🔒 Y LAS RONDAS PREVIAS NO SE MUEVEN: la escalera heredada es correcta para
+  // ellas — Lucero viene en los 3 — y tocarlas sería cambiar la historia del show.
+  const previas = (p) => p.rondas.slice(0, -1).map((r) => r.miembros.map((m) => m.folio).join(','));
+  af(() => JSON.stringify(previas(nueva)) === JSON.stringify(previas(vieja)),
+     'las rondas PREVIAS cambiaron: la escalera heredada es correcta para ellas y moverlas reescribe el show');
+  af(() => (nueva.rondas[3].miembros || []).some((m) => m.folio === 144),
+     'la ronda de 3 ya no trae a la ganadora: el escalón del que salió tiene que incluirla');
+  // 🔒 Y UN GIRO NORMAL NO SE MUEVE: `orden[0]` ya es su registro, así que pasar
+  // el hecho da lo mismo. Es lo que permite que la regla NO se ramifique.
+  const normal = ESC.proyectarRondas(Object.assign({}, comun, { ganadorId: 'r97' }));
+  af(() => finDe(normal).folio === 97,
+     'en un giro normal (el ganador ES `orden[0]`) la regla cambió el resultado: entonces no se puede '
+     + 'aplicar sin ramificar, y una rama que solo corre en el caso raro es donde nadie la mira');
+  // 🔴 Y SI EL GANADOR NO ESTÁ EN LA ESCALERA, SE DICE — y NO se cae al orden[0]:
+  // mostrar a la persona equivocada es peor que una ficha sin folio.
+  const incoh = ESC.proyectarRondas(Object.assign({}, comun, {
+    ganadorId: 'NO-ESTA', ganadorNombre: 'Quien Sea Perez' }));
+  console.log('    ganador ausente → incoherente=' + incoh.ganador_incoherente
+    + ' · folio ' + finDe(incoh).folio);
+  af(() => incoh.ganador_incoherente === true,
+     'un ganador que no está en la escalera no se DICE: el show de Karol G corrió con la tarjeta mala y en '
+     + 'silencio, y eso es lo que no se repite');
+  af(() => finDe(incoh).folio === null,
+     'con el ganador ausente se cayó a un folio: tenía que quedar en null («no sé»), no en el de otra persona');
+  af(() => finDe(incoh).folio !== 97,
+     '🔴 con el ganador ausente se mostró a Carolina: caer al `orden[0]` es exactamente el defecto');
+}
+
 const x2p = chi2(posG, POSN / 24);
 console.log('    posición del ganador en el mosaico: χ² ' + x2p.toFixed(1) + ' (gl 23) · min '
           + Math.min.apply(null, posG) + ' · max ' + Math.max.apply(null, posG));

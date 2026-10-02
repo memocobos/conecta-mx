@@ -236,7 +236,38 @@ function proyectarRondas(o) {
   // ficha para que el mosaico diga «Karla M. · Guadalajara».
   const ciudadDeId = (o && o.ciudadDeId) || function () { return null; };
 
+  // ═══ [HOTFIX-REGIRO-RONDA-FINAL] LA RONDA FINAL ES **ESTE** GIRO ══════════
+  // 🔴 EL DEFECTO, visto en producción con Karol G el 2-oct: un re-giro HEREDA la
+  // escalera del giro original, y la ronda final sale de `orden.slice(0,1)` — o
+  // sea el ganador de AQUEL giro. En el intento 2 de Karol G eso revelaba a
+  // Carolina Denisse (folio 97, ganadora del intento 1 que se re-giró) con el
+  // nombre de Lucero (folio 144) encima. La escalera heredada es CORRECTA para
+  // las rondas previas —Lucero viene en los 3— pero la final no es suya.
+  // Y el defecto era INVISIBLE mientras no había fotos: la tarjeta salía con
+  // iniciales. El hotfix de las fotos lo volvió una cara equivocada.
+  //
+  // 🔒 LA REGLA: **la ronda final es SIEMPRE el `registro_id` del giro actual.**
+  // No se ramifica por `es_regiro`: en un giro normal `orden[0]` YA es ese
+  // registro, así que la regla sin condición da lo mismo y no deja una rama que
+  // solo corre en el caso raro — justo donde nadie la mira.
+  //
+  // ⚠️ El llamador pasa el HECHO (quién ganó ESTE giro); la escalera sigue
+  // siendo la dueña de cómo se arma la ronda. Si el ganador no estuviera en la
+  // escalera heredada, NO se cae al `orden[0]`: se dice (`ganador_incoherente`)
+  // y se arma con lo que el giro sí sabe, porque mostrar a la persona
+  // equivocada es peor que mostrar una ficha incompleta.
+  const ganadorId = (o && o.ganadorId != null) ? String(o.ganadorId) : null;
+  const ganadorNombre = (o && o.ganadorNombre) || null;
+  let ganadorIncoherente = false;
+
   const libera = (k) => Math.max(0, (mm[k] || 0) - margen);
+  const ficha = (r) => ({
+    folio: Number(r && r.folio) || null,
+    corto: nombreCorto(r && r.nombre),
+    ini: iniciales(r && r.nombre),
+    foto: (r && fotoDeId(r.id)) || null,
+    ciudad: (r && ciudadDeId(r.id)) || null,
+  });
 
   const out = [];
   let siguiente = null;
@@ -245,19 +276,26 @@ function proyectarRondas(o) {
       if (siguiente === null) siguiente = libera(k) - t;
       continue;
     }
-    const miembros = orden.slice(0, esc[k])
-      // 🔒 AQUÍ MUERE EL ORDEN DE LA REVOLTURA. El `slice()` de arriba ya
-      // devolvió copia, así que el `sort` no puede mutar la columna guardada.
-      .sort((a, b) => (Number(a.folio) || 0) - (Number(b.folio) || 0))
-      .map((r) => ({
-        folio: Number(r.folio) || null,
-        corto: nombreCorto(r.nombre),
-        ini: iniciales(r.nombre),
+    let miembros;
+    if (k === esc.length - 1 && ganadorId) {
+      // LA FINAL: el ganador de ESTE giro, buscado en la escalera por su id.
+      const suyo = orden.filter((r) => r && String(r.id) === ganadorId)[0] || null;
+      if (suyo) miembros = [ficha(suyo)];
+      else {
+        ganadorIncoherente = true;
+        // Sin ficha en la escalera se arma con lo que el giro sabe. El folio
+        // queda en null a propósito: «no sé», no un número inventado.
+        miembros = [ficha({ id: ganadorId, folio: null, nombre: ganadorNombre })];
+      }
+    } else {
+      miembros = orden.slice(0, esc[k])
+        // 🔒 AQUÍ MUERE EL ORDEN DE LA REVOLTURA. El `slice()` de arriba ya
+        // devolvió copia, así que el `sort` no puede mutar la columna guardada.
+        .sort((a, b) => (Number(a.folio) || 0) - (Number(b.folio) || 0))
         // Se re-declara en CADA ronda —con null explícito— para que un
         // «invalidar» posterior llegue a quien ya está mirando.
-        foto: fotoDeId(r.id) || null,
-        ciudad: ciudadDeId(r.id) || null,
-      }));
+        .map(ficha);
+    }
     out.push({ i: k, tam: esc[k], miembros });
   }
 
@@ -313,7 +351,9 @@ function proyectarRondas(o) {
     }
   }
 
-  return { rondas: out, rondas_totales: esc.length,
+  // [HOTFIX-REGIRO-RONDA-FINAL] Viaja el flag para que el HANDLER lo grite: el
+  // dueño de la lógica es esta función, el dueño del log es quien tiene consola.
+  return { rondas: out, rondas_totales: esc.length, ganador_incoherente: ganadorIncoherente,
            siguiente_ronda_en_ms: siguiente, ganador_liberado, dos };
 }
 

@@ -2441,9 +2441,27 @@ está caduco antes de escribirse.
   > adicional.»
 
   **La regla completa, como queda:**
-  - en las **DOS** fuentes → el abonado lo manda **EL LIBRO, SOLO**. El dinero de
-    la pestaña (separo incluido) **no se suma**. Varias filas del libro SÍ suman
-    entre sí: dos compras CHEAP son dos ventas, no un reflejo.
+  - **CHEAP** en las **DOS** fuentes → el abonado lo manda **EL LIBRO, SOLO**. El
+    dinero de la pestaña (separo incluido) **no se suma**. Varias filas del libro SÍ
+    suman entre sí: dos compras CHEAP son dos ventas, no un reflejo.
+  - 🔒✅ **Y LA REGLA ESTÁ ACOTADA A CHEAP — palabra de Memo (opción B, 1-oct-2026),
+    citada:**
+    > «La regla “el libro manda el dinero” se limita a CHEAP. Para una persona cuyo
+    > paquete en la base NO es CHEAP, el dinero sigue mandando la pestaña aunque
+    > aparezca en el libro — esa fila del libro es anomalía, NO fuente: sale en el
+    > aviso (a) con sus montos y no suma ni resta un peso.»
+
+    Esto cierra la pregunta que yo dejé abierta: sin acotar, a un PLUS con $5,000 en
+    la pestaña y $3,000 en el libro se le quitaban $5,000 **que la pestaña SÍ posee
+    por esta misma regla**. Aplicar una conclusión fuera del dominio de su premisa
+    —el libro es venta CHEAP— era el defecto.
+    - **El orden del respaldo cuando no se sabe el paquete**, dicho: manda la **BASE**
+      (es el padrón), luego la **PESTAÑA**, y si ninguna lo sabe se trata como
+      **CHEAP** — la única forma de estar en el libro es haber comprado un boleto
+      CHEAP. 🔒 El respaldo **nunca inventa un no-CHEAP**, y eso es el lado seguro:
+      equivocarse hacia «es CHEAP» deja el dinero en el libro y **se ve** en el careo;
+      equivocarse hacia «no es CHEAP» lo deja sumado, que es lo invisible que costó
+      $214,233.
   - solo en la **pestaña** → como siempre. Solo en el **libro** → como siempre
     (CUADRE-2c). Fila **roja** del libro → exactamente como CAREO-ZONA-1b.
   - 🔒 **El TOTAL, la zona y los boletos siguen siendo de la pestaña**: «el libro
@@ -2457,16 +2475,25 @@ está caduco antes de escribirse.
   - **Tres avisos nuevos, que NOMBRAN y no adivinan** (viven en `correrCareo`,
     porque preguntan por el paquete de la BASE que la fusión no conoce):
     (a) `libro_no_cheap` — en el libro con paquete NO-CHEAP en la base;
-    (b) `pestana_sobre_separo` — en las dos y la pestaña traía más que el separo,
-        **con los DOS montos**: un dinero que deja de contarse no se calla;
+    (b) `pestana_sobre_separo` — **CHEAP** en las dos y la pestaña traía más que el
+        separo, **con los DOS montos**: un dinero que deja de contarse no se calla.
+        ⚠️ **RETIRADO del caso no-CHEAP** (y no en silencio): a un no-CHEAP ya no se
+        le deja de contar nada, así que avisar ahí diría que se perdió un dinero que
+        no se perdió y mandaría a buscar un agujero que no existe. Su puerta es la
+        HUELLA que la fusión deja (`abonado_pestana`), no una segunda regla copiada;
     (c) `cheap_sin_libro` — CHEAP con dinero solo en la pestaña: su pago no tiene
         dueño que lo respalde, hay que completar el libro, no inventar la fila.
-  - 🔴 **LA PREGUNTA QUE DEJO ABIERTA, PORQUE ES DE MEMO Y NO MÍA**: un **PLUS que
-    aparece en el libro** cae en (a) **y** en (b) a la vez, y la regla tal como está
-    firmada le quita el dinero de la pestaña — que es dinero que la pestaña SÍ
-    posee por esta misma regla. La apliqué **tal como se firmó** (en las dos fuentes
-    manda el libro) y la consecuencia sale NOMBRADA en los dos avisos; si la regla
-    debe limitarse a los CHEAP, eso lo decide Memo, no un lector.
+  - ✅ **LA PREGUNTA DEL PLUS-EN-LIBRO QUEDÓ CERRADA** por la opción B de arriba: su
+    abonado es **el de la pestaña, intacto**, y sale **solo en (a)** con el monto del
+    libro que se está ignorando. Ese aviso es el **ÚNICO sitio** donde ese dinero
+    aparece — bajo la regla acotada no mueve un peso, así que sin la cifra nadie
+    podría ir a buscarlo.
+  - ⚠️ **UN FIXTURE VIEJO ERA INCONSISTENTE CON LA REGLA Y SE NOTÓ AL ESCRIBIRLA**:
+    el candado de boletos de `mide:cuadre-numerologia` tenía a «Camila Dos» como
+    **PLUS** en las dos fuentes. Con la acotación, las filas del libro de un PLUS ya
+    no inflan `filas`, así que ese candado habría pasado VERDE **por no poder
+    ocurrir** — letra muerta. Camila es CHEAP (que es lo que de verdad sería) y el
+    candado vuelve a guardar donde el riesgo vive.
   ⏳ **LA AUDITORÍA DE LOS 141 SIGUE PENDIENTE Y ESTÁ BLOQUEADA POR LLAVES**: clasificar
   cada sobrepagado en doble conteo / contrato corto / legítimo exige la COSECHA real
   (la fuente se reconstruye de la cosecha, **no de la nota** — los abonos existentes

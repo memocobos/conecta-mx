@@ -236,7 +236,27 @@ exports.handler = async (event) => {
       // que se pueda desincronizar.
       momentoDosMs: TI.momentoDosMs(escalones),
       ciudadDeId: (id) => ciudadPorId[String(id)] || null,
+      // 🔴 [HOTFIX-REGIRO-RONDA-FINAL] QUIÉN GANÓ **ESTE** GIRO. Sin esto, un
+      // re-giro hereda la escalera del original y su ronda final revela al
+      // ganador de AQUEL giro: en Karol G intento 2 salía Carolina (folio 97,
+      // ganadora del intento 1 que se re-giró) con el nombre de Lucero encima.
+      // El dato de la base está bien — lo que estaba mal era la proyección.
+      // ⚠️ Se pasa SIEMPRE, no solo en re-giros: en un giro normal `orden[0]` ya es
+      // este registro, así que la regla sin condición da lo mismo y no deja una
+      // rama que solo corre en el caso raro, que es donde nadie la mira.
+      ganadorId: ultimoCrudo.registro_id || null,
+      ganadorNombre: ultimoCrudo.ganador_nombre || null,
     });
+    // 🔒 Y SI EL GANADOR NO ESTABA EN LA ESCALERA, SE GRITA. Es un dato
+    // incoherente entre el giro y su escalera, y la tarjeta final sale sin folio
+    // en vez de con la persona equivocada — pero nadie debe enterarse por la
+    // pantalla: el show de Karol G corrió con la tarjeta mala y en silencio.
+    if (proy && proy.ganador_incoherente) {
+      console.error('[giveaway-estado] el ganador del giro ' + ultimoCrudo.intento
+        + ' (registro ' + ultimoCrudo.registro_id + ') NO está en la escalera que se heredó'
+        + (ultimoCrudo.origen_sorteo_id ? (' del giro ' + ultimoCrudo.origen_sorteo_id) : '')
+        + '. La ronda final sale SIN folio. Revisa `rondas.orden` y `escalon`.');
+    }
     // Sin ?fotos=1 la clave se OMITE (no se pone en null): así la página
     // distingue «no me lo dijeron» de «no tiene foto aprobada», y conserva la
     // que ya tenía en vez de dejar tarjetas rotas.

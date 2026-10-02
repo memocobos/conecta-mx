@@ -217,6 +217,18 @@ async function correrCareo(eventoId) {
     }
   }
 
+  // ── EL LADO DEL SISTEMA, ADELANTADO ───────────────────────────
+  // ⚠️ [CUADRE-FUENTE-1b] SE MOVIÓ AQUÍ ARRIBA a propósito: la fusión necesita saber
+  // el PAQUETE DE LA BASE para decidir de quién es el dinero (la regla acotada de
+  // Memo), y antes la base se leía después. Nada entre los dos sitios dependía de
+  // la fusión, así que el movimiento es seguro — y de paso, si la base falla ya no
+  // se paga la cosecha del libro (~2 s) para nada.
+  // 🔒 UN DUEÑO DECIDE UNA VEZ, CON EL DATO EN LA MANO. La alternativa —fundir
+  // como antes y luego «deshacer» el dinero de los no-CHEAP— habría dejado el
+  // valor malo vivo un instante y dos sitios donde se decide lo mismo.
+  const base = await leerBase(eventoId, sb);
+  if (base.error) return { error: { status: 502, mensaje: base.error } };
+
   // ── 2.5 [CUADRE-2a] LA TERCERA FUENTE ────────────────────────────────────
   // El lado-Excel deja de ser «la pestaña» y pasa a ser «la pestaña + el libro
   // de Memo». Mientras no exista, el careo sigue exactamente como estaba: la
@@ -224,8 +236,18 @@ async function correrCareo(eventoId) {
   // útil que tronar.
   const numerologia = await traerNumerologia(eventoId, sb);
   let personasLado = [...personas.values()];
+  // El paquete que la BASE cree, por nombre normalizado. 🔒 Una COLA por llave, no
+  // un valor: dos personas pueden llamarse igual y un `Map` por una llave no única
+  // descarta en silencio. Se arma UNA vez y la usan la fusión Y los avisos — dos
+  // mapas serían dos listas que todavía no divergen.
+  const paqueteBase = new Map();
+  for (const v2 of (base.viajeros || [])) {
+    const k = normalizarNombre(v2.nombre);
+    if (!paqueteBase.has(k)) paqueteBase.set(k, []);
+    paqueteBase.get(k).push(String(v2.paquete || '').trim());
+  }
   if (numerologia.personas && numerologia.personas.length) {
-    personasLado = fundirNumerologia(personasLado, numerologia.personas);
+    personasLado = fundirNumerologia(personasLado, numerologia.personas, paqueteBase);
   } else {
     // Sin tercera fuente, todos vienen de la pestaña — y se dice, para que la
     // pantalla no tenga que adivinar la procedencia por ausencia.
@@ -241,9 +263,7 @@ async function correrCareo(eventoId) {
   const ar = await fetch(`${SB_URL}/rest/v1/stock_ajustes?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,zona,vendidos_fuera&limit=2000`, { headers: sb });
   const ajustes = ar.ok ? (await ar.json().catch(() => [])) : [];
 
-  // 3. El lado del sistema.
-  const base = await leerBase(eventoId, sb);
-  if (base.error) return { error: { status: 502, mensaje: base.error } };
+  // 3. (El lado del sistema ya se leyó arriba: lo necesita la fusión.)
 
   // ── [CUADRE-5] ¿EL EVENTO ES DE CDMX? ────────────────────────────────────
   // La regla del $0 tecleado depende de si el index puede saber el total
@@ -301,15 +321,8 @@ async function correrCareo(eventoId) {
   // dinero, no qué hacer cuando los papeles no cuadran.
   const avisosFuente = { libro_no_cheap: [], pestana_sobre_separo: [], cheap_sin_libro: [] };
   {
-    // El paquete que la BASE cree, por nombre normalizado. 🔒 Se guarda una COLA
-    // por llave, no un valor: dos personas pueden llamarse igual y un `Map` por
-    // una llave no única descarta en silencio (esta casa ya perdió gente así).
-    const paqueteBase = new Map();
-    for (const v2 of (base.viajeros || [])) {
-      const k = normalizarNombre(v2.nombre);
-      if (!paqueteBase.has(k)) paqueteBase.set(k, []);
-      paqueteBase.get(k).push(String(v2.paquete || '').trim());
-    }
+    // ⚠️ REUSA el `paqueteBase` de arriba: armar un segundo mapa aquí sería la
+    // fuente número dos esperando a divergir de la que usa la fusión.
     const esCheap = (pq) => normalizarNombre(pq) === 'cheap';
     for (const p of personasLado) {
       const fuentes = p.fuentes || [];
@@ -321,16 +334,34 @@ async function correrCareo(eventoId) {
       // PLUS/STAY/RIDE que aparece ahí es un dato que no encaja con la regla, y
       // la regla no decide quién se equivocó: lo mira un humano.
       if (enLibro && paquetes.length && !paquetes.some(esCheap)) {
+        // 🔒 [CUADRE-FUENTE-1b] CON LOS MONTOS DE LA FILA ANÓMALA. Bajo la regla
+        // acotada esa fila **no mueve un peso**, así que el aviso es el ÚNICO sitio
+        // donde ese dinero del libro aparece: sin la cifra, nadie podría ir a
+        // buscarla. `libro_anomalo_monto` lo pone la fusión al saltarse la fila.
         avisosFuente.libro_no_cheap.push({ nombre: p.nombre, clave: p.clave,
-          paquete_base: paquetes.join(' / '), abonado_libro: Number(p.abonado_libro || p.abonado || 0),
-          motivo: 'está en el LIBRO de Numerología pero su paquete en la base es «' + paquetes.join(' / ')
-                + '». El libro es SOLO venta CHEAP (regla de Memo, 1-oct), así que uno de los dos papeles '
-                + 'está mal y no se adivina cuál.' });
+          paquete_base: paquetes.join(' / '),
+          filas_libro: Number(p.libro_anomalo || 0),
+          monto_libro_ignorado: Number(p.libro_anomalo_monto || 0),
+          abonado_pestana: Number(p.abonado || 0),
+          motivo: 'está en el LIBRO de Numerología con ' + _mxnC(Number(p.libro_anomalo_monto || 0))
+                + ' en ' + Number(p.libro_anomalo || 0) + ' fila(s), pero su paquete en la base es «'
+                + paquetes.join(' / ') + '». El libro es SOLO venta CHEAP (regla de Memo, 1-oct), así que esa '
+                + 'fila es ANOMALÍA, no fuente: su dinero NO se suma ni se resta y el abonado sigue siendo el '
+                + 'de la pestaña (' + _mxnC(Number(p.abonado || 0)) + '). Uno de los dos papeles está mal y '
+                + 'no se adivina cuál.' });
       }
       // ── (b) EN LAS DOS, Y LA PESTAÑA TRAÍA MÁS QUE UN SEPARO ──────────────
       // 🔒 Bajo la regla nueva ese dinero DEJA DE CONTARSE. Y eso no se hace en
       // silencio: se nombra con los DOS montos, porque un dinero que desaparece
       // de una cuenta sin que nadie lo diga es la peor clase de arreglo.
+      // ⚠️ [CUADRE-FUENTE-1b] ESTE AVISO YA **NO APLICA AL CASO NO-CHEAP**, y se
+      // retira diciendo por qué: desde la regla acotada de Memo, a un no-CHEAP NO
+      // se le deja de contar nada — su dinero de la pestaña queda intacto. Avisar
+      // ahí diría que se perdió un dinero que no se perdió, y mandaría a buscar un
+      // agujero que no existe. Esa persona ya sale, con sus montos, en (a).
+      // 🔒 La puerta es `abonado_pestana != null`, que es la MARCA que la fusión
+      // pone **solo cuando el libro mandó**. O sea que el filtro no es una segunda
+      // regla copiada: es la misma decisión de la fusión, leída de su huella.
       if (enLibro && enPestana && p.abonado_pestana != null) {
         const dePestana = Number(p.abonado_pestana || 0);
         const delLibro = Number(p.abonado_libro || 0);

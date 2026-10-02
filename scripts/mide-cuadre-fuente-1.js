@@ -106,10 +106,19 @@ const LIBRO = [
   const numH = require(path.join(h.dir, 'netlify/functions/_lib/numerologia.js'));
   const numB = require(path.join(b.dir, 'netlify/functions/_lib/numerologia.js'));
   const porClave = (arr) => new Map(arr.map((p) => [p.clave, p]));
+  // ⚠️ [CUADRE-FUENTE-1b] La fusión ahora recibe el PAQUETE DE LA BASE: la regla
+  // «el libro manda el dinero» está ACOTADA A CHEAP (palabra de Memo, opción B).
+  // Se le pasa el MISMO mapa que arma `correrCareo`, con la misma forma (cola por
+  // llave), para no medir una estructura que el código real no usa.
+  const PAQ = new Map([
+    ['cheap dos fuentes', ['CHEAP']], ['cheap sobre separo', ['CHEAP']],
+    ['plus intocable', ['PLUS']], ['plus en libro', ['PLUS']],
+    ['cheap sin libro', ['CHEAP']], ['cheap dos compras', ['CHEAP']],
+  ]);
 
   // ── [F] LA REGLA · EL LIBRO MANDA EL DINERO ───────────────────────────
   console.log('[F] el abonado lo manda el LIBRO');
-  const fH = porClave(numH.fundirNumerologia(PESTANA, LIBRO));
+  const fH = porClave(numH.fundirNumerologia(PESTANA, LIBRO, PAQ));
   const uno = fH.get('cheap dos fuentes');
   console.log('    Cheap Dos Fuentes → abonado ' + ver(() => uno.abonado)
     + ' (pestaña ' + ver(() => uno.abonado_pestana) + ' · libro ' + ver(() => uno.abonado_libro) + ')');
@@ -130,7 +139,7 @@ const LIBRO = [
   // 🔴 Sin esto el verde de arriba no dice nada: podría estar pasando porque el
   // fixture no ejercita la suma.
   console.log('\n[+] control positivo · BASE suma los dos');
-  const fB = porClave(numB.fundirNumerologia(PESTANA, LIBRO));
+  const fB = porClave(numB.fundirNumerologia(PESTANA, LIBRO, PAQ));
   const unoB = fB.get('cheap dos fuentes');
   console.log('    BASE → ' + ver(() => unoB.abonado) + '   ·   HEAD → ' + ver(() => uno.abonado));
   af(unoB && unoB.abonado === 4300,
@@ -165,6 +174,56 @@ const LIBRO = [
   af(solo && soloB && solo.abonado === soloB.abonado && solo.abonado === 3000,
      () => 'quien vive SOLO en el libro cambió: CUADRE-2c no se toca. ' + ver(() => ({ b: soloB && soloB.abonado, h: solo && solo.abonado })));
   af(solo && solo.total === 3000, 'el total del que solo vive en el libro ya no es su `costo_publico` (CUADRE-2c)');
+
+  // ══ [¬] LA REGLA ESTÁ ACOTADA A CHEAP · EL PLUS-EN-LIBRO ══════════════
+  // 🔒 Palabra de Memo (opción B, 1-oct): para un no-CHEAP el dinero sigue
+  // mandando la PESTAÑA aunque aparezca en el libro — esa fila es anomalía, no
+  // fuente, y no suma ni resta un peso.
+  console.log('\n[¬] la regla acotada · el PLUS que aparece en el libro');
+  const pl = fH.get('plus en libro'), plB = fB.get('plus en libro');
+  console.log('    HEAD → abonado ' + ver(() => pl.abonado) + ' (pestaña intacta)   ·   '
+    + 'fila anómala: ' + ver(() => pl.libro_anomalo) + ' × ' + ver(() => pl.libro_anomalo_monto));
+  console.log('    BASE → abonado ' + ver(() => plB.abonado));
+  af(pl && pl.abonado === 5000,
+     () => '🔴 al PLUS que aparece en el libro se le movió el dinero. Bajo la regla ACOTADA su abonado es '
+     + 'EL DE LA PESTAÑA ($5,000) intacto: la pestaña es la dueña del dinero PLUS por la misma regla de '
+     + 'Memo, y la fila del libro es anomalía. Salió ' + ver(() => pl && pl.abonado));
+  // 🔴 EL FIXTURE SIGUE DISTINGUIENDO IMPLEMENTACIONES: con la regla SIN acotar,
+  // este PLUS habría dado el monto del LIBRO ($3,000). Los dos números tienen que
+  // diferir, o el verde de arriba no prueba que la acotación exista.
+  af(plB && plB.abonado === 8000,
+     () => 'CONTROL POSITIVO: en BASE (que sumaba) este PLUS tenía que dar $8,000 (5,000 + 3,000). Si da '
+     + '5,000 el fixture no ejercita nada. Salió ' + ver(() => plB && plB.abonado));
+  af(pl && plB && pl.abonado !== plB.abonado,
+     'BASE y HEAD dan el MISMO abonado para el PLUS-en-libro: el fixture no separa las implementaciones');
+  // 🔒 Y el dinero del libro NO se perdió de vista: queda contado aparte para que
+  // el aviso (a) lo pueda decir. Un dinero ignorado y además invisible sería peor
+  // que sumarlo.
+  af(pl && pl.libro_anomalo === 1 && pl.libro_anomalo_monto === 3000,
+     () => 'la fila anómala del libro no se contó aparte: sin su monto, el aviso no puede decir qué dinero '
+     + 'del libro se está ignorando. ' + ver(() => pl && { n: pl.libro_anomalo, m: pl.libro_anomalo_monto }));
+  // 🔒 Y NO lleva la marca de «el libro mandó»: esa huella es lo que el aviso (b)
+  // mira para no nombrarlo.
+  af(pl && pl.abonado_pestana === undefined,
+     'al PLUS se le puso `abonado_pestana`: esa marca significa «el libro mandó» y aquí NO mandó');
+  // ⚠️ Su fila del libro no entra a `filas`: no es una venta de este careo.
+  af(pl && pl.filas === 1, () => 'la fila anómala del libro se contó como una fila más: ' + ver(() => pl && pl.filas));
+
+  // ── [=] LOS CASOS CHEAP NO SE MUEVEN NI UN BIT ──────────────────
+  // 🔒 La acotación no podía tocar a los CHEAP, y no se promete: se CAREA el
+  // objeto entero de cada uno contra lo que daba la regla sin acotar.
+  console.log('\n[=] los CHEAP, idénticos a antes de la acotación');
+  {
+    const sinAcotar = porClave(numH.fundirNumerologia(PESTANA, LIBRO));   // sin el mapa → cae al paquete de la pestaña
+    for (const k of ['cheap dos fuentes', 'cheap sobre separo', 'cheap sin libro', 'cheap dos compras']) {
+      const a = fH.get(k), b2 = sinAcotar.get(k);
+      af(a && b2 && a.abonado === b2.abonado,
+         () => 'el CHEAP «' + k + '» cambió con la acotación: ' + ver(() => ({ con: a && a.abonado, sin: b2 && b2.abonado })));
+    }
+    console.log('    los cuatro CHEAP: ' + ver(() => ['cheap dos fuentes', 'cheap sobre separo', 'cheap sin libro', 'cheap dos compras'].map((k) => fH.get(k).abonado)));
+    // Y el solo-libro tampoco.
+    af(fH.get('solo libro').abonado === 3000, 'el solo-libro cambió con la acotación');
+  }
 
   // ── [R] LA FILA ROJA SIGUE EXACTAMENTE COMO CAREO-ZONA-1b ─────────────
   console.log('\n[R] el rojo del libro, intacto');
@@ -201,12 +260,24 @@ const LIBRO = [
   // 🔒 Se exige que salga en LOS DOS avisos, porque es la combinación peligrosa:
   // (a) dice «este PLUS no debería estar en el libro» y (b) dice «y por eso se le
   // dejó de contar dinero». Nombrarlo en uno solo contaría media historia.
-  af(JSON.stringify(n('pestana_sobre_separo')) === JSON.stringify(['Cheap Sobre Separo', 'Plus En Libro']),
-     () => '(b) no nombra a los DOS a quienes se les deja de contar dinero de la pestaña: ' + ver(() => n('pestana_sobre_separo')));
-  af(n('libro_no_cheap').includes('Plus En Libro') && n('pestana_sobre_separo').includes('Plus En Libro'),
-     () => '🔴 el PLUS que aparece en el libro tiene que salir en LOS DOS avisos: (a) porque rompe la '
-     + 'premisa de la regla (el libro es solo CHEAP) y (b) porque la regla le quita $5,000 de dinero que la '
-     + 'pestaña sí posee. Nombrarlo en uno solo cuenta media historia.');
+  // ⚠️ ESTA ASERCIÓN EXIGÍA AL PLUS EN **LOS DOS** AVISOS, y la palabra de Memo
+  // (opción B) la cambió: con la regla acotada al no-CHEAP **no se le deja de
+  // contar nada**, así que (b) ya no le toca. Avisar ahí diría que se perdió un
+  // dinero que no se perdió — y mandaría a buscar un agujero que no existe. Se
+  // retira de ese caso CON SU RAZÓN; sigue saliendo en (a), con sus montos.
+  af(JSON.stringify(n('pestana_sobre_separo')) === JSON.stringify(['Cheap Sobre Separo']),
+     () => '(b) tiene que nombrar SOLO al CHEAP a quien de verdad se le deja de contar dinero. Si nombra al '
+     + 'PLUS, está avisando de una pérdida que la regla acotada ya no causa. ' + ver(() => n('pestana_sobre_separo')));
+  af(!n('pestana_sobre_separo').includes('Plus En Libro'),
+     'el PLUS sigue en (b): con la regla acotada su dinero NO se deja de contar, así que ese aviso mentiría');
+  // 🔒 Y (a) trae los montos, porque es el ÚNICO sitio donde ese dinero del libro
+  // aparece: bajo la regla acotada no mueve un peso, así que sin la cifra nadie
+  // podría ir a buscarla.
+  const ava = (avisos.libro_no_cheap || [])[0];
+  af(ava && ava.monto_libro_ignorado === 3000 && ava.abonado_pestana === 5000 && ava.filas_libro === 1,
+     () => '(a) no trae los montos de la fila anómala ni el abonado que SÍ cuenta: ' + ver(() => ava));
+  af(ava && /ANOMAL/i.test(ava.motivo) && /\$3,000/.test(ava.motivo) && /\$5,000/.test(ava.motivo),
+     () => '(a) no dice en palabras que la fila es anomalía y cuánto dinero ignora: ' + ver(() => ava && ava.motivo));
   af(JSON.stringify(n('cheap_sin_libro')) === JSON.stringify(['Cheap Sin Libro']),
      () => '(c) no nombra al CHEAP con dinero y sin fila en el libro: su pago no tiene dueño que lo respalde. '
      + ver(() => n('cheap_sin_libro')));

@@ -313,7 +313,34 @@ function mapearLibro(personasLibro, mapeos, eventoId) {
 // Y cada persona carga su PROCEDENCIA. No es adorno: cuando una fila trae las
 // dos fuentes, la pantalla puede decir de dónde salió el dinero en vez de
 // enseñar una suma que no cuadra con ninguna de las dos hojas por separado.
-function fundirNumerologia(personasPestana, personasLibro) {
+// ⚠️ `paqueteBase` es un Map(clave → [paquetes de la base]) y es OPCIONAL por una
+// razón: quien no lo pase cae al paquete de la PESTAÑA, que es la mejor señal
+// disponible. El respaldo está escrito y no es un descuido — ver `mandaElLibro`.
+function fundirNumerologia(personasPestana, personasLibro, paqueteBase) {
+  // ══ [CUADRE-FUENTE-1b] LA REGLA ESTÁ **ACOTADA A CHEAP** ═══════════════
+  // 🔒 PALABRA DE MEMO (opción B, 1-oct-2026): «la regla "el libro manda el dinero"
+  // se limita a CHEAP. Para una persona cuyo paquete en la base NO es CHEAP, el
+  // dinero sigue mandando la pestaña aunque aparezca en el libro — esa fila del
+  // libro es ANOMALÍA, NO FUENTE: sale en el aviso (a) y no suma ni resta un peso.»
+  //
+  // Esto cerró la pregunta que la primera versión dejó abierta: sin acotar, a un
+  // PLUS con $5,000 en la pestaña y $3,000 en el libro se le quitaban $5,000 que la
+  // pestaña SÍ posee por esta misma regla. Aplicar una conclusión fuera del dominio
+  // de su premisa —el libro es venta CHEAP— era el defecto.
+  //
+  // El orden del respaldo, dicho: **la BASE manda** (es el padrón), luego la
+  // PESTAÑA (su columna Paquete), y si ninguna lo sabe se trata como CHEAP — porque
+  // la única forma de estar en el libro es haber comprado un boleto CHEAP. El
+  // respaldo nunca inventa un no-CHEAP, que es el lado seguro: equivocarse hacia
+  // «es CHEAP» deja el dinero en el libro y eso se VE en el careo; equivocarse hacia
+  // «no es CHEAP» lo deja sumado y eso es justo lo invisible que costó $214,233.
+  const _norm = (x) => normalizarNombre(x == null ? '' : x);
+  const mandaElLibro = (p) => {
+    const dela = (paqueteBase instanceof Map) ? (paqueteBase.get(p.clave) || []) : [];
+    if (dela.length) return dela.some((pq) => _norm(pq) === 'cheap');
+    if (p && p.paquete != null && String(p.paquete).trim() !== '') return _norm(p.paquete) === 'cheap';
+    return true;
+  };
   const out = new Map();
   for (const p of (personasPestana || [])) {
     out.set(p.clave, { ...p, fuentes: ['pestana'] });
@@ -368,6 +395,19 @@ function fundirNumerologia(personasPestana, personasLibro) {
       // pestaña y las siguientes SUMAN. Sin esta distinción, un `=` a secas
       // dejaría a quien compró dos veces con el dinero de una sola compra —
       // que es el mismo defecto al revés, y más difícil de ver.
+      // 🔒 LA PUERTA DE LA REGLA ACOTADA. Un no-CHEAP cuya fila del libro es
+      // anomalía: su dinero NO se toca — ni se reemplaza ni se suma. Se deja la
+      // marca `libro_anomalo` con los montos para que el aviso (a) los diga, y el
+      // abonado queda EXACTAMENTE como lo dejó la pestaña.
+      // ⚠️ «No suma ni resta un peso» es literal: ni siquiera entra a `filas`, porque
+      // esa fila no es una venta de este careo. Lo que SÍ viaja es que la fuente
+      // existe (`fuentes`), o el aviso no podría encontrarla.
+      if (!mandaElLibro(ya)) {
+        ya.libro_anomalo = (ya.libro_anomalo || 0) + 1;
+        ya.libro_anomalo_monto = (ya.libro_anomalo_monto || 0) + Number(n.abonado || 0);
+        if (!ya.fuentes.includes('numerologia')) ya.fuentes.push('numerologia');
+        continue;
+      }
       if (!ya.__libroManda) {
         // 🔒 Lo de la pestaña se CONSERVA con nombre, no se tira: es lo que el
         // aviso (b) necesita para decir los DOS montos. Un dinero que se deja

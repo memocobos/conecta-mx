@@ -2966,10 +2966,20 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
   function tocaPedirFotos(){
     // Girando no se pide nada: el giro no espera una consulta.
     if (girando) return false;
-    // 🔒 Y NO ANTES DEL GIRO: sin giro el servidor no firma nada (regla de
-    // privacidad), así que pedirlo sería un viaje en vacío. Se pide cuando hay
-    // mosaico que dibujar — que es cuando hay giro.
-    if (!(estado && estado.ultimo) && !SHOW) return false;
+    // 🔴 ARRANQUE EN FRÍO — el defecto de la primera versión de este hotfix.
+    // Esta compuerta decía `if (!(estado && estado.ultimo) && !SHOW) return false`,
+    // y en la PRIMERA consulta `estado` es null, así que no pedía fotos. Las fotos
+    // llegaban en el segundo latido, 4 s después — y «Repetir» pone `girando` en
+    // true, que bloquea toda petición nueva durante los 82 s del show. O sea que
+    // quien cargaba y le daba a Repetir en esos 4 segundos veía la repetición
+    // ENTERA sin fotos. Medido con Memo en producción el 2-oct.
+    //
+    // 🔒 AHORA SE PIDE TAMBIÉN CUANDO NO SE SABE TODAVÍA (`estado === null`): es
+    // gratis, porque sin giro el servidor devuelve `{}` por su regla de privacidad.
+    // Solo se calla cuando CONSTA que no hay giro — `estado` llegó y no trae
+    // `ultimo`—, que era la intención original. «No sé» y «no hay» no son lo mismo,
+    // y tratarlos igual fue el error.
+    if (estado && !estado.ultimo && !SHOW) return false;
     if ((Date.now() - fotosPedidoAl) < FOTOS_REINTENTO_MS) return false;
     return (Date.now() - fotosAl) > FOTOS_CADA_MS;
   }

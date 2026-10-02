@@ -150,6 +150,16 @@ function urlQueConstruye(src, mundo) {
   // consulta nada. Pedirlo ahí serían viajes en vacío — y 24 firmas por visitante
   // cada 4 s es justo lo que el servidor advierte que no se haga.
   console.log('\n[N] cuándo NO se piden');
+  // 🔴 EL ARRANQUE EN FRÍO, que la primera versión de este hotfix falló: en la
+  // PRIMERA consulta `estado` es null y NO se pedían fotos; llegaban 4 s después, y
+  // «Repetir» (que pone `girando`) bloquea toda petición durante los 82 s del show.
+  // Quien cargaba y repetía en esos 4 segundos veía el show entero sin fotos.
+  const frio = urlQueConstruye(srcH, { estado: null });
+  console.log('    arranque en frío (estado=null) → ' + ver(() => frio.url));
+  af(/fotos=1/.test(frio.url || ''),
+     () => '🔴 en la PRIMERA consulta no se piden las fotos. Es gratis pedirlas — sin giro el servidor '
+     + 'devuelve {} por su regla de privacidad— y no pedirlas deja 4 segundos en los que «Repetir» corre el '
+     + 'show COMPLETO sin caras. «No sé» no es «no hay». Salió ' + ver(() => frio.url));
   const sinGiro = urlQueConstruye(srcH, { estado: { ok: true } });
   const girando = urlQueConstruye(srcH, { ...CON_GIRO, girando: true });
   console.log('    sin giro → ' + ver(() => sinGiro.url) + '   ·   girando → ' + ver(() => girando.url));

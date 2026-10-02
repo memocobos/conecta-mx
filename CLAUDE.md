@@ -251,7 +251,7 @@ está caduco antes de escribirse.
   lector de Netlify que tengo no devuelve variables de entorno) y **no lo adivino**; se
   comprueba en el panel. Si faltan, se ponen con esos dos nombres exactos.
 
-- 🔨⏳ **ZONA-EXCEL-MANDA-1 · FASE 1 EN MAIN (2-oct-2026, merge 4d90a24): la FICHA
+- 🏆 **ZONA-EXCEL-MANDA-1 COMPLETA — FASE 1 Y 2 EN PROD (2-oct-2026, merge 4d90a24): la FICHA
   obedece la ortografía del Excel.** Regla firmada de Memo, citada: *«NO cambio el
   Excel: tú cámbialo en el index. Si dice 1er Nivel regútalo a Primer Nivel
   (arjona), y así con todos.»* Y la precisión de Jane: **la firma es de LA CLASE**
@@ -339,17 +339,40 @@ está caduco antes de escribirse.
   commit dejaría de cazar una regresión del normalizador, que es justo lo que tiene
   que cazar. Si algún día se le pone ancla, va **con su BASE a la vez**.
 
-  ⏳ **FASE 2 PENDIENTE — los 30 renglones de datos** (compras 6 · `viajeros_evento`
-  23 · `rol_recordatorios` 1), escritos y comentados en el acta, **esperando el
-  publish de Memo desde Esferas**. 🔒 `stock_ajustes` **NO se toca**: sus filas YA
-  traen la ortografía nueva porque el careo canoniza desde la pestaña — **ÉSA ERA LA
-  DERIVA**, el ajuste restaba de una llave que la ficha no tenía, y el renombre de la
-  ficha las **CURA sin tocarlas**. Igual la viajera de trueno capturada como
-  «Beyond», hoy huérfana: el renombre la cura sola.
-  ⚠️ **Memo publicó DOS veces (17:36 y 17:43, hora de Reynosa) justo antes de que la
-  ficha cambiara**, así que el index servido salió con los nombres viejos y el estado
-  quedó CONSISTENTE por los pelos. **El siguiente publish se lleva los renombres**, y
-  en ese momento la FASE 2 tiene que correr enseguida.
+  ✅ **FASE 2 APLICADA (2-oct, inmediatamente después del publish de Memo): los 30
+  renglones.** `compras` **6** · `viajeros_evento` **23** · `rol_recordatorios` **1**.
+  Releídos par por par **en su ficha**: **CERO** ocurrencias de cualquier nombre viejo
+  en las tres tablas. 🔒 `stock_ajustes` **no se tocó** — sus filas YA traían la
+  ortografía nueva porque el careo canoniza desde la pestaña, y **ÉSA ERA LA DERIVA**:
+  el ajuste restaba de una llave que la ficha no tenía. El renombre las **curó sin
+  tocarlas**. Igual `precios_historial` (cero filas) y la telemetría (478 + 26 filas,
+  **no se migra** por orden de Memo: es el registro de lo que la gente vio ENTONCES).
+
+  ⚠️ **LA VENTANA SE ABRIÓ DE VERDAD Y SE CERRÓ EN MINUTOS, y conviene que quede
+  escrito porque fue suerte de calendario, no diseño.** Memo publicó **tres veces** en
+  una hora (17:36 · 17:43 · y la tercera ya con la ficha cambiada). Las dos primeras
+  cayeron **antes** del cambio de ficha, así que el index salió con los nombres viejos
+  y todo quedó consistente; **la tercera se llevó los seis renombres** y ahí la FASE 2
+  corrió enseguida. Entre ese publish y la FASE 2, las 5 zonas que siguen vendiendo
+  mostraron su conteo de vendidos en cero. **La lección operativa: una tuerca que
+  necesita un publish ajeno en medio no se puede planear con un «luego»** — o se hace
+  con el publish coordinado, o se asume la ventana y se dice.
+
+  ✅ **CAREO DE CIERRE CORRIDO (no prometido), contra las DOS puntas reales — el Excel
+  cosechado y el index SERVIDO: 22 en verde, 0 en rojo.**
+  - 🔒 **El montón `fuera` en CERO para las 4 pestañas** (20 zonas de Excel miradas:
+    arjona 8 · caifanes#0 3 · caifanes#1 5 · trueno 4), con candado de cardinalidad: con
+    menos de 18 zonas el barrido se declara incapaz en vez de pasar en vacío.
+  - Las **6 nuevas PRESENTES** en el index servido y las **6 viejas AUSENTES**, zona por
+    zona — medido sobre el universo que la puerta consulta de verdad (`catalogo-index`),
+    no sobre `esferas_eventos`.
+  - 🔒 **El peligro del prefijo, comprobado EN VIVO**: `Perfil B`, `Perfil C`,
+    `General de Pie` y el `Perfil B` de trueno **siguen ahí**. Si el replace se hubiera
+    hecho por prefijo, estas aserciones caerían.
+  - 🔒 **Y la viajera huérfana, CURADA SOLA**: Cristyan Sureyma (trueno, zona
+    «Beyond», 1 boleto, **alta del 28-ago-2026**) llevaba cinco semanas con una zona que
+    la ficha no tenía. El renombre **no tocó su renglón** y hoy su zona existe
+    (`zona_en_ficha: true`). Era el caso que Jane pidió por nombre.
 
   ⏳ **ESPERA PALABRA DE MEMO: caifanes «Perfil B» y «Perfil C» NO se renombraron.**
   El Excel **no las escribe** (las dos van `ag:1`, agotadas), así que no hay dato que

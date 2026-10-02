@@ -50,6 +50,7 @@
     "mide:num-multifecha-1": "node scripts/mide-num-multifecha-1.js",
     "mide:itin-nobus-1": "node scripts/mide-itin-nobus-1.js",
     "mide:careo-retry-1": "node scripts/mide-careo-retry-1.js",
+    "mide:chatarra-sello-1": "node scripts/mide-chatarra-sello-1.js",
     "mide:plan-case-1": "node scripts/mide-plan-case-1.js",
     "mide:mig-1d-ii": "node scripts/mide-mig-1d-ii.js",
     "mide:concilia-1": "node scripts/mide-concilia-1.js",

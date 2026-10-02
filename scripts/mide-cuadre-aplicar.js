@@ -507,8 +507,30 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     await mod2.handler({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer x' },
       body: JSON.stringify({ evento_id: EVENTO, confirmar: true }) });
     console.log('    escrituras del 1er clic: ' + a.escrituras.length + ' · del 2º: ' + red2.escrituras.length);
-    af(red2.escrituras.length === 0, 'el SEGUNDO clic escribió ' + red2.escrituras.length + ' vez(ces): '
-       + JSON.stringify(red2.escrituras.map((e) => e.tabla + ':' + e.op)));
+    // ⚠️ ESTA GUARDA DECÍA «CERO ESCRITURAS» y CHATARRA-SELLO-1 la puso en rojo con
+    // razón: el segundo clic ahora SELLA («verificada ⟨hoy⟩⟩) las filas de chatarra
+    // que el primero acabó de cuadrar. Medido: los dos únicos escritos del 2º clic
+    // son `{nota:…}` y `vendidos_fuera` queda idéntico.
+    // 🔒 SE ACTUALIZA A SU **INTENCIÓN**, QUE ES MÁS ESTRICTA QUE EL CONTEO: lo que
+    // la idempotencia prohíbe es que un segundo clic mueva DINERO O BOLETOS. Contar
+    // escrituras era un proxy; ahora se mira QUÉ escribe, columna por columna. Con
+    // el «cero» un sello legítimo tumbaba el careo, y —peor— cualquier escritura
+    // futura que SÍ moviera algo se habría podido «arreglar» subiendo el número.
+    const COLUMNAS_PROHIBIDAS = ['vendidos_fuera', 'monto', 'abonado_previo', 'total_contrato',
+                                 'boletos', 'zona_boleto', 'precio', 'cantidad'];
+    const ofensoras = red2.escrituras.filter((e) =>
+      Object.keys(e.parche || {}).some((k) => COLUMNAS_PROHIBIDAS.includes(k)));
+    console.log('    el 2º clic escribió: ' + JSON.stringify(red2.escrituras.map((e) => e.tabla + ' ' + JSON.stringify(Object.keys(e.parche || {})))));
+    af(ofensoras.length === 0,
+       '🔴 el SEGUNDO clic movió dinero o boletos: ' + JSON.stringify(ofensoras.map((e) => ({ t: e.tabla, parche: e.parche }))));
+    // Y lo único que sí puede escribir es el sello, NOMBRADO: si apareciera otra
+    // escritura de otra clase, este careo tiene que caerse en vez de tolerarla.
+    const noSellos = red2.escrituras.filter((e) =>
+      !(e.tabla === 'stock_ajustes' && JSON.stringify(Object.keys(e.parche || {}).sort()) === '["nota"]'));
+    af(noSellos.length === 0,
+       'el SEGUNDO clic escribió algo que NO es un sello de nota: ' + JSON.stringify(noSellos.map((e) => ({ t: e.tabla, op: e.op, parche: e.parche }))));
+    af(red2.escrituras.every((e) => /verificada \d{4}-\d{2}-\d{2}$/.test(String((e.parche || {}).nota || ''))),
+       'alguna nota del 2º clic no termina en el sello con fecha: ' + JSON.stringify(red2.escrituras.map((e) => (e.parche || {}).nota)));
     // 🔒 Y `vendidos_fuera` QUEDA IDÉNTICO, no duplicado. `stock_ajustes` SUMA
     // por diseño: un sync que sumara convertiría cada clic en boletos de más.
     const ajDesp = (a.tablas.stock_ajustes || []).map((x) => [x.zona, x.vendidos_fuera]).sort();

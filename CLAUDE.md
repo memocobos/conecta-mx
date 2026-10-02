@@ -167,6 +167,116 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔨⏳ **ZONA-EXCEL-MANDA-1 · FASE 1 EN MAIN (2-oct-2026, merge 4d90a24): la FICHA
+  obedece la ortografía del Excel.** Regla firmada de Memo, citada: *«NO cambio el
+  Excel: tú cámbialo en el index. Si dice 1er Nivel regútalo a Primer Nivel
+  (arjona), y así con todos.»* Y la precisión de Jane: **la firma es de LA CLASE**
+  —toda zona cuya ficha difiera de cómo la escribe el Excel—, no de los cuatro
+  nombres que traía mi lista. `npm run mide:zona-excel-manda-1` (**66**), acta en
+  `migraciones/ZONA-EXCEL-MANDA-1.sql`. **6 renombres de ficha · 20 sitios de JSON
+  · 7 pares (pestaña,zona)**, más uno ya aplicado.
+
+  🔒 **EL LOTE NO SALIÓ DE UNA LISTA: SALIÓ DE CAREAR LA FICHA CONTRA LA COSECHA.**
+  Se cosecharon las **4 pestañas reales** (fuente `pestanas`, columna «Boleto» por su
+  LITERAL en la fila 10, jamás por índice) y el lote se DERIVÓ de lo que el Excel
+  escribe. Es la única forma que sobrevive: mi lista escrita a mano se quedó corta
+  **dos veces en el mismo encargo** — caifanes#1 lo corrigió Memo, y los dos
+  renombres que faltaban los midió Jane.
+
+  🔴🔒 **EL PELIGRO CENTRAL, MEDIDO ANTES DE COBRARLO: «Perfil» ES PREFIJO DE
+  «Perfil B/C/D».** En la ficha de caifanes el token exacto `"n":"Perfil"` aparece
+  **6** veces y el prefijo `"n":"Perfil` aparece **24** — un replace a ciegas habría
+  corrompido **18 nombres de zona** («Perfil B» → «Perfiles B»), en las zonas que el
+  cliente VE y por las que PAGA. **EL ANCLA ES LA COMILLA DE CIERRE.** El careo lo
+  vuelve candado con su **control positivo**: se exige que el replace por prefijo
+  SÍ corrompa, porque sin esa mitad «no corrompió nada» no distingue «el ancla es
+  buena» de «no medí».
+
+  🔴 **TRES HALLAZGOS QUE CAMBIARON LA FORMA DEL TRABAJO, ninguno en mi camino
+  aprobado** — que hablaba de «4 fichas, 4 sitios, 4 tablas»:
+  - 🔒 **CAIFANES ES *UNA* FICHA QUE SIRVE A *DOS* PESTAÑAS.** `caifanes#0` y
+    `caifanes#1` **no tienen fila** en `esferas_eventos`: la ficha es la del **PADRE**
+    `caifanes`, y sus zonas viven en **SEIS** sitios —`zonas`, `cheap_zonas` y, dentro
+    de `multifecha`, las `zonas` **y** `cheapZonas` de **cada una de las dos fechas**—.
+    Por eso un renombre cura DOS pares con UNA edición, y por eso son **20 sitios**.
+  - **arjona «2do Nivel» → «Segundo Nivel» YA ESTABA HECHO** (0 ocurrencias del token
+    viejo) y sus 2 viajeros ya estaban capturados así. Es el séptimo par, con cero
+    trabajo — y la ficha estaba **inconsistente consigo misma**: «1er» + «Segundo» +
+    «3er». Queda nombrado porque Memo lo nombró; no es un olvido.
+  - **La base guarda zonas en MÁS tablas que mi lista**: `precios_historial`,
+    `excel_pestanas.regla_zona`, `main_eventos_uso`, `rol_eventos_uso`. Medidas:
+    `precios_historial` da **CERO** filas para los tres eventos —**incluida la llave
+    PADRE**, que es justo la trampa de ROL-HIST-PADRE— y `regla_zona` está en NULL.
+    Un cero es una afirmación: estos eventos nunca registraron un cambio de precio,
+    así que no hay historial que arrastrar.
+  - ⚰️ **TELEMETRÍA NO SE MIGRA** (orden de Memo): `main_eventos_uso` (478 filas) y
+    `rol_eventos_uso` (26) conservan el nombre viejo A PROPÓSITO — son el registro de
+    lo que la gente vio ENTONCES, y reescribirlo falsearía el pasado.
+
+  🔒 **EL ORDEN ES FICHA → PUBLICAR → DATOS, Y LA RAZÓN ESTÁ MEDIDA:** la puerta de
+  zonas (`_lib/zona-ficha`) toma su universo de `catalogo-index`, o sea del **index
+  SERVIDO**, NO de `esferas_eventos`. De ahí las dos mitades:
+  - cambiar la ficha es **invisible para el cliente** — verificado contando lectores:
+    los de `esferas_eventos` son Esferas, el compilador y el contador público (que
+    mira `fecha_inicio`); **ningún camino de precio ni de venta la lee**;
+  - pero **hasta que no se PUBLIQUE, cada venta nueva sigue escribiendo la ortografía
+    VIEJA** y crea un huérfano nuevo. Migrar los datos antes del publish sería
+    trabajar para volver a trabajar.
+
+  🔴🔒 **LEY NUEVA, y nació de una regresión falsa que estuve a punto de reportar:
+  UN PAR DE RENOMBRE VIVE EN SU FICHA, JAMÁS EN UNA LISTA GLOBAL.** Pregunté
+  «¿quedan nombres viejos?» con los pares de los TRES eventos en una sola lista y me
+  contestó que **trueno tenía 4 viejas vivas**. Mentira: `Perfil` es el nombre
+  **NUEVO** de trueno y a la vez el **VIEJO** de caifanes, y `Perfil D` es viejo en
+  caifanes y **legítimo** en trueno (ahí no se renombra, porque el Excel de trueno no
+  lo escribe). **La misma cadena significa cosas opuestas según la ficha.** Y no es
+  solo un error de consulta: un renombre GLOBAL sobre estas tablas le cambiaría el
+  nombre a zonas sanas de otro evento. Bloque `[G]`, con el cruce IMPRESO.
+  Hermana de *dos caminos, una columna*.
+
+  **LOS DOS CANDADOS QUE PIDIÓ JANE, dentro:**
+  - `[D]` **CARDINALIDAD DEL LOTE**: el barrido pestaña-vs-ficha no deja un par sin
+    cubrir, y **lo DICE** si aparece uno — jamás pasa en vacío. Con control positivo:
+    sin el lote tienen que quedar **7** huérfanos.
+  - `[C]` **COLISIONES POST-RENOMBRE re-corridas con el lote puesto**, preguntándole
+    al **dueño** (`_lib/normalizar-zona`) en vez de repetir la forma, y con control
+    positivo sembrado. Jane lo pidió por nombre: en trueno conviven «Perfil»,
+    «Perfil B» y «Beyond», y ninguna pareja normalizada colisiona.
+
+  ⚠️ **DOS ROJOS Y LOS DOS ERAN MÍOS** (la ley de siempre): conté **8** pares y son
+  **7**, y **6** huérfanos donde el barrido dijo **7**. Las dos veces tenía razón el
+  dato, y la causa era la misma: caifanes#0 y caifanes#1 son dos pares curados por
+  **un** renombre de ficha.
+
+  ⚠️ **ESTE CAREO NO TIENE ANCLA, y es a propósito** (dicho, no supuesto): cero
+  `git archive`, cero `HEAD_SHA`. Sus fixtures de ficha son **fotos fechadas** sobre
+  las que **RECOMPUTA** el renombre, y `normalizar-zona` lo lee del **árbol de
+  trabajo** — que es la forma correcta para un guardia de colisiones: anclado a un
+  commit dejaría de cazar una regresión del normalizador, que es justo lo que tiene
+  que cazar. Si algún día se le pone ancla, va **con su BASE a la vez**.
+
+  ⏳ **FASE 2 PENDIENTE — los 30 renglones de datos** (compras 6 · `viajeros_evento`
+  23 · `rol_recordatorios` 1), escritos y comentados en el acta, **esperando el
+  publish de Memo desde Esferas**. 🔒 `stock_ajustes` **NO se toca**: sus filas YA
+  traen la ortografía nueva porque el careo canoniza desde la pestaña — **ÉSA ERA LA
+  DERIVA**, el ajuste restaba de una llave que la ficha no tenía, y el renombre de la
+  ficha las **CURA sin tocarlas**. Igual la viajera de trueno capturada como
+  «Beyond», hoy huérfana: el renombre la cura sola.
+  ⚠️ **Memo publicó DOS veces (17:36 y 17:43, hora de Reynosa) justo antes de que la
+  ficha cambiara**, así que el index servido salió con los nombres viejos y el estado
+  quedó CONSISTENTE por los pelos. **El siguiente publish se lleva los renombres**, y
+  en ese momento la FASE 2 tiene que correr enseguida.
+
+  ⏳ **ESPERA PALABRA DE MEMO: caifanes «Perfil B» y «Perfil C» NO se renombraron.**
+  El Excel **no las escribe** (las dos van `ag:1`, agotadas), así que no hay dato que
+  diga si serían «Perfiles B»/«Perfiles C», y renombrarlas sería **inventar lo que el
+  Excel va a escribir** — la casa ya tiene la regla: *la puerta abre lo que no se
+  vende, jamás lo que NO SE SABE*. El corchete de la palabra llegó **vacío** en el
+  encargo («[plural — la palabra de Memo]», con un condicional detrás), así que se
+  tomó la rama segura y reversible. Si Memo dice que «y así con TODOS» las incluye,
+  son **2 renombres más (12 sitios)** en esta misma forma. Mientras no, el candado de
+  cardinalidad queda **de guardia**: las caza el día que alguien venda ahí.
+
 - 🏆🔴 **LA EMERGENCIA DEL SORTEO DE KAROL G, CERRADA EN TRES CAPAS
   (2-oct-2026). Durante TODO el show no salió ni una foto y la tarjeta final
   mostraba a OTRA PERSONA.** Ganó **Lucero Vargas Bermúdez** (folio 144,

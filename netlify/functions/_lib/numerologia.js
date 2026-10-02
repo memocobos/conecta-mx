@@ -339,7 +339,47 @@ function fundirNumerologia(personasPestana, personasLibro) {
         // ocupar. Sumarla y luego «descontarla» habría sido dos verdades.
         continue;
       }
-      ya.abonado += Number(n.abonado || 0);
+      // ═══ [CUADRE-FUENTE-1] EL DINERO TIENE **UN** DUEÑO POR PAQUETE ═══════
+      // 🔒 PALABRA DE MEMO (1-oct-2026), citada:
+      //   «Numerología es SOLO venta CHEAP y lleva los pagos COMPLETOS. La
+      //    pestaña de Conecta 2026 lleva los pagos de PLUS/STAY/RIDE. El CHEAP
+      //    en la pestaña aparece a veces sin saldo o solo con el separo — ese
+      //    separo es REFLEJO, NO es dinero adicional.»
+      //
+      // 🔴 LO QUE ESTA LÍNEA HACÍA: `ya.abonado += n.abonado`, o sea SUMAR el
+      // libro encima de la pestaña para la MISMA persona. Y el separo de la
+      // pestaña es un REFLEJO del pago que el libro ya trae completo, así que
+      // sumarlos cuenta el mismo dinero dos veces. La consecuencia está en
+      // producción, medida por el verificador: **141 personas cobradas por
+      // encima de su contrato, $214,233 «de más»**, con casos exactamente al
+      // DOBLE — Angie y Janeth en straykids#0 ($7,600 → $15,200), San Juanita
+      // en natanael ($3,600 → $7,200), Miguel en straykids#0 ($6,200 →
+      // $14,400). Los ×2 exactos son la firma del doble conteo.
+      //
+      // 🔒 LA REGLA NUEVA: para quien vive en las DOS fuentes, el abonado lo
+      // manda **EL LIBRO, SOLO**. El dinero de la pestaña —separo incluido— no
+      // se suma. Y el libro sigue sin pisar el TOTAL, la zona ni los boletos:
+      // ahí la pestaña sigue mandando, que es la ley de siempre. Lo que cambia
+      // es ÚNICAMENTE de quién es el dinero.
+      //
+      // ⚠️ PERO VARIAS FILAS DEL LIBRO SÍ SE SUMAN ENTRE SÍ: una persona puede
+      // comprar boletos CHEAP en dos tandas, y ésas son dos ventas distintas,
+      // no un reflejo. Así que la PRIMERA fila del libro REEMPLAZA lo de la
+      // pestaña y las siguientes SUMAN. Sin esta distinción, un `=` a secas
+      // dejaría a quien compró dos veces con el dinero de una sola compra —
+      // que es el mismo defecto al revés, y más difícil de ver.
+      if (!ya.__libroManda) {
+        // 🔒 Lo de la pestaña se CONSERVA con nombre, no se tira: es lo que el
+        // aviso (b) necesita para decir los DOS montos. Un dinero que se deja
+        // de contar sin decirlo es exactamente lo que no se hace aquí.
+        ya.abonado_pestana = Number(ya.abonado || 0);
+        ya.abonado = Number(n.abonado || 0);
+        ya.abonado_libro = Number(n.abonado || 0);
+        ya.__libroManda = true;
+      } else {
+        ya.abonado += Number(n.abonado || 0);
+        ya.abonado_libro = Number(ya.abonado_libro || 0) + Number(n.abonado || 0);
+      }
       ya.filas = (ya.filas || 0) + 1;
       ya.boletos_numerologia = (ya.boletos_numerologia || 0) + Number(n.boletos || 0);
       if (!ya.fuentes.includes('numerologia')) ya.fuentes.push('numerologia');
@@ -371,7 +411,9 @@ function fundirNumerologia(personasPestana, personasLibro) {
       roja: !!n.roja,
     });
   }
-  return [...out.values()];
+  // El andamio NO viaja: `__libroManda` es de esta función y nadie más debe
+  // leerlo. Dejarlo sería invitar a que alguien decidiera con él más adelante.
+  return [...out.values()].map((p) => { const { __libroManda, ...resto } = p; return resto; });
 }
 
 module.exports = { mapearLibro, fundirNumerologia, llave, PESTANA_LIBRO,

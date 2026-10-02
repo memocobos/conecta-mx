@@ -16,7 +16,10 @@
 // =============================================================================
 
 const { cosechar } = require('./cosecha-excel');
-const { parsearPestana, carear } = require('./excel-careo');
+// [CUADRE-FUENTE-1] `normalizarNombre` viene del MISMO dueño que usa `carear`:
+// los avisos de fuente emparejan por nombre y tienen que hacerlo con la misma
+// llave que el careo, o serían dos listas que todavía no divergen.
+const { parsearPestana, carear, normalizarNombre } = require('./excel-careo');
 const { mapearLibro, fundirNumerologia, parsearLibro, PESTANA_LIBRO } = require('./numerologia');
 // [CUADRE-5] El catálogo, para saber si el evento es de CDMX y para el precio
 // vivo por paquete+zona. Los dos salen del MISMO dueño que usa el index.
@@ -112,6 +115,8 @@ async function leerBase(eventoId, sb) {
 }
 
 // correrCareo(eventoId) → { error } | { ok:true, pestanas, personas, viajeros, montones }
+const _mxnC = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
+
 async function correrCareo(eventoId) {
   const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   const sb = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
@@ -285,6 +290,86 @@ async function correrCareo(eventoId) {
     Object.assign(chatarraPorZona, canonizada);
   }
 
+  // ═══ [CUADRE-FUENTE-1] LOS TRES AVISOS DE LA FUENTE DEL DINERO ════════════
+  // 🔒 Viven AQUÍ y no en `fundirNumerologia` por una razón de dueño: los tres
+  // preguntan por el PAQUETE DE LA BASE, y la fusión solo conoce la pestaña y el
+  // libro. Calcularlos allá obligaría a pasarle los viajeros, y una función con
+  // dos trabajos se confunde consigo misma (la cicatriz de `regiaEl`).
+  //
+  // ⚠️ LOS TRES **NOMBRAN**, NINGUNO ADIVINA. Son datos que alguien tiene que
+  // mirar, no correcciones automáticas: la regla de Memo dice de quién es el
+  // dinero, no qué hacer cuando los papeles no cuadran.
+  const avisosFuente = { libro_no_cheap: [], pestana_sobre_separo: [], cheap_sin_libro: [] };
+  {
+    // El paquete que la BASE cree, por nombre normalizado. 🔒 Se guarda una COLA
+    // por llave, no un valor: dos personas pueden llamarse igual y un `Map` por
+    // una llave no única descarta en silencio (esta casa ya perdió gente así).
+    const paqueteBase = new Map();
+    for (const v2 of (base.viajeros || [])) {
+      const k = normalizarNombre(v2.nombre);
+      if (!paqueteBase.has(k)) paqueteBase.set(k, []);
+      paqueteBase.get(k).push(String(v2.paquete || '').trim());
+    }
+    const esCheap = (pq) => normalizarNombre(pq) === 'cheap';
+    for (const p of personasLado) {
+      const fuentes = p.fuentes || [];
+      const enLibro = fuentes.includes('numerologia');
+      const enPestana = fuentes.includes('pestana');
+      const paquetes = paqueteBase.get(p.clave) || [];
+      // ── (a) EN EL LIBRO Y SU PAQUETE EN LA BASE **NO** ES CHEAP ───────────
+      // El libro es venta CHEAP por regla firmada. Una persona con paquete
+      // PLUS/STAY/RIDE que aparece ahí es un dato que no encaja con la regla, y
+      // la regla no decide quién se equivocó: lo mira un humano.
+      if (enLibro && paquetes.length && !paquetes.some(esCheap)) {
+        avisosFuente.libro_no_cheap.push({ nombre: p.nombre, clave: p.clave,
+          paquete_base: paquetes.join(' / '), abonado_libro: Number(p.abonado_libro || p.abonado || 0),
+          motivo: 'está en el LIBRO de Numerología pero su paquete en la base es «' + paquetes.join(' / ')
+                + '». El libro es SOLO venta CHEAP (regla de Memo, 1-oct), así que uno de los dos papeles '
+                + 'está mal y no se adivina cuál.' });
+      }
+      // ── (b) EN LAS DOS, Y LA PESTAÑA TRAÍA MÁS QUE UN SEPARO ──────────────
+      // 🔒 Bajo la regla nueva ese dinero DEJA DE CONTARSE. Y eso no se hace en
+      // silencio: se nombra con los DOS montos, porque un dinero que desaparece
+      // de una cuenta sin que nadie lo diga es la peor clase de arreglo.
+      if (enLibro && enPestana && p.abonado_pestana != null) {
+        const dePestana = Number(p.abonado_pestana || 0);
+        const delLibro = Number(p.abonado_libro || 0);
+        // El separo es el reflejo esperado; MÁS que eso es dinero que alguien
+        // capturó en la pestaña y que la regla nueva ya no cuenta.
+        // ⚠️ EL SEPARO SALE DEL CATÁLOGO (`evCat`), no de una constante aquí —
+        // estuve a punto de inventarme un `sepDelEvento` que no existe. Y es
+        // `sepCheap` el que manda, porque esta gente es CHEAP; `sep` es el
+        // respaldo. 🔒 SIN CATÁLOGO `sep` queda en 0 y entonces se nombra
+        // CUALQUIER dinero de la pestaña: nombrar de más es el lado seguro —
+        // callar por no saber el separo sería esconder justo lo que se busca.
+        const sep = Number((evCat && (evCat.sepCheap != null ? evCat.sepCheap : evCat.sep)) || 0);
+        if (dePestana > 0 && (!sep || dePestana > sep)) {
+          avisosFuente.pestana_sobre_separo.push({ nombre: p.nombre, clave: p.clave,
+            abonado_pestana: dePestana, abonado_libro: delLibro, separo_del_evento: sep || null,
+            paquete_base: paquetes.join(' / ') || null,
+            motivo: 'vive en las DOS fuentes y la pestaña traía ' + _mxnC(dePestana)
+                  + (sep ? (', más que el separo de ' + _mxnC(sep)) : '')
+                  + '. Desde CUADRE-FUENTE-1 el abonado lo manda el LIBRO ('
+                  + _mxnC(delLibro) + '), así que ese dinero de la pestaña YA NO SE CUENTA — '
+                  + 'si era un pago de verdad, tiene que entrar al libro.' });
+        }
+      }
+      // ── (c) CHEAP SOLO EN LA PESTAÑA, CON DINERO ─────────────────────────
+      // Su pago no tiene dueño que lo respalde: el libro es quien lleva los
+      // pagos CHEAP completos, y ahí no está. Se nombra para que Memo complete
+      // el libro — NO se inventa una fila, y NO se le quita el dinero.
+      if (enPestana && !enLibro && Number(p.abonado || 0) > 0
+          && (paquetes.some(esCheap) || esCheap(p.paquete))) {
+        avisosFuente.cheap_sin_libro.push({ nombre: p.nombre, clave: p.clave,
+          abonado_pestana: Number(p.abonado || 0),
+          paquete_base: paquetes.join(' / ') || String(p.paquete || ''),
+          motivo: 'es CHEAP con ' + _mxnC(Number(p.abonado || 0)) + ' en la pestaña y NO tiene fila en el '
+                + 'libro. Los pagos CHEAP los lleva el libro completos, así que este pago no tiene dueño '
+                + 'que lo respalde: hay que completar el libro, no inventarle la fila.' });
+      }
+    }
+  }
+
   // 4. Los montones.
   const montones = carear(personasLado, base.viajeros, { cdmx });
 
@@ -398,7 +483,7 @@ async function correrCareo(eventoId) {
   if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
 
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
-           viajeros: base.viajeros, montones, numerologia, zonasCanonicas,
+           viajeros: base.viajeros, montones, numerologia, zonasCanonicas, avisosFuente,
            chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };
 }
 

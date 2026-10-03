@@ -167,6 +167,89 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴🔒 **COSECHA-REDIRECT-1 · EL POST QUE VOLVÍA GET (3-oct-2026).** Jane intentó
+  verificar la sección de EXCEL-AG-2 en navegador contra producción y **la cosecha por
+  evento de trueno nunca llegó a contestar**: tres corridas del botón «Comparar con
+  Excel» dieron **504 · 504 · y a la tercera el cuerpo del `doGet` del `.gs`** —
+  «Este script solo contesta por POST y con token · [SIN_TOKEN]». La pantalla no
+  alcanzó a pintarse, así que **la verificación de la pantalla sigue sin el visto de Jane**.
+
+  **LO MEDIDO, no supuesto.** 21 cosechas contra producción (catálogo · trueno ×6 ·
+  una tanda de 10 en paralelo, que es la condición que midió CAREO-RETRY-1): **las 21
+  salieron OK** y la cadena real es **SIEMPRE**
+
+  ```
+  POST  script.google.com/macros/s/<id>/exec       → 302
+  GET   script.googleusercontent.com/macros/echo   → 200
+  ```
+
+  O sea: **el despliegue NO se movió y el token sirve.** Lo que falló fue la
+  redirección, a esa hora, del lado de Google — y la prueba la dio la segunda ronda de
+  medición, ya con el lib nuevo: **8/8 buenas pero con dos cosechas en 5,769 y 5,912 ms**
+  cuando en la primera ronda el techo era 2,264 ms. **Google está lento HOY**, y el
+  careo de un evento vive dentro de los 10 s de Netlify.
+
+  🔒 **ESE CAMBIO DE MÉTODO ES DEL ESTÁNDAR, NO UN DEFECTO.** Un 301/302/303 sobre un
+  POST se sigue con **GET y sin cuerpo**; el `echo` sirve el resultado que el POST ya
+  ejecutó. La mordida es otra: **si el `Location` apunta OTRA VEZ al `/exec`, ese GET ya
+  no recoge nada — EJECUTA `doGet`**, que contesta SIN_TOKEN.
+
+  🔒 **Y DE AHÍ SALE EL HECHO QUE MANDA: `SIN_TOKEN` NO ES UNA FALLA DE CONFIGURACIÓN,
+  ES UN ACCIDENTE DE RED.** Medido sobre los tres caminos de `cosechar`: todos mandan
+  token, sin env var sale `SIN_CONFIG` **y ni se le pega**, y un token equivocado sale
+  `TOKEN_INVALIDO`. No hay un camino nuestro que produzca `SIN_TOKEN`.
+
+  **LA DIFERENCIA ENTRE LOS DOS CAMINOS, que es lo que Jane pidió nombrar:** el careo
+  **global** tiene escalera de reintentos (`khExcelRecorrer`, CAREO-RETRY-1) y el
+  **por-evento** (`excelCarear`) **no tenía ninguna** — un solo fetch, sin reloj. El
+  mismo mal rato de Google se ve verde en uno y rojo en el otro.
+
+  **LO QUE ENTRA, en el ÚNICO dueño que comparten los dos caminos (`_lib/cosecha-excel`):**
+  1. **La cadena se camina a mano** para no degradar el método donde importa: al `echo`
+     con GET (es lo correcto y es lo medido), y **si el destino es la MISMA puerta, se
+     vuelve a POSTEAR con el cuerpo**. Nunca se le hace GET a lo que ejecuta `doGet`.
+  2. **Un reloj**, porque la otra cara del mismo mal rato es el 504: el fetch no tenía
+     ninguno, así que un Google colgado se comía los 10 s enteros de Netlify y el admin
+     recibía **un 504 pelón, sin una palabra de qué pasó**.
+  3. **UN reintento** para las tres caras transitorias (`SIN_TOKEN`, `NO_ES_JSON`,
+     `SIN_RESPUESTA`), con presupuesto. 🔒 Reintentar es seguro **y no es suposición**:
+     `doPost` del `.gs` **solo LEE** (`getValues`/`getBackgrounds`), no tiene una sola
+     escritura. Dos cosechas son dos fotos, nunca dos efectos.
+
+  🔴 **`SIN_TOKEN` FALTABA EN `_KH_CAREO_TRANSITORIOS`, Y ERA UNO DE LOS DOS CÓDIGOS
+  MEDIDOS.** El acta de CAREO-RETRY-1 dice, del 28-sep, «29 cosechas contestaron una
+  PÁGINA **o SOLO POST**» — y «solo POST» **ES** el SIN_TOKEN del `doGet`. La lista se
+  escribió al lado de esa prosa y se quedó con uno de los dos. Así que el código que más
+  se repitió en aquel incidente era justo **el único que no se reintentaba**. Es
+  *la lista a mano al lado de la realidad*, y esta vez la lista estaba al lado de **mi
+  propia acta**.
+
+  🔴 **Y UNA REGRESIÓN MÍA, CAZADA EN VIVO Y DOS VECES.** El reloj nació partido en
+  rebanadas fijas de 4.5 s por intento («el doble de la peor cosecha medida»). La
+  **primera** corrida del lib nuevo contra el Google real lo tumbó: el arranque en frío
+  pasó de 4.5 s, el intento 1 abortó, al reintento le quedaron 2,690 ms y abortó
+  también — **7,506 ms para fallar algo que sin reloj habría contestado bien**. Un
+  candado que convierte una llamada **lenta-pero-buena** en un fallo es peor que el 504
+  que vino a curar. Curado: **el reloj de un intento es el presupuesto que QUEDA**, el
+  reparto es asimétrico a propósito (el primer intento se lleva todo; solo hay reintento
+  si el fallo dejó tiempo, que es justo la forma del transitorio). La segunda ronda en
+  vivo lo confirmó: **8/8 con dos cosechas de 5.8–5.9 s que la rebanada habría matado.**
+
+  **Careo:** `npm run mide:cosecha-redirect-1` — **59 aserciones**, con control positivo
+  en cada sección: **BASE falla con el código Y el mensaje exactos que Jane vio en
+  pantalla**, BASE se cuelga sin tope, BASE no reintenta, y BASE no traía `SIN_TOKEN` en
+  la lista. Incluye el control de **mi** regresión (una cosecha de 5 s tiene que salir
+  bien) y el candado de que **la lista del navegador CONTIENE la del servidor** — si no,
+  el servidor daría por recuperable un código que muere en el botón.
+
+  🔴 **El rojo del arnés era mío, otra vez:** mi Google falso no seguía los redirects, así
+  que BASE moría de «no es JSON» en vez de su defecto — **el control positivo medía mi
+  doble**. El falso ahora obedece `init.redirect` como el fetch de verdad.
+
+  ⏳ **PENDIENTE DE JANE:** la verificación de la sección de EXCEL-AG-2 **en navegador
+  contra producción, con captura**, por el botón, ya con esto desplegado — y después el
+  cierre de «Perfil» que aplica Memo.
+
 - 🔎 **EXCEL-AG-1 · FASE 1 (SOLO LECTURA) ENTREGADA (2-oct-2026).** La pregunta era
   si el cosechador sirve el bloque «Disponibilidad» (Pedido/Restan). **Sí: 71 de 71
   filas activas**, cero sin bloque, cero errores de cosecha. **Ninguna palomita

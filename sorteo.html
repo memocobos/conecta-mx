@@ -1035,6 +1035,19 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
       <div class="st-msg" id="st-msg"></div>
     </div>
 
+    <!-- [CONSUELO-BOTON-1] EL CORREO DE CONSOLACIÓN. Misma puerta que el story
+         (token Y premio ACEPTADO), porque el handler se rehúsa con 409 si no hay
+         ganador confirmado: ofrecer el botón antes sería ofrecer un 409.
+         🔒 NO MANDA AL PRIMER CLIC. El primer clic corre el SECO y enseña el
+         número; el envío pide un segundo gesto. El handler NO tiene puerta
+         `confirmar` —a diferencia de admin-portal-invitar— así que la segunda
+         puerta vive aquí, y es la única que hay. -->
+    <div class="story" id="consuelo" hidden>
+      <button class="btn btn-si" id="cons-seco">Correo de consuelo — ver en seco</button>
+      <button class="btn btn-no" id="cons-mandar" hidden>Mandar los correos</button>
+      <div class="st-msg" id="cons-msg"></div>
+    </div>
+
     <div style="margin-top:10px">
       <button class="mini" id="repetir"><svg class="ic" style="width:11px;height:11px"><use href="#ic-repetir"/></svg> Ver de nuevo</button>
     </div>
@@ -2850,6 +2863,7 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
     if (TOKEN && telAdmin) mostrarTel(telVisible);
     pintarContacto();
     pintarStory();
+    pintarConsuelo();
   }
 
   // ═══ 🔒 CON GANADOR CONFIRMADO, «GIRAR» SE VA ═══════════════════════════
@@ -3216,6 +3230,97 @@ body.gano .placa-ganador .pg-p{margin-top:6px;padding-top:6px;font-size:11px;lin
     var caja = $('story');
     if (caja) caja.hidden = !storyPuede();
   }
+
+  // ═══ [CONSUELO-BOTON-1] ════════════════════════════════════════════════════
+  // Hasta hoy `giveaway-consuelo` NO TENÍA CÓMO DISPARARSE desde ninguna pantalla:
+  // medido, cero llamadores en el árbol, cero crons en netlify.toml, y las dos
+  // menciones de «consuelo» en esta página eran PROSA. No se perdió al rehacer el
+  // panel — nunca existió. Los 88 de melanie salieron por una llamada a mano.
+  //
+  // 🔴 Y LA GUARDA QUE NO PUEDE FALTAR: ESTA FUNCTION NO SABE DE ENSAYO.
+  // Medido: `giveaway-consuelo` no lee `modo` ni usa `slugDe` ni `esEnsayo` — cero
+  // menciones— y consulta SIEMPRE `G.SLUG`, el slug real. O sea que un clic desde
+  // el modo ensayo **mandaría los correos de verdad** al padrón real. Es
+  // exactamente lo que advierte el comentario de `api()` sobre el `modo`, ahora con
+  // Resend del otro lado. Así que el botón SE REHÚSA en ensayo, y lo dice.
+  var consVisto = null;   // el resultado del último seco; sin él no se manda.
+  function pintarConsuelo(){
+    var caja = $('consuelo');
+    if (!caja) return;
+    caja.hidden = !storyPuede();
+    if (caja.hidden){ consVisto = null; var b = $('cons-mandar'); if (b) b.hidden = true; }
+  }
+  function consBloquear(v){
+    ['cons-seco', 'cons-mandar'].forEach(function(id){ var b = $(id); if (b) b.disabled = v; });
+  }
+  function consEnsayo(){
+    if (MODO !== 'ensayo') return false;
+    $('cons-msg').textContent = 'En modo ENSAYO no se puede: esta function no sabe de ensayo '
+      + '— siempre lee el padrón REAL, así que mandaría correos de verdad. '
+      + 'Sálte del ensayo para usarla.';
+    return true;
+  }
+  function consPedir(seco){
+    return api('giveaway-consuelo', { method: 'POST', body: JSON.stringify({ seco: seco }) });
+  }
+
+  (function(){
+    var bs = $('cons-seco'), bm = $('cons-mandar'), msg = $('cons-msg');
+    if (!bs || !bm) return;
+
+    bs.addEventListener('click', function(){
+      if (consEnsayo()) return;
+      consBloquear(true); msg.textContent = 'Corriendo en seco…'; bm.hidden = true; consVisto = null;
+      consPedir(true).then(function(res){
+        consBloquear(false);
+        var j = res.j;
+        if (!j || j.ok !== true){
+          // El servidor manda la voz («publica los códigos desde Baba», «no hay
+          // ganador CONFIRMADO»…). Se enseña TAL CUAL, como en `resolver()`.
+          msg.textContent = (j && j.error) || 'No se pudo correr el seco';
+          return;
+        }
+        consVisto = j;
+        var g = (estado && estado.ultimo && estado.ultimo.nombre) || 'el ganador';
+        msg.textContent = 'En seco: se enviarían ' + j.destinatarios + ' correos, excluyendo al ganador ('
+          + g + '). Filas a marcar: ' + j.filas_a_marcar
+          + (j.sin_correo ? ' · sin correo: ' + j.sin_correo : '')
+          + '. ' + (j.validez || '') + ' ' + (j.evento || '');
+        bm.hidden = false;
+        bm.textContent = 'Mandar los ' + j.destinatarios + ' correos';
+      }).catch(function(){ consBloquear(false); msg.textContent = 'Se cayó la conexión'; });
+    });
+
+    bm.addEventListener('click', function(){
+      if (consEnsayo()) return;
+      // 🔒 SIN SECO NO SE MANDA. El botón nace oculto y solo lo destapa un seco
+      // que acabó bien, así que el número del confirm es uno MEDIDO, no supuesto.
+      if (!consVisto || !consVisto.destinatarios){
+        msg.textContent = 'Corre primero el seco: el número del aviso sale de ahí.'; return;
+      }
+      var n = consVisto.destinatarios;
+      var g = (estado && estado.ultimo && estado.ultimo.nombre) || 'el ganador';
+      if (!window.confirm('¿Mandar ' + n + ' correos de consuelo AHORA?\n\n'
+        + 'Se excluye al ganador (' + g + ').\n'
+        + 'Esto NO se puede deshacer: los correos salen de verdad y las filas quedan marcadas.')) return;
+      consBloquear(true); bm.hidden = true; msg.textContent = 'Mandando ' + n + ' correos, uno por uno…';
+      consPedir(false).then(function(res){
+        consBloquear(false);
+        var j = res.j;
+        if (!j || j.ok !== true){ msg.textContent = (j && j.error) || 'No se pudo mandar'; bm.hidden = false; return; }
+        consVisto = null;
+        // 🔒 `sin_marcar` SE DICE SIEMPRE Y DE PRIMERO cuando no es cero: son
+        // personas que YA recibieron el correo y NO quedaron marcadas, así que un
+        // segundo disparo se lo mandaría otra vez. Callarlo sería el defecto.
+        msg.textContent = (j.sin_marcar ? '⚠️ ' + j.sin_marcar + ' RECIBIERON Y NO QUEDARON MARCADAS '
+            + '(un segundo envío se lo repetiría). ' : '')
+          + 'Destinatarios ' + j.destinatarios + ' · enviados ' + j.enviados
+          + ' · fallidos ' + j.fallidos + ' · filas marcadas ' + j.filas_marcadas
+          + ' · ganador excluido ' + j.excluido_ganador + '.';
+      }).catch(function(){ consBloquear(false); bm.hidden = false;
+        msg.textContent = 'Se cayó la conexión — REVISA antes de reintentar: pudieron salir algunos.'; });
+    });
+  })();
   // ⚰️ [GANADOR-PODA-1] Aquí vivía `dibujarCover`, que recortaba la foto de
   // fondo a «cover». Se quedó sin llamadores al irse la imagen del canvas.
   function cargarImg(src){

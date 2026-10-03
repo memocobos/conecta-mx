@@ -31,6 +31,7 @@ const { normalizarZona } = require('./normalizar-zona');
 // [DISPO-NORM-1] La puerta de la chatarra: sus llaves se canonizan a la
 // ortografía de la ficha antes de que `planear` las compare con la base.
 const { zonasCanonicasDe, resolverZonaFicha } = require('./zona-ficha');
+const DISPO = require('./excel-disponibilidad');
 
 // [CAREO-ZONA-1] Cuántas celdas rojas hacen una fila roja. ⚠️ DECLARADO Y
 // PENDIENTE DE MEDICIÓN contra las filas rojas reales de la pestaña de Karol
@@ -123,7 +124,7 @@ async function correrCareo(eventoId) {
 
   // 1. ¿Qué pestañas son de este evento? Puede haber varias (Pa'l Norte), y una
   //    puede traer regla de zona (Corona Capital).
-  const mr = await fetch(`${SB_URL}/rest/v1/excel_pestanas?evento_id=eq.${encodeURIComponent(eventoId)}&activa=is.true&select=pestana,regla_zona,notas`, { headers: sb });
+  const mr = await fetch(`${SB_URL}/rest/v1/excel_pestanas?evento_id=eq.${encodeURIComponent(eventoId)}&activa=is.true&select=pestana,regla_zona,notas,ag_activa`, { headers: sb });
   if (!mr.ok) return { error: { status: 502, mensaje: 'No pude leer el mapeo de pestañas', detail: await mr.text() } };
   const mapeos = await mr.json().catch(() => []);
   if (!Array.isArray(mapeos) || !mapeos.length) {
@@ -139,6 +140,11 @@ async function correrCareo(eventoId) {
   // [BOLETOS-1 adenda] La chatarra por zona, fundida entre pestañas del mismo
   // evento igual que la gente. Viaja APARTE: no es nadie, pero ocupa boleto.
   const chatarraPorZona = {};
+  // [EXCEL-AG-2] Las filas CRUDAS de cada pestaña, para el bloque «Disponibilidad».
+  // Se guardan aquí en vez de volver a cosechar: una segunda cosecha serían dos
+  // fotos del Excel en la misma corrida, y la de la disponibilidad podría leer un
+  // estado que el careo del dinero ya no vio.
+  const crudasPorPestana = [];
   for (const m of mapeos) {
     const c = await cosechar({ pestana: m.pestana });
     if (!c.ok) {
@@ -148,6 +154,9 @@ async function correrCareo(eventoId) {
       return { error: { status: 502, codigo: c.codigo, pestana: m.pestana, pestanas: c.pestanas,
         mensaje: `No pude cosechar la pestaña "${m.pestana}": ${c.mensaje}` } };
     }
+    crudasPorPestana.push({ pestana: m.pestana, filas: c.filas,
+                            regla_zona: m.regla_zona || null, ag_activa: m.ag_activa === true });
+
     // ── [CAREO-ZONA-1] LA FILA ROJA SE MARCA ANTES DE PARSEAR ───────────────
     // El cosechador devuelve CUÁNTAS celdas rojas tiene cada fila; la decisión
     // de «esta fila es una cancelación» es de aquí, no del script.
@@ -513,9 +522,52 @@ async function correrCareo(eventoId) {
   }
   if (catalogoError && montones.cuadre5) montones.cuadre5.catalogo_error = catalogoError;
 
+  // ── [EXCEL-AG-2] EL BLOQUE «Disponibilidad» ───────────────────────────────
+  // 🔒 SOLO si la palomita de ESTE evento-fecha está prendida. Memo las prende una
+  // por una con el reporte enfrente; ninguna nace prendida (default false).
+  // ⚠️ Y esto NO escribe nada: la palomita decide si el evento ENTRA a la
+  // PROPUESTA. El cierre lo aplica un humano con la vista previa — palabra de
+  // Memo (opción a, 2-oct). Un careo que cerrara zonas solo le quitaría venta al
+  // sitio sin que nadie lo viera.
+  let disponibilidad = null;
+  const conPalomita = crudasPorPestana.filter((x) => x.ag_activa);
+  if (conPalomita.length) {
+    if (!evCat) {
+      // 🔒 Un cero sin razón se lee como «no había nada que cambiar». Se DICE.
+      disponibilidad = { ok: false, motivo: 'no se pudo leer el catálogo: sin la ficha no se'
+        + ' sabe qué zonas existen ni cuáles están ya agotadas' + (catalogoError ? ' (' + catalogoError + ')' : '') };
+    } else {
+      const fichaZonas = DISPO.fichaZonasDe(evCat, eventoId);
+      if (!fichaZonas) {
+        disponibilidad = { ok: false, motivo: 'la ficha no tiene la fecha de «' + eventoId + '»' };
+      } else {
+        // Con varias pestañas por evento se funden los montones; hoy es 1 a 1
+        // salvo coronacapital, donde UNA pestaña sirve a VARIAS fechas y cada
+        // fila trae su `regla_zona`.
+        const acum = { ok: true, cerradas: [], reactivadas: [], sobrevendidas: [],
+                       vendo_sin_pedido: [], sin_ficha: [], prox_saltadas: [], bloques: [] };
+        for (const x of conPalomita) {
+          const c = DISPO.clasificar({ filas: x.filas, fichaZonas, reglaZona: x.regla_zona,
+                                       pestana: x.pestana, eventoId });
+          acum.bloques.push({ pestana: x.pestana, ok: c.ok, motivo: c.motivo || null,
+                              bloque: c.bloque || null, zonas_leidas: c.zonas_leidas || 0 });
+          if (!c.ok) { acum.ok = false; continue; }
+          for (const k of ['cerradas', 'reactivadas', 'sobrevendidas', 'vendo_sin_pedido', 'sin_ficha', 'prox_saltadas']) {
+            acum[k] = acum[k].concat(c[k] || []);
+          }
+        }
+        acum.sin_ficha_sobrevendidas = acum.sin_ficha.filter((z) => z.sobrevendida).length;
+        disponibilidad = acum;
+      }
+    }
+  }
+
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
            viajeros: base.viajeros, montones, numerologia, zonasCanonicas, avisosFuente,
-           chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [] };
+           chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [],
+           // [EXCEL-AG-2] `null` = la palomita de este evento-fecha está APAGADA.
+           // No es lo mismo que «no había nada»: se distingue a propósito.
+           disponibilidad };
 }
 
 // ── traerNumerologia ────────────────────────────────────────────────────────

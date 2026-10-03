@@ -61,7 +61,11 @@ const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
 // convertiría «no vino en la pestaña» en «cancelado» y borraría lugares de gente
 // que sí viaja. `ambiguos` sigue sin puerta a propósito.
 const MONTONES_APLICABLES = ['abonos', 'totales', 'altas', 'boletos', 'fuera',
-                             'zonas', 'partidas', 'bajas', 'sellos'];
+                             'zonas', 'partidas', 'bajas', 'sellos',
+                             // [EXCEL-AG-2] Entra para que el botón ACOTADO pueda
+                             // pedirlo por su nombre. 🔒 Estar aquí NO lo mete al
+                             // clic global: eso lo decide `quiereAg`, abajo.
+                             'disponibilidad'];
 
 // 🔒 UN GUION NO ES UNA ZONA. En la pestaña, «-» es como las chicas escriben
 // «nada» —no un valor—, y la diferencia importa justo aquí: `viajero_migrar`
@@ -634,7 +638,20 @@ function planear(careo, opciones) {
   // escribe nada.
   const dispo = careo.disponibilidad || null;
   const agCerrar = [], agAbrir = [];
-  if (dispo && dispo.ok && quiere('disponibilidad')) {
+  // 🔴🔒 OPT-IN EXPLÍCITO, Y ESTE CANDADO NACIÓ DE UN HUECO REAL QUE CAZÓ JANE.
+  // Mi primera versión usaba `quiere('disponibilidad')`, que es `!solo || solo===m`
+  // — o sea que **el clic GLOBAL, que no manda `solo`, lo incluía**. Medido en el
+  // árbol mergeado: `admin-excel-actualizar-todo` llama `planear(careo, {})` SIN
+  // acotar y para TODOS los eventos, así que un clic de «SÍ, GUARDAR» habría
+  // cerrado zonas en la ficha **sin que la pantalla las hubiera enseñado jamás**.
+  // Aplicar sin enseñar es exactamente lo que la vista previa existe para impedir.
+  // ⚠️ Y la ficha de trueno sobrevivió hoy por una razón distinta — correr el careo
+  // NO escribe; solo `ejecutarPlan` lo hace—, que es justo por lo que «no se
+  // escribió» sin saber POR QUÉ no es un candado.
+  // La regla, en palabras de Memo: **el servidor no ejecuta `ag` si la petición no
+  // lo pide EXPLÍCITAMENTE.** La ausencia de `solo` no es una petición.
+  const quiereAg = o.disponibilidad === true || solo === 'disponibilidad';
+  if (dispo && dispo.ok && quiereAg) {
     for (const z of (dispo.cerradas || [])) {
       if (!elegida(normalizarNombre(z.zona))) continue;
       agCerrar.push({ zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: true,
@@ -660,7 +677,13 @@ function planear(careo, opciones) {
            } : null,
            // `null` = palomita APAGADA · `{ok:false}` = prendida pero no se pudo leer.
            // No es lo mismo y no se aplasta: un vacío sin razón se lee como «nada que hacer».
-           ag_estado: dispo ? (dispo.ok ? 'propuesto' : 'ilegible') : 'apagada',
+           // `apagada` = la palomita está off · `ilegible` = prendida pero no se pudo
+           // leer · `no_pedido` = hay propuesta pero ESTA petición no la pidió (el
+           // clic global) · `propuesto` = se pidió y va en el plan. Los cuatro se
+           // distinguen: aplastarlos haría que «no se aplicó» no dijera por qué.
+           ag_estado: !dispo ? 'apagada'
+                     : !dispo.ok ? 'ilegible'
+                     : !quiereAg ? 'no_pedido' : 'propuesto',
            ag_motivo: dispo && !dispo.ok ? dispo.motivo : null,
            // [CAREO-ZONA-1]
            zonas: zonasPlan, partidas, bajas, avisos_zonas: avisosZonas,

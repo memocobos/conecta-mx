@@ -366,6 +366,75 @@ console.log('\n[H] `regla_zona`: UNA pestaña, VARIAS fechas (coronacapital)');
      '#1 (restan −3) tenía que cerrarse Y salir como sobrevendida');
 }
 
+// ═══ [SEG] 🔴 EL CLIC GLOBAL NO PUEDE APLICAR LO QUE NO ENSEÑÓ ═══════════
+// Hueco cazado por Jane contra el árbol MERGEADO: `ag_cerrar`/`ag_abrir` existían
+// en el plan y en NINGÚN módulo de UI. Y medido, el clic global los habría MANDADO:
+// `admin-excel-actualizar-todo` llama `planear(careo, {})` sin acotar y para TODOS
+// los eventos, y mi `quiere('disponibilidad')` era `!solo || solo===m` — verdadero
+// cuando no hay `solo`. O sea: cerrar zonas en la ficha sin que la pantalla las
+// enseñara jamás.
+// 🔒 La regla de Memo: **el servidor no ejecuta `ag` si la petición no lo pide
+// EXPLÍCITAMENTE.** La ausencia de `solo` NO es una petición.
+// ⚠️ Y se entra por `planear` con los CUERPOS REALES que mandan los dos handlers,
+// no con opciones inventadas: `admin-excel-actualizar-todo` manda `{}` y
+// `admin-excel-aplicar` manda `{solo, claves}`.
+console.log('\n[SEG] el clic global NO aplica la disponibilidad');
+{
+  const APL = require(path.join(RAIZ, 'netlify/functions/_lib/excel-aplicar.js'));
+  // Un careo con propuesta REAL de cierre, de la misma forma que arma correrCareo.
+  const careo = {
+    montones: {}, personas: [], viajeros: [],
+    disponibilidad: { ok: true,
+      cerradas: [{ zona: 'Perfil', zona_ficha: 'Perfil', pedido: 2, restan: 0, motivo: 'x' }],
+      reactivadas: [{ zona: 'Oro', zona_ficha: 'Oro', pedido: 5, restan: 3, motivo: 'y' }],
+      sobrevendidas: [], vendo_sin_pedido: [], sin_ficha: [], prox_saltadas: [] },
+  };
+  // (1) EL CUERPO REAL DEL BOTÓN GLOBAL DE «TODOS»: planear(careo, {})
+  const global = APL.planear(careo, {});
+  console.log('    global  {}            → ag_cerrar ' + global.ag_cerrar.length
+    + ' · ag_abrir ' + global.ag_abrir.length + ' · estado ' + global.ag_estado);
+  af(() => global.ag_cerrar.length === 0,
+     '\u{1F534} EL CLIC GLOBAL MANDA ' + global.ag_cerrar.length + ' CIERRE(S): aplicaría sin enseñar');
+  af(() => global.ag_abrir.length === 0, '\u{1F534} el clic global manda reactivaciones');
+  af(() => global.ag_estado === 'no_pedido',
+     'el estado no distingue «no lo pidió» de «no había»: dio «' + global.ag_estado + '»');
+
+  // (2) EL CUERPO REAL DEL BOTÓN DE UN EVENTO SIN montón: planear(careo,{solo:null,...})
+  const unEvento = APL.planear(careo, { solo: null, claves: null });
+  af(() => unEvento.ag_cerrar.length === 0,
+     '\u{1F534} el botón de un evento sin acotar también manda cierres');
+
+  // (3) OTRO montón acotado NO arrastra la disponibilidad
+  const soloAbonos = APL.planear(careo, { solo: 'abonos' });
+  af(() => soloAbonos.ag_cerrar.length === 0, '\u{1F534} pedir «abonos» arrastró la disponibilidad');
+
+  // 🔒 CONTROL POSITIVO — sin él, los ceros de arriba no distinguen «el candado
+  // muerde» de «la propuesta nunca llegó al plan».
+  const pedido = APL.planear(careo, { solo: 'disponibilidad' });
+  console.log('    solo:\'disponibilidad\' → ag_cerrar ' + pedido.ag_cerrar.length
+    + ' · ag_abrir ' + pedido.ag_abrir.length + ' · estado ' + pedido.ag_estado);
+  af(() => pedido.ag_cerrar.length === 1 && pedido.ag_abrir.length === 1,
+     '\u{1F534} CONTROL POSITIVO: pidiéndolo explícitamente TENÍA que venir — si no, los ceros no prueban nada');
+  af(() => pedido.ag_estado === 'propuesto', 'el estado pedido no es «propuesto»: ' + pedido.ag_estado);
+  const porBandera = APL.planear(careo, { disponibilidad: true });
+  af(() => porBandera.ag_cerrar.length === 1, 'la bandera explícita no lo incluye');
+
+  // 🔒 Y LOS AVISOS SÍ VIAJAN SIEMPRE: no escriben nada y la pantalla los pinta.
+  af(() => global.ag_avisos !== null, 'los avisos no viajan en el clic global: la pantalla no podría pintarlos');
+
+  // 🔒 CONTROL POSITIVO POR COMMIT: el árbol MERGEADO (b2bf313) SÍ mandaba el
+  // cierre en el clic global. Sin esta mitad, los ceros de arriba solo dirían
+  // «hoy no pasa», no «esto arregló algo» — la ley del control positivo.
+  // Reproducido: `planear(careo,{})` daba ag_cerrar 1 y estado «propuesto».
+  // ⚠️ Se deja como NOTA y no como código: anclar este careo a un commit lo volvería
+  // un arnés del pasado, y ya pagamos esa (el verde también caduca). La prueba
+  // vive en el acta y en el mensaje del commit, con su sha.
+  // 🔒 Y `disponibilidad` está en la lista de aplicables, para que el botón
+  // acotado no se rechace en la puerta.
+  af(() => APL.MONTONES_APLICABLES.includes('disponibilidad'),
+     'el botón acotado se rechazaría: «disponibilidad» no está en MONTONES_APLICABLES');
+}
+
 console.log('\n' + (r === 0
   ? (v === 0 ? '⚠️  NADA MEDIDO · esto NO es un verde' : '✅ VERDE · ' + v + ' en verde, 0 en rojo')
   : '🔴 ROJO · ' + v + ' en verde, ' + r + ' en rojo'));

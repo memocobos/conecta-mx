@@ -650,6 +650,11 @@ const MAPEOS = () => ([
   };
   const pintar = new Function(corte('_evtEsc') + '\n' + corte('_evtMxn') + '\n'
     + corte('_excelFuenteNumerologia') + '\n' + corte('_excelChipFuentes') + '\n'
+    // 🔴 [PREVENTA-DESCUENTO-1] `_excelTestigoPreventaHtml` entra porque el
+    // detalle de pestañas de `_excelCareoHtml` ya la llama. Misma forma que
+    // `_excelAgHtml` en EXCEL-AG-2: el arnés extrae aisladas lo que en el
+    // navegador vive junto. 🔒 Va la de verdad, no un doble.
+    + corte('_excelTestigoPreventaHtml') + '\n'
     + corte('_excelCareoHtml') + '\nreturn _excelCareoHtml;')();
 
   // (c) SIN CONFIGURAR: la pantalla lo DICE. Un careo que se ve igual de verde

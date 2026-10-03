@@ -54,6 +54,7 @@
     "mide:dispo-norm-1": "node scripts/mide-dispo-norm-1.js",
     "mide:num-multifecha-1": "node scripts/mide-num-multifecha-1.js",
     "mide:itin-nobus-1": "node scripts/mide-itin-nobus-1.js",
+    "mide:preventa-descuento-1": "node scripts/mide-preventa-descuento-1.js",
     "mide:cosecha-redirect-1": "node scripts/mide-cosecha-redirect-1.js",
     "mide:careo-retry-1": "node scripts/mide-careo-retry-1.js",
     "mide:sorteo-fotos-1": "node scripts/mide-sorteo-fotos-1.js",

@@ -25,6 +25,7 @@
     "mide:luces-placa": "node scripts/mide-luces-placa.js",
     "mide:viajeros-contador": "node scripts/mide-viajeros-contador.js",
     "mide:zona-excel-manda-1": "node scripts/mide-zona-excel-manda-1.js",
+    "mide:excel-ag-pantalla": "node scripts/mide-excel-ag-pantalla.js",
     "mide:excel-ag-2": "node scripts/mide-excel-ag-2.js",
     "mide:consuelo-paq-1": "node scripts/mide-consuelo-paq-1.js",
     "mide:consuelo-boton": "node scripts/mide-consuelo-boton.js",

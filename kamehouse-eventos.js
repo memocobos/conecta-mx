@@ -869,6 +869,19 @@ function _excelAplicarPreviaHtml(d, alcance) {
     ${p.zonas_sin_catalogo ? `<div style="font-size:12px;color:var(--orange);margin-top:8px">
       <b>El catálogo no se pudo leer</b>, así que NINGUNA zona se validó ni se propone: los montones de
       zona salen vacíos por eso y no porque no hubiera nada que cambiar.</div>` : ''}
+    <!-- ══ [EXCEL-AG-2] LA DISPONIBILIDAD ═══════════════════════════
+         🔴 ESTA SECCIÓN FALTABA Y LO CAZÓ JANE: el plan traía ag_cerrar/ag_abrir
+         y NINGÚN módulo de UI los pintaba.
+         ⚠️ Y este comentario NO lleva backticks a propósito: vive DENTRO de un
+         template literal, y un backtick aquí lo CORTA. Mismo defecto que el de
+         zsh coméndose los backticks en los mensajes de commit, en otro lenguaje. Un plan que nadie enseña es un plan que
+         no se puede confirmar — y peor: con el clic global SÍ se aplicaba.
+         🔒 CERRADAS Y REACTIVADAS CON BOTÓN PROPIO Y SEPARADO (palabra de Memo): él
+         agota zonas A PROPÓSITO (straykids/solo-viaje), así que una reactivación
+         encima de un cierre suyo tiene que poder aplicarse SOLA o no aplicarse.
+         Un botón para las dos haría que aceptar un cierre deshiciera su decisión. -->
+    ${_excelAgHtml(p)}
+
     <div style="font-size:11px;color:var(--ts);margin:10px 0">
       <!-- ⏳ [CAREO-ZONA-1] ESTA FRASE SE CORRIGIÓ, no se dejó mintiendo: decía
            «las BAJAS y los AMBIGUOS no se aplican nunca», y desde esta tuerca las
@@ -891,6 +904,122 @@ function _excelAplicarPreviaHtml(d, alcance) {
           + (r.partidas ? ` · ${r.partidas} partida(s)` : '')
           + (r.bajas ? ` · ${r.bajas} BAJA(S)` : '')}
     </button>
+    <!-- ⚠️ EL BOTÓN DE ARRIBA NO MENCIONA LA DISPONIBILIDAD, Y ES CORRECTO: con el
+         opt-in, el clic global NO la manda (ag_estado queda en no_pedido).
+         Prometerla aquí sería un letrero que no corresponde a lo que el botón hace. -->
+  </div>`;
+}
+
+// ═══ [EXCEL-AG-2] LA SECCIÓN DE DISPONIBILIDAD ══════════════════════════════
+// Lo que el bloque «Disponibilidad» del Excel (Pedido/Restan) propone para las
+// zonas de ESTE evento-fecha. Solo aparece si su palomita está prendida.
+//
+// 🔒 LO QUE SE ENSEÑA ES LO QUE SE MANDA. Cada botón lleva su alcance en el
+// `dataset` —`solo:'disponibilidad'` más las CLAVES de las zonas que este
+// renglón pintó—, siguiendo la ley que ya vive en `excelAplicarConfirmar`: si el
+// alcance viviera en una variable de módulo, un segundo clic podría mandar más
+// de lo que el ojo vio.
+function _excelAgHtml(p) {
+  const est = p.ag_estado || 'apagada';
+  // 🔒 CUATRO ESTADOS, CUATRO LETREROS. `apagada` no se pinta (no es un hueco:
+  // es que Memo no la prendió). Los otros tres SÍ, porque callarlos haría que
+  // «no salió nada» no dijera por qué.
+  if (est === 'apagada') return '';
+  if (est === 'ilegible') {
+    return `<div class="alert alert-error" style="margin-top:12px">
+      <b>Disponibilidad: la palomita está prendida pero el bloque no se pudo leer.</b>
+      ${_evtEsc(p.ag_motivo || '')} — no se propone nada, y no es porque no hubiera nada que cambiar.
+    </div>`;
+  }
+  const av = p.ag_avisos || {};
+  const cerrar = p.ag_cerrar || [], abrir = p.ag_abrir || [];
+  const sv = av.sobrevendidas || [], vsp = av.vendo_sin_pedido || [],
+        sf = av.sin_ficha || [], px = av.prox_saltadas || [];
+
+  const fila = (izq, der) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0">
+       <span>${izq}</span><span style="font-family:'JetBrains Mono',monospace;white-space:nowrap">${der}</span></div>`;
+  const cab = (t, n, c) =>
+    `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${c};margin-top:10px">${t} · ${n}</div>`;
+  const nums = (x) => `pedido ${x.pedido == null ? '—' : x.pedido} · restan ${x.restan == null ? '—' : x.restan}`;
+  // El botón de un montón, con SUS claves. `claves` son los nombres de zona que
+  // este renglón pintó — ni uno más.
+  const botón = (arr, texto, color) => {
+    if (!arr.length) return '';
+    const alc = { solo: 'disponibilidad', claves: arr.map((x) => x.zona_excel || x.zona) };
+    return `<button class="btn" style="margin-top:6px;border-color:${color}"
+      data-alcance="${_evtEsc(JSON.stringify(alc))}"
+      onclick="excelAplicarConfirmar(this)">${texto}</button>`;
+  };
+
+  // ⚠️ Si el estado es `no_pedido` hay propuesta pero ESTA petición no la pidió:
+  // se enseña igual (para eso es la vista previa) y los botones son los que la
+  // piden explícitamente.
+  return `<div class="card" style="padding:14px;margin-top:12px;border:1px solid var(--yellow,#e8ff4c)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--yellow,#e8ff4c)">
+      disponibilidad del Excel — Pedido / Restan
+    </div>
+    <div style="font-size:11px;color:var(--ts);margin-top:4px">
+      La palomita de este evento-fecha está <b style="color:var(--tp)">prendida</b>.
+      ${est === 'no_pedido'
+        ? 'Esta vista previa NO la incluye en el botón grande: se aplica con los botones de abajo, uno por montón.'
+        : 'Se pidió explícitamente en esta petición.'}
+    </div>
+
+    ${cab('zonas a CERRAR — el pedido se agotó', cerrar.length, 'var(--red)')}
+    ${cerrar.length
+      ? cerrar.map((x) => fila(`<b>${_evtEsc(x.zona)}</b>`,
+          `${nums(x)} · <b style="color:var(--red)">a la venta → AGOTADA</b>`)).join('')
+        + botón(cerrar, `Sí, cerrar ${cerrar.length} zona(s)`, 'var(--red)')
+      : '<div style="font-size:12px;color:var(--ts)">— ninguna</div>'}
+
+    <!-- 🔒 SEPARADAS, Y CON SU PROPIO BOTÓN. Memo agota zonas a propósito. -->
+    ${cab('zonas a REACTIVAR — hay pedido nuevo', abrir.length, 'var(--green)')}
+    ${abrir.length
+      ? `<div style="font-size:11px;color:var(--orange);padding:2px 0">
+           ⚠️ Si alguna de éstas la agotaste tú a propósito, NO la apliques: el Excel no sabe eso.
+         </div>`
+        + abrir.map((x) => fila(`<b>${_evtEsc(x.zona)}</b>`,
+          `${nums(x)} · <b style="color:var(--green)">AGOTADA → a la venta</b>`)).join('')
+        + botón(abrir, `Sí, reactivar ${abrir.length} zona(s)`, 'var(--green)')
+      : '<div style="font-size:12px;color:var(--ts)">— ninguna</div>'}
+
+    <!-- ── LOS AVISOS: NO ESCRIBEN NADA ───────────────────────────────────── -->
+    ${sv.length ? `${cab('🔴 SOBREVENDIDAS — hay lugares de más', sv.length, 'var(--red)')}
+      <div style="font-size:11px;color:var(--ts);padding:2px 0">
+        Esto NO se arregla cerrando la zona: son lugares ya vendidos sobre el pedido. Hay que revisar la pestaña.
+      </div>
+      ${sv.map((x) => fila(
+        `<b style="color:var(--red)">${_evtEsc(x.aviso)}</b> «${_evtEsc(x.zona_ficha || x.zona)}»`
+        + (x.prox ? ' <span style="font-size:10px;color:var(--orange)">· en PRÓXIMAMENTE, no se cierra</span>' : ''),
+        `<span style="font-size:11px;color:var(--ts)">${_evtEsc(x.pestana || '')}</span>`)).join('')}` : ''}
+
+    ${vsp.length ? `${cab('vendo sin pedido — NO se tocan', vsp.length, 'var(--orange)')}
+      <div style="font-size:11px;color:var(--ts);padding:2px 0">
+        Con <b>Pedido 0</b> la palomita jamás cierra la venta: aquí se compra conforme se vende.
+      </div>
+      ${vsp.map((x) => fila(`«${_evtEsc(x.zona_ficha || x.zona)}»`,
+        `${nums(x)} <span style="font-size:11px;color:var(--ts)">${_evtEsc(x.motivo || '')}</span>`)).join('')}` : ''}
+
+    ${px.length ? `${cab('en PRÓXIMAMENTE — no se cierran ni se abren', px.length, 'var(--ts)')}
+      ${px.map((x) => fila(`«${_evtEsc(x.zona_ficha || x.zona)}»`, nums(x))).join('')}` : ''}
+
+    ${sf.length ? `${cab('zonas del Excel que NO están en la ficha', sf.length, 'var(--orange)')}
+      <div style="font-size:11px;color:var(--ts);padding:2px 0">
+        No se pueden gobernar hasta que existan en la ficha.
+        ${av.sin_ficha_sobrevendidas
+          ? `<b style="color:var(--red)">${av.sin_ficha_sobrevendidas} de éstas están SOBREVENDIDAS y van primero.</b>`
+          : ''}
+      </div>
+      ${sf.map((x) => fila(
+        `«${_evtEsc(x.zona)}»${x.sobrevendida ? ' <b style="color:var(--red)">⚠️ SOBREVENDIDA</b>' : ''}`,
+        nums(x))).join('')}` : ''}
+
+    <div style="font-size:11px;color:var(--orange);margin-top:10px">
+      ⚠️ <b>El cierre no se ve en el sitio hasta que publiques desde Esferas.</b> Esto escribe la
+      ficha; el cotizador y la puerta de zonas leen el index SERVIDO, así que entre una cosa y otra
+      el sitio sigue vendiendo la zona.
+    </div>
   </div>`;
 }
 

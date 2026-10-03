@@ -167,6 +167,92 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔴 **LA AUDITORÍA DE LOS 141, APLICADA: CORR-DOBLE-1 y CORR-CONTRATO-1
+  CERRADAS CON VISTO DE JANE (2-oct-2026).** Padrón: **141 → 114 personas**, el «de
+  más» **$214,233 → $141,522**. Cada tuerca con vista previa primero, cero escrituras
+  sin palabra de Memo, y Jane re-midiendo contra la base antes del visto.
+
+  **CORR-DOBLE-1 · 34 personas · −$71,286 exactos.** La forma la firmó Memo:
+  **ANULAR** el abono duplicado (monto a $0) con el motivo y su monto **ANEXADOS** a
+  la nota. La fila no se borra: su fecha, su nota original y lo que tenía quedan
+  escritos. Ejemplo real: *«Careo Excel Karol G - 6 de noviembre 2026-09-20 · ANULADO
+  2-oct-2026: duplicado de CUADRE-FUENTE-1, este abono de $2,000 era reflejo de la
+  pestaña; el pago completo vive en el libro ($11,000)»*.
+  - 🔴 **EL ALTER QUE NO ESPERABA: el CHECK era `monto > 0`, así que el $0 TAMBIÉN
+    estaba prohibido**, no solo el negativo. La forma aprobada no se podía ejecutar.
+    Acta en `migraciones/CORR-DOBLE-1-ALTER.sql`, corrida y verificada por Jane:
+    `monto >= 0` — **el cero pasa y el negativo sigue dando 23514**.
+  - 🔒 **SE ABRIÓ AL CERO Y NO AL NEGATIVO, Y LA RAZÓN ES EL CLIENTE:**
+    `portal-mi-plan-migrado` **LISTA** los abonos en su pantalla (`{monto, fecha}`) y
+    **NO manda la nota**. Con un contra-asiento negativo, 34 clientes verían
+    «−$2,000» sin una palabra que lo explique.
+  - 🔒 **Y LA MEDICIÓN QUE ELIGIÓ LA FORMA: el duplicado NO vive en
+    `abonado_previo`.** En **33 de 34** el monto a retirar es EXACTAMENTE la suma de
+    los abonos de esa persona, y en el 34º (Demian) es UNA fila identificable de
+    $2,000 del 20-sep. No hubo que inventar una transacción: ya existía la que sobraba.
+  - ⏸️ **CINCO RETENIDOS, y el freno es el hallazgo**: Allan Abalos, Delmi Yaneth,
+    Roberto Venner, Ernersto Hinojosa y Elvia Guadalupe quedarían **DEBIENDO** si se
+    aplicara la regla, porque **el libro trae MENOS que su propio contrato**. La
+    premisa —«Numerología lleva los pagos COMPLETOS»— **no se cumple en los cinco**.
+    Es *aplicar una conclusión fuera del dominio de su premisa*, lo mismo que la
+    opción B ya corrigió una vez con los PLUS. Su arreglo es **completar Numerología**
+    (le faltan **$3,143** en total), no tocar la base: la lista con nombres y montos
+    se le pasó a Ximena. Cuando el libro esté completo, se re-corre y entran solos.
+
+  **CORR-CONTRATO-1 · 19 personas · Δ +$57,020** (los 18 por pestaña **+$50,020**, más
+  Arian **+$7,000**). Mueve el **CONTRATO** y jamás el abonado — el abonado es lo que
+  la persona PAGÓ y moverlo falsearía un hecho. Resultado: **0 debiendo**, 16 en saldo
+  cero, y **3 con saldo a favor dichos con su monto** (Veronica $100 · Jose Luis
+  galindo $219 · Ashley Rubi $6).
+  - 🔴 **UN NÚMERO MÍO, MAL, CORREGIDO ANTES DE QUE SE CAREARA: dije «+$43,906» y
+    era $50,020.** Lo dije como «aprox», me lo devolvieron como cifra exacta y lo
+    cacé al imprimir el candado de salida. Es la ley de siempre: **los números del
+    reporte los imprime la medición, no yo.**
+  - 🔒 **RE-MEDIR CONTRA LA BASE DE AHORA NO FUE CEREMONIA: la vista previa vieja
+    YA ERA UN FIXTURE GRABADO.** CORR-DOBLE-1 había movido el cobrado de 7 personas y
+    Ximena estuvo editando pestañas — la cosecha de hoy cambió **dos** totales
+    (Veronica $15,900→$15,800 · Jose Luis galindo $11,700→$11,481). Con los viejos,
+    esos dos habrían quedado con otro saldo.
+  - 🔴 **Y MI CLASIFICACIÓN ERA DEMASIADO GENEROSA:** de los 50 que llamé «contrato
+    corto», la pestaña dice que **solo 21 lo son**. **26 tienen el contrato YA igual al
+    total de la pestaña** — su excedente es otra cosa— y 3 no traen total. Mi regla
+    miró «el cobrado casa con la pestaña y supera al contrato» y **nunca preguntó si
+    el contrato ya era el de la pestaña**. Los 26 se re-trían como montón propio.
+  - ⚠️ **ARIAN ENTRÓ POR UN CAMINO PROPIO Y ESO QUEDA EN SU NOTA**: su total salió del
+    **`costo_publico` del LIBRO** (2 filas × $4,000, una por boleto) porque el total de
+    su pestaña dice $2,000 = **los dos separos**, que es REFLEJO y no precio. **Memo lo
+    autorizó PARA ESE CASO y dejó dicho que NO es regla nueva**: si alguna vez se
+    quiere «total de pestaña = solo separos → manda el libro», se mide primero cuántos
+    casos existen y se trae como tuerca propia con su careo. 🔒 **Las reglas de dinero
+    no nacen dentro de una corrección** — y la advertencia vive DENTRO de la nota de
+    Arian, no solo en el chat, para que nadie la lea como precedente.
+
+  ✅ **MUDANZA-KAROLG-1 (2-oct): tres viajeras del 6-nov al 7-nov, sin tocar su dinero.**
+  No era cancelación —siguen viajando— así que la regla de «saldo 0 del cancelado» NO
+  aplicó. Se **movió la fila** (`evento_id`), los **6 abonos viajaron solos** (llavean
+  por `viajero_id`), y el contrato subió a **$7,450** por el camino A.
+  - 🔒 **CUATRO FUENTES INDEPENDIENTES dijeron $7,450**: el plan de `/rol` de Emery
+    del 16-may (**$1,000 + 10×$645, `cuadra: true`**), las dos pestañas, y el desglose
+    pago por pago del Excel (**Separo 500 + Preventa 500 + 620 + 645×8 + 670**). La
+    única que decía $6,950 era el contrato — y su propia nota lo confesaba:
+    *«TOTAL-1: contrato derivado del catálogo (se afina contra la pestaña)»*. Se derivó
+    y **nunca se afinó**. Quedó **$25 por cabeza** de saldo real.
+  - 🔴 **EL RIESGO QUE TENÍA RELOJ**: las tres estaban en LAS DOS pestañas con el
+    mismo $7,450. Si el careo del 7 corría antes, les daba ALTA en `#1` con su fila de
+    `#0` viva: **$22,350 de dinero fantasma entre eventos**. Cerrado.
+  - ⚠️ **Y UNA INFERENCIA INVÁLIDA QUE CASI REPITO**: iba a usar `updated_at` de
+    `stock_ajustes` para decir que el `«-»=3` era anterior a la mudanza — y el careo
+    **nunca mueve esa columna** (yo mismo corregí eso en CHATARRA-SELLO-1). Se midió
+    por el dato: las tres caen en `personas`, no en chatarra, y `esChatarra()` dice
+    **false** para los tres nombres. **El `«-»=3` no son ellas.**
+  - 🔴⏳ **TUERCA PROPIA NOMBRADA, sin tocar: la chatarra cambió de ZONA.** La base
+    guarda `karolg#0 «-»=3` y la pestaña produce hoy `«Poniente Baja»=3`. El próximo
+    careo escribiría la nueva y dejaría la vieja **huérfana** → 3 boletos contados dos
+    veces. Familia de CHATARRA-RESIDUO-1.
+  - ⚠️ **Los 7 recordatorios viven en la llave PADRE `karolg`** (pre-multifecha): mi
+    «cero» era cierto para `#0`/`#1` y ciego para el padre. **Un barrido por las llaves
+    hijas no ve lo que vive en el padre** — ROL-HIST-PADRE en otra tabla.
+
 - 🏆🔴 **LA AUDITORÍA DE LOS 141 SOBREPAGADOS: CERRADA (2-oct-2026).** Era el
   punto 3 de CUADRE-FUENTE-1 y llevaba días **bloqueada por llaves**; Memo pasó
   `NUMEROLOGIA_SCRIPT_URL` y `NUMEROLOGIA_SCRIPT_TOKEN` y se pudo hacer como la orden

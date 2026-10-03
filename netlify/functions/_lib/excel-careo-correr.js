@@ -180,6 +180,11 @@ async function correrCareo(eventoId) {
                            mapa: p.mapa, notas: m.notas || null,
                            // [CAREO-ZONA-1] El estado del color, SIEMPRE dicho — y el
                            // histograma con el que se corrige el umbral con datos.
+                           // 🔒 [PREVENTA-DESCUENTO-1] EL TESTIGO VIAJA. Un testigo que
+                           // nadie enseña es una nota: si la Preventa vuelve a
+                           // hacer de dinero, tiene que VERSE en la pantalla el
+                           // día que pase, no el día que alguien lea el lib.
+                           testigo_preventa: p.testigo_preventa || null,
                            colores_leidos: c.colores_leidos === true,
                            filas_rojas: rojasFila
                              ? rojasFila.filter((n) => Number(n || 0) >= ROJAS_MIN_CELDAS).length : null,

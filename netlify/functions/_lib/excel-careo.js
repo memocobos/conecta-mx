@@ -138,6 +138,12 @@ function mapearColumnas(filaEncabezado) {
     // columnas que se SUMAN para el abonado, y meter el vuelo inflaría el
     // abonado de todo el mundo. El vuelo es otra cuenta.
     avionBus: idx('Avión - Bus'),
+    // 🔒 [PREVENTA-DESCUENTO-1] LA CELDA `Abonado` DE LA PESTAÑA, Y SOLO COMO
+    // ORÁCULO DEL TESTIGO. Es lo que la pestaña dice que RECIBIÓ el negocio, así
+    // que sirve para preguntarle a la hoja si una columna es dinero o no. ⚠️ NO
+    // ENTRA A `mapa.dinero` —por lo mismo que `total` y `avionBus`—: sumarla
+    // duplicaría el abonado de todo el mundo.
+    abonado: idx('Abonado'),
     pagos: [],
   };
   for (let i = 0; i < celdas.length; i++) {
@@ -145,7 +151,28 @@ function mapearColumnas(filaEncabezado) {
   }
   // Las columnas de dinero, en un solo lugar para que la suma y el reporte
   // hablen de lo mismo.
-  mapa.dinero = [mapa.separoSinNombre, mapa.separoNombrado, mapa.preventa, ...mapa.pagos]
+  //
+  // 🔴🔒 [PREVENTA-DESCUENTO-1] LA `Preventa` YA NO ES DINERO, Y SE MIDIÓ.
+  // Entró aquí con esta razón escrita: «en Pa'l Norte la preventa hace de
+  // separo». Barrido el 3-oct-2026 sobre LAS 68 PESTAÑAS ACTIVAS, preguntándole
+  // a la celda `Abonado` de cada pestaña —que es lo que la hoja dice que recibió
+  // el negocio— en las 28 filas que traen Preventa con valor:
+  //
+  //     PREVENTA ES DESCUENTO : 28/28      PREVENTA ES DINERO : 0/28
+  //     pestañas con «Pa'l Norte» activas : NINGUNA
+  //
+  // Y la cuenta cierra al peso en los casos: `Total = Costo + Hab + Avión −
+  // Preventa`. O sea que la Preventa es un DESCUENTO sobre el precio, y sumarla
+  // como pago le regalaba al negocio $14,556 que nunca recibió — y a 16 personas
+  // les hacía ver la deuda MÁS CHICA de lo que es.
+  //
+  // 🔒 ES «DOS CAMINOS, UNA COLUMNA»: la misma celda significaba dinero en un
+  // camino y descuento en otro, y la lista de dinero solo podía servir a uno.
+  // Hoy el dato dice que no hay un solo caso del primero.
+  //
+  // ⚠️ `mapa.preventa` SE QUEDA en el mapa a propósito: el testigo de abajo la
+  // necesita, y el reporte la enseña. Lo que cambia es que NO SE SUMA.
+  mapa.dinero = [mapa.separoSinNombre, mapa.separoNombrado, ...mapa.pagos]
     .filter((i) => i >= 0);
   return mapa;
 }
@@ -205,6 +232,20 @@ function parsearPestana(filas, encabezado, reglaZona) {
     if (reglaZona && normalizarNombre(zona) !== normalizarNombre(reglaZona)) { descartes.otraZona++; continue; }
 
     const abonado = mapa.dinero.reduce((a, c) => a + leerDinero(f[c]), 0);
+    // ── 🔒 [PREVENTA-DESCUENTO-1] EL TESTIGO ────────────────────────────────
+    // La `Preventa` ya no se suma, y esta tuerca NO quiere que esa decisión
+    // reviva sola el día que Pa'l Norte vuelva con pestaña. Así que se lee la
+    // celda, se lee el `Abonado` QUE LA PESTAÑA MISMA DECLARA, y se compara:
+    //   · `Abonado ≈ suma sin preventa`  → la Preventa es DESCUENTO (lo medido);
+    //   · `Abonado ≈ suma + preventa`    → la Preventa ESTÁ HACIENDO DE DINERO,
+    //     y entonces la regla hay que RE-DECIDIRLA con datos. El testigo lo
+    //     grita; no cambia nada por su cuenta.
+    // ⚠️ Y no se asume que la celda exista: sin `Abonado` el testigo dice «no se
+    // puede decir», que no es lo mismo que «es descuento».
+    const preventaFila = mapa.preventa >= 0 ? leerDinero(f[mapa.preventa]) : 0;
+    const celdaAb = mapa.abonado >= 0 ? f[mapa.abonado] : null;
+    const abLegible = mapa.abonado >= 0 && /[0-9]/.test(String(celdaAb == null ? '' : celdaAb));
+    const abDeclarado = abLegible ? leerDinero(celdaAb) : null;
     // [CUADRE-1a] EL TOTAL DE LA FILA, Y EL HUECO DICHO APARTE.
     //
     // 🔒 UNA CELDA VACÍA NO ES UN TOTAL DE CERO. `leerDinero` contesta 0 tanto
@@ -232,6 +273,13 @@ function parsearPestana(filas, encabezado, reglaZona) {
       // MISMA PERSONA, otra compra: se suma el dinero y se cuentan las filas.
       ya.abonado += abonado;
       ya.filas += 1;
+      // [PREVENTA-DESCUENTO-1] La preventa y el abonado DECLARADO se suman entre
+      // las filas del grupo, igual que el dinero: la pestaña lleva una fila por
+      // boleto. Y el hueco se arrastra: si a UNA fila le falta el `Abonado`, la
+      // suma de las otras no puede servir de oráculo.
+      ya.preventa += preventaFila;
+      if (abDeclarado == null) ya.abDeclaradoIncompleto = true;
+      else ya.abDeclarado += abDeclarado;
       // [BOLETOS-1] CUÁNTOS BOLETOS Y EN QUÉ ZONAS. La pestaña lleva UNA FILA
       // POR BOLETO, así que `filas` ya era el conteo — lo que faltaba era saber
       // DÓNDE, porque la persona solo guardaba la PRIMERA zona. Sin este mapa
@@ -259,6 +307,10 @@ function parsearPestana(filas, encabezado, reglaZona) {
     } else {
       out.set(clave, {
         nombre: nombreCrudo, clave, abonado, filas: 1, zona,
+        // [PREVENTA-DESCUENTO-1] viajan APARTE del dinero, para el testigo.
+        preventa: preventaFila,
+        abDeclarado: abDeclarado == null ? 0 : abDeclarado,
+        abDeclaradoIncompleto: abDeclarado == null,
         // [CAREO-ZONA-1] Las zonas que SÍ son zonas, y las filas «-» contadas
         // aparte. `zonas` NO se toca — tiene consumidores (CUADRE-5/6) y
         // cambiarle la forma sería otra tuerca; esto se AÑADE al lado.
@@ -289,7 +341,43 @@ function parsearPestana(filas, encabezado, reglaZona) {
              // sus filas). `0` = el cero TECLEADO. Dos cosas distintas.
              vuelo: vueloIncompleto ? null : p.vuelo };
   });
-  return { personas, mapa, descartes, chatarraPorZona };
+  // ── 🔒 [PREVENTA-DESCUENTO-1] EL VEREDICTO DEL TESTIGO ────────────────────
+  // Se le pregunta a la pestaña, persona por persona, si su `Preventa` es
+  // descuento o dinero. Nadie decide nada aquí: se CUENTA y se nombra.
+  //
+  // 🔒 LOS TRES ESTADOS NO SE APLASTAN. «descuento», «dinero» y «no se puede
+  // decir» (sin celda `Abonado`, o incompleta) se arreglan distinto, y meter el
+  // tercero en el primero sería afirmar sobre una hoja que no se midió — el
+  // mismo pecado del cero falso.
+  const testigo = { con_preventa: 0, descuento: 0, dinero: 0, no_se_puede_decir: 0,
+                    suma_preventa: 0, como_dinero: [], columna_preventa: mapa.preventa >= 0,
+                    columna_abonado: mapa.abonado >= 0 };
+  for (const p of out.values()) {
+    if (!(p.preventa > 0)) continue;
+    testigo.con_preventa++;
+    testigo.suma_preventa += p.preventa;
+    if (p.abDeclaradoIncompleto || !(p.abDeclarado > 0)) { testigo.no_se_puede_decir++; continue; }
+    if (Math.abs(p.abDeclarado - p.abonado) <= TOLERANCIA_TESTIGO) { testigo.descuento++; continue; }
+    if (Math.abs(p.abDeclarado - (p.abonado + p.preventa)) <= TOLERANCIA_TESTIGO) {
+      testigo.dinero++;
+      // 🔴 Se NOMBRAN, hasta un tope: un conteo sin nombres no se puede revisar.
+      if (testigo.como_dinero.length < 40) {
+        testigo.como_dinero.push({ nombre: p.nombre, preventa: p.preventa,
+                                   suma_sin_preventa: p.abonado, abonado_declarado: p.abDeclarado });
+      }
+      continue;
+    }
+    testigo.no_se_puede_decir++;
+  }
+  // 🔴 EL AVISO QUE OBLIGA A RE-DECIDIR. Mientras sea 0, la regla medida sigue
+  // en pie; en cuanto aparezca uno, la pestaña lo dice en pantalla.
+  testigo.aviso = testigo.dinero > 0
+    ? 'La columna «Preventa» de esta pestaña está haciendo de DINERO en '
+      + testigo.dinero + ' persona(s): su celda «Abonado» incluye la preventa. '
+      + 'La regla de hoy la trata como DESCUENTO (medido 28/28 el 3-oct-2026), así que '
+      + 'este caso NO entra al abonado y hay que RE-DECIDIR la regla con estos datos.'
+    : null;
+  return { personas, mapa, descartes, chatarraPorZona, testigo_preventa: testigo };
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────
@@ -299,6 +387,12 @@ function parsearPestana(filas, encabezado, reglaZona) {
 // La tolerancia es de UN PESO, la misma que usa la reconciliación del dinero en
 // el Portal: un centavo de redondeo no es una diferencia de pagos.
 const TOLERANCIA_MXN = 1;
+// [PREVENTA-DESCUENTO-1] La del testigo es más holgada A PROPÓSITO: compara una
+// celda que la pestaña calcula con fórmula contra una suma de celdas, y un peso
+// de redondeo ahí mandaría filas buenas a «no se puede decir». Medido el 3-oct:
+// con 2 pesos, 27 de 28 cuadran EXACTO y la que no se va por $3,300, no por
+// redondeo — o sea que holgar más no taparía nada.
+const TOLERANCIA_TESTIGO = 2;
 
 // [EXCEL-CAREO-FIX-1] LA BASE YA NO SE COLAPSA POR NOMBRE.
 //

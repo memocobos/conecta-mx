@@ -619,6 +619,14 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
       // del código (en el navegador viven en el mismo archivo), era este arnés
       // armando un mundo donde la función no tenía compañera.
       corte('_evtEsc') + '\n' + corte('_evtMxn') + '\n' + corte('_excelAplicar') + '\n'
+      // 🔴 [PREVENTA-DESCUENTO-1] Y AHORA TAMBIÉN `_excelTestigoPreventaHtml`,
+      // por lo MISMO que `_excelAgHtml` en EXCEL-AG-2: este arnés extrae las
+      // funciones de UI AISLADAS y el detalle de pestañas ya la llama. En el
+      // navegador viven en el mismo archivo, así que no era un defecto del
+      // código — era este arnés armando un mundo donde la función no tenía
+      // compañera. 🔒 Y va LA DE VERDAD, no un doble: un testigo falso daría
+      // verde con el aviso roto.
+      + corte('_excelTestigoPreventaHtml') + '\n'
       + corte('_excelAgHtml') + '\n'
       + corte('_excelAplicarPreviaHtml') + '\n' + corte('excelAplicarUno') + '\n'
       + corte('excelAplicarConfirmar') + '\n' + corte('_excelAplicarHechoHtml') + '\n'
@@ -775,6 +783,7 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
   // ⚠️ Y SE PREFIRIÓ TRAER LA DE VERDAD en vez de un doble: un `_excelAgHtml` falso
   // aquí haría que este careo diera verde con la sección rota.
   const previa = new Function(recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n'
+    + recortar('_excelTestigoPreventaHtml') + '\n'
     + recortar('_excelAgHtml') + '\n'
     + recortar('_excelAplicarPreviaHtml') + '\nreturn _excelAplicarPreviaHtml;')();
   const html = previa(p.d);
@@ -794,7 +803,12 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
   // exacto de la libreta— y NO donde sí llega: un botón de más ahí invita a
   // aplicar a mano lo que ya se aplicó en bola.
   const pintarCareo = new Function(recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n'
-    + recortar('_excelFuenteNumerologia') + '\n' + recortar('_excelChipFuentes') + '\n' + recortar('_excelCareoHtml') + '\nreturn _excelCareoHtml;')();
+    + recortar('_excelFuenteNumerologia') + '\n' + recortar('_excelChipFuentes') + '\n'
+    // 🔴 El TERCER sitio de extracción de este arnés, y lo encontré buscando EL
+    // HECHO (`new Function(`) y no la palabra: parchar dos y reportar habría sido
+    // *arreglar un sitio sin barrer la familia* dentro del propio instrumento.
+    + recortar('_excelTestigoPreventaHtml') + '\n'
+    + recortar('_excelCareoHtml') + '\nreturn _excelCareoHtml;')();
   const redC = redFalsa(SEMILLA(), null);
   global.fetch = redC.fetchFalso;
   for (const f of ['admin-excel-careo.js', '_lib/excel-careo-correr.js', '_lib/excel-careo.js', '_lib/cosecha-excel.js']) {

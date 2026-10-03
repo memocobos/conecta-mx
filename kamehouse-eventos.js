@@ -623,7 +623,8 @@ function _excelCareoHtml(d) {
        <b style="color:var(--tp)">${_evtEsc(p.pestana)}</b>${p.regla_zona ? ` <span style="color:var(--orange)">· solo zona «${_evtEsc(p.regla_zona)}»</span>` : ''}
        — ${p.personas} persona(s) · columnas de dinero: ${(p.mapa && p.mapa.dinero || []).length}
        · descartes: ${p.descartes.chatarra} chatarra, ${p.descartes.sinNombre} sin nombre${p.descartes.otraZona ? `, ${p.descartes.otraZona} de otra zona` : ''}
-     </div>`).join('');
+     </div>
+     ${_excelTestigoPreventaHtml(p.testigo_preventa)}`).join('');
 
   return `<div class="card" style="padding:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -919,6 +920,38 @@ function _excelAplicarPreviaHtml(d, alcance) {
 // renglón pintó—, siguiendo la ley que ya vive en `excelAplicarConfirmar`: si el
 // alcance viviera en una variable de módulo, un segundo clic podría mandar más
 // de lo que el ojo vio.
+// 🔒 [PREVENTA-DESCUENTO-1] EL TESTIGO DE LA PREVENTA, EN PANTALLA.
+// La regla medida es que la `Preventa` es un DESCUENTO (28 de 28 el 3-oct-2026),
+// así que NO entra al abonado. Esta sección existe para que el día que vuelva a
+// hacer de dinero —el caso de Pa'l Norte, que hoy no tiene pestaña activa— se
+// VEA, y la regla se re-decida con datos en vez de revivir sola.
+//
+// ⚠️ EN SILENCIO CUANDO NO HAY NADA QUE DECIR: con cero casos de dinero no se
+// pinta. Un letrero permanente de «todo bien» se vuelve invisible a la semana, y
+// entonces el día que importe tampoco se va a ver.
+// 🔒 Pero «no se puede decir» SÍ se pinta: es un hueco, no una confirmación —
+// la pestaña sin columna «Abonado» no confirma nada, y callarlo lo volvería un
+// verde. Es la misma ley del cero falso.
+function _excelTestigoPreventaHtml(t) {
+  if (!t) return '';
+  if (t.dinero > 0) {
+    return `<div class="alert alert-error" style="margin:6px 0;font-size:12px">
+      <b>🔴 La columna «Preventa» está haciendo de DINERO en ${t.dinero} persona(s).</b>
+      ${_evtEsc(t.aviso || '')}
+      <div style="margin-top:6px">${(t.como_dinero || []).map((x) =>
+        `${_evtEsc(x.nombre)} — preventa ${_evtMxn(x.preventa)} · suma sin ella ${_evtMxn(x.suma_sin_preventa)}
+         · la pestaña declara ${_evtMxn(x.abonado_declarado)}`).join('<br>')}</div>
+    </div>`;
+  }
+  if (t.no_se_puede_decir > 0) {
+    return `<div style="font-size:11px;color:var(--orange);padding:2px 0 2px 8px">
+      ⚠️ ${t.no_se_puede_decir} fila(s) con «Preventa» que NO se pudieron juzgar${t.columna_abonado ? '' : ' (esta pestaña no trae columna «Abonado»)'}:
+      no se puede afirmar que sean descuento. La preventa no se sumó al abonado, que es la regla de hoy.
+    </div>`;
+  }
+  return '';
+}
+
 function _excelAgHtml(p) {
   const est = p.ag_estado || 'apagada';
   // 🔒 CUATRO ESTADOS, CUATRO LETREROS. `apagada` no se pinta (no es un hueco:

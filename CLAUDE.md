@@ -167,6 +167,83 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴🔒 **PREVENTA-DESCUENTO-1 · EL DESCUENTO QUE SE CONTABA COMO PAGO (3-oct-2026).**
+  `mapa.dinero` de `_lib/excel-careo` incluía la columna **«Preventa»**, con esta razón
+  escrita: *«en Pa'l Norte la preventa hace de separo»*. Barrido sobre **las 68 pestañas
+  activas**, preguntándole a la celda `Abonado` de cada pestaña —que es lo que la hoja
+  dice que RECIBIÓ el negocio— en las **28 filas** que traen Preventa con valor:
+
+  ```
+  PREVENTA ES DESCUENTO : 28/28       PREVENTA ES DINERO : 0/28
+  pestañas con «Pa'l Norte» activas : NINGUNA
+  y la cuenta cierra al peso: Total = Costo + Hab + Avión − Preventa
+  ```
+
+  🔒 **Es *dos caminos, una columna*:** la misma celda significaba dinero en un camino y
+  descuento en otro, y la lista de dinero solo podía servir a uno. Hoy el dato dice que
+  **no hay un solo caso del primero.**
+
+  **El daño medido contra la base:** el negocio creía tener **$14,556 que nunca recibió**,
+  y a **16 personas** les hacía ver la deuda **más chica de lo que es** (deuda de los 28:
+  se veía **$15,821**, es **$30,377**).
+
+  🔴 **Y UNA FRASE MÍA QUE ERA FALSA, CORREGIDA POR JANE.** Dije que la nota de las tres
+  de karolg#1 *«escribió lo que la columna no hizo»*. **Falso:** la columna SÍ decía
+  $7,450 el 2-oct (Jane lo verificó post-mudanza) y **el careo del 3-oct la deshizo** —
+  la cola de la nota trae su sello, `Total de pestaña (careo 2026-10-03)`. No era una
+  escritura que faltó: era **una corrección firmada que el careo DESHIZO.**
+
+  🔒 **PERO SON DOS MECANISMOS, Y ESTA TUERCA SOLO ARREGLA UNO.** Medido en el código:
+  - el **dinero** (`cobrado`) se inflaba por `mapa.dinero` + preventa → **esto se arregla aquí**;
+  - el **precio** (`total_contrato`) lo re-escribe el montón `totales_contrato`, que lee
+    **`mapa.total`, la celda «Total»** — y esta tuerca **NO la toca**.
+
+  O sea que **sacar la preventa de `mapa.dinero` NO protege el contrato de las tres.** Lo
+  que lo protege es que la celda `Total` de la pestaña diga **$7,450** (encargo que Memo
+  ya le dio a Ximena). El careo lo AFIRMA en su bloque `[D]` para que nadie lo crea
+  arreglado. ⏳ Y queda nombrado como tuerca propia: **el careo puede deshacer una
+  corrección firmada y hoy nada se lo impide** — `totalesContrato` no tiene guarda.
+
+  **EL TESTIGO, por orden de Memo:** «un testigo para el día que Pa'l Norte reviva con
+  pestaña: ese día la regla se re-decide con datos, no revive sola». Vive en
+  `parsearPestana` y viaja a la pantalla por el detalle de pestañas. 🔒 **Tres estados sin
+  aplastar:** `descuento` · `dinero` (🔴 grita, con NOMBRES, y pide re-decidir) · `no se
+  puede decir` (sin celda `Abonado`). Y **calla cuando todo es descuento**: un letrero
+  permanente de «todo bien» se vuelve invisible a la semana. Pero **el hueco SÍ se pinta**:
+  callarlo lo volvería un verde — la misma ley del cero falso.
+
+  🔒 **El testigo AVISA, no decide:** el careo afirma que aun gritando, el abonado sigue
+  SIN la preventa.
+
+  **Careo:** `npm run mide:preventa-descuento-1` — **34 aserciones, en los dos sentidos**
+  que pidió Memo: la preventa no suma (**BASE sumaba 5500 donde HEAD suma 5300, que es lo
+  que la pestaña declara**) y el separo + los pagos **siguen** sumando, con el separo SIN
+  NOMBRE —que vive por POSICIÓN— verificado aparte.
+
+  🔒 **Y la medición que manda, contra el Excel real:** tras el arreglo, **el abonado
+  coincide con el `Abonado` que la pestaña declara en 28 de 28.**
+
+  🔒 **SEGURIDAD, medida antes de mergear:** con el código nuevo los 28 caen al montón
+  `negativas`, que **«nunca se aplica, se NOMBRA»** — y `ejecutarPlan` tiene **CERO**
+  referencias a `plan.negativas`. La corrección del dato sigue siendo un acto deliberado.
+
+  🔴 **Tres arneses vecinos se cayeron, y era el instrumento, no el código:**
+  `_excelTestigoPreventaHtml is not defined` en `cuadre-aplicar` (**dos** sitios) y
+  `cuadre-numerologia`. Misma forma que EXCEL-AG-2: extraen funciones de UI **aisladas** y
+  en el navegador viven juntas. **El tercer sitio lo encontré buscando EL HECHO
+  (`new Function(`) y no la palabra** — parchar dos y reportar habría sido *arreglar un
+  sitio sin barrer la familia* dentro del propio instrumento. Y va **la de verdad, no un
+  doble**: un testigo falso daría verde con el aviso roto.
+
+  ⏳ **ESPERANDO PALABRA DE MEMO (dos decisiones que llegaron en blanco):**
+  1. las **tres de karolg#1** — `[$7,450 con $500 de saldo cada una / $6,950 a cero]`;
+  2. el **montón de 19 saldos a favor ($15,956)** — `[anticipo / devolver a quien lo pida / otra]`.
+
+  ⏳ **Y después del código:** vista previa de la corrección del dato (7 fantasma + 16 de
+  deuda chica + el caso C aparte), con nombres y montos, **y el careo de Jane antes de
+  aplicar.** El padrón se re-mide con corrida. **Roberto Venner** queda aparte: su sistema
+  trae **$3,800** más que la pestaña, no $500 — no es este defecto.
+
 - 🔴🔒 **AG-CERO-FALSO-1 · EL CERO QUE SALÍA POR CONSTRUCCIÓN (3-oct-2026).** Jane
   verificó la sección de EXCEL-AG-2 en navegador contra producción, **por el botón**, y
   la pantalla se pintaba **con un CERO FALSO**: «ZONAS A CERRAR · 0 — ninguna», sin

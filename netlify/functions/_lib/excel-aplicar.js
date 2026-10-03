@@ -38,6 +38,7 @@ const { resolverZonaFicha } = require('./zona-ficha');
 // [DISPO-NORM-1] El dueño de «¿son la misma zona?» — el montón `fuera` empareja
 // chatarra↔base por zona normalizada, jamás por cadena exacta.
 const { normalizarZona } = require('./normalizar-zona');
+const DISPO = require('./excel-disponibilidad');
 
 // Los paquetes que `viajero_migrar` acepta. Se dicen aquí para poder SALTAR
 // con motivo en vez de mandar un alta a rebotar contra el otro handler.
@@ -622,8 +623,45 @@ function planear(careo, opciones) {
       pestanas: p.pestanas || [] });
   }
 
+  // ── [EXCEL-AG-2] LA SECCIÓN DE DISPONIBILIDAD ─────────────────────────────
+  // 🔒 CERRADAS Y REACTIVADAS VAN SEPARADAS Y NUNCA SE MEZCLAN — palabra de Memo
+  // (2-oct), y la razón es concreta: él agota zonas A PROPÓSITO (el caso
+  // straykids/solo-viaje), así que una reactivación propuesta encima de un cierre
+  // suyo tiene que VERSE antes de aplicarse. Fundirlas en «cambios de ag» haría
+  // que un clic deshiciera una decisión que nadie revisó.
+  // ⚠️ Los demás montones (sobrevendidas, vendo_sin_pedido, sin_ficha, prox) NO
+  // son plan: son AVISOS. Viajan para que la vista previa los pinte, y ninguno
+  // escribe nada.
+  const dispo = careo.disponibilidad || null;
+  const agCerrar = [], agAbrir = [];
+  if (dispo && dispo.ok && quiere('disponibilidad')) {
+    for (const z of (dispo.cerradas || [])) {
+      if (!elegida(normalizarNombre(z.zona))) continue;
+      agCerrar.push({ zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: true,
+                      pedido: z.pedido, restan: z.restan, motivo: z.motivo });
+    }
+    for (const z of (dispo.reactivadas || [])) {
+      if (!elegida(normalizarNombre(z.zona))) continue;
+      agAbrir.push({ zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: false,
+                     pedido: z.pedido, restan: z.restan, motivo: z.motivo });
+    }
+  }
+
   return { abonos, totales, altas, negativas, saltados, boletos, fuera, sellos,
            avisos_boletos: avisosBoletos,
+           // [EXCEL-AG-2] los dos montones, SEPARADOS, más los avisos que no escriben.
+           ag_cerrar: agCerrar, ag_abrir: agAbrir,
+           ag_avisos: dispo && dispo.ok ? {
+             sobrevendidas: dispo.sobrevendidas || [],
+             vendo_sin_pedido: dispo.vendo_sin_pedido || [],
+             sin_ficha: dispo.sin_ficha || [],
+             sin_ficha_sobrevendidas: dispo.sin_ficha_sobrevendidas || 0,
+             prox_saltadas: dispo.prox_saltadas || [],
+           } : null,
+           // `null` = palomita APAGADA · `{ok:false}` = prendida pero no se pudo leer.
+           // No es lo mismo y no se aplasta: un vacío sin razón se lee como «nada que hacer».
+           ag_estado: dispo ? (dispo.ok ? 'propuesto' : 'ilegible') : 'apagada',
+           ag_motivo: dispo && !dispo.ok ? dispo.motivo : null,
            // [CAREO-ZONA-1]
            zonas: zonasPlan, partidas, bajas, avisos_zonas: avisosZonas,
            // ⚠️ Se DICE cuando el catálogo no se pudo leer: sin él la puerta no
@@ -668,7 +706,9 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
                       zonas: [], partidas: [], bajas: [],
                       // [CAREO-ZONA-1b] Las que la base rehusó porque ya estaban
                       // bajadas. Viajan APARTE de `bajas`: no se escribieron.
-                      bajas_ya_estaban: [], errores: [] };
+                      bajas_ya_estaban: [], errores: [],
+                      // [EXCEL-AG-2] los dos SEPARADOS también en el resultado.
+                      ag_cerradas: [], ag_abiertas: [] };
   // La nota se AGREGA, nunca pisa: el historial de una fila es su rastro.
   const _nota = (previas, txt) => {
     const p0 = String(previas == null ? '' : previas).trim();
@@ -971,6 +1011,78 @@ async function ejecutarPlan({ plan, eventoId, pestanaNombre, quien, origin, auth
         vendidos_fuera: x.vendidos_fuera, nota: x.nota });
     }));
   }
+  // ── [EXCEL-AG-2] EL `ag` EN LA FICHA ──────────────────────────────────────
+  // 🔒 POR EL DUEÑO DE LA FICHA, NO ESCRIBIENDO EL INDEX (palabra de Memo): se
+  // hace PATCH a `esferas_eventos` y el publish normal compila. El index no se
+  // toca por un camino nuevo.
+  // 🔴 Y EL SITIO ES LA MITAD DEL ASUNTO: en un multifecha las zonas viven en SEIS
+  // sitios. `aplicarAgEnFicha` escribe SOLO en `multifecha[idx]` y deja las
+  // globales y las otras fechas BYTE A BYTE — careado en el bloque [C].
+  const _ag = (Array.isArray(plan.ag_cerrar) ? plan.ag_cerrar : [])
+    .concat(Array.isArray(plan.ag_abrir) ? plan.ag_abrir : []);
+  if (_ag.length) {
+    const slug = String(eventoId).split('#')[0];
+    let fila = null;
+    try {
+      const fr = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}`
+        + '&select=slug,zonas,cheap_zonas,multifecha&limit=1', { headers: sb });
+      if (!fr.ok) throw new Error('lectura esferas_eventos ' + fr.status);
+      fila = (await fr.json())[0] || null;
+    } catch (e) {
+      resultado.errores.push({ que: 'disponibilidad', error: 'no se pudo leer la ficha: ' + e.message });
+    }
+    if (!fila) {
+      // 🔒 Sin ficha NO se inventa nada y se DICE. Un evento sin fila en
+      // `esferas_eventos` no se gobierna desde Esferas (el caso melanie).
+      if (!resultado.errores.some((x) => x.que === 'disponibilidad')) {
+        resultado.errores.push({ que: 'disponibilidad',
+          error: `«${slug}» no tiene fila en esferas_eventos: su ficha no se gobierna desde Esferas` });
+      }
+    } else {
+      // Se acumulan TODOS los cambios sobre los MISMOS textos y se manda UN PATCH.
+      // Un PATCH por zona re-leería la fila entre uno y otro y la última escritura
+      // pisaría a las anteriores — el defecto de las dos fotos del mismo dato.
+      let txt = { zonas: fila.zonas, cheap_zonas: fila.cheap_zonas, multifecha: fila.multifecha };
+      const hechos = [];
+      for (const z of _ag) {
+        const r = DISPO.aplicarAgEnFicha({ zonas: txt.zonas, cheap_zonas: txt.cheap_zonas,
+          multifecha: txt.multifecha, eventoId, zona: z.zona, ag: z.ag === true });
+        if (r.error) { resultado.errores.push({ que: 'disponibilidad', zona: z.zona, error: r.error }); continue; }
+        if (!r.detalle.tocadas) {
+          // Cero tocadas no es éxito silencioso: la zona no estaba donde debía.
+          resultado.errores.push({ que: 'disponibilidad', zona: z.zona,
+            error: 'la zona no se encontró en la ficha de «' + eventoId + '»: no se escribió nada' });
+          continue;
+        }
+        Object.assign(txt, r.cambios);
+        hechos.push({ zona: z.zona, ag_de: !z.ag, ag_a: z.ag === true,
+                      pedido: z.pedido, restan: z.restan,
+                      donde: r.detalle.donde, motivo: z.motivo });
+      }
+      if (hechos.length) {
+        const cuerpo = {};
+        for (const k of ['zonas', 'cheap_zonas', 'multifecha']) {
+          if (txt[k] !== fila[k]) cuerpo[k] = txt[k];
+        }
+        try {
+          const pr = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}`,
+            { method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' }, body: JSON.stringify(cuerpo) });
+          if (!pr.ok) throw new Error('PATCH ' + pr.status + ' ' + (await pr.text().catch(() => '')));
+          // 🔒 SEPARADOS en el resultado, igual que en el plan.
+          for (const h of hechos) (h.ag_a ? resultado.ag_cerradas : resultado.ag_abiertas).push(h);
+        } catch (e) {
+          resultado.errores.push({ que: 'disponibilidad', error: 'no se pudo escribir la ficha: ' + e.message });
+        }
+      }
+      // ⚠️ EL CIERRE NO SE VE HASTA QUE SE PUBLIQUE, y eso se DICE: la puerta de
+      // zonas y el cotizador leen el index SERVIDO, no `esferas_eventos`. Entre el
+      // PATCH y el publish el sitio sigue vendiendo la zona cerrada.
+      if (resultado.ag_cerradas.length || resultado.ag_abiertas.length) {
+        resultado.requiere_publicar = true;
+      }
+    }
+  }
+
   return resultado;
 }
 

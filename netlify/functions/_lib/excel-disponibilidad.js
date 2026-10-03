@@ -381,3 +381,40 @@ module.exports.aplicarAgEnFicha = aplicarAgEnFicha;
 module.exports.agEnArreglo = agEnArreglo;
 module.exports.partirArreglo = partirArreglo;
 module.exports.sitioDe = sitioDe;
+
+// ── LAS ZONAS DE LA FICHA PARA **ESE** EVENTO-FECHA ─────────────────────────
+// 🔒 `zonasCanonicasDe` de `_lib/zona-ficha` no sirve aquí y conviene decir por
+// qué, para que nadie la sustituya creyendo que es lo mismo: esa función devuelve
+// **solo los NOMBRES** y además FUNDE las globales con TODAS las fechas del
+// multifecha. Para decidir un `ag` hacen falta dos cosas que ella no da: el
+// estado (`ag`, `prox`) y la SEPARACIÓN por fecha. Usarla aquí cerraría zonas de
+// una fecha mirando el estado de otra.
+// ⚠️ Recibe el EV **crudo** (`fetchEventosRaw`), que el runner ya tiene en la
+// mano: ni una petición nueva.
+function fichaZonasDe(evCrudo, eventoId) {
+  if (!evCrudo) return null;
+  const sitio = sitioDe(eventoId);
+  let zonas = null, cheap = null;
+  if (sitio.multifecha) {
+    const mf = Array.isArray(evCrudo.multifecha) ? evCrudo.multifecha[sitio.idx] : null;
+    if (!mf) return null;                  // la fecha no existe: se DICE arriba
+    zonas = mf.zonas; cheap = mf.cheapZonas;
+  } else {
+    zonas = evCrudo.zonas; cheap = evCrudo.cheapZonas;
+  }
+  const vistas = new Map();
+  for (const lista of [zonas, cheap]) {
+    for (const z of (Array.isArray(lista) ? lista : [])) {
+      const n = z && z.n != null ? String(z.n).trim() : '';
+      if (!n) continue;
+      const k = normalizarZona(n);
+      const ag = !!(z.ag), prox = !!(z.prox);
+      const prev = vistas.get(k);
+      // Basta que UNA de las dos listas la dé por agotada para que lo esté.
+      if (!prev) vistas.set(k, { n, ag, prox });
+      else { prev.ag = prev.ag || ag; prev.prox = prev.prox || prox; }
+    }
+  }
+  return [...vistas.values()];
+}
+module.exports.fichaZonasDe = fichaZonasDe;

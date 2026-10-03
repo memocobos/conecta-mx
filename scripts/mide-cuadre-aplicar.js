@@ -614,7 +614,12 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
       },
     };
     const armar = new Function('document', 'showToast', 'excelCarear', 'khAdminFetch',
+      // 🔴 [EXCEL-AG-2] `_excelAgHtml` entra porque la vista previa ahora la
+      // llama. Sin ella el contexto tronaba con ReferenceError — no era un defecto
+      // del código (en el navegador viven en el mismo archivo), era este arnés
+      // armando un mundo donde la función no tenía compañera.
       corte('_evtEsc') + '\n' + corte('_evtMxn') + '\n' + corte('_excelAplicar') + '\n'
+      + corte('_excelAgHtml') + '\n'
       + corte('_excelAplicarPreviaHtml') + '\n' + corte('excelAplicarUno') + '\n'
       + corte('excelAplicarConfirmar') + '\n' + corte('_excelAplicarHechoHtml') + '\n'
       + 'return { excelAplicarUno, excelAplicarConfirmar, _excelAplicarPreviaHtml };');
@@ -761,7 +766,16 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     }
     throw new Error('llaves desbalanceadas en ' + n);
   };
+  // 🔴 [EXCEL-AG-2] ESTE ARNÉS TRONÓ AL MERGEAR ESA TUERCA, y el motivo vale
+  // el renglón: `_excelAplicarPreviaHtml` ahora llama a `_excelAgHtml` (la sección
+  // de disponibilidad), y este recorte la ejecutaba AISLADA — `ReferenceError`.
+  // No era un defecto del código: en el navegador las dos viven en el MISMO
+  // archivo, así que no hay riesgo de orden de carga. Era el arnés midiendo un
+  // mundo donde la función no tenía compañera. Se actualiza a la verdad nueva.
+  // ⚠️ Y SE PREFIRIÓ TRAER LA DE VERDAD en vez de un doble: un `_excelAgHtml` falso
+  // aquí haría que este careo diera verde con la sección rota.
   const previa = new Function(recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n'
+    + recortar('_excelAgHtml') + '\n'
     + recortar('_excelAplicarPreviaHtml') + '\nreturn _excelAplicarPreviaHtml;')();
   const html = previa(p.d);
   af(/todavía NO se ha escrito nada/i.test(html), 'la vista previa no avisa de que aún no escribió nada');

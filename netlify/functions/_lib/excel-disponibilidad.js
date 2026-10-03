@@ -150,24 +150,51 @@ function clasificar({ filas, fichaZonas, reglaZona, pestana, eventoId }) {
     const f = porFicha.get(normalizarZona(z.zona));
 
     // (2) Sin ficha: se IGNORA y se LISTA. No se inventa la zona.
-    if (!f) { sinFicha.push(Object.assign({}, base,
-      { motivo: 'la zona del Excel no existe en la ficha: no se puede gobernar' })); continue; }
+    if (!f) {
+      // ⚠️ LA MISMA LÓGICA DE JANE, UN NIVEL MÁS ALLÁ: si no se puede gobernar, el
+      // sobrecupo **sigue siendo real**. No se cambia la regla de Memo — estas zonas
+      // se siguen IGNORANDO— pero se LISTAN MEJOR: el número viaja en su propio
+      // renglón. Medido: son 9 zonas (karolg#0 «Club Seat» −4, juniorh «Mesa
+      // Rockstar» −4…). Listarlas sin decir que están sobrevendidas sería
+      // esconder un dato dentro de un montón que nadie lee con lupa.
+      // 🔒 NO entran a `sobrevendidas` porque ese montón es de zonas gobernables y
+      // mezclarlas pediría a alguien ir a arreglar lo que no tiene ficha. Que Memo
+      // decida si quiere que griten ahí también.
+      const neg = z.restan != null && z.restan < 0;
+      sinFicha.push(Object.assign({}, base, {
+        sobrevendida: neg,
+        motivo: 'la zona del Excel no existe en la ficha: no se puede gobernar'
+              + (neg ? ' — ⚠️ y además está SOBREVENDIDA ' + z.restan : '') }));
+      continue;
+    }
+
+    // 🔴 SOBREVENDIDA PRIMERO, Y EL ORDEN ES EL ARREGLO — lo cazó Jane:
+    // el candado de `prox` se estaba TRAGANDO este aviso. Una zona `prox` con
+    // `Restan < 0` caía en `prox_saltadas` y nunca gritaba.
+    // 🔒 SU FORMULACIÓN ES LA LEY: **el candado protege la VENTA, pero un AVISO
+    // NO ES UNA VENTA.** Que no se pueda cerrar una zona no vuelve invisible que
+    // alguien vendió lugares de más en ella. Misma familia que el `revento` de
+    // CAREO-RED-1 y el de la ronda final del sorteo: el orden de los `if` no es
+    // cosmética, decide qué se llega a reportar.
+    // Sale SIEMPRE que `Restan < 0`: **aunque también se cierre** y **aunque sea
+    // `prox`**. Son lugares vendidos de más y alguien tiene que ir a esa pestaña.
+    if (z.restan != null && z.restan < 0) {
+      sobrevendidas.push(Object.assign({}, base, { zona_ficha: f.n,
+        aviso: 'SOBREVENDIDA ' + z.restan,
+        prox: !!f.prox,
+        motivo: 'hay ' + Math.abs(z.restan) + ' lugar(es) vendidos de más sobre el pedido'
+              + ' — revisar la pestaña «' + (pestana || '?') + '»'
+              + (f.prox ? ' · ⚠️ la zona está en PRÓXIMAMENTE: no se cierra, pero el sobrecupo es real' : '') }));
+    }
 
     // 🔒 EL TERCER ESTADO. `prox` no es «a la venta»: cerrarla no quita nada pero
     // le cambia el letrero de PRÓXIMAMENTE a AGOTADO, que es decirle al cliente
     // lo contrario de lo que pasa. Aprobado por Memo (2-oct).
+    // ⚠️ VA DESPUÉS del aviso de sobrevendida, a propósito (ver arriba).
     if (f.prox) { proxSaltadas.push(Object.assign({}, base, { zona_ficha: f.n,
-      motivo: 'la zona está en PRÓXIMAMENTE: no está a la venta, así que no se cierra ni se abre' })); continue; }
-
-    // 🔴 SOBREVENDIDA: sale SIEMPRE que `Restan < 0`, **aunque también se cierre**.
-    // Son lugares vendidos de más sobre el pedido y alguien tiene que ir a esa
-    // pestaña. Reportarlo solo como «agotada» es lo que esconde el problema.
-    if (z.restan != null && z.restan < 0) {
-      sobrevendidas.push(Object.assign({}, base, { zona_ficha: f.n,
-        aviso: 'SOBREVENDIDA ' + z.restan,
-        motivo: 'hay ' + Math.abs(z.restan) + ' lugar(es) vendidos de más sobre el pedido'
-              + ' — revisar la pestaña «' + (pestana || '?') + '»' }));
-    }
+      sobrevendida: z.restan != null && z.restan < 0,
+      motivo: 'la zona está en PRÓXIMAMENTE: no está a la venta, así que no se cierra ni se abre'
+            + (z.restan != null && z.restan < 0 ? ' — pero su sobrecupo SÍ se reportó' : '') })); continue; }
 
     // 🔒 LA REGLA DE SEGURIDAD, Y VA COMO CONDICIÓN DE ENTRADA, NO COMO FILTRO
     // POSTERIOR: con `Pedido` 0 o vacío NO se toca la venta. Puesta después de

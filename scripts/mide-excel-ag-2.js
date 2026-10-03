@@ -143,7 +143,41 @@ console.log('\n[E] 🔒 EL CANDADO DE `prox` (aprobado 2-oct)');
   af(() => rr.prox_saltadas.some((x) => x.zona === 'Plata'), 'la zona `prox` no salió en su montón');
   af(() => !rr.cerradas.some((x) => x.zona === 'Plata'),
      '🔴 SE CERRÓ una zona `prox`: le cambia el letrero de PRÓXIMAMENTE a AGOTADO, que es lo contrario de lo que pasa');
-  af(() => !rr.sobrevendidas.some((x) => x.zona === 'Plata'), 'una zona `prox` salió en sobrevendidas');
+  // ⚠️ Plata aquí trae `Restan 0`, que NO es sobrevendida: esta aserción pasa por
+  // la razón correcta, y por eso NO era la que cazaba el defecto de abajo.
+  af(() => !rr.sobrevendidas.some((x) => x.zona === 'Plata'), 'un Restan 0 en zona `prox` salió como sobrevendida');
+
+  // ══ 🔴 EL CASO QUE CAZÓ JANE: UNA ZONA `prox` SOBREVENDIDA SÍ TIENE QUE GRITAR
+  // El candado de `prox` se estaba TRAGANDO el aviso: caía en `prox_saltadas` y
+  // nunca salía en `sobrevendidas`. 🔒 Su formulación es la ley: **el candado
+  // protege la VENTA, pero un AVISO NO ES UNA VENTA.** Que no se pueda cerrar una
+  // zona no vuelve invisible que alguien vendió lugares de más en ella.
+  // Mi careo NO lo cazaba porque mi fixture de `prox` tenía `Restan 0`: la
+  // aserción pasaba en vacío sobre el caso que importaba.
+  {
+    // VIP: prox:1 Y Restan −1 — las dos cosas a la vez, que es el caso real.
+    const fichaProxNeg = FICHA.map((z) => z.n === 'VIP' ? { n: 'VIP', ag: false, prox: true } : z);
+    const conPed = FILAS.map((f) => f.slice());
+    conPed[5][3] = '6';                       // VIP: Pedido 0 → 6, Restan sigue en −1
+    const pn = D.clasificar({ filas: conPed, fichaZonas: fichaProxNeg,
+                              pestana: 'Ricardo Arjona - 5 de diciembre', eventoId: 'arjona' });
+    const sv = pn.sobrevendidas.find((x) => x.zona === 'VIP');
+    console.log('    VIP prox:1 + Restan −1 → grita: ' + !!sv
+      + '  ·  en prox_saltadas: ' + pn.prox_saltadas.some((x) => x.zona === 'VIP')
+      + '  ·  cerrada: ' + pn.cerradas.some((x) => x.zona === 'VIP'));
+    af(() => !!sv,
+       '\u{1F534} una zona `prox` SOBREVENDIDA no grita: el candado se tragó el aviso (el defecto de Jane)');
+    af(() => sv && sv.aviso === 'SOBREVENDIDA -1', 'el aviso no trae el número: «' + (sv && sv.aviso) + '»');
+    af(() => sv && sv.prox === true, 'el aviso no dice que la zona es `prox`');
+    af(() => sv && /PRÓXIMAMENTE/.test(sv.motivo),
+       'el motivo no explica que no se cierra pero el sobrecupo es real');
+    // 🔒 Y LA VENTA SIGUE PROTEGIDA: grita, pero NO se cierra.
+    af(() => !pn.cerradas.some((x) => x.zona === 'VIP'),
+       '\u{1F534} al arreglar el aviso se rompió el candado: una zona `prox` se CERRÓ');
+    af(() => pn.prox_saltadas.some((x) => x.zona === 'VIP'), 'la zona `prox` dejó de salir en su propio montón');
+    af(() => pn.prox_saltadas.find((x) => x.zona === 'VIP').sobrevendida === true,
+       'el montón de prox no dice que esa zona además está sobrevendida');
+  }
   // CONTROL POSITIVO: sin `prox`, esa MISMA zona sí se cierra.
   af(() => cls().cerradas.some((x) => x.zona === 'Plata'),
      '🔴 CONTROL POSITIVO: sin `prox` Plata TENÍA que cerrarse — el candado no es el que decide');
@@ -157,6 +191,18 @@ console.log('\n[F] 🔒 SIN FICHA: se ignora y se LISTA');
         && !rr.reactivadas.some((x) => x.zona === 'Diamante'),
      '🔴 se gobernó una zona que la ficha no tiene');
   af(() => rr.sin_ficha[0] && /no existe en la ficha/.test(rr.sin_ficha[0].motivo), 'el motivo no dice por qué');
+  // ⚠️ Y si además está sobrevendida, el número VIAJA en su renglón — la lógica de
+  // Jane un nivel más allá: no se gobierna, pero el sobrecupo es real.
+  {
+    const sinNeg = D.clasificar({ filas: FILAS, pestana: 'x', eventoId: 'arjona',
+      fichaZonas: FICHA.filter((z) => z.n !== 'Platino') });   // Platino: Restan −7
+    const p = sinNeg.sin_ficha.find((x) => x.zona === 'Platino');
+    af(() => p && p.sobrevendida === true, 'una zona sin ficha y sobrevendida no lo dice en su renglón');
+    af(() => p && /SOBREVENDIDA -7/.test(p.motivo), 'el motivo no trae el número del sobrecupo');
+    // 🔒 Y NO se cuela al montón de las gobernables.
+    af(() => !sinNeg.sobrevendidas.some((x) => x.zona === 'Platino'),
+       'una zona SIN ficha se coló a `sobrevendidas`: ese montón es de zonas que SÍ se pueden arreglar');
+  }
 }
 
 console.log('\n[G] la posición del bloque VARÍA, y el fixture lo prueba');

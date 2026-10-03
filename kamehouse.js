@@ -293,7 +293,16 @@ async function khAdminFetch(url, options) {
 //    reintento ya no ve lo aplicado— y el arnés lo AFIRMA en vez de darlo
 //    por sabido (mide-careo-retry-1, sección [I]).
 // 🔒 Sigue subiendo SOLO un índice. Jamás montos.
-const _KH_CAREO_TRANSITORIOS = ['NO_ES_JSON', 'SIN_RESPUESTA'];
+// 🔴 [COSECHA-REDIRECT-1] **SIN_TOKEN FALTABA, Y ERA UNO DE LOS DOS MEDIDOS.**
+// El acta de arriba dice, del 28-sep, «29 cosechas contestaron una PÁGINA o
+// SOLO POST» — y «solo POST» ES el SIN_TOKEN del `doGet` del .gs. La lista se
+// escribió al lado de esa prosa y se quedó con uno de los dos: la lista a mano
+// al lado de la realidad. Así que el 3-oct, con Jane pidiendo trueno, el código
+// que más se repitió era justo el que NO se reintentaba.
+// 🔒 Y no es una falla de configuración, está medido en `_lib/cosecha-excel`:
+// sin env var sale SIN_CONFIG y con token malo sale TOKEN_INVALIDO, así que la
+// única forma de ver SIN_TOKEN es que la redirección de Google se degradara.
+const _KH_CAREO_TRANSITORIOS = ['SIN_TOKEN', 'NO_ES_JSON', 'SIN_RESPUESTA'];
 
 function _khEsperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 

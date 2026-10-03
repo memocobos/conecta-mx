@@ -167,6 +167,71 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴🔒 **AG-CERO-FALSO-1 · EL CERO QUE SALÍA POR CONSTRUCCIÓN (3-oct-2026).** Jane
+  verificó la sección de EXCEL-AG-2 en navegador contra producción, **por el botón**, y
+  la pantalla se pintaba **con un CERO FALSO**: «ZONAS A CERRAR · 0 — ninguna», sin
+  botón, con la palomita prendida y el Excel proponiendo cerrar «Perfil».
+
+  **LA CAUSA, leída en el camino real.** `admin-excel-aplicar` arma la vista previa con
+  `planear(careo, { solo:null, claves:null })`, y mi opt-in de seguridad
+  (`o.disponibilidad === true || solo === 'disponibilidad'`) dejaba la disponibilidad
+  **sin calcular**. O sea que **el 0 no salía del Excel: salía por construcción.** Mi
+  propio bloque `[SEG]` lo demostraba desde el día que lo escribí — `{}` → `ag_cerrar 0`.
+
+  🔒 **EL ARREGLO DE SEGURIDAD ESTABA BIEN PARA APLICAR Y MAL PARA ENSEÑAR.** Palabra de
+  Jane, y es la ley: **enseñar no es aplicar — calcular los montones para la pantalla no
+  escribe nada.** Así que ahora son DOS CAMPOS, y la separación es **estructural, no una
+  convención de llamada**:
+
+  | campo | quién lo usa | cuándo se llena |
+  |---|---|---|
+  | `ag_propuesta` | **la pantalla**, para enseñar | SIEMPRE que el bloque se pudo leer |
+  | `ag_cerrar` / `ag_abrir` | **`ejecutarPlan`**, para escribir | solo con opt-in explícito, acotado por `claves` |
+
+  El clic global sigue sin poder escribir en la ficha —el hueco que cazó Jane el 2-oct— y
+  la vista previa ya enseña. `ag_propuesta` va **sin** el filtro de `claves` a propósito:
+  es la foto completa de lo que el Excel propone, y la vista previa es donde se ve entera.
+
+  🔒 **Y UN HUECO NO SE DICE «0 · NINGUNA».** Si `ag_propuesta` viene en `null`, la
+  sección dice **que no se calculó**, con su razón. «Ninguna» es una **afirmación sobre
+  el Excel**, y en ese caso no se midió nada. `null` y `{cerrar:[],abrir:[]}` no se
+  aplastan: *un cero es una afirmación*, y **un cero falso es justo lo que los cuatro
+  estados existían para impedir** — y aun así se colaba por este campo.
+
+  🔴 **MI COMENTARIO PROMETÍA LO QUE EL CÓDIGO NO HACÍA.** En `_excelAgHtml` estaba
+  escrito «si el estado es `no_pedido` hay propuesta pero ESTA petición no la pidió: **se
+  enseña igual (para eso es la vista previa)**» — y el código pintaba de `ag_cerrar`, que
+  en toda vista previa viene vacío. Es *un candado prometido en un comentario*, otra vez.
+
+  🔴 **Y LA MITAD DEL MÉTODO: MI «VERIFICACIÓN EN NAVEGADOR» RENDERIZÓ CON DATOS A MANO.**
+  Por eso el hueco pasó: medí **la promesa del comentario**, no el camino. La corrección
+  de Jane es ley y ya vive en el careo: **el careo de la pantalla entra por el botón real**
+  (Comparar → Aplicar el careo…), con el handler de verdad, y la respuesta se le da a la
+  pantalla de verdad.
+
+  **Careo:** `npm run mide:excel-ag-pantalla` — **60 aserciones**, con la sección `[F]`
+  nueva que recorre **handler real → vista previa → pantalla → segundo clic → ficha**:
+  - 🔒 **control positivo:** el MISMO camino en `9e166d3` **reproduce el cero falso de
+    Jane** (`ag_cerrar=0`, 0 botones, «— ninguna»);
+  - la vista previa **no escribe nada** (0 escrituras) y trae `ag_cerrar` **vacío**;
+  - la pantalla enseña «Perfil · pedido 2 · restan 0» y **un** botón con
+    `{solo:'disponibilidad', claves:['Perfil']}`;
+  - 🔒 el **clic global con `confirmar`** sigue sin meter `ag` al plan y sin tocar la ficha;
+  - **la otra mitad de la puerta:** el segundo clic —con el alcance **sacado del botón que
+    la pantalla pintó**— escribe UN PATCH, cierra solo «Perfil», deja «Oro» byte a byte,
+    y el resultado pide `requiere_publicar`.
+
+  🔴 **Tres rojos del arnés fueron MÍOS, y los tres valen de lección:** (1) limpiaba la
+  caché de `require` **después** de parchar al guardia, así que me borraba el parche — *el
+  orden es parte del arreglo*; (2) el fixture de la ficha copió el literal del index
+  (`n:'Pista'`, comillas simples) cuando **la columna de `esferas_eventos` habla JSON
+  estricto** (`"n":"Perfil"`, y el escritor pone `"ag":1`) — **las dos formas existen de
+  verdad y no son la misma**; (3) afirmé `requiere_publicar` **en el cuerpo del PATCH**
+  cuando vive en el **resultado** que lee la pantalla.
+
+  ⏳ **PENDIENTE DE JANE:** la verificación en navegador contra producción, con captura,
+  por el botón — y después el cierre de «Perfil» que aplica Memo.
+
 - 🔴🔒 **COSECHA-REDIRECT-1 · EL POST QUE VOLVÍA GET (3-oct-2026).** Jane intentó
   verificar la sección de EXCEL-AG-2 en navegador contra producción y **la cosecha por
   evento de trueno nunca llegó a contestar**: tres corridas del botón «Comparar con

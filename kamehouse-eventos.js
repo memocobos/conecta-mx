@@ -932,7 +932,27 @@ function _excelAgHtml(p) {
     </div>`;
   }
   const av = p.ag_avisos || {};
-  const cerrar = p.ag_cerrar || [], abrir = p.ag_abrir || [];
+  // 🔴🔒 [AG-CERO-FALSO-1] SE PINTA DE `ag_propuesta`, NO DE `ag_cerrar`.
+  // `ag_cerrar`/`ag_abrir` son lo que el servidor va a ESCRIBIR, y están vacías a
+  // propósito cuando la petición no pidió aplicar — que es SIEMPRE el caso de la
+  // vista previa. Pintar de ahí le enseñaba a Jane «ZONAS A CERRAR · 0 — ninguna»
+  // con la palomita prendida y el Excel proponiendo cerrar «Perfil».
+  // 🔒 Y el comentario de abajo PROMETÍA esto («se enseña igual, para eso es la
+  // vista previa») mientras el código hacía lo contrario: un candado prometido en
+  // un comentario. Mi careo no lo cazó porque le pasé los datos A MANO — probé la
+  // promesa, no el camino.
+  const prop = p.ag_propuesta || null;
+  // 🔒 UN HUECO NO SE DICE «0 · NINGUNA». Si no se calculó, se dice que no se
+  // calculó: «ninguna» es una AFIRMACIÓN sobre el Excel, y aquí no se midió nada.
+  if (!prop) {
+    return `<div class="alert alert-error" style="margin-top:12px">
+      <b>Disponibilidad: la palomita está prendida y la propuesta NO se calculó en esta respuesta.</b>
+      No se enseña «0 zonas» porque eso sería afirmar que el Excel no propone nada, y eso no se midió.
+      Vuelve a correr «Comparar con Excel»; si sigue igual, es un defecto del servidor
+      (<code>ag_propuesta</code> vino en null con <code>ag_estado=${_evtEsc(est)}</code>).
+    </div>`;
+  }
+  const cerrar = prop.cerrar || [], abrir = prop.abrir || [];
   const sv = av.sobrevendidas || [], vsp = av.vendo_sin_pedido || [],
         sf = av.sin_ficha || [], px = av.prox_saltadas || [];
 

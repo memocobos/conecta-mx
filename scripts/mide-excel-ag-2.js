@@ -101,7 +101,7 @@ console.log('\n[B] 🔒 LA SEGURIDAD: con Pedido 0 NO se cierra — con su CONTR
      'el Pedido vacío no se distingue del cero en el motivo');
 }
 
-console.log('\n[C] 🔴 SOBREVENDIDA: sale AUNQUE también se cierre');
+console.log('\n[S] 🔴 SOBREVENDIDA: sale AUNQUE también se cierre');
 {
   const conPedido = FILAS.map((f) => f.slice());
   conPedido[6][3] = '5';                        // Platino: Pedido 0 → 5, Restan −7
@@ -183,6 +183,93 @@ console.log('\n[E] 🔒 EL CANDADO DE `prox` (aprobado 2-oct)');
      '🔴 CONTROL POSITIVO: sin `prox` Plata TENÍA que cerrarse — el candado no es el que decide');
 }
 
+// ═══ [C] 🔴 EL SITIO DE LA FICHA — donde un error CORROMPE EL CATÁLOGO ═════
+// Medido en ZONA-EXCEL-MANDA-1: en un multifecha las zonas viven en SEIS sitios.
+// Para `karolg#1` el `ag` va en `multifecha[1]` y JAMÁS en las globales — tocarlas
+// cerraría la zona para LAS TRES fechas.
+console.log('\n[C] el `ag` se escribe en multifecha[idx], y lo de al lado queda BYTE A BYTE');
+{
+  // Ficha con la FORMA real de karolg: globales + 3 fechas, «Poniente Baja» en todas.
+  const z = (n, extra) => '{"n":"' + n + '"' + (extra || '') + '}';
+  const lista = (sufijo) => '[' + z('VIP A', ',"p":9200') + ',' + z('Poniente Baja', ',"p":7200' + (sufijo || '')) + ',' + z('Norte General', ',"p":4600,"ag":1') + ']';
+  const FICHA_ROW = {
+    zonas: lista(), cheap_zonas: lista(),
+    multifecha: '[{"lbl":"6 Noviembre","zonas":' + lista() + ',"cheapZonas":' + lista() + '},'
+              + '{"lbl":"7 Noviembre","zonas":' + lista() + ',"cheapZonas":' + lista() + '},'
+              + '{"lbl":"8 Noviembre","zonas":' + lista() + ',"cheapZonas":' + lista() + '}]',
+  };
+  const r = D.aplicarAgEnFicha(Object.assign({}, FICHA_ROW,
+    { eventoId: 'karolg#1', zona: 'Poniente Baja', ag: true }));
+  console.log('    tocadas: ' + r.detalle.tocadas + ' · donde: ' + JSON.stringify(r.detalle.donde));
+  af(() => !r.error, 'error: ' + r.error);
+  af(() => r.detalle.tocadas === 2, 'tenía que tocar 2 sitios (zonas y cheapZonas de la fecha), tocó ' + r.detalle.tocadas);
+  af(() => JSON.stringify(r.detalle.donde) === '["multifecha[1].zonas","multifecha[1].cheapZonas"]',
+     'los sitios tocados no son los de la fecha 1: ' + JSON.stringify(r.detalle.donde));
+  // 🔴 LO QUE NO SE TOCA, BYTE A BYTE
+  af(() => r.cambios.zonas === undefined,
+     '\u{1F534} SE TOCÓ `zonas` GLOBAL: eso cierra la zona para LAS TRES fechas');
+  af(() => r.cambios.cheap_zonas === undefined, '\u{1F534} SE TOCÓ `cheap_zonas` GLOBAL');
+  af(() => typeof r.cambios.multifecha === 'string', 'no devolvió el multifecha nuevo');
+  // Las OTRAS fechas, byte a byte
+  const trozos = (t) => D.partirArreglo(t).partes;
+  const antes = trozos(FICHA_ROW.multifecha), desp = trozos(r.cambios.multifecha);
+  af(() => antes.length === desp.length && desp.length === 3, 'cambió el número de fechas');
+  af(() => desp[0] === antes[0], '\u{1F534} la fecha [0] CAMBIÓ — se escribió en la fecha equivocada');
+  af(() => desp[2] === antes[2], '\u{1F534} la fecha [2] CAMBIÓ');
+  af(() => desp[1] !== antes[1], 'la fecha [1] NO cambió: no se escribió nada');
+  // Y dentro de la fecha 1, SOLO esa zona
+  // ⚠️ NO se mide la POSICIÓN de la llave: `ponerAg` la inserta junto a `"n"`, que
+  // es la única que siempre existe, así que sale `{"n":…,"ag":1,"p":…}`. Mi primera
+  // aserción exigía `…,"p":7200,"ag":1}` y salió ROJA contra código correcto: medía
+  // el ORDEN de las llaves —cosmética— en vez del HECHO. El compilador hace
+  // JSON.parse, así que lo que importa es el OBJETO, no la cadena.
+  {
+    const fecha1 = JSON.parse(desp[1]);
+    const pb = fecha1.zonas.find((x) => x.n === 'Poniente Baja');
+    af(() => pb && pb.ag === 1, 'la zona no quedó con ag:1 (parseado): ' + JSON.stringify(pb));
+    af(() => pb && pb.p === 7200, '🔴 se perdió el PRECIO al escribir el ag: ' + JSON.stringify(pb));
+    const pbc = fecha1.cheapZonas.find((x) => x.n === 'Poniente Baja');
+    af(() => pbc && pbc.ag === 1, 'la cheapZonas de la fecha no quedó con ag:1');
+  }
+  af(() => (desp[1].match(/"n":"VIP A","p":9200\}/g) || []).length === 2,
+     '\u{1F534} se tocó «VIP A», que no era la zona');
+  af(() => (desp[1].match(/"ag":1/g) || []).length === 4,
+     'los `ag:1` de la fecha 1 debían ser 4 (2 de Norte General + 2 nuevos), son '
+     + (desp[1].match(/"ag":1/g) || []).length);
+  // 🔒 Y EL JSON SIGUE SIENDO JSON (parsear no es funcionar, pero no parsear SÍ es romper)
+  af(() => { JSON.parse(r.cambios.multifecha); return true; }, '\u{1F534} el multifecha resultante NO PARSEA');
+  af(() => JSON.parse(r.cambios.multifecha)[1].zonas.find((x) => x.n === 'Poniente Baja').ag === 1,
+     'parseado, la zona no trae ag:1');
+
+  // ── ABRIR (reactivar) ──
+  const ab = D.aplicarAgEnFicha(Object.assign({}, FICHA_ROW,
+    { eventoId: 'karolg#0', zona: 'Norte General', ag: false }));
+  af(() => ab.detalle.tocadas === 2, 'abrir tocaba 2 sitios, tocó ' + ab.detalle.tocadas);
+  af(() => /"n":"Norte General","p":4600,"ag":0/.test(trozos(ab.cambios.multifecha)[0]),
+     'al abrir no quedó en ag:0');
+  af(() => trozos(ab.cambios.multifecha)[1] === antes[1], 'al abrir la fecha [0] se tocó la [1]');
+  // 🔒 Abrir una zona que NUNCA tuvo `ag` es un NO-OP: no se inventa la llave.
+  const noop = D.aplicarAgEnFicha(Object.assign({}, FICHA_ROW,
+    { eventoId: 'karolg#0', zona: 'VIP A', ag: false }));
+  af(() => noop.detalle.tocadas === 0,
+     'abrir una zona sin `ag` escribió algo: una llave que nadie puso no la añade un cierre que no ocurrió');
+
+  // ── FECHA ÚNICA: ahí SÍ van las globales ──
+  const uni = D.aplicarAgEnFicha(Object.assign({}, FICHA_ROW,
+    { eventoId: 'arjona', zona: 'Poniente Baja', ag: true }));
+  af(() => uni.detalle.tocadas === 2 && uni.cambios.zonas && uni.cambios.cheap_zonas,
+     'en un evento de fecha única tenían que tocarse las dos globales');
+  af(() => uni.cambios.multifecha === undefined, 'en fecha única se tocó el multifecha');
+
+  // ── LOS ERRORES SE DICEN, no se devuelven vacíos ──
+  const mal = D.aplicarAgEnFicha({ zonas: FICHA_ROW.zonas, cheap_zonas: FICHA_ROW.cheap_zonas,
+    multifecha: FICHA_ROW.multifecha, eventoId: 'karolg#9', zona: 'Poniente Baja', ag: true });
+  af(() => !!mal.error && /fecha #9/.test(mal.error), 'una fecha que no existe no dice el motivo');
+  const noZona = D.aplicarAgEnFicha(Object.assign({}, FICHA_ROW,
+    { eventoId: 'karolg#1', zona: 'Zona Que No Existe', ag: true }));
+  af(() => noZona.detalle.tocadas === 0, 'una zona inexistente tocó algo');
+}
+
 console.log('\n[F] 🔒 SIN FICHA: se ignora y se LISTA');
 {
   const rr = cls({ fichaZonas: FICHA.filter((z) => z.n !== 'Diamante') });
@@ -203,6 +290,36 @@ console.log('\n[F] 🔒 SIN FICHA: se ignora y se LISTA');
     af(() => !sinNeg.sobrevendidas.some((x) => x.zona === 'Platino'),
        'una zona SIN ficha se coló a `sobrevendidas`: ese montón es de zonas que SÍ se pueden arreglar');
   }
+}
+
+// ═══ [F2] 🔒 EL ORDEN DE `sin_ficha` ES UN HECHO ═════════════════════
+// Palabra de Memo (2-oct): las sobrevendidas van HASTA ARRIBA, por su Restan.
+// Entre 176 renglones un −4 se pierde — y esas son las fichas que completa primero.
+console.log('\n[F2] el orden del listado sin_ficha');
+{
+  // Ninguna zona en la ficha: las 6 caen a sin_ficha, con Restan 1,2,0,2,−1,−7.
+  const rr = D.clasificar({ filas: FILAS, fichaZonas: [], pestana: 'x', eventoId: 'arjona' });
+  const orden = rr.sin_ficha.map((x) => x.zona + '(' + x.restan + ')');
+  console.log('    orden: ' + orden.join(' · '));
+  af(() => rr.sin_ficha.length === 6, 'cayeron ' + rr.sin_ficha.length + ' a sin_ficha, eran 6');
+  af(() => rr.sin_ficha_sobrevendidas === 2, 'el conteo de sobrevendidas sin ficha dio ' + rr.sin_ficha_sobrevendidas);
+  // 🔴 Las dos negativas, ARRIBA, y la más negativa PRIMERO.
+  af(() => rr.sin_ficha[0].zona === 'Platino' && rr.sin_ficha[0].restan === -7,
+     '\u{1F534} la más negativa (−7) no quedó primera: quedó «' + rr.sin_ficha[0].zona + '»');
+  af(() => rr.sin_ficha[1].zona === 'VIP' && rr.sin_ficha[1].restan === -1,
+     'la segunda más negativa (−1) no quedó segunda');
+  af(() => rr.sin_ficha.slice(0, 2).every((x) => x.sobrevendida),
+     'las dos primeras no son las sobrevendidas');
+  af(() => rr.sin_ficha.slice(2).every((x) => !x.sobrevendida),
+     '\u{1F534} una sobrevendida quedó ENTERRADA bajo las demás');
+  // 🔒 CONTROL POSITIVO DEL ORDEN: sin ordenar, el −7 NO sale primero — el
+  // orden natural de lectura del bloque pone Diamante arriba. Si este control
+  // pasara, el orden no lo estaría poniendo el código.
+  const natural = ['Diamante', 'Oro', 'Plata', 'Primer Nivel', 'VIP', 'Platino'];
+  af(() => natural[0] !== rr.sin_ficha[0].zona,
+     'CONTROL POSITIVO: el primero coincide con el orden de lectura — el `sort` no está haciendo nada');
+  // Y el número se VE en el motivo, no solo en un campo.
+  af(() => /SOBREVENDIDA -7/.test(rr.sin_ficha[0].motivo), 'el número no se ve en el renglón');
 }
 
 console.log('\n[G] la posición del bloque VARÍA, y el fixture lo prueba');

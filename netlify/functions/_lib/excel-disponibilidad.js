@@ -227,12 +227,157 @@ function clasificar({ filas, fichaZonas, reglaZona, pestana, eventoId }) {
     }
   }
 
+  // 🔒 EL ORDEN DE `sin_ficha` ES UN HECHO, NO COSMÉTICA — palabra de Memo
+  // (2-oct): las SOBREVENDIDAS van HASTA ARRIBA, ordenadas por su `Restan` (la más
+  // negativa primero). **Entre 176 renglones un −4 se pierde**, y esas son
+  // justamente las fichas que él va a completar primero. Un listado que entierra
+  // su propio dato urgente es un listado que nadie lee dos veces.
+  sinFicha.sort((a, b) => {
+    const na = a.sobrevendida ? 1 : 0, nb = b.sobrevendida ? 1 : 0;
+    if (na !== nb) return nb - na;                       // las sobrevendidas, arriba
+    if (na) return (a.restan || 0) - (b.restan || 0);    // la más negativa, primero
+    return String(a.evento_id || '').localeCompare(String(b.evento_id || ''))
+        || String(a.zona).localeCompare(String(b.zona));
+  });
+
   return { ok: true, bloque: { fila: ub.fila, col: ub.col, cols: ub.cols },
            zonas_leidas: zonas.length,
            cerradas, reactivadas, sobrevendidas,
            vendo_sin_pedido: vendoSinPedido, sin_ficha: sinFicha,
+           sin_ficha_sobrevendidas: sinFicha.filter((x) => x.sobrevendida).length,
            prox_saltadas: proxSaltadas };
 }
 
 module.exports = { clasificar, ubicarBloque, leerZonas, leerNum,
                    MAX_FILAS_BLOQUE, ANCHO_BLOQUE };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// APLICAR EL `ag` EN LA FICHA — la pieza donde un error corrompe el catálogo
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔴 EL SITIO NO ES OBVIO, Y YA LO MEDÍ EN ZONA-EXCEL-MANDA-1: en un multifecha
+// las zonas viven en SEIS sitios (`zonas`, `cheap_zonas`, y dentro de cada fecha
+// de `multifecha` sus `zonas` y `cheapZonas`). Para `karolg#1` el `ag` va en
+// `multifecha[1]` y **jamás** en las globales: tocarlas cerraría la zona para
+// LAS TRES fechas. El índice sale del sufijo del `evento_id`, que es la misma
+// llave que ya usa `regla_zona`.
+//
+// 🔒 Y SE EDITA QUIRÚRGICAMENTE, NO RE-SERIALIZANDO. Parsear y volver a escribir
+// el JSON entero cambiaría bytes que nadie pidió (orden de llaves, espaciado) y
+// volvería imposible afirmar que las otras fechas quedaron igual. Aquí se parte
+// el arreglo por BALANCE DE LLAVES, se toca SOLO el elemento que cambia y se
+// rejunta con sus separadores originales — así el careo puede exigir que los
+// hermanos queden byte a byte.
+
+// Parte un texto `[{...},{...}]` en sus elementos de nivel 1, conservando lo que
+// hay ENTRE ellos (comas, espacios) para poder rejuntar sin inventar formato.
+function partirArreglo(texto) {
+  const t = String(texto == null ? '' : texto);
+  const ini = t.indexOf('[');
+  if (ini < 0) return null;
+  const partes = [], seps = [];
+  let d = 0, desde = -1, cursor = ini + 1, fin = -1;
+  for (let i = ini + 1; i < t.length; i++) {
+    const c = t[i];
+    if (c === '{') { if (d === 0) { seps.push(t.slice(cursor, i)); desde = i; } d++; }
+    else if (c === '}') { d--; if (d === 0) { partes.push(t.slice(desde, i + 1)); cursor = i + 1; } }
+    else if (c === ']' && d === 0) { fin = i; break; }
+  }
+  if (fin < 0) return null;
+  return { prefijo: t.slice(0, ini + 1), partes, seps, cola: t.slice(cursor, fin), sufijo: t.slice(fin) };
+}
+function juntarArreglo(p) {
+  let out = p.prefijo;
+  for (let i = 0; i < p.partes.length; i++) out += (p.seps[i] != null ? p.seps[i] : (i ? ',' : '')) + p.partes[i];
+  return out + p.cola + p.sufijo;
+}
+
+// Pone o quita `ag` en UN objeto de zona, sin tocar nada más de ese objeto.
+// `ag:1` cuando se cierra; cuando se abre se pone `ag:0` si la llave existía, y
+// si no existía NO se inventa — una llave que nadie escribió no la añade un
+// cierre que no ocurrió.
+function ponerAg(objTexto, ag) {
+  const t = String(objTexto);
+  if (/"ag"\s*:/.test(t)) return t.replace(/("ag"\s*:\s*)(?:true|false|-?\d+)/, '$1' + (ag ? 1 : 0));
+  if (!ag) return t;                       // abrir algo que nunca estuvo cerrado: no-op
+  // Se inserta junto al nombre, que es la llave que siempre existe.
+  return t.replace(/("n"\s*:\s*"(?:[^"\\]|\\.)*")/, '$1,"ag":1');
+}
+
+// Cambia el `ag` de UNA zona dentro de un texto de arreglo de zonas.
+// Devuelve { texto, tocadas } — `tocadas` es cuántos objetos cambiaron, y el
+// llamador lo AFIRMA: cero significa que la zona no estaba, y más de uno que el
+// nombre no es único.
+function agEnArreglo(texto, zona, ag) {
+  const p = partirArreglo(texto);
+  if (!p) return { texto: texto, tocadas: 0, error: 'no es un arreglo' };
+  const k = normalizarZona(zona);
+  let tocadas = 0;
+  p.partes = p.partes.map((o) => {
+    const m = /"n"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(o);
+    if (!m || normalizarZona(m[1]) !== k) return o;
+    const nuevo = ponerAg(o, ag);
+    if (nuevo !== o) tocadas++;
+    return nuevo;
+  });
+  return { texto: juntarArreglo(p), tocadas };
+}
+
+// El sitio: para `slug#idx` es la fecha idx del multifecha; si no, las globales.
+function sitioDe(eventoId) {
+  const m = /^(.+?)#(\d+)$/.exec(String(eventoId || ''));
+  return m ? { slug: m[1], idx: Number(m[2]), multifecha: true }
+           : { slug: String(eventoId || ''), idx: null, multifecha: false };
+}
+
+// Aplica el cambio sobre los TRES campos de la fila de `esferas_eventos`.
+// Devuelve solo los que CAMBIAN, para que el PATCH no toque lo que no movió.
+function aplicarAgEnFicha({ zonas, cheap_zonas, multifecha, eventoId, zona, ag }) {
+  const sitio = sitioDe(eventoId);
+  const cambios = {}, detalle = { sitio, tocadas: 0, donde: [] };
+
+  if (!sitio.multifecha) {
+    for (const [campo, txt] of [['zonas', zonas], ['cheap_zonas', cheap_zonas]]) {
+      if (!txt) continue;
+      const r = agEnArreglo(txt, zona, ag);
+      if (r.tocadas) { cambios[campo] = r.texto; detalle.tocadas += r.tocadas; detalle.donde.push(campo); }
+    }
+    return { cambios, detalle };
+  }
+
+  // MULTIFECHA: solo la fecha `idx`, y dentro de ella sus dos listas.
+  if (!multifecha) return { cambios, detalle, error: 'el evento es multifecha y la ficha no trae `multifecha`' };
+  const p = partirArreglo(multifecha);
+  if (!p) return { cambios, detalle, error: '`multifecha` no es un arreglo legible' };
+  if (!p.partes[sitio.idx]) return { cambios, detalle, error: 'la ficha no tiene la fecha #' + sitio.idx };
+
+  let el = p.partes[sitio.idx];
+  for (const llave of ['zonas', 'cheapZonas']) {
+    // 🔒 Se corta la sub-lista por su llave Y por balance, no por `indexOf` de la
+    // siguiente: el ancla también vive anidada, y un corte por texto cae dentro
+    // del dato de adentro.
+    const re = new RegExp('"' + llave + '"\\s*:\\s*\\[');
+    const m = re.exec(el);
+    if (!m) continue;
+    const desde = m.index + m[0].length - 1;
+    let d = 0, hasta = -1;
+    for (let i = desde; i < el.length; i++) {
+      if (el[i] === '[') d++;
+      else if (el[i] === ']') { d--; if (d === 0) { hasta = i; break; } }
+    }
+    if (hasta < 0) continue;
+    const sub = el.slice(desde, hasta + 1);
+    const r = agEnArreglo(sub, zona, ag);
+    if (r.tocadas) {
+      el = el.slice(0, desde) + r.texto + el.slice(hasta + 1);
+      detalle.tocadas += r.tocadas;
+      detalle.donde.push('multifecha[' + sitio.idx + '].' + llave);
+    }
+  }
+  if (detalle.tocadas) { p.partes[sitio.idx] = el; cambios.multifecha = juntarArreglo(p); }
+  return { cambios, detalle };
+}
+
+module.exports.aplicarAgEnFicha = aplicarAgEnFicha;
+module.exports.agEnArreglo = agEnArreglo;
+module.exports.partirArreglo = partirArreglo;
+module.exports.sitioDe = sitioDe;

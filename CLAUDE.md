@@ -341,6 +341,17 @@ está caduco antes de escribirse.
 
   ✅ **FASE 2 APLICADA (2-oct, inmediatamente después del publish de Memo): los 30
   renglones.** `compras` **6** · `viajeros_evento` **23** · `rol_recordatorios` **1**.
+
+  🔒 **EL 26 DE JANE Y EL 30 MÍO CUADRAN SIN RESIDUO, Y SON PREGUNTAS DISTINTAS**
+  — la ley de ZONA-NORM-1, otra vez, y esta vez sin hoyo que buscar:
+  - **30 = los renglones ESCRITOS**, en tres tablas (6 + 23 + 1). Es la cifra del acta.
+  - **26 = el estado del universo de VIAJEROS**: las 23 movidas + las 2 de «Segundo
+    Nivel» que ya estaban + Cristyan. Su consulta no incluía `compras` ni
+    `rol_recordatorios`.
+  - Y el puente entre las dos: **31 filas tienen hoy un nombre nuevo, pero solo 30 se
+    movieron** — la 31 es Cristyan, que ya era «Beyond».
+  Los dos barridos son correctos; lo que no se puede es reportar uno como si
+  contestara el otro.
   Releídos par por par **en su ficha**: **CERO** ocurrencias de cualquier nombre viejo
   en las tres tablas. 🔒 `stock_ajustes` **no se tocó** — sus filas YA traían la
   ortografía nueva porque el careo canoniza desde la pestaña, y **ÉSA ERA LA DERIVA**:

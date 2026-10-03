@@ -1053,8 +1053,25 @@ function servir() {
     const mapea = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js'), 'utf8');
     af(/nombre:\s*\(e\.a != null\)/.test(mapea),
        'el catálogo ya no mapea `a` → `nombre`: el fixture de este careo dejó de parecerse a producción');
-    const EVT = { ds: '2026-11-06', nombre: 'Karol G en Monterrey' };
-    const htmlC = CC._correoHtml('Ana Pérez', 'https://x/#karolg', PROMO, EVT);
+    const EVT = { ds: '2026-11-06', nombre: 'Karol G en Monterrey',
+      // [CONSUELO-PAQ-1] karolg es MULTIFECHA y el correo anuncia LAS TRES.
+      dsList: ['2026-11-06', '2026-11-07', '2026-11-08'] };
+    // 🔴 [CONSUELO-PAQ-1] ESTE ARNÉS SE CAYÓ AL MERGEAR ESA TUERCA, Y EL
+    // RAZONAMIENTO IMPORTA: `_correoHtml` ahora exige la promo del SITIO porque de
+    // ahí deriva la línea de paquetes, y se REHÚSA a renderizar sin ella. O sea que
+    // la caída era el fail-safe funcionando, no un defecto. El arnés se actualiza a
+    // la verdad nueva — no se silencia ni se deja tronando.
+    // 🔒 El `excludePkg` es el REAL de KAROL (leído del index servido): solo PLUS.
+    const SITIO = { amount: 500, desc: PROMO.texto, onlyEvent: 'karolg',
+                    excludePkg: ['ride', 'stay', 'cheap'] };
+    const htmlC = CC._correoHtml('Ana Pérez', 'https://x/#karolg', PROMO, EVT, SITIO);
+    // Y de paso queda vigilado lo que esta tuerca arregló, en SU careo también:
+    af(htmlC.includes('Aplica solo en PLUS.'),
+       'el consuelo no trae la línea de paquetes DERIVADA (solo PLUS para KAROL)');
+    af(!/>STAY</.test(htmlC) && !/>CHEAP</.test(htmlC),
+       '🔴 el consuelo menciona STAY o CHEAP con un código que NO aplica ahí');
+    af(htmlC.includes('6, 7 y 8 de noviembre'),
+       'el consuelo no anuncia las TRES fechas de karolg');
     af(typeof htmlC === 'string' && htmlC.length > 1000, 'el consuelo no imprimió HTML (cardinalidad)');
     af(htmlC.includes(EVT.nombre),
        'el consuelo no imprime el nombre derivado del catálogo («' + EVT.nombre + '»)');

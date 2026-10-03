@@ -141,6 +141,71 @@ function fechaEvento(ds) {
   return `${p.weekday} ${p.day} de ${p.month}`;
 }
 
+// [CONSUELO-PAQ-1] LAS FECHAS DE UN MULTIFECHA, EN PLURAL.
+// `ds` es la PRIMERA de la lista, y karolg tiene TRES (6, 7 y 8 de noviembre):
+// anunciar una sola no es falso, es INCOMPLETO — y el premio del sorteo era para
+// el 7, o sea la que no salía. Palabra de Memo (2-oct): van las tres.
+// 🔒 Se derivan de `dsList` (fechas de calendario), NO de `f`, que es una cadena
+// que cura un humano y podría decir cualquier cosa. Mismo trato que el resto del
+// correo: si no se puede leer, no se manda.
+function fechaEventos(evento) {
+  const lista = (evento && Array.isArray(evento.dsList) && evento.dsList.length)
+    ? evento.dsList : null;
+  if (!lista || lista.length < 2) return fechaEvento(evento && evento.ds);
+  // Cada fecha se valida con el MISMO candado que la singular (el año 0026 y el
+  // «2026-13-45» que se acomoda solo ya mordieron en esta casa).
+  const partes = lista.map((ds) => {
+    const mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ds || ''));
+    if (!mt) throw new Error(`fecha del evento ilegible en dsList: ${ds}`);
+    const d = new Date(Date.UTC(+mt[1], +mt[2] - 1, +mt[3], 12));
+    if (d.getUTCFullYear() !== +mt[1] || d.getUTCMonth() !== +mt[2] - 1 || d.getUTCDate() !== +mt[3]) {
+      throw new Error(`fecha del evento imposible en dsList: ${ds}`);
+    }
+    return _partes(d, 'UTC');
+  });
+  const meses = [...new Set(partes.map((x) => x.month))];
+  // ⚠️ SI CRUZAN DE MES, cada día lleva el suyo: «31 de octubre y 1 de noviembre».
+  // Decir «31, 1 de noviembre» sería mentir sobre uno de los dos días.
+  const trozos = meses.length === 1
+    ? partes.map((x) => x.day)
+    : partes.map((x) => `${x.day} de ${x.month}`);
+  const unidos = trozos.length === 2
+    ? trozos.join(' y ')
+    : trozos.slice(0, -1).join(', ') + ' y ' + trozos[trozos.length - 1];
+  return meses.length === 1 ? `${unidos} de ${meses[0]}` : unidos;
+}
+
+// [CONSUELO-PAQ-1] 🔴 LA LÍNEA DE PAQUETES SE DERIVA, y es la TERCERA cara del
+// mismo defecto que CONSUELO-VERDAD-1 ya arregló dos veces.
+// Decía TECLEADO «Aplica en PLUS, STAY y CHEAP (no aplica en RIDE)» y el KAROL
+// real trae `excludePkg:['ride','stay','cheap']` — o sea **SOLO PLUS**. Ese texto
+// describe a `LOOP`, que sí excluye solo RIDE: era cierto en la época en que el
+// consuelo se parecía a eso, y nadie volvió a leerlo. 157 personas habrían
+// intentado el código en STAY o CHEAP y el checkout se lo rechaza.
+// 🔒 Sale del MISMO `PROMOS` del index SERVIDO que esta function ya lee para
+// validar el código — no hay lectura nueva, y es la fuente que el cliente ve.
+const PAQUETES = ['PLUS', 'STAY', 'CHEAP', 'RIDE'];
+function paquetesPermitidos(sitio) {
+  if (!sitio) throw new Error('no se pudo leer la promo del sitio: sin ella la línea de paquetes sería inventada');
+  const ex = sitio.excludePkg;
+  // Ausente = no excluye nada (la semántica del propio index). Presente y que no
+  // sea lista = ilegible, y entonces NO SE MANDA: un «aplica en todos» por
+  // defecto es exactamente la mentira que esta tuerca viene a quitar.
+  if (ex != null && !Array.isArray(ex)) throw new Error('`excludePkg` del sitio no es una lista: no se manda');
+  const fuera = (Array.isArray(ex) ? ex : []).map((x) => String(x).trim().toUpperCase());
+  const perm = PAQUETES.filter((p) => fuera.indexOf(p) === -1);
+  if (!perm.length) throw new Error('el código no aplica en NINGÚN paquete: un descuento que no sirve para nada no se anuncia');
+  return perm;
+}
+function lineaPaquetes(perm) {
+  const fuera = PAQUETES.filter((p) => perm.indexOf(p) === -1);
+  const y = (a) => a.length === 1 ? a[0]
+    : a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1];
+  if (!fuera.length) return 'Aplica en cualquier paquete.';
+  if (perm.length === 1) return `Aplica solo en ${perm[0]}.`;
+  return `Aplica en ${y(perm)} (no aplica en ${fuera.join(' ni ')}).`;
+}
+
 // 🔒 LA TERCERA MENTIRA, la que no está en la plantilla: la FILA puede decir
 // «vigente hasta el 20» y el SITIO seguir diciendo «Código expirado». El index
 // no lee `promos_codigos`: lleva su copia en `var PROMOS`, y esa copia solo se
@@ -170,7 +235,10 @@ async function codigoEnElSitio(codigo, expiraFila, ahoraMs) {
   if (p.expiresTs !== Date.parse(expiraFila)) {
     return { error: `el sitio y la fila no vencen igual (sitio ${p.expiresTs ? new Date(p.expiresTs).toISOString() : 'sin vencimiento'} · fila ${expiraFila})` + publica };
   }
-  return { ok: true };
+  // [CONSUELO-PAQ-1] La promo del SITIO viaja: de aquí sale `excludePkg`, y así
+  // el index se lee UNA vez. Pedirlo otra vez sería una segunda lectura del
+  // mismo hecho, que es como se empieza a divergir.
+  return { ok: true, sitio: p };
 }
 
 const ASUNTO = 'No ganaste el sorteo… pero te tenemos algo 💜';
@@ -183,10 +251,11 @@ function escapeHtml(s) {
 // `promo` = { codigo, texto, expira } tal como lo devuelve promoViva; `evento` =
 // { ds } del catálogo. Las dos líneas se derivan AQUÍ, dentro del render que se
 // imprime: si truena, truena antes de escribirle a nadie.
-function correoHtml(nombre, link, promo, evento) {
+function correoHtml(nombre, link, promo, evento, sitio) {
   const { codigo, texto } = promo || {};
   const validez = lineaValidez(promo && promo.expira);
-  const cuando = fechaEvento(evento && evento.ds);
+  // [CONSUELO-PAQ-1] las TRES fechas si el evento es multifecha (palabra de Memo).
+  const cuando = fechaEventos(evento);
   // [GIVEAWAY-KG-1] EL NOMBRE DEL ARTISTA TAMBIÉN SE DERIVA. Estaba tecleado
   // («Natanael Cano») y es la MISMA forma que las dos fechas que esta tuerca ya
   // corrigió: un letrero de la época anterior dentro de una plantilla que nadie
@@ -194,6 +263,20 @@ function correoHtml(nombre, link, promo, evento) {
   // NO SE MANDA NADA — la regla de la casa en este archivo.
   const artista = String((evento && evento.nombre) || '').trim();
   if (!artista) throw new Error(`no se pudo leer el nombre de ${EVENTO_SLUG} del catálogo`);
+  // 🔴 EL ORDEN DE ESTAS GUARDAS ES PARTE DEL ARREGLO, y me lo cobró un rojo.
+  // Puse la del SITIO antes que la del ARTISTA y el caso «evento sin nombre» de
+  // `mide:giveaway-karolg` empezó a tronar por la razón equivocada: decía «no se
+  // pudo leer la promo del sitio» en vez de «no se pudo leer el nombre». Las dos
+  // se rehúsan a mandar, pero **mandan a buscar a sitios distintos**, y un motivo
+  // equivocado cuesta el tiempo de quien lo lee. Primero lo del EVENTO (fechas y
+  // nombre), después lo del SITIO. Misma ley que el `revento` de CAREO-RED-1.
+  // [CONSUELO-PAQ-1] los paquetes, DERIVADOS del `excludePkg` del sitio servido.
+  const perm = paquetesPermitidos(sitio);
+  const lineaPaq = lineaPaquetes(perm);
+  // 🔒 «en tu paquete PLUS» solo cuando hay UNO. Con dos o más no se puede
+  // nombrar sin elegir por el cliente, así que la frase se queda genérica y el
+  // renglón de abajo enumera. Inventar un paquete ahí sería el mismo defecto.
+  const enPaquete = perm.length === 1 ? ` en tu paquete ${perm[0]}` : '';
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(ASUNTO)}</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
@@ -209,8 +292,8 @@ function correoHtml(nombre, link, promo, evento) {
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">No salió tu nombre</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:32px;line-height:1.05;color:#e8ff4c;text-transform:uppercase;margin:0 0 16px 0">${escapeHtml(primero)}, no te vamos a dejar con las ganas</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para ${escapeHtml(artista)}… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${escapeHtml(codigo)}</strong> y llévate <strong style="color:#e8ff4c">${escapeHtml(texto)}</strong>.</p>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 20px 0">Aplica en <strong>PLUS</strong>, <strong>STAY</strong> y <strong>CHEAP</strong> (no aplica en RIDE).</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 16px 0">Sabemos que duele no haber ganado el boleto para ${escapeHtml(artista)}… pero te tenemos algo: usa el código <strong style="color:#e8ff4c">${escapeHtml(codigo)}</strong> y llévate <strong style="color:#e8ff4c">${escapeHtml(texto)}</strong>${escapeHtml(enPaquete)}.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 20px 0">${escapeHtml(lineaPaq)}</p>
       </td></tr>
       <tr><td style="padding:0 26px 20px 26px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000;border:1px dashed #e8ff4c">
@@ -258,6 +341,9 @@ exports._ASUNTO = ASUNTO;
 exports._lineaValidez = lineaValidez;
 exports._fechaEvento = fechaEvento;
 exports._codigoEnElSitio = codigoEnElSitio;
+exports._fechaEventos = fechaEventos;
+exports._paquetesPermitidos = paquetesPermitidos;
+exports._lineaPaquetes = lineaPaquetes;
 
 exports.handler = async (event) => {
   const origin = G.corsCheck(event);
@@ -389,8 +475,8 @@ exports.handler = async (event) => {
   let validez, cuando;
   try {
     validez = lineaValidez(promo.expira);
-    cuando = fechaEvento(evento.ds);
-    correoHtml('', link, promo, evento);   // el render entero, una vez, antes del primero
+    cuando = fechaEventos(evento);
+    correoHtml('', link, promo, evento, sitio.sitio);   // el render entero, una vez, antes del primero
   } catch (e) {
     return G.json(409, headers, { ok: false, error: 'No se mandó ningún correo: ' + e.message });
   }
@@ -405,6 +491,9 @@ exports.handler = async (event) => {
       filas_a_marcar: destinatarios.reduce((a, [, v]) => a + v.ids.length, 0),
       // Las dos líneas derivadas, para verlas en el ensayo antes del botón.
       validez, evento: 'El concierto es el ' + cuando,
+      // [CONSUELO-PAQ-1] La línea de paquetes DERIVADA, para verla en el ensayo:
+      // es la que estaba mintiendo, así que es la que hay que poder leer antes.
+      paquetes: lineaPaquetes(paquetesPermitidos(sitio.sitio)),
     });
   }
 
@@ -412,7 +501,7 @@ exports.handler = async (event) => {
 
   // Uno por uno y en serie: un buzón malo no puede tumbar al resto.
   for (const [correo, info] of destinatarios) {
-    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link, promo, evento));
+    const ok = await enviar(correo, ASUNTO, correoHtml(info.nombre, link, promo, evento, sitio.sitio));
     if (!ok) { fallidos++; continue; }
     enviados++;
 

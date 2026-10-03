@@ -92,6 +92,13 @@ async function fetchCatalogo() {
         ciudad: _ciudadDeVenue(e.v),
         banco:      _cuenta(e.banco),                 // objeto o null (BANCO_* ya sembrado)
         ds: e.ds || null,
+        // [CONSUELO-PAQ-1] ADITIVO: la LISTA de fechas de un multifecha. `ds` es
+        // solo la PRIMERA, y un correo que anuncia una de tres fechas dice menos
+        // de lo que el evento es. `f` existe pero es texto que cura un humano
+        // ("6, 7 y 8 nov 2026"): sirve para pintar, no para derivar. Esto son
+        // FECHAS, que es con lo que se puede construir una frase sin adivinar.
+        dsList: Array.isArray(e.dsList) && e.dsList.length
+          ? e.dsList.map(function (d) { return String(d); }) : null,
         multifecha: Array.isArray(e.multifecha) && e.multifecha.length
           ? e.multifecha.map((m, i) => ({
               idx: i,                                   // el índice ES la posición (slug#idx)

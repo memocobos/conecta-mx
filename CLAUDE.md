@@ -167,6 +167,67 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💰⏳ **PREVENTA-CORR-1 · LA CORRECCIÓN DEL DATO, EN ESPERA DEL CAREO DE JANE (3-oct-2026).**
+  El código ya está en prod ([PREVENTA-DESCUENTO-1](#), merge `b5b134b`). Esta acta
+  —`migraciones/PREVENTA-CORR-1-datos.sql`— corrige el dato que quedó atrás.
+  🔒 **CERO ESCRITURAS hasta el visto de Jane.** 33 `update`, repartidos así:
+
+  | bloque | quién | qué |
+  |---|---|---|
+  | 1 | **27 personas** | `abonado_previo −= preventa` · **−$14,056** |
+  | 2 | **Allan Abalos** · badgyal | previo $3,200 → 0 · baja por cancelación · contrato = $500 |
+  | 3 | **Delmi Yaneth** · karolg#1 | anular los $5,000 de reflejo **y** previo $16,100 → $16,500 |
+  | 4 | **Elvia Guadalupe** · karolg#0 | anular los $2,000 · con sus **$2 de residuo DICHOS** |
+
+  🔒 **CADA `update` LLEVA SU VALOR ESPERADO EN EL `where`.** Si el careo movió el
+  `abonado_previo` entre la medición y la corrida, la fila **no se escribe** — pero eso
+  es silencioso, y por eso el acta trae un **candado de ENTRADA ejecutable** que lo hace
+  ruidoso antes. Corrido contra la base viva: **29 renglones · 29 encontradas · previo
+  COINCIDE 29 · se movió 0 · negativos 0 · problemas NINGUNO.**
+  🔒 Y las 29 tripletas se **extraen del propio archivo**, no de la fuente que lo generó:
+  un dedazo en el acta se caza ahí. Igual la lista del candado de SALIDA, que escribí a
+  mano y **careé contra los `update` generados: 27 y 27, sin sobrantes ni faltantes.**
+
+  🔴 **UN DEFECTO DE FORMA QUE HABRÍA PARTIDO LA MIGRACIÓN A MEDIA CORRIDA:** tres notas
+  traían un **`;` dentro del texto de la cadena**. Postgres lo tolera, pero cualquier
+  runner que parta las sentencias por `;` habría cortado el `update` justo antes de su
+  `where` — o sea un `update` SIN `where` sobre `abonos_viajero`. Lo cazó mi propia sonda
+  en seco al no encontrarle el `where` a una sentencia. Cambiados por `—`.
+
+  **ALLAN ABALOS · el doble humo, confesado por su propia nota.** Palabra de Memo (3-oct):
+  canceló y pagó $500 — manda el libro, cuya fila está **ROJA**. Verificado con cosecha
+  fresca: 865 filas, `colores_leidos=true`, histograma `{0:798, 1:16, 20:48, 21:3}` →
+  **51 filas rojas** con el umbral de 3, y la de Allan es una (`evento_libro «Bad Gyal»`,
+  $500). Su «cobrado» de $3,700 era humo: su nota dice literalmente
+  **«TOTAL-1: contrato $3200 (Costo al Público de Numerología)»** — el precio copiado
+  como pago por la migración del 28-ago. ⚠️ **El ORDEN es parte de la corrección:** primero
+  se limpia el humo y hasta el final se fija el contrato a lo cobrado; al revés, la baja
+  quedaría con **$3,200 de saldo A FAVOR del cliente**.
+
+  🔴🔒 **Y UN CONFLICTO QUE LEVANTÉ ANTES DE ESCRIBIR: la palabra de hoy choca con una
+  regla firmada del 1-oct.** El código tiene, **antes** del `if (p.roja)`:
+  `if (p.libro_rojo && pestanas.length) → AVISO, no baja`, con su razón escrita —
+  *«la fila roja cancela esa compra, no a la persona»*. Allan está VIVO en la pestaña de
+  badgyal con $3,200, así que por código sale como **aviso**, no como baja. Memo resolvió
+  a favor de la baja **para este caso**, con el dato de la nota enfrente. ⏳ Queda
+  nombrado: **la regla del 1-oct sigue viva para los demás** y nadie la cambió.
+
+  ⚰️ **ERNERSTO HINOJOSA salió solo**: el libro de hoy trae 2 filas de $8,715 = $17,430 =
+  su contrato = su cobrado. Deuda $0, nada que escribir.
+  🔍 **Su nombre está mal escrito en la base: «Ernersto», con una r de más.** Una búsqueda
+  por el nombre bueno lo pierde — apareció **barriendo por «Hinojosa»**, que es *buscar el
+  hecho y no la palabra* otra vez.
+
+  🔒 **LO QUE NO SE TOCA, dicho en el acta para que nadie lo busque:** la fila de
+  **`dalemix`** de Allan (evento anterior a calle24, sello `CERO-HIST 20-sep`), y
+  **Roberto Venner** (su sistema trae **$3,800** más que la pestaña y su libro **$25** más
+  que su contrato: otra familia). El candado de salida **afirma que los dos quedaron
+  INTACTOS** — proteger al que no entra es parte de la corrección.
+
+  ⏳ **SIGUE EN BLANCO, y no frena nada:** el montón de **19 SALDOS A FAVOR REALES
+  ($15,956)** — `anticipo` / `devolver a quien lo pida` / `otra`. Ésos son dinero que el
+  cliente SÍ pagó: la pestaña lo confirma con su celda `Resta` en negativo, 19 de 19.
+
 - 🔴🔒 **PREVENTA-DESCUENTO-1 · EL DESCUENTO QUE SE CONTABA COMO PAGO (3-oct-2026).**
   `mapa.dinero` de `_lib/excel-careo` incluía la columna **«Preventa»**, con esta razón
   escrita: *«en Pa'l Norte la preventa hace de separo»*. Barrido sobre **las 68 pestañas

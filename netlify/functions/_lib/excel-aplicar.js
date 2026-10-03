@@ -650,17 +650,40 @@ function planear(careo, opciones) {
   // escribió» sin saber POR QUÉ no es un candado.
   // La regla, en palabras de Memo: **el servidor no ejecuta `ag` si la petición no
   // lo pide EXPLÍCITAMENTE.** La ausencia de `solo` no es una petición.
+  // 🔴🔒 [AG-CERO-FALSO-1] ENSEÑAR NO ES APLICAR, Y AHORA SON DOS CAMPOS.
+  // El candado de arriba quedó BIEN para aplicar y MAL para enseñar: la vista
+  // previa entra por `planear(careo, { solo:null, claves:null })`, así que
+  // `quiereAg` salía false y la disponibilidad NO SE CALCULABA. La pantalla
+  // pintaba «ZONAS A CERRAR · 0 — ninguna» sin botón, con la palomita prendida y
+  // el Excel proponiendo cerrar «Perfil». **Ese 0 salía por construcción, no del
+  // Excel** — y mi propio bloque [SEG] lo demostraba: `{}` → `ag_cerrar 0`.
+  //
+  // 🔒 La separación es ESTRUCTURAL, no una convención de llamada:
+  //   · `ag_propuesta`        → lo que el Excel PROPONE. Se calcula SIEMPRE que el
+  //                             bloque se pudo leer. Es lo que la pantalla pinta.
+  //                             Calcular montones para enseñar NO ESCRIBE NADA.
+  //   · `ag_cerrar`/`ag_abrir`→ lo que `ejecutarPlan` ESCRIBE. Solo con opt-in
+  //                             explícito, y acotado por `claves`.
+  // Así el clic global —que no pide `disponibilidad`— sigue sin poder escribir en
+  // la ficha, que es el hueco que cazó Jane, y la vista previa ya puede enseñar.
+  //
+  // ⚠️ `ag_propuesta` va SIN el filtro de `claves` a propósito: es la foto
+  // completa de lo que el Excel propone, y la vista previa es justo donde se ve
+  // entera. El recorte por claves es del APLICAR.
   const quiereAg = o.disponibilidad === true || solo === 'disponibilidad';
-  if (dispo && dispo.ok && quiereAg) {
+  const propCerrar = [], propAbrir = [];
+  if (dispo && dispo.ok) {
     for (const z of (dispo.cerradas || [])) {
-      if (!elegida(normalizarNombre(z.zona))) continue;
-      agCerrar.push({ zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: true,
-                      pedido: z.pedido, restan: z.restan, motivo: z.motivo });
+      const r = { zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: true,
+                  pedido: z.pedido, restan: z.restan, motivo: z.motivo };
+      propCerrar.push(r);
+      if (quiereAg && elegida(normalizarNombre(z.zona))) agCerrar.push(r);
     }
     for (const z of (dispo.reactivadas || [])) {
-      if (!elegida(normalizarNombre(z.zona))) continue;
-      agAbrir.push({ zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: false,
-                     pedido: z.pedido, restan: z.restan, motivo: z.motivo });
+      const r = { zona: z.zona_ficha || z.zona, zona_excel: z.zona, ag: false,
+                  pedido: z.pedido, restan: z.restan, motivo: z.motivo };
+      propAbrir.push(r);
+      if (quiereAg && elegida(normalizarNombre(z.zona))) agAbrir.push(r);
     }
   }
 
@@ -668,6 +691,12 @@ function planear(careo, opciones) {
            avisos_boletos: avisosBoletos,
            // [EXCEL-AG-2] los dos montones, SEPARADOS, más los avisos que no escriben.
            ag_cerrar: agCerrar, ag_abrir: agAbrir,
+           // 🔴 [AG-CERO-FALSO-1] LO QUE LA PANTALLA PINTA, y `null` cuando NO se
+           // calculó. 🔒 `null` y `{cerrar:[],abrir:[]}` NO son lo mismo y no se
+           // aplastan: el primero es «no se pudo saber» y el segundo es «el Excel
+           // no propone nada». Un cero falso es exactamente lo que los cuatro
+           // estados existían para impedir, y aun así se colaba por este campo.
+           ag_propuesta: dispo && dispo.ok ? { cerrar: propCerrar, abrir: propAbrir } : null,
            ag_avisos: dispo && dispo.ok ? {
              sobrevendidas: dispo.sobrevendidas || [],
              vendo_sin_pedido: dispo.vendo_sin_pedido || [],

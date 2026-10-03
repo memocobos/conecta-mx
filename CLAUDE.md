@@ -167,6 +167,56 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆💰 **EL PADRÓN POST-CORRECCIÓN, RE-MEDIDO CON CORRIDA (3-oct-2026).** PREVENTA-CORR-1
+  **aplicada por Jane**, y los 8 conteos del candado de salida **los volví a correr yo**
+  —no los di por buenos—: `los_27=27 · allan=1 · allan_pago_vivo=1 · delmi_abono=1 ·
+  delmi_previo=1 · elvia_abono=1 · roberto_intacto=1 · dalemix_intacto=1`. Y la marca
+  `PREVENTA-CORR-1` aparece en **30 viajeros** = 27 + Allan + Delmi + Elvia. Cuadra.
+
+  **EL CENSO OFICIAL:**
+
+  ```
+  PADRÓN  ·  102 personas  ·  $74,952  ·  24 eventos
+  ```
+
+  🔒 **CON EL FILTRO COMPLETO, QUE ES LA MITAD DEL NÚMERO** (la ley ya escrita de la
+  auditoría de los 141): `cobrado > contrato` **Y** `contrato > 0` **Y** no es baja
+  (`boletos=0 ∧ zona NULL`). El control, re-corrido hoy, sigue diciendo lo mismo y por
+  eso se conserva: **sin el `contrato > 0` salen 1,243 personas y $5,872,195**, porque
+  **1,141 traen contrato en CERO o NULL** — y un contrato en cero no es un sobrepago, es
+  un contrato **sin capturar**. El filtro infla o desinfla el problema 58 veces.
+
+  ⚠️ **Y LAS 2 BAJAS QUE EL FILTRO EXCLUYE, NOMBRADAS para que no sean un hueco mudo**
+  (suman **$6,550** que NO están en los $74,952): *Julian Abisay Hernández Rivera*
+  (natanael, $1,850) y *Paula hernandez* (soyluna, $4,700).
+
+  ✅ **De los 30 que toqué, CERO siguen sobrepagados.** Medido con la consulta, no
+  supuesto. **Roberto Venner SÍ está dentro de los 102** ($973) y es correcto: su caso
+  quedó aparte por orden de Memo y no se corrigió.
+
+  🔴🔒 **LO QUE NO ATRIBUYO, Y ES LA PARTE IMPORTANTE DE ESTE RENGLÓN.** Contra el
+  **114 · $141,522** del 2-oct la caída es de **−12 personas y −$66,570**. De eso,
+  **mis correcciones explican 14 personas y $13,090** (los 11 del montón A, Allan $500,
+  Delmi $4,600, Elvia $1,998). El resto —**$53,480**— **no lo autoricé ni lo escribí**, y
+  decir que «bajó el padrón gracias a la corrección» sería colgarme una medalla ajena.
+  Lo busqué: el careo del 3-oct solo tocó el `total_contrato` de **9** viajeros, así que
+  tampoco lo explica. **Queda como pregunta abierta, no como logro.**
+
+  🔒 **Y LA LEY QUE SALE DE AQUÍ: EL PADRÓN ES UNA FOTO, NO UN SALDO.** Dos fotos tomadas
+  con un día de diferencia —con un careo diario corriendo y tres tuercas aplicadas en
+  medio— **no atribuyen causa**. Y la cuenta lo delata al revés: si solo hubieran salido
+  mis 14, serían 100, y son **102** → **2 personas ENTRARON** al padrón en ese día. Si se
+  quiere atribución, es su propia medición.
+
+  **Los 8 eventos que más traen hoy:** straykids#1 $13,200 (1) · tini $12,308 (6) ·
+  neighbourhood $7,951 (10) · hilary $6,800 (2) · straykids#0 $6,303 (5) ·
+  enjambre $4,954 (8) · edenmunoz $4,560 (2) · natanael $3,600 (1).
+
+  ⏳ **Sigue en blanco:** los **19 saldos a favor REALES ($15,956)** — `anticipo` /
+  `devolver a quien lo pida` / `otra`. Ésos son dinero que el cliente SÍ pagó y la
+  pestaña lo confirma con su celda `Resta` en negativo, 19 de 19. **Están DENTRO de los
+  102**, así que el padrón no baja a su número final hasta que se decidan.
+
 - 💰⏳ **PREVENTA-CORR-1 · LA CORRECCIÓN DEL DATO, EN ESPERA DEL CAREO DE JANE (3-oct-2026).**
   El código ya está en prod ([PREVENTA-DESCUENTO-1](#), merge `b5b134b`). Esta acta
   —`migraciones/PREVENTA-CORR-1-datos.sql`— corrige el dato que quedó atrás.

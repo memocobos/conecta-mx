@@ -167,6 +167,80 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔎 **EXCEL-AG-1 · FASE 1 (SOLO LECTURA) ENTREGADA (2-oct-2026).** La pregunta era
+  si el cosechador sirve el bloque «Disponibilidad» (Pedido/Restan). **Sí: 71 de 71
+  filas activas**, cero sin bloque, cero errores de cosecha. **Ninguna palomita
+  prendida** — el reporte lo ve Memo antes de que se prenda alguna.
+
+  🔴 **EL «123» NO EXISTÍÓ: ERA UNA CIFRA HEREDADA, Y LA SOLTÉ YO.** Lo rastreó
+  Jane: nació en **mi propio mensaje del 1-oct** y de ahí lo repetimos todos — yo
+  incluido, varias veces— sin que nadie la midiera. Medido: `excel_pestanas` tiene
+  **115 filas · 71 activas · 44 inactivas · 112 pestañas distintas**. **El universo del
+  barrido son las 71 activas.** Queda escrito con su origen para que nadie vaya a
+  buscar las 52 que faltan. Hermana de *la lista a mano al lado de la realidad*, con
+  cara nueva: **una cifra que yo inventé y que volvió como dato de encargo.**
+
+  🔴🔒 **EL CONTROL POSITIVO ESTRUCTURAL, Y ES LA LEY DEL ANCLA CON CARA NUEVA: EL
+  LITERAL TAMPOCO ES ANCLA SI HAY DOS IGUALES EN LA MISMA FILA.** Medido en arjona:
+  `Pedido` aparece **DOS veces en la fila 0** — col 3 (boletos) y **col 9, que es el
+  `Pedido` de TALLAS** (XS 1 · S 10 · M 19 · L 12 · XL 0 · XXL 4). O sea que ni
+  «la columna llamada Pedido» sirve: **el ancla es su POSICIÓN RELATIVA a
+  «Disponibilidad»**. Leer la otra columna convertiría **camisetas en lugares**.
+  ✅ Aprobado por Jane así.
+
+  🔒 **Y EL BLOQUE SÍ CAMBIA DE SITIO**: 70 pestañas lo traen en `col 1` y **una en
+  `col 2`**. Anclar por índice fijo habría leído mal esa — la lección de CUADRE-6
+  («Avón - Bus» en la 19 y en la 20), cobrada otra vez.
+
+  **LA CLASIFICACIÓN, 438 zonas en las 71 filas activas:**
+
+      Restan > 0  (vendiendo)          143
+      Restan = 0  (el Excel la AGOTA)  255
+      Restan < 0  (SOBREVENDIDA)        40   ← la regla NO nombra este estado
+      Pedido = 0  (no pedí)            192
+      Pedido vacío (sin capturar)         0
+
+  ⚠️ **DOS UNIVERSOS, Y NO SON EL MISMO NÚMERO** (la ley de ZONA-NORM-1): sobre las
+  **438** zonas del Excel hay **295** con `Restan ≤ 0`; sobre las **262 que SÍ existen
+  en la ficha**, son **142**. Las dos cuentas son correctas — lo que no se puede es
+  reportar una como si contestara la otra.
+
+  🔴 **LOS CHOQUES, que son el motivo de la tuerca** (sobre las 262 gobernables):
+  **46 «EXCEL agota · index VENDE»** (se vende lo que no hay) y **13 «EXCEL tiene ·
+  index AGOTADA»** (no se vende lo que sí hay). Y los 46 se parten **exactamente por
+  la regla de Memo**, medido sin sembrar nada:
+  - **(a) 21 zonas** con `Pedido 0` y `Restan < 0` — *«no pedí y vendo igual»*: es
+    **el caso de arjona (4) y juniorh (2)** que Memo nombró, **y salieron solos en la
+    lista**, con titodoble (5) a la cabeza. 🔴 Si la palomita se prende sin distinguir
+    este caso, **le apaga la venta a lo que SÍ está vendiendo.**
+  - **(b) 25 zonas** con `Pedido > 0` y `Restan ≤ 0` — *«pedí N y se acabaron»*: el que
+    la regla SÍ quiere cerrar.
+
+  ⚠️ **176 DE LAS 438 ZONAS DEL EXCEL NO EXISTEN EN LA FICHA (40%)** y por lo tanto
+  **no se pueden gobernar**: karolcdmx#1 (12), y con 7 cada uno dimitri, flowfest#0,
+  intocable, ironmaiden, juniorh, karolg#2, romeo, sleeping, warped.
+
+  🔴 **Y UNA CORRECCIÓN A MI PROPIO REPORTE: dije «una pestaña = una fecha» y para
+  coronacapital es FALSO** — UNA pestaña sirve a **CUATRO** evento-fecha. El mecanismo
+  que las parte es **`excel_pestanas.regla_zona`**, que es el **TERCER argumento de
+  `parsearPestana`** y yo estaba pasando en `null`. Por eso mi primer barrido fueron
+  68 y no 71.
+  - ✅ **Pero mi preocupación estructural NO se sostuvo, y eso también se mide:** creí
+    que la palomita por evento-fecha no podría mapear a un bloque compartido, y
+    **sí mapea** — cada `regla_zona` casa con **exactamente 1 zona**:
+    `#0 General Viernes` (ped 19, restan 8) · `#1 General Sabado` (19, **−3**) ·
+    `#2 General Domingo` (19, 15) · `#5 General` (17, **0**). Sin ambigüedad.
+
+  ⏳ **TRES PREGUNTAS QUE LA REGLA FIRMADA NO CUBRE, entregadas con la fase 1 y sin
+  contestar por mí:**
+  1. **`Restan` NEGATIVO existe: 40 zonas.** La regla dice *«cuando Restan llega a 0,
+     esa zona se agota y listo»* — pero **−7 no es 0**. ¿Agota igual, o es
+     «sobrevendida» y necesita su propio aviso? (arjona trae un −7; titodoble un −9.)
+  2. **Las 176 no gobernables**: hasta que esas zonas existan en la ficha, la palomita
+     no puede abrirlas ni cerrarlas.
+  3. **El caso (a)**: hace falta una marca por evento-fecha de *«vendo sin pedido»*,
+     o la palomita de arjona apaga 4 zonas vivas.
+
 - 🏆🔴 **LA AUDITORÍA DE LOS 141, APLICADA: CORR-DOBLE-1 y CORR-CONTRATO-1
   CERRADAS CON VISTO DE JANE (2-oct-2026).** Padrón: **141 → 114 personas**, el «de
   más» **$214,233 → $141,522**. Cada tuerca con vista previa primero, cero escrituras

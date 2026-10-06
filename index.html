@@ -5383,7 +5383,12 @@ function updatePkgCards(){
   // El cálculo del total final usa la fecha seleccionada vía calcular().
   var rideBase=desdeDelPaquete(cur,'ride');
   var rideCost=rideBase+(mh>0?mh:0);
-  $$('pi-ride').textContent=txtTransporte(cur)+(cur.noHotel?' · Boleto · Kit Conecta':' · Hospedaje · Kit');
+  // [NSQK-RIDE-1, 6-oct-2026] En un noHotel el resumen del card se DERIVA del
+  // mismo `inc` que pinta "Tu paquete incluye" (orden de Memo: los dos textos
+  // tienen que decir LO MISMO). El literal viejo decía «Boleto» aunque el
+  // evento no venda boleto (nsqkparty: acceso gratis). Sin `inc`, cae al texto
+  // de antes. Los eventos CON hotel no se tocan.
+  $$('pi-ride').textContent=cur.noHotel?((cur.inc&&cur.inc.length)?cur.inc.join(' · '):txtTransporte(cur)+' · Boleto · Kit Conecta'):txtTransporte(cur)+' · Hospedaje · Kit';
   $$('pp-ride').textContent=fmt(rideCost);
   var _rideTag=document.getElementById('pkg-tag-ride');
   if(_rideTag) _rideTag.textContent=cur.noHotel?'Sin hotel':'Sin boleto';

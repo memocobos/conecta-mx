@@ -5701,6 +5701,23 @@ function selPaquete(btn,pkg){
 
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
+  // [NSQK-RIDE-2, 6-oct-2026] RIDE SIN HOTEL EN EL FLUJO NORMAL ERA UN CALLEJÓN:
+  // sin hotel, sin zona y sin fecha NO QUEDA NINGÚN PASO que contestar, y nadie
+  // llamaba a calcular() — el cliente veía «elige tus opciones» para siempre.
+  // La rama diaFirst de ESTA MISMA función ya lo resuelve (selH sintético +
+  // calcular()); esto es la simetría que faltaba, la misma forma que
+  // CALLEJON-CDMX-1 pero en espejo. Va DESPUÉS del reset de placeholder/result
+  // para que calcular() pinte encima y no al revés. Caso real: nsqkparty.
+  if(!hasHotel&&!hasZona&&!hasFecha){
+    selH={n:'Sin hospedaje',e:0};
+    if(isCDMX(cur)&&pkg!=='cheap'){
+      buildTransporteButtons();
+      $$('w-transport-card').style.display='block';guiaPintar();
+    } else {
+      calcular();
+      setTimeout(scrollToTotal,200);
+    }
+  }
   // Fix 3: tras elegir paquete, scroll al PRIMER paso visible (normalmente ZONAS,
   // o FECHA si el evento la pide). block:'center' consistente con el resto.
   setTimeout(function(){

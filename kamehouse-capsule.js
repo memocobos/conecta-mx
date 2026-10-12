@@ -839,33 +839,51 @@ async function guardarViajero() {
   }
 }
 async function exportarViajeros(formato) {
-  if (!_ccViajeros.length) { alert('No hay viajeros para exportar'); return; }
+  // [MUNDO-REAL-1 · RUMBO 12-oct] El export sale de la LISTA REAL
+  // (viajeros_evento), no de las solicitudes del Portal. Antes, con 0 en el
+  // Portal, decía «No hay viajeros» con 150 reales a la vista: el mundo vacío
+  // mandaba. El dinero sale de `_vj3Saldo` — la MISMA fórmula que pinta la
+  // tabla; un export con su propia suma sería la fórmula número doce.
+  let lista = [], porViajero = {};
+  try {
+    lista = await khViajeros.listar(_ccEventoActual) || [];              // [sec-coordi]
+    (await khViajeros.abonosDeEvento(_ccEventoActual)).forEach((a) => {  // [sec-coordi]
+      (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a);
+    });
+  } catch (e) { alert('No se pudo leer la lista: ' + e.message); return; }
+  if (!lista.length) { alert('No hay viajeros para exportar'); return; }
   const excluirStaff = !!document.getElementById('cc-export-excluir-staff')?.checked;
-  const lista = excluirStaff ? _ccViajeros.filter(v => !_esStaff(v)) : _ccViajeros;
+  const esStaffKH = (v) => !!(v.tipo_viajero && String(v.tipo_viajero) !== 'cliente');
+  if (excluirStaff) lista = lista.filter(v => !esStaffKH(v));
   if (!lista.length) { alert('No hay clientes para exportar (todos son staff)'); return; }
   const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
   const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
+  const sufijoFile = excluirStaff ? '-sin-staff' : '';
   const titulo = `Viajeros — ${ev?.nombre||'Evento'}${sufijoTitulo}`;
-  const _vNombre = v => (v.clientes || {}).nombre_completo || '';
-  const _vCel    = v => (v.clientes || {}).celular || '';
-  const _vCorreo = v => (v.clientes || {}).correo || '';
-  const _vPago   = v => v.pago || {};
+  const fila = (v) => {
+    const s = (typeof _vj3Saldo === 'function') ? _vj3Saldo(v, porViajero[v.id]) : null;
+    return {
+      nombre: v.nombre || '', cel: v.celular || '', correo: v.correo || '',
+      paq: (v.tipo_paquete || '').toUpperCase(), zona: v.zona_boleto || '',
+      talla: v.talla_playera || '',
+      total: s ? s.total : '', abonado: s ? s.abonado : '', resta: s ? s.resta : '',
+      notas: v.notas || '',
+    };
+  };
   if (formato === 'pdf') {
-    const sufijoFile = excluirStaff ? '-sin-staff' : '';
     const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}td.num{text-align:right}</style></head><body>
     <h2>${_esfEsc(titulo)}</h2>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Paquete</th><th>Zona</th><th>Pers.</th><th>Total</th><th>Abonado</th><th>Restante</th><th>Estado</th></tr></thead>
-    <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td>${_vNombre(v)}</td><td>${_vCel(v)}</td><td>${_vCorreo(v)}</td><td>${v.paquete||''}</td><td>${_esfEsc(v.zona||'')}</td><td>${v.num_personas||1}</td><td class="num">${_spFmtMxn(_vPago(v).total)}</td><td class="num">${_spFmtMxn(_vPago(v).abonado)}</td><td class="num">${_spFmtMxn(_vPago(v).restante)}</td><td>${v.estado||''}</td></tr>`).join('')}</tbody>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Total</th><th>Abonado</th><th>Resta</th><th>Notas</th></tr></thead>
+    <tbody>${lista.map((v,i)=>{ const f=fila(v); return `<tr><td>${i+1}</td><td>${_esfEsc(f.nombre)}</td><td>${_esfEsc(f.cel)}</td><td>${_esfEsc(f.correo)}</td><td>${_esfEsc(f.paq)}</td><td>${_esfEsc(f.zona)}</td><td>${_esfEsc(f.talla)}</td><td class="num">${f.total===''?'—':_spFmtMxn(f.total)}</td><td class="num">${f.abonado===''?'—':_spFmtMxn(f.abonado)}</td><td class="num">${f.resta===''?'—':_spFmtMxn(f.resta)}</td><td>${_esfEsc(f.notas)}</td></tr>`; }).join('')}</tbody>
     </table></body></html>`;
     _descargarHTML(`viajeros-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
-    const headers = ['#','Nombre','Celular','Correo','Paquete','Zona','Personas','Total','Abonado','Restante','Estado'];
-    const rows = lista.map((v,i) => [i+1,_vNombre(v),_vCel(v),_vCorreo(v),v.paquete||'',v.zona||'',v.num_personas||1,_vPago(v).total||0,_vPago(v).abonado||0,_vPago(v).restante||0,v.estado||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+    const headers = ['#','Nombre','Celular','Correo','Paquete','Zona','Talla','Total','Abonado','Resta','Notas'];
+    const rows = lista.map((v,i) => { const f=fila(v); return [i+1,f.nombre,f.cel,f.correo,f.paq,f.zona,f.talla,f.total,f.abonado,f.resta,f.notas].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','); });
     const csv = [headers.join(','), ...rows].join('\n');
     const a = document.createElement('a');
-    a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
-    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
     a.download = `viajeros-${ev?.nombre||'evento'}${sufijoFile}.csv`;
     a.click();
   }

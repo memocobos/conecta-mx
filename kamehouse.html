@@ -1057,18 +1057,10 @@
              🔒 NO se suman los dos mundos: están separados A PROPÓSITO (dos
              orígenes con reglas distintas y contabilidades distintas), y un
              chip «todos (12)» que al pulsarlo enseña 0 sería peor mentira. -->
-        <!-- Se usan `vj2-t`/`vj2-d` (la tipografía del hermano) pero NO `vj2-h`:
-             esa clase trae `border-top`, que ahí es el SEPARADOR entre los dos
-             mundos. Arriba del primero sería una línea suelta bajo la barra. -->
-        <div style="margin-bottom:10px">
-         <div class="vj2-t">Viajeros del Portal</div>
-         <div class="vj2-d">Los que reservaron en el sitio. Su dinero se lleva aquí.</div>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-         <button class="gz-filter active" id="cc-fil-viaj-todos" onclick="filtrarViajerosCC('todos',this)">// todos <span id="cc-cnt-todos" style="color:var(--ts);margin-left:4px"></span></button>
-         <button class="gz-filter" id="cc-fil-viaj-cliente" onclick="filtrarViajerosCC('cliente',this)">// clientes <span id="cc-cnt-cliente" style="color:var(--ts);margin-left:4px"></span></button>
-         <button class="gz-filter" id="cc-fil-viaj-staff" onclick="filtrarViajerosCC('staff',this)">// staff <span id="cc-cnt-staff" style="color:var(--ts);margin-left:4px"></span></button>
-        </div>
+        <!-- [MUNDO-REAL-1 · RUMBO 12-oct] El encabezado y los filtros del
+             Portal se MUDARON abajo, adentro de #cc-portal-wrap: el Portal dejó
+             de ser la lista principal. La principal es la REAL (viajeros_evento),
+             que ahora se pinta primero. -->
         <!-- ═══ [MIG-1a] EL WIZARD DE CAPTURA ═══════════════════════════════
              Uno tras otro sin salir de la pantalla: al guardar, la fila se suma
              a la lista de abajo, el formulario se limpia y el foco vuelve al
@@ -1145,25 +1137,41 @@
          <div id="mig-capturados" style="margin-top:14px"></div>
         </div>
 
-        <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros registrados</div></div>
-
-        <!-- [VJ-2] EL SEGUNDO MUNDO: viajeros_evento (KH). Son los que migraron
-             del Excel y el staff que entra al aceptar un tour. Vivían sin
-             ninguna pantalla de admin que los mostrara — Memo los buscó por todo
-             KameHouse y no aparecían.
-             Va DEBAJO y aparte del Portal a propósito: son dos orígenes con
-             reglas distintas, y mezclarlos en una sola tabla haría creer que
-             comparten contabilidad. Sin evento con migrados, este bloque no se
-             pinta y la pestaña queda idéntica a como estaba. -->
-        <div id="cc-kh-wrap" style="display:none;margin-top:22px">
-         <div class="vj2-h">
+        <!-- ═══ [MUNDO-REAL-1 · RUMBO 12-oct] LA LISTA REAL ES LA PRINCIPAL ═══
+             `viajeros_evento` manda: altas manuales, migrados del Excel y staff.
+             Su dinero SÍ se lleva aquí (total/abonado/resta por fila, y abonos
+             manuales con el botón ➕ de cada fila). Antes este bloque era un
+             anexo escondido debajo del Portal y por eso «nada aparecía»: las
+             pantallas le hablaban al mundo vacío. ⚰️ El letrero viejo decía
+             «su dinero NO se lleva aquí — vive en el Excel»: superado por el
+             rumbo del 12-oct (el careo del Excel pasó de escritor a vigilante). -->
+        <div id="cc-kh-wrap" style="margin-top:4px">
+         <div class="vj2-h" style="border-top:0;padding-top:0;margin-top:0">
           <div>
-           <div class="vj2-t">Viajeros migrados y de staff</div>
-           <div class="vj2-d">Vienen del Excel o de aceptar un tour. Su dinero NO se lleva aquí — la contabilidad de éstos vive en el Excel.</div>
+           <div class="vj2-t">Viajeros del evento</div>
+           <div class="vj2-d">La lista real: altas manuales, migrados del Excel y staff. El dinero se captura y se lleva aquí.</div>
           </div>
           <div class="vj2-cnt" id="cc-kh-count">0</div>
          </div>
-         <div id="cc-kh-list"></div>
+         <div id="cc-kh-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+        </div>
+
+        <!-- SOLICITUDES DEL PORTAL (antes «Viajeros del Portal» y antes ARRIBA).
+             Reservas del sitio; en FASE B se vuelven la bandeja de requisiciones
+             que Bulma/Milk aprueban. Oculto cuando no hay ninguna. -->
+        <div id="cc-portal-wrap" style="display:none;margin-top:22px">
+         <div class="vj2-h">
+          <div>
+           <div class="vj2-t">Solicitudes del Portal</div>
+           <div class="vj2-d">Reservas hechas en el sitio, pendientes de proceso. (FASE B: requisiciones.)</div>
+          </div>
+         </div>
+         <div style="display:flex;gap:6px;margin:10px 0 14px;flex-wrap:wrap">
+          <button class="gz-filter active" id="cc-fil-viaj-todos" onclick="filtrarViajerosCC('todos',this)">// todos <span id="cc-cnt-todos" style="color:var(--ts);margin-left:4px"></span></button>
+          <button class="gz-filter" id="cc-fil-viaj-cliente" onclick="filtrarViajerosCC('cliente',this)">// clientes <span id="cc-cnt-cliente" style="color:var(--ts);margin-left:4px"></span></button>
+          <button class="gz-filter" id="cc-fil-viaj-staff" onclick="filtrarViajerosCC('staff',this)">// staff <span id="cc-cnt-staff" style="color:var(--ts);margin-left:4px"></span></button>
+         </div>
+         <div id="cc-viajeros-list"></div>
         </div>
        </div>
 

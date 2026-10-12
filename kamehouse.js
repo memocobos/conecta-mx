@@ -5556,41 +5556,56 @@ async function invitarWalkin(clienteId, btn) {
 
 async function loadViajeros() {
   if (!_ccEventoActual) return;
-  const list = document.getElementById('cc-viajeros-list');
-  if (!list) return;
-  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  // [MUNDO-REAL-1 · RUMBO 12-oct] LA LISTA REAL PRIMERO Y COMO PRINCIPAL.
+  // `viajeros_evento` es donde viven los 2,400+ de verdad; el Portal son
+  // solicitudes (0 hoy) y pasa a anexo fails-soft. Antes era al revés: el
+  // Portal mandaba y la lista real era «un extra» — y Memo no podía operar.
+  await _vj2Cargar();
+
+  // El anexo del Portal: si falla, la pantalla principal ya está pintada.
+  const pw = document.getElementById('cc-portal-wrap');
+  _ccViajeros = [];
   try {
-    // Viajeros = solicitudes del portal (en_pagos/pagado) de este evento, con
-    // su resumen de pago. service_role vive en la función; aquí va el JWT admin.
     const r = await khAdminFetch('/.netlify/functions/admin-viajeros-evento', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ evento_id: _ccEventoActual }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'No se pudieron cargar los viajeros');
-    _ccViajeros = Array.isArray(data.viajeros) ? data.viajeros : [];
-    _renderViajerosTabla();
-    // [VJ-2] El segundo mundo. Va DESPUÉS de pintar el Portal y en su propio
-    // try: si viajeros_evento fallara, la pestaña de siempre ya está en
-    // pantalla y no se cae por una lista que es un extra.
-    await _vj2Cargar();
-  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+    if (r.ok) _ccViajeros = Array.isArray(data.viajeros) ? data.viajeros : [];
+  } catch (_) { /* fails-soft: el Portal es anexo */ }
+  if (pw) pw.style.display = _ccViajeros.length ? '' : 'none';
+  if (_ccViajeros.length) _renderViajerosTabla();
+  _vjConteoPintar();
+}
+
+// [MUNDO-REAL-1] El contador de arriba dice las dos poblaciones por su nombre,
+// con la REAL primero. Un solo sitio lo escribe: dos escritores del mismo
+// letrero acaban diciendo cosas distintas.
+function _vjConteoPintar() {
+  const countEl = document.getElementById('cc-viajeros-count');
+  if (!countEl) return;
+  const n = _vj2Filas.length, m = _ccViajeros.length;
+  let t = `${n} viajero${n !== 1 ? 's' : ''}`;
+  if (m) t += ` · ${m} solicitud${m !== 1 ? 'es' : ''} del Portal`;
+  countEl.textContent = t;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// [VJ-2] LOS DOS MUNDOS DE VIAJEROS
+// [VJ-2 → MUNDO-REAL-1 · RUMBO 12-oct] LA LISTA REAL, AHORA LA PRINCIPAL
 //
-// El Portal (solicitudes, con su dinero) y KH `viajeros_evento` (los que
-// migraron del Excel y el staff). Los segundos existían sin ninguna pantalla de
-// admin: Memo los buscó por todo KameHouse y no aparecían.
+// `viajeros_evento` (altas manuales, migrados del Excel, staff) es LA lista
+// del evento y se pinta PRIMERO y SIEMPRE; las solicitudes del Portal son el
+// anexo (#cc-portal-wrap), rumbo a volverse requisiciones en FASE B.
 //
-// Se pintan APARTE y sin montos. La contabilidad de los migrados vive en el
-// Excel, y poner una columna de dinero aquí obligaría a inventar una cifra —
-// que es exactamente lo que no se debe hacer en una pantalla de dinero.
+// ⚰️ Historia, para leer commits viejos sin confundirse: VJ-2 nació al revés
+// (Portal principal, esto «un extra sin montos» porque "la contabilidad vivía
+// en el Excel"). VJ-3 le puso el dinero; el rumbo del 12-oct la hizo la
+// principal y sumó el abono manual por fila (➕). El careo del Excel pasó de
+// escritor a VIGILANTE: aquí se captura, él cuadra.
 //
-// Lectura con `viajero_listar`, que ya existía y ya admite admin. Cero
-// endpoints nuevos.
+// Lectura con `viajero_listar`; dinero con `_vj3Saldo` + abonos del evento.
+// Cero endpoints nuevos.
 // ═══════════════════════════════════════════════════════════════════════════
 let _vj2Filas = [];
 
@@ -5606,23 +5621,27 @@ async function _vj2Cargar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
   const cnt = document.getElementById('cc-kh-count');
-  const countEl = document.getElementById('cc-viajeros-count');
-  const nPortal = _ccViajeros.length;
-  // Texto de siempre, por si no hay migrados o la consulta falla.
-  const soloPortal = () => { if (countEl) countEl.textContent = `${nPortal} viajero${nPortal !== 1 ? 's' : ''}`; };
 
   _vj2Filas = [];
-  if (wrap) wrap.style.display = 'none';
-  soloPortal();
   if (!wrap || !list) return;
+  // [MUNDO-REAL-1] Esta lista ya es LA PRINCIPAL: siempre visible, y sus
+  // errores se DICEN aquí mismo — un principal que falla en silencio dejaría
+  // la pantalla en blanco sin una palabra (la ley del cero falso, en UI).
+  wrap.style.display = '';
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
 
   try {
     _vj2Filas = await khViajeros.listar(_ccEventoActual) || [];   // [sec-coordi]
-  } catch (_) {
-    // Fails-soft a propósito: sin este bloque la pestaña es la de siempre.
+  } catch (e) {
+    list.innerHTML = `<div class="alert alert-error">No se pudo cargar la lista de viajeros: ${_esfEsc(e.message)}</div>`;
+    if (cnt) cnt.textContent = '—';
     return;
   }
-  if (!_vj2Filas.length) return;   // sin migrados = idéntico a hoy
+  if (!_vj2Filas.length) {
+    if (cnt) cnt.textContent = '0';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aún — captúralos con «+ Registrar cliente»</div>';
+    return;
+  }
 
   // [VJ-3] Los abonos de TODO el evento en UNA llamada: 29 filas no pueden
   // hacer 29 consultas. Fails-soft — sin abonos el saldo sale del congelado.
@@ -5635,9 +5654,7 @@ async function _vj2Cargar() {
 
   const n = _vj2Filas.length;
   if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
-  // El total, DICHO: que nadie tenga que sumarlo de cabeza ni suponer si el
-  // número de arriba ya incluía a los de abajo.
-  if (countEl) countEl.textContent = `${nPortal} del Portal + ${n} migrados = ${nPortal + n}`;
+  // (El contador de arriba lo escribe _vjConteoPintar, su único dueño.)
 
   // [VJ-3] El dinero del evento, separado en sus dos naturalezas.
   //
@@ -5706,13 +5723,69 @@ async function _vj2Cargar() {
                   <td class="vj3-col ${s.aFavor ? 'vj3-favor' : (s.resta > 0 ? 'vj3-debe' : '')}">${_vj3Money(s.resta)}${s.aFavor ? '<i class="vj3-af"> a favor</i>' : ''}</td>`;
         })()}
         <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
-        ${_vjPuedeEliminar() ? `<td><button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
+        ${_vjPuedeEliminar() ? `<td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
+            title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
+            onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
+          <button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
           title="Eliminar a ${_esfEsc(v.nombre || '')} de este evento"
           onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button></td>` : ''}
-      </tr>`;
+      </tr><tr id="vj-ab-${_esfEsc(v.id)}" style="display:none"><td colspan="20"></td></tr>`;
     }).join('')}</tbody>
   </table></div>`;
   wrap.style.display = '';
+}
+
+// ═══ [MUNDO-REAL-1 · FASE A2] ABONO MANUAL POR FILA ═════════════════════════
+// Bulma/Milk capturan el pago AQUÍ, donde están mirando al viajero — sin ir a
+// otra pantalla. Escribe por `khViajeros.abonoCrear` (abono_crear, el MISMO
+// endpoint de la caja de Cobranza): cero fórmulas nuevas, cero endpoints
+// nuevos. La fecha nace en HOY (es FORMA, no atribución — DEFAULTS-1) y el
+// monto nace VACÍO. El comprobante con foto vive en la caja de Cobranza; aquí
+// va lo diario: monto, fecha y nota.
+function _vjAbonoAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none';
+  // Un solo renglón abierto a la vez: dos formularios de dinero a la vista son
+  // dos oportunidades de capturarle el pago a la persona equivocada.
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.firstElementChild.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--green);border-radius:8px;background:rgba(136,234,78,.04)">
+      <div style="font-size:11px;color:var(--ts);min-width:140px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>nuevo abono</div>
+      <label style="font-size:10px;color:var(--ts)">MONTO<br><input class="cot-input" id="vja-m-${_esfEsc(id)}" type="number" min="0" step="0.01" placeholder="0.00" style="width:110px"></label>
+      <label style="font-size:10px;color:var(--ts)">FECHA<br><input class="cot-input" id="vja-f-${_esfEsc(id)}" type="date" value="${_esfEsc(_mxFechaStr ? _mxFechaStr() : '')}" style="width:140px"></label>
+      <label style="font-size:10px;color:var(--ts);flex:1;min-width:160px">NOTA<br><input class="cot-input" id="vja-n-${_esfEsc(id)}" placeholder="ej. transferencia BBVA · link de pago" maxlength="500" style="width:100%"></label>
+      <button class="btn btn-primary btn-sm" id="vja-b-${_esfEsc(id)}" onclick="_vjAbonoGuardar('${_attrJs(id)}')">Guardar abono</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjAbonoAbrir('${_attrJs(id)}')">Cancelar</button>
+      <div id="vja-e-${_esfEsc(id)}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
+    </div>`;
+  const m = document.getElementById(`vja-m-${id}`);
+  if (m) { try { m.focus(); } catch (_) {} }
+}
+
+async function _vjAbonoGuardar(id) {
+  const err = document.getElementById(`vja-e-${id}`);
+  const monto = Number((document.getElementById(`vja-m-${id}`) || {}).value);
+  // > 0 estricto, ESPEJO del servidor (`abono_crear` rechaza <= 0); el servidor
+  // sigue siendo la autoridad, esto solo ahorra el viaje.
+  if (!Number.isFinite(monto) || monto <= 0) { if (err) err.textContent = 'El monto tiene que ser mayor que cero.'; return; }
+  const fecha = String((document.getElementById(`vja-f-${id}`) || {}).value || '').trim();
+  const nota = String((document.getElementById(`vja-n-${id}`) || {}).value || '').trim();
+  const btn = document.getElementById(`vja-b-${id}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await khViajeros.abonoCrear({ viajero_id: id, monto, fecha: fecha || undefined, nota: nota || undefined });   // [sec-coordi]
+    showToast(`Abono de ${_spFmtMxn(monto)} registrado`, 'success');
+    // Se RECARGA del servidor: la resta que queda en pantalla sale de los
+    // datos, no de restar aquí y confiar (la decisión de VJ-3 y de la caja).
+    await loadViajeros();
+  } catch (e) {
+    if (err) err.textContent = e.message;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar abono'; }
+  }
 }
 
 

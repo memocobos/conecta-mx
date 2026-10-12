@@ -346,6 +346,17 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   af((khj.match(/'requisiciones'/g) || []).length >= 4, '[C4] PERMISOS_TABS (3 roles) + dispatch llevan la pantalla');
   af(mod.includes('admin-requisiciones') && mod.includes('_reqBdjAprobar'), '[C5] el módulo le habla al endpoint y trae el aprobar');
   af(khj.includes('${reqHtml}'), '[C6] el inicio de Milk/Bulma PINTA la tarjeta de requisiciones');
+  // 🔒 EL INTERRUPTOR (orden de Memo, 12-oct): la requisición NO sale a la luz
+  // hasta la luz verde. Se mide EL HECHO en el código vivo: el flag declarado
+  // en false, el guard al ARRANQUE de _reqPintar (vaciando la sección), y el
+  // override secreto ?req=1 para probar en producción.
+  af(/var REQUISICION_VIVA\s*=\s*false/.test(idx), '[C7] 🔒 REQUISICION_VIVA declarado APAGADO — el sitio público queda como siempre');
+  {
+    const i0 = idx.indexOf('function _reqPintar');
+    const cuerpo = idx.slice(i0, idx.indexOf('function _reqForma', i0));
+    af(/if\(!_requisicionActiva\(\)\)\{\s*cont\.innerHTML=''/.test(cuerpo), '[C8] _reqPintar se rinde Y VACÍA la sección con el interruptor apagado');
+  }
+  af(idx.includes("conecta_req_preview") && idx.includes("get('req')"), '[C9] override ?req=1 por pestaña (patrón RESERVA_PORTAL) para probar sin enseñarlo');
 
   console.log(`\n${R === 0 ? '✅ VERDE' : '🔴 ROJO'} · ${V} en verde · ${R} en rojo`);
   if (V === 0) { console.log('NADA MEDIDO · esto NO es un verde'); process.exit(1); }

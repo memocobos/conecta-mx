@@ -6556,10 +6556,31 @@ function abrirModalPago(){
 // AQUÍ NO SE REGISTRA NADA: Bulma/Milk revisan y aprueban a mano (EL RUMBO).
 // El precio NO viaja para decidir nada — el servidor lo recalcula; solo va
 // _lastCotizacion como texto, para que el staff lea lo que el cliente vio.
+// 🔒 INTERRUPTOR GLOBAL (orden de Memo, 12-oct): la requisición NO sale a la
+// luz hasta su luz verde. Apagado = el modal de pago queda EXACTAMENTE como
+// siempre (cuentas + Messenger). Override secreto por pestaña para probar en
+// producción sin enseñárselo a nadie: ?req=1 lo prende SOLO en esa pestaña
+// (?req=0 lo apaga) — el mismo patrón de RESERVA_PORTAL, porque el index
+// reescribe la URL al navegar y el parámetro se perdería sin sessionStorage.
+var REQUISICION_VIVA=false;
+(function(){
+  try{
+    var v=new URLSearchParams(location.search).get('req');
+    if(v==='1')sessionStorage.setItem('conecta_req_preview','1');
+    else if(v==='0')sessionStorage.removeItem('conecta_req_preview');
+  }catch(e){}
+})();
+function _requisicionActiva(){
+  if(REQUISICION_VIVA)return true;
+  try{ return sessionStorage.getItem('conecta_req_preview')==='1'; }catch(e){ return false; }
+}
 var _reqEstado={forma:null,archivo:null,enviando:false};
 function _reqPintar(){
   var cont=document.getElementById('req-seccion');
   if(!cont)return;
+  // Con el interruptor apagado la sección se VACÍA (no solo se salta el
+  // pintado: si quedó algo de una pestaña con preview, se limpia).
+  if(!_requisicionActiva()){ cont.innerHTML=''; return; }
   _reqEstado={forma:null,archivo:null,enviando:false};
   var inp='width:100%;box-sizing:border-box;padding:11px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-family:Montserrat,sans-serif;font-size:13px;margin:0 0 8px';
   cont.innerHTML=

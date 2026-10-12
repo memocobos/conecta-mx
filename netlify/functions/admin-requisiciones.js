@@ -1,0 +1,265 @@
+// =============================================================================
+// admin-requisiciones — FASE B del rumbo (12-oct-2026): la BANDEJA.
+//
+// Bulma y Milk (y Memo) revisan las requisiciones que levanta el index:
+// ven el comprobante, aprueban (y ahí NACE el viajero por la puerta de zonas,
+// con su abono), rechazan con motivo, o le escriben al cliente por WhatsApp
+// (eso es del navegador — aquí no se manda nada).
+//
+// 🔒 LA CAPTURA ES MANUAL: el MONTO del abono lo teclea el humano que VIO el
+//    comprobante. Viene en el body, pre-llenado por la pantalla con el separo
+//    del sistema, pero la autoridad es la persona. Nada automático decide
+//    dinero (EL RUMBO, 12-oct).
+// 🔒 EL VIAJERO NACE POR LA PUERTA DE ZONAS (_lib/zona-ficha, DISPO-NORM-1):
+//    zona desconocida se RECHAZA nombrando las de la ficha; mal escrita se
+//    guarda con la ortografía canónica. RIDE va sin zona.
+// 🔒 LA CARRERA DEL DOBLE CLIC se cierra RECLAMANDO primero: el PATCH a
+//    'aprobada' lleva &estado=eq.pendiente y pide representación — 0 filas =
+//    alguien más la revisó primero (409, sin viajero duplicado). Si el insert
+//    del viajero falla DESPUÉS del reclamo, el reclamo se REVIERTE a
+//    pendiente y se dice. Si lo que falla es el ABONO (el viajero ya nació),
+//    NO se borra nada: se contesta con la instrucción exacta — capturar el
+//    abono a mano con ➕Abono — porque un viajero sin abono se corrige en un
+//    clic y un borrado automático de datos de gente no se hace jamás.
+// 🔒 El abono hereda el comprobante: foto_path = comprobante_path (mismo
+//    bucket abonos-viajeros, por eso el crear sube ahí).
+// 🔒 total_contrato default = total_sistema (el precio del index cuando el
+//    cliente cotizó — «los costos son los del index siempre»). El staff puede
+//    ajustarlo (CDMX sin transporte en el total del sistema, p. ej.), y eso
+//    también es captura manual.
+//
+// Env: SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE, JWT_SECRET.
+// =============================================================================
+
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { puertaZona } = require('./_lib/zona-ficha');
+
+const ROLES_BANDEJA = ['maestro_roshi', 'bulma', 'milk'];
+const ACCIONES = {
+  listar: ROLES_BANDEJA,
+  detalle: ROLES_BANDEJA,
+  aprobar: ROLES_BANDEJA,
+  rechazar: ROLES_BANDEJA,
+};
+const SIGN_EXPIRA = 60 * 60; // 1 hora, como admin-solicitud-comprobante
+const BUCKET = 'abonos-viajeros';
+
+function j(status, headers, body) { return { statusCode: status, headers, body: JSON.stringify(body) }; }
+
+exports.handler = async (event) => {
+  const __origin = corsCheck(event);
+  const headers = {
+    'Access-Control-Allow-Origin': __origin || 'null',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+    'Content-Type': 'application/json',
+  };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
+  if (event.httpMethod !== 'POST') return j(405, headers, { error: 'Solo POST' });
+
+  let body;
+  try { body = JSON.parse(event.body || '{}'); } catch (_) { return j(400, headers, { error: 'Cuerpo inválido' }); }
+  const accion = String(body.accion || '');
+  if (!ACCIONES[accion]) return j(400, headers, { error: 'Acción desconocida: ' + accion });
+
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
+  if (!auth.valid) return j(auth.status, headers, { error: auth.error });
+  const quien = (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || (auth.user && (auth.user.id || auth.user.sub)) || 'panel';
+
+  const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  if (!SB_URL || !SB_KEY) return j(500, headers, { error: 'Faltan credenciales de KameHouse en el entorno' });
+  const sbH = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+  const base = `${SB_URL}/rest/v1/requisiciones`;
+
+  // ── listar ────────────────────────────────────────────────────────────────
+  if (accion === 'listar') {
+    const estado = String(body.estado || 'pendiente');
+    let q = `${base}?select=*&order=creado_en.desc&limit=200`;
+    if (estado !== 'todas') q += `&estado=eq.${encodeURIComponent(estado)}`;
+    if (body.evento_id) q += `&evento_id=eq.${encodeURIComponent(String(body.evento_id))}`;
+    const [r, rc] = await Promise.all([
+      fetch(q, { headers: sbH }),
+      // El conteo de pendientes viaja SIEMPRE (badge de la bandeja y del inicio).
+      fetch(`${base}?select=id&estado=eq.pendiente&limit=500`, { headers: sbH }),
+    ]);
+    if (!r.ok) return j(502, headers, { error: 'No se pudo leer la bandeja', detail: (await r.text()).slice(0, 300) });
+    const rows = await r.json();
+    const pend = rc.ok ? (await rc.json()).length : null; // null = no se pudo contar (no es 0)
+    return j(200, headers, { ok: true, requisiciones: rows, pendientes: pend });
+  }
+
+  // Las tres restantes piden el id.
+  const id = String(body.id || '');
+  if (!/^[0-9a-f-]{36}$/.test(id)) return j(400, headers, { error: 'id inválido' });
+
+  // ── detalle: la fila + URL firmada del comprobante (1 h) ─────────────────
+  if (accion === 'detalle') {
+    const r = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
+    if (!r.ok) return j(502, headers, { error: 'No se pudo leer la requisición' });
+    const rows = await r.json();
+    if (!rows.length) return j(404, headers, { error: 'Esa requisición no existe' });
+    const req = rows[0];
+    let signed_url = null;
+    if (req.comprobante_path) {
+      try {
+        const rs = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${encodeURI(req.comprobante_path)}`, {
+          method: 'POST',
+          headers: Object.assign({}, sbH, { 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ expiresIn: SIGN_EXPIRA }),
+        });
+        if (rs.ok) {
+          const js = await rs.json().catch(() => null);
+          if (js && js.signedURL) signed_url = `${SB_URL}/storage/v1${js.signedURL}`;
+        }
+      } catch (_) { /* sin firma: la pantalla lo dice, no lo inventa */ }
+    }
+    return j(200, headers, { ok: true, requisicion: req, signed_url });
+  }
+
+  // ── rechazar: motivo OBLIGATORIO — un rechazo sin palabra no le sirve a
+  // nadie: ni al cliente que pregunta ni al que lo revisa en un mes. ────────
+  if (accion === 'rechazar') {
+    const motivo = String(body.motivo || '').trim().slice(0, 500);
+    if (motivo.length < 3) return j(400, headers, { error: 'Di por qué se rechaza (el cliente lo va a preguntar)' });
+    const r = await fetch(`${base}?id=eq.${id}&estado=eq.pendiente`, {
+      method: 'PATCH',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ estado: 'rechazada', motivo_rechazo: motivo, revisada_por: quien, revisada_at: new Date().toISOString() }),
+    });
+    if (!r.ok) return j(502, headers, { error: 'No se pudo rechazar', detail: (await r.text()).slice(0, 300) });
+    const rows = await r.json();
+    if (!rows.length) return j(409, headers, { error: 'Esa requisición ya no está pendiente — alguien más la revisó' });
+    return j(200, headers, { ok: true, requisicion: rows[0] });
+  }
+
+  // ── aprobar: NACE el viajero ──────────────────────────────────────────────
+  if (accion === 'aprobar') {
+    // 1 · Leer la fila (para armar el viajero con sus datos).
+    const r0 = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
+    if (!r0.ok) return j(502, headers, { error: 'No se pudo leer la requisición' });
+    const rows0 = await r0.json();
+    if (!rows0.length) return j(404, headers, { error: 'Esa requisición no existe' });
+    const req = rows0[0];
+    if (req.estado !== 'pendiente') return j(409, headers, { error: `Ya está ${req.estado}` });
+
+    // 2 · El dinero, tecleado por el humano que vio el comprobante.
+    const monto = Math.round(Number(body.monto));
+    if (!(monto > 0)) return j(400, headers, { error: 'El monto del abono va en pesos y mayor a cero — es lo que dice el comprobante que verificaste' });
+    const total_contrato = (body.total_contrato != null && body.total_contrato !== '')
+      ? Math.round(Number(body.total_contrato))
+      : (req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null);
+    if (!(total_contrato > 0)) return j(400, headers, { error: 'Falta el total del contrato (el sistema no lo tiene para este caso — por ejemplo CDMX con transporte): captúralo' });
+    if (monto > total_contrato) return j(400, headers, { error: `El abono ($${monto}) no puede ser mayor que el total del contrato ($${total_contrato}). Si el cliente pagó de más, ajusta el total o revisa el comprobante.` });
+    const notaStaff = String(body.nota || '').trim().slice(0, 500);
+
+    // 3 · La zona, por la PUERTA. El staff puede corregirla al aprobar.
+    let zonaFinal = null;
+    if (req.paquete !== 'ride') {
+      const capturada = String(body.zona != null && String(body.zona).trim() !== '' ? body.zona : (req.zona || '')).trim();
+      if (!capturada) return j(400, headers, { error: 'Falta la zona del boleto' });
+      let p;
+      try { p = await puertaZona(req.evento_id, capturada); } catch (e) { p = { estado: 'sin-catalogo', zona: capturada }; }
+      if (p.estado === 'desconocida') {
+        return j(409, headers, { error: `La zona «${capturada}» no existe en la ficha de ${req.evento_id}. Las de la ficha: ${(p.canonicas || []).join(' · ') || '(no se pudieron leer)'}` });
+      }
+      if (p.estado === 'sin-evento') return j(409, headers, { error: `El evento ${req.evento_id} ya no está en el catálogo` });
+      // 'sin-catalogo' pasa tal cual Y SE CONFIESA en la nota (regla DISPO-NORM-1).
+      zonaFinal = p.zona;
+      var zonaConfesion = (p.estado === 'canonizada') ? ` · zona escrita «${p.capturada}», guardada como la ficha la escribe` :
+                          (p.estado === 'sin-catalogo') ? ' · ⚠️ catálogo ilegible al aprobar: la zona pasó sin validar' : '';
+    }
+
+    // 4 · RECLAMAR la requisición (cierra la carrera del doble clic).
+    const rClaim = await fetch(`${base}?id=eq.${id}&estado=eq.pendiente`, {
+      method: 'PATCH',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ estado: 'aprobada', revisada_por: quien, revisada_at: new Date().toISOString(), nota_staff: notaStaff || null }),
+    });
+    if (!rClaim.ok) return j(502, headers, { error: 'No se pudo reclamar la requisición', detail: (await rClaim.text()).slice(0, 300) });
+    const claimed = await rClaim.json();
+    if (!claimed.length) return j(409, headers, { error: 'Alguien más la revisó primero — refresca la bandeja' });
+
+    // 5 · Nace el viajero. INSERT directo, sin on_conflict.
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const notaViajero = [
+      `Requisición ${req.folio} · ${req.forma_pago}${req.transporte ? ' · ' + req.transporte : ''}${req.hotel ? ' · hotel: ' + req.hotel : ''}`,
+      `aprobada por ${quien} ${hoyMX}${zonaConfesion || ''}`,
+      notaStaff ? `nota: ${notaStaff}` : '',
+    ].filter(Boolean).join(' · ');
+    const viajero = {
+      evento_id: req.evento_id,
+      nombre: req.nombre,
+      celular: req.celular,
+      correo: req.correo,
+      tipo_paquete: req.paquete,
+      zona_boleto: zonaFinal,
+      boletos: req.num_personas,
+      total_contrato,
+      abonado_previo: 0,
+      notas: notaViajero,
+    };
+    const rV = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
+      method: 'POST',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(viajero),
+    });
+    if (!rV.ok) {
+      const det = (await rV.text().catch(() => '')).slice(0, 300);
+      // Revertir el reclamo: la requisición vuelve a pendiente y se dice.
+      await fetch(`${base}?id=eq.${id}&estado=eq.aprobada`, {
+        method: 'PATCH',
+        headers: Object.assign({}, sbH, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ estado: 'pendiente', revisada_por: null, revisada_at: null }),
+      }).catch(() => {});
+      return j(502, headers, { error: 'No se pudo crear el viajero — la requisición sigue PENDIENTE, inténtalo otra vez', detail: det });
+    }
+    const vNuevo = (await rV.json())[0];
+
+    // 6 · El abono, con el comprobante heredado. capturado_por del JWT.
+    const rA = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
+      method: 'POST',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        viajero_id: vNuevo.id,
+        monto,
+        nota: `Requisición ${req.folio} · comprobante verificado al aprobar`,
+        foto_path: req.comprobante_path || null,
+        capturado_por: quien,
+      }),
+    });
+    if (!rA.ok) {
+      const det = (await rA.text().catch(() => '')).slice(0, 300);
+      // El viajero YA nació — no se borra (datos de gente). Instrucción exacta:
+      return j(207, headers, {
+        ok: false, viajero_id: vNuevo.id,
+        error: `El viajero quedó creado pero SU ABONO NO SE REGISTRÓ. Captúralo a mano con ➕ Abono sobre «${req.nombre}» ($${monto}, requisición ${req.folio}).`,
+        detail: det,
+      });
+    }
+
+    // 7 · Colgarle el viajero a la requisición (informativo; si falla, se dice).
+    let enlaceOk = true;
+    try {
+      const rE = await fetch(`${base}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: Object.assign({}, sbH, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ viajero_id: vNuevo.id }),
+      });
+      enlaceOk = rE.ok;
+    } catch (_) { enlaceOk = false; }
+
+    return j(200, headers, {
+      ok: true,
+      viajero_id: vNuevo.id,
+      folio: req.folio,
+      zona: zonaFinal,
+      total_contrato,
+      monto,
+      enlace_registrado: enlaceOk,
+    });
+  }
+
+  return j(400, headers, { error: 'Acción no implementada' });
+};

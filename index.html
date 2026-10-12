@@ -6545,8 +6545,161 @@ function abrirModalPago(){
   var instr=$$('pago-msg-instruccion');
   if(instr)instr.style.display=isHey?'none':'block';
   $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
+  // FASE B (REQ-B1): pinta el formulario de requisición. En try para que un
+  // tropiezo ahí JAMÁS tire el modal del dinero: sin él queda el camino de
+  // siempre (cuentas + Messenger).
+  try{_reqPintar();}catch(e){try{console.error('[req] no se pudo pintar:',e);}catch(_){}}
   document.getElementById('pago-modal-bg').style.display='flex';
 }
+// ── FASE B (REQ-B1): la REQUISICIÓN — el cliente aparta aquí mismo ─────────
+// Sube su comprobante (o pide link de pago) y cae a la bandeja de KameHouse.
+// AQUÍ NO SE REGISTRA NADA: Bulma/Milk revisan y aprueban a mano (EL RUMBO).
+// El precio NO viaja para decidir nada — el servidor lo recalcula; solo va
+// _lastCotizacion como texto, para que el staff lea lo que el cliente vio.
+var _reqEstado={forma:null,archivo:null,enviando:false};
+function _reqPintar(){
+  var cont=document.getElementById('req-seccion');
+  if(!cont)return;
+  _reqEstado={forma:null,archivo:null,enviando:false};
+  var inp='width:100%;box-sizing:border-box;padding:11px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-family:Montserrat,sans-serif;font-size:13px;margin:0 0 8px';
+  cont.innerHTML=
+    '<div style="border-top:1px solid rgba(255,255,255,.14);margin:14px 0 12px"></div>'+
+    '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#e8ff4c;margin:0 0 2px">Aparta tu lugar aquí mismo</div>'+
+    '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 10px">Sube tu comprobante y el equipo te confirma por WhatsApp. Sin cuentas ni contraseñas.</div>'+
+    '<input type="text" id="req-nombre" placeholder="Tu nombre completo *" maxlength="80" style="'+inp+'">'+
+    '<input type="tel" id="req-celular" placeholder="Tu WhatsApp (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
+    '<input type="email" id="req-correo" placeholder="Tu correo (opcional)" maxlength="120" style="'+inp+'">'+
+    '<div style="font-family:Montserrat,sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:4px 0 6px">¿Cómo pagaste? *</div>'+
+    '<div id="req-formas" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></div>'+
+    '<div id="req-file-wrap" style="display:none">'+
+      '<label for="req-file" id="req-file-lbl" style="display:block;text-align:center;padding:12px;border:1.5px dashed rgba(232,255,76,.5);border-radius:8px;color:#e8ff4c;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin:0 0 8px">📎 Subir foto de tu comprobante *</label>'+
+      '<input type="file" id="req-file" accept="image/*,application/pdf" style="display:none">'+
+    '</div>'+
+    '<div id="req-link-msg" style="display:none;font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 8px">Te mandamos tu link de pago por WhatsApp — pagas con tarjeta u OXXO en la página segura de Mercado Pago.</div>'+
+    '<input type="text" id="req-web" name="web" value="" style="display:none" tabindex="-1" autocomplete="off">'+
+    '<button type="button" id="req-enviar" onclick="_reqEnviar()" style="width:100%;padding:13px;background:#e8ff4c;color:#000;border:none;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer">Enviar mi reservación</button>'+
+    '<div id="req-msg" style="font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.45;margin:8px 0 0;min-height:1px"></div>'+
+    '<div style="font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.45);text-align:center;margin:10px 0 2px">¿Prefieres mandarlo por chat? Abajo está el botón de siempre ↓</div>';
+  var formas=[['transferencia','Transferencia'],['deposito','Depósito'],['oxxo','Pagué en OXXO'],['link_pago','Quiero link de pago']];
+  var fw=document.getElementById('req-formas');
+  formas.forEach(function(f){
+    var b=document.createElement('button');
+    b.type='button';b.textContent=f[1];b.dataset.forma=f[0];
+    b.style.cssText='padding:8px 10px;border-radius:999px;border:1.5px solid rgba(255,255,255,.25);background:transparent;color:#fff;font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;cursor:pointer';
+    b.onclick=function(){_reqForma(f[0]);};
+    fw.appendChild(b);
+  });
+  var fi=document.getElementById('req-file');
+  if(fi)fi.onchange=function(){
+    _reqEstado.archivo=(fi.files&&fi.files[0])||null;
+    var l=document.getElementById('req-file-lbl');
+    if(l)l.textContent=_reqEstado.archivo?('✓ '+_reqEstado.archivo.name.slice(0,34)+' — toca para cambiar'):'📎 Subir foto de tu comprobante *';
+  };
+}
+function _reqForma(f){
+  _reqEstado.forma=f;
+  var fw=document.getElementById('req-formas');
+  if(fw)Array.prototype.forEach.call(fw.children,function(b){
+    var on=b.dataset.forma===f;
+    b.style.background=on?'#e8ff4c':'transparent';
+    b.style.color=on?'#000':'#fff';
+    b.style.borderColor=on?'#e8ff4c':'rgba(255,255,255,.25)';
+  });
+  var esLink=(f==='link_pago');
+  var w=document.getElementById('req-file-wrap');if(w)w.style.display=esLink?'none':'block';
+  var m=document.getElementById('req-link-msg');if(m)m.style.display=esLink?'block':'none';
+}
+// Imagen → JPEG a máx 1600px antes de viajar (un ticket fotografiado pesa MB
+// y a 1600px sigue legible). PDF pasa tal cual si cabe. Devuelve Promise.
+function _reqArchivoB64(file){
+  return new Promise(function(res,rej){
+    if(!file)return res(null);
+    if(file.type==='application/pdf'){
+      if(file.size>3*1024*1024)return rej(new Error('El PDF pesa demasiado (máx 3 MB). Mándalo como foto.'));
+      var r=new FileReader();
+      r.onload=function(){res(String(r.result||''));};
+      r.onerror=function(){rej(new Error('No se pudo leer tu archivo'));};
+      r.readAsDataURL(file);
+      return;
+    }
+    if(!/^image\//.test(file.type||''))return rej(new Error('Sube una foto (JPG/PNG) o un PDF'));
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var MAX=1600,w=img.naturalWidth,h=img.naturalHeight;
+        var esc=Math.min(1,MAX/Math.max(w,h));
+        var c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(w*esc));c.height=Math.max(1,Math.round(h*esc));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg',.85));
+      }catch(e){URL.revokeObjectURL(url);rej(new Error('No se pudo procesar tu foto'));}
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('Esa imagen no se pudo abrir'));};
+    img.src=url;
+  });
+}
+function _reqMsg(t,esError){
+  var m=document.getElementById('req-msg');
+  if(m){m.textContent=t;m.style.color=esError?'#ff6b6b':'#88ea4e';}
+}
+function _reqEnviar(){
+  if(_reqEstado.enviando)return;
+  if(!cur||!selPkg)return _reqMsg('Primero completa tu cotización arriba',true);
+  var nombre=(document.getElementById('req-nombre')||{value:''}).value.trim();
+  var cel=((document.getElementById('req-celular')||{value:''}).value||'').replace(/\D/g,'');
+  var correo=(document.getElementById('req-correo')||{value:''}).value.trim();
+  if(nombre.length<2)return _reqMsg('Escribe tu nombre completo',true);
+  if(cel.length!==10)return _reqMsg('Tu WhatsApp va a 10 dígitos, sin lada de país',true);
+  if(!_reqEstado.forma)return _reqMsg('Elige cómo pagaste',true);
+  if(_reqEstado.forma!=='link_pago'&&!_reqEstado.archivo)return _reqMsg('Sube la foto de tu comprobante',true);
+  var btn=document.getElementById('req-enviar');
+  _reqEstado.enviando=true;
+  if(btn){btn.disabled=true;btn.textContent='Enviando…';btn.style.opacity='.6';}
+  _reqMsg('');
+  _reqArchivoB64(_reqEstado.forma==='link_pago'?null:_reqEstado.archivo).then(function(b64){
+    var payload={
+      web:(document.getElementById('req-web')||{value:''}).value,
+      evento_id:cur.id+((cur.multifecha&&cur.multifecha.length)?('#'+(selFechaIdx||0)):''),
+      paquete:selPkg,
+      zona:(selZ&&selZ.n)||null,
+      num_personas:selViaj||1,
+      hotel:(selH&&selH.n)||null,
+      transporte:selTransporte?(selTransporte.n+(selTransporte.cost?(' $'+selTransporte.cost):'')):null,
+      cotizacion_texto:_lastCotizacion||'',
+      nombre:nombre,celular:cel,correo:correo,
+      forma_pago:_reqEstado.forma,
+      comprobante_base64:b64||''
+    };
+    return fetch('/.netlify/functions/requisicion-crear',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+    }).then(function(r){return r.json().then(function(j){return{st:r.status,j:j};});});
+  }).then(function(r){
+    if(r.j&&r.j.ok&&r.j.folio){
+      try{trackMainEvent('main_requisicion_creada',{forma:_reqEstado.forma});}catch(e){}
+      var cont=document.getElementById('req-seccion');
+      if(cont)cont.innerHTML=
+        '<div style="border-top:1px solid rgba(255,255,255,.14);margin:14px 0 12px"></div>'+
+        '<div style="text-align:center;padding:14px 10px;background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.4);border-radius:10px">'+
+        '<div style="font-size:26px;margin-bottom:4px">✅</div>'+
+        '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">¡Recibimos tu reservación!</div>'+
+        '<div style="font-family:Montserrat,sans-serif;font-size:12px;color:#fff;margin-bottom:6px">Tu folio: <b style="color:#e8ff4c;letter-spacing:.06em">'+r.j.folio+'</b></div>'+
+        '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">El equipo revisa tu '+(_reqEstado.forma==='link_pago'?'solicitud y te manda tu link de pago':'comprobante')+' y te confirma por WhatsApp. Guarda tu folio.</div>'+
+        '</div>';
+    }else{
+      try{trackMainEvent('main_requisicion_error',{st:r.st});}catch(e){}
+      _reqMsg((r.j&&r.j.error)||'No se pudo enviar. Inténtalo otra vez o usa el botón de Messenger de abajo.',true);
+      _reqEstado.enviando=false;
+      if(btn){btn.disabled=false;btn.textContent='Enviar mi reservación';btn.style.opacity='1';}
+    }
+  }).catch(function(e){
+    _reqMsg((e&&e.message)||'No se pudo enviar. Revisa tu señal e inténtalo otra vez.',true);
+    _reqEstado.enviando=false;
+    if(btn){btn.disabled=false;btn.textContent='Enviar mi reservación';btn.style.opacity='1';}
+  });
+}
+
 function abrirNuevaFechaModal(){
   document.getElementById('nf-modal-bg').style.display='flex';
 }
@@ -7748,6 +7901,10 @@ function getQuincenas(from, until, max, diasAntes){
         <div class="pago-separo-amt" id="pago-monto"></div>
       </div>
       <div class="pago-bank" id="pago-bank-info"></div>
+      <!-- FASE B (REQ-B1): la requisición nace aquí. El contenido lo pinta
+           _reqPintar() en cada apertura del modal (estado fresco). Si ese JS
+           tronara, el modal sigue entero: cuentas + Messenger de siempre. -->
+      <div id="req-seccion"></div>
       <div class="pago-actions">
         <p id="pago-msg-instruccion" style="display:none;margin:0 0 10px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:#e8ff4c;opacity:.85;text-align:center;letter-spacing:.02em;line-height:1.35">Envía tu comprobante de pago por Messenger para confirmar tu lugar</p>
         <a class="pago-btn-primary" id="pago-btn-comprobante" href="#" target="_blank">Ya pagué, enviar comprobante</a>

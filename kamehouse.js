@@ -81,18 +81,18 @@ let disenoLoaded = false;
 const PERMISOS_TABS = {
   // [HOME-ROL-1] `inicio` es la pantalla de ENTRADA por rol (RUMBO 12-oct):
   // todos la pueden ver; a quién ATERRIZA ahí lo decide HOME_PREFERIDO.
-  maestro_roshi: ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube'],
+  maestro_roshi: ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
-  bulma:         ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
+  bulma:         ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
   mister_popo:   ['inicio','inventario','reportes','equipo'],
   coordinador:   ['inicio','inventario','reportes','equipo'],
   cc:            ['inicio','equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
+  milk:          ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -2324,6 +2324,7 @@ function showPage(name) {
 
 function loadPage(name) {
  if (name === 'inicio') loadInicio();
+ if (name === 'requisiciones') loadRequisiciones(); // [REQ-B1] la bandeja de FASE B
  if (name === 'resumen') loadResumen();
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
@@ -11003,12 +11004,35 @@ async function _inicioMB(cont) {
   // En paralelo y cada una fails-soft POR TARJETA: si la Nube tose, la
   // cobranza igual se pinta — un inicio que se cae entero por una tarjeta es
   // peor que una tarjeta que confiesa.
-  const [nube, deud, evs] = await Promise.all([
+  const [nube, deud, evs, reqs] = await Promise.all([
     khAdminFetch('/.netlify/functions/admin-nube', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
       .then((r) => r.json()).catch((e) => ({ _err: e.message })),
     khViajeros._call({ accion: 'deudores_migrados' }).catch((e) => ({ _err: e.message })),
     (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+    // [REQ-B1] Las requisiciones pendientes — la bandeja de FASE B es EL
+    // pendiente nuevo de Bulma/Milk: una reservación esperando es un cliente
+    // esperando. Fails-soft como las demás tarjetas.
+    khAdminFetch('/.netlify/functions/admin-requisiciones', { method: 'POST', body: JSON.stringify({ accion: 'listar', estado: 'pendiente' }) })
+      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
   ]);
+
+  // ⓪ REQUISICIONES — va PRIMERA: dinero de clientes esperando confirmación.
+  let reqHtml;
+  if (reqs && reqs.ok) {
+    const lista = reqs.requisiciones || [];
+    if (!lista.length) {
+      reqHtml = ''; // cero pendientes = la tarjeta se CALLA (un «todo bien»
+                    // permanente se vuelve mueble y deja de avisar — ley NUBE).
+    } else {
+      const filas = lista.slice(0, 5).map((q) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(q.nombre)}<i style="color:var(--ts)"> · ${_iniEsc(q.evento_nombre || q.evento_id)} · ${_iniEsc(q.forma_pago)}</i></span><b>${q.separo_sistema != null ? _spFmtMxn(q.separo_sistema) : '—'}</b></div>`).join('');
+      reqHtml = _iniCard(`🎟 Requisiciones por revisar · ${lista.length}`,
+        filas + (lista.length > 5 ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">…y ${lista.length - 5} más en la bandeja</div>` : ''),
+        `<button class="btn btn-primary btn-sm" onclick="showPage('requisiciones')">Abrir la bandeja →</button>`);
+    }
+  } else {
+    reqHtml = _iniCard('🎟 Requisiciones', `<div style="color:var(--ts);font-size:12px">No se pudo leer la bandeja: ${_iniEsc((reqs && (reqs._err || reqs.error)) || 'sin respuesta')}</div>`,
+      `<button class="btn btn-ghost btn-sm" onclick="showPage('requisiciones')">Abrir la bandeja →</button>`);
+  }
 
   // ① LA NUBE VOLADORA — el encargo directo de Memo: que capturen los vuelos.
   let nubeHtml;
@@ -11054,7 +11078,7 @@ async function _inicioMB(cont) {
       : '<div style="color:var(--ts);font-size:12px">Ninguno esta semana.</div>',
     `<button class="btn btn-ghost btn-sm" onclick="showPage('capsule')">Ver viajeros →</button>`);
 
-  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${nubeHtml}${cobHtml}${proxHtml}</div>`;
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando
 }
 
 // ── La cara de GUERREROS Z: contrato · datos · tours · ranking ──────────────

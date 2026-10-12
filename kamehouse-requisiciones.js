@@ -1,0 +1,174 @@
+/* =============================================================================
+ * kamehouse-requisiciones.js — FASE B del rumbo (12-oct-2026): LA BANDEJA.
+ *
+ * Las requisiciones que levanta el index (cotización + forma de pago +
+ * comprobante) caen aquí. Bulma/Milk/Memo las revisan:
+ *   · VER el comprobante (URL firmada de 1 h, pedida al servidor al momento)
+ *   · APROBAR — y ahí nace el viajero por la puerta de zonas, con su abono.
+ *     El MONTO lo teclea quien VIO el comprobante (pre-llenado con el separo
+ *     del sistema, editable): la captura es manual, nada automático decide
+ *     dinero.
+ *   · RECHAZAR con motivo (obligatorio).
+ *   · WHATSAPP al cliente con mensaje redactado (confirmación o faltante) —
+ *     abre wa.me, no manda nada solo.
+ *
+ * Endpoint: admin-requisiciones (listar / detalle / aprobar / rechazar).
+ * Roles: maestro_roshi, bulma, milk (PERMISOS_TABS gobierna el botón).
+ * ========================================================================== */
+
+let _reqBdjRows = [];
+let _reqBdjFiltro = 'pendiente';
+let _reqBdjCargando = false;
+
+function _reqBdjEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function _reqBdjMxn(n) {
+  if (n == null || n === '') return '—';
+  try { return '$' + Number(n).toLocaleString('es-MX'); } catch (_) { return '$' + n; }
+}
+function _reqBdjFecha(iso) {
+  try { return new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
+  catch (_) { return String(iso || ''); }
+}
+
+async function _reqBdjCall(body) {
+  const r = await khAdminFetch('/.netlify/functions/admin-requisiciones', {
+    method: 'POST', body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok && !j.error) j.error = 'HTTP ' + r.status;
+  j._status = r.status;
+  return j;
+}
+
+async function loadRequisiciones(filtro) {
+  if (filtro) _reqBdjFiltro = filtro;
+  const cont = document.getElementById('req-bdj-lista');
+  if (!cont) return;
+  if (_reqBdjCargando) return;
+  _reqBdjCargando = true;
+  cont.innerHTML = '<div style="color:var(--ts);padding:20px">Cargando la bandeja…</div>';
+  const j = await _reqBdjCall({ accion: 'listar', estado: _reqBdjFiltro }).catch((e) => ({ error: e.message }));
+  _reqBdjCargando = false;
+  // Los tabs pintan su estado activo SIEMPRE (también en error).
+  document.querySelectorAll('#req-bdj-tabs .tab-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.filtro === _reqBdjFiltro);
+  });
+  if (!j || !j.ok) {
+    cont.innerHTML = `<div style="color:var(--red);padding:20px">No se pudo leer la bandeja: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`;
+    return;
+  }
+  _reqBdjRows = j.requisiciones || [];
+  const badge = document.getElementById('req-bdj-pend');
+  // j.pendientes en null = «no se pudo contar», que NO es cero.
+  if (badge) badge.textContent = (j.pendientes == null) ? '?' : String(j.pendientes);
+  if (!_reqBdjRows.length) {
+    cont.innerHTML = `<div style="color:var(--ts);padding:24px;text-align:center">No hay requisiciones ${_reqBdjFiltro === 'todas' ? '' : _reqBdjEsc(_reqBdjFiltro + 's')} por ahora.<br><span style="font-size:11px">Las que lleguen del sitio caen aquí solas.</span></div>`;
+    return;
+  }
+  cont.innerHTML = _reqBdjRows.map(_reqBdjCard).join('');
+}
+
+function _reqBdjCard(r) {
+  const esPend = r.estado === 'pendiente';
+  const colorEstado = r.estado === 'aprobada' ? 'var(--green)' : r.estado === 'rechazada' ? 'var(--red)' : 'var(--yellow, #e8ff4c)';
+  const chip = (t) => t ? `<span style="display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:10.5px;color:var(--ts);margin:2px 4px 2px 0">${_reqBdjEsc(t)}</span>` : '';
+  const formaTxt = { transferencia: 'Transferencia', deposito: 'Depósito', oxxo: 'OXXO', link_pago: '🔗 PIDE LINK DE PAGO' }[r.forma_pago] || r.forma_pago;
+  const cel = String(r.celular || '').replace(/\D/g, '');
+  return `
+  <div class="card" style="margin-bottom:12px;padding:14px" id="req-card-${r.id}">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+      <div>
+        <b style="font-size:15px">${_reqBdjEsc(r.nombre)}</b>
+        <span style="color:var(--ts);font-size:12px"> · ${_reqBdjEsc(r.evento_nombre || r.evento_id)}</span>
+      </div>
+      <div style="font-size:11px;letter-spacing:.06em"><b style="color:${colorEstado};text-transform:uppercase">${_reqBdjEsc(r.estado)}</b> <span style="color:var(--ts)">· ${_reqBdjEsc(r.folio)} · ${_reqBdjFecha(r.creado_en)}</span></div>
+    </div>
+    <div style="margin:8px 0 6px">
+      ${chip(String(r.paquete || '').toUpperCase())}${chip(r.zona)}${chip((r.num_personas || 1) + (r.num_personas > 1 ? ' personas' : ' persona'))}${chip(r.hotel)}${chip(r.transporte)}${chip(formaTxt)}
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ts);margin-bottom:10px">
+      <span>Separo del sistema: <b style="color:var(--text)">${_reqBdjMxn(r.separo_sistema)}</b></span>
+      <span>Total del sistema: <b style="color:var(--text)">${_reqBdjMxn(r.total_sistema)}</b>${(r.transporte && r.total_sistema != null) ? ' <i style="font-size:10px">(sin transporte CDMX)</i>' : ''}</span>
+      <span>WhatsApp: <b style="color:var(--text)">${_reqBdjEsc(r.celular)}</b></span>
+      ${r.correo ? `<span>Correo: <b style="color:var(--text)">${_reqBdjEsc(r.correo)}</b></span>` : ''}
+    </div>
+    ${r.cotizacion_texto ? `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:11px;color:var(--ts)">Ver la cotización que el cliente vio</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--ts);background:rgba(255,255,255,.04);padding:10px;border-radius:8px;margin:6px 0 0">${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
+    ${r.estado === 'rechazada' && r.motivo_rechazo ? `<div style="font-size:12px;color:var(--red);margin-bottom:8px">Motivo: ${_reqBdjEsc(r.motivo_rechazo)}</div>` : ''}
+    ${r.estado !== 'pendiente' && r.revisada_por ? `<div style="font-size:11px;color:var(--ts);margin-bottom:8px">Revisada por ${_reqBdjEsc(r.revisada_por)}${r.nota_staff ? ' · ' + _reqBdjEsc(r.nota_staff) : ''}</div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${r.comprobante_path ? `<button class="btn btn-ghost btn-sm" onclick="_reqBdjVerComprobante('${r.id}')">📎 Ver comprobante</button>` : '<span style="font-size:11px;color:var(--ts);align-self:center">Sin comprobante (pide link de pago)</span>'}
+      <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="https://wa.me/52${cel}?text=${encodeURIComponent('¡Hola ' + (String(r.nombre || '').split(' ')[0]) + '! Te escribimos de Conecta Reynosa por tu reservación ' + r.folio + ' 😄')}">💬 WhatsApp</a>
+      ${esPend ? `<button class="btn btn-primary btn-sm" onclick="_reqBdjAprobarUI('${r.id}')">✓ Aprobar…</button>` : ''}
+      ${esPend ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="_reqBdjRechazar('${r.id}')">✕ Rechazar</button>` : ''}
+      ${r.estado === 'aprobada' && r.viajero_id ? '<span style="font-size:11px;color:var(--green);align-self:center">Viajero creado ✓</span>' : ''}
+    </div>
+    <div id="req-apr-${r.id}" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px"></div>
+  </div>`;
+}
+
+async function _reqBdjVerComprobante(id) {
+  const j = await _reqBdjCall({ accion: 'detalle', id }).catch((e) => ({ error: e.message }));
+  if (j && j.ok && j.signed_url) { window.open(j.signed_url, '_blank', 'noopener'); return; }
+  alert('No se pudo abrir el comprobante: ' + ((j && j.error) || 'la firma no llegó. Reintenta.'));
+}
+
+// ── Aprobar: el formulario del humano. Pre-llenado con lo del sistema,
+// EDITABLE — la autoridad es quien vio el comprobante. ───────────────────────
+function _reqBdjAprobarUI(id) {
+  const r = _reqBdjRows.find((x) => x.id === id);
+  const box = document.getElementById('req-apr-' + id);
+  if (!r || !box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const esRide = r.paquete === 'ride';
+  box.innerHTML = `
+    <div style="font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">Al aprobar NACE el viajero con su abono</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px">
+      <label style="font-size:11px;color:var(--ts)">Abono verificado (lo que dice el comprobante) *<input type="number" id="req-apr-monto-${id}" value="${r.separo_sistema != null ? Math.round(Number(r.separo_sistema)) : ''}" min="1" step="1" style="width:100%;margin-top:4px"></label>
+      <label style="font-size:11px;color:var(--ts)">Total del contrato *<input type="number" id="req-apr-total-${id}" value="${r.total_sistema != null ? Math.round(Number(r.total_sistema)) : ''}" min="1" step="1" style="width:100%;margin-top:4px"></label>
+      ${esRide ? '' : `<label style="font-size:11px;color:var(--ts)">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}" style="width:100%;margin-top:4px"></label>`}
+    </div>
+    <label style="font-size:11px;color:var(--ts)">Nota (opcional)<input type="text" id="req-apr-nota-${id}" maxlength="500" style="width:100%;margin-top:4px"></label>
+    ${(r.transporte && r.total_sistema != null) ? '<div style="font-size:11px;color:var(--orange,#ffb020);margin-top:6px">⚠️ El total del sistema NO incluye el transporte a CDMX — ajústalo si aplica (la cotización del cliente lo trae).</div>' : ''}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary btn-sm" id="req-apr-go-${id}" onclick="_reqBdjAprobar('${id}')">Confirmar — crear viajero</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('req-apr-${id}').style.display='none'">Cancelar</button>
+    </div>
+    <div id="req-apr-msg-${id}" style="font-size:12px;margin-top:8px"></div>`;
+  box.style.display = 'block';
+}
+
+async function _reqBdjAprobar(id) {
+  const $ = (suf) => document.getElementById('req-apr-' + suf + '-' + id);
+  const msg = $('msg');
+  const monto = Math.round(Number(($('monto') || {}).value));
+  const total = Math.round(Number(($('total') || {}).value));
+  const zonaEl = $('zona');
+  const nota = (($('nota') || {}).value || '').trim();
+  if (!(monto > 0)) { if (msg) { msg.textContent = 'El abono va en pesos, mayor a cero.'; msg.style.color = 'var(--red)'; } return; }
+  if (!(total > 0)) { if (msg) { msg.textContent = 'Falta el total del contrato.'; msg.style.color = 'var(--red)'; } return; }
+  const btn = $('go');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+  const body = { accion: 'aprobar', id, monto, total_contrato: total, nota };
+  if (zonaEl) body.zona = zonaEl.value;
+  const j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
+  if (j && j.ok) {
+    if (msg) { msg.innerHTML = '✓ Viajero creado con su abono de ' + _reqBdjMxn(j.monto) + '. Confírmale al cliente por WhatsApp.'; msg.style.color = 'var(--green)'; }
+    setTimeout(() => loadRequisiciones(), 900);
+  } else {
+    // El 207 trae instrucción exacta (viajero creado, abono no) — se enseña TAL CUAL.
+    if (msg) { msg.textContent = (j && j.error) || 'No se pudo aprobar'; msg.style.color = 'var(--red)'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; }
+    if (j && j._status === 207) setTimeout(() => loadRequisiciones(), 4000);
+  }
+}
+
+async function _reqBdjRechazar(id) {
+  const motivo = prompt('¿Por qué se rechaza? (el cliente lo va a preguntar)');
+  if (motivo == null) return;
+  if (String(motivo).trim().length < 3) { alert('Escribe el motivo.'); return; }
+  const j = await _reqBdjCall({ accion: 'rechazar', id, motivo: String(motivo).trim() }).catch((e) => ({ error: e.message }));
+  if (j && j.ok) loadRequisiciones();
+  else alert('No se pudo rechazar: ' + ((j && j.error) || 'sin respuesta'));
+}

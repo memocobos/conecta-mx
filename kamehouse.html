@@ -132,6 +132,8 @@
    <button class="nav-btn" onclick="showPage('inicio')" id="nav-inicio"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Inicio</span></button>
    <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
+   <!-- [REQ-B1] La bandeja de FASE B: las reservaciones que levanta el index. -->
+   <button class="nav-btn" onclick="showPage('requisiciones')" id="nav-requisiciones"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Requisiciones</span></button>
    <!-- [EVT-NAV-1] Vuelve el botón que E5-4 quitó. Sin él, POR EVENTO solo se
         alcanzaba clicando un evento en el Resumen (`_evtIrA`), y una pantalla
         que solo se abre desde otra es una pantalla que nadie encuentra: Memo
@@ -1271,6 +1273,27 @@
      <div class="modal-overlay" id="modal-cancelar-evento"></div>
      <div class="modal-overlay" id="modal-yamcha-datos"></div>
      <div class="modal-overlay" id="modal-yamcha-transferir"></div>
+
+     <!-- ─── REQUISICIONES (FASE B del rumbo, REQ-B1) ─── -->
+     <div class="page" id="page-requisiciones">
+       <div class="page-head">
+        <div>
+         <div class="page-title"><svg class="ic"><use href="#ic-solicitudes"/></svg> REQUISICIONES</div>
+         <div class="page-sub">// Las reservaciones del sitio: comprobante + forma de pago. Aprobar crea el viajero con su abono — tú verificas el dinero.</div>
+        </div>
+        <div class="page-actions">
+         <span class="chip" style="font-weight:800">PENDIENTES <b id="req-bdj-pend">—</b></span>
+         <button class="btn btn-ghost btn-sm" onclick="loadRequisiciones()">↻ Refrescar</button>
+        </div>
+       </div>
+       <div class="tabs" id="req-bdj-tabs" style="margin-bottom:14px">
+        <button class="tab-btn active" data-filtro="pendiente" onclick="loadRequisiciones('pendiente')">// pendientes</button>
+        <button class="tab-btn" data-filtro="aprobada" onclick="loadRequisiciones('aprobada')">// aprobadas</button>
+        <button class="tab-btn" data-filtro="rechazada" onclick="loadRequisiciones('rechazada')">// rechazadas</button>
+        <button class="tab-btn" data-filtro="todas" onclick="loadRequisiciones('todas')">// todas</button>
+       </div>
+       <div id="req-bdj-lista"><div style="color:var(--ts);padding:20px">Cargando…</div></div>
+     </div>
 
      <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->
      <div class="page" id="page-solicitudes_portal">
@@ -4121,5 +4144,6 @@
 <script src="kamehouse-operacion.js"></script>
 <!-- [MONO-17] Antes del tronco, regla del sentido único (ver MONO-2). -->
 <script src="kamehouse-nube.js"></script>
+<script src="kamehouse-requisiciones.js"></script>
 <script src="kamehouse-resumen.js"></script>
 <script src="kamehouse.js"></script>

@@ -1,30 +1,51 @@
 # Conecta Reynosa — Contexto Completo para Claude Code
 
-> ## 🎯 EL RUMBO (30-ago-2026): KameHouse sólido, rápido y con flujo
+> ## 🎯 EL RUMBO (12-oct-2026): MANUAL PRIMERO — el humano opera, el sistema vigila
 >
-> **El arranque del 1-sep YA NO manda.** Se retiró como vara de medir: dejó de
-> ser la fecha contra la que se decide qué entra y qué no. Lo que manda ahora es
-> que **KameHouse sea sólido, rápido y con flujo** — que aguante el uso diario y
-> que dos personas puedan trabajar en él a la vez sin pisarse.
+> **Palabra de Memo, citada:** *«todo funciona y nada funciona a la vez …
+> tengo meses intentándolo pero no podemos porque queremos automatizar
+> demasiado … lo mejor es que los pagos y separos se metan manual y lo que ya
+> tenemos cargado cargarlo realmente como información ya del kamehouse.»*
+> La causa estaba medida: KameHouse tiene DOS listas de viajeros que no se ven
+> entre sí, y las pantallas (rooming, lista de viajeros) le hablan a la VACÍA
+> (solicitudes del Portal) mientras los 2,400+ reales viven en
+> `viajeros_evento`. El sistema entero esperaba una automatización que
+> esperaba otra.
 >
-> Tres cosas que fija esta orden:
-> - **El Excel sigue en paralelo**, con **careo diario** contra el sistema hasta
->   la paridad. No se apaga por decreto: se apaga cuando los números coincidan.
-> - **Las sucursales quedan CONGELADAS** hasta nueva orden. La replicación a las
->   23 no es el objetivo de hoy; sigue siendo el destino, y por eso lo sencillo
->   se sigue prefiriendo — pero ya no se construye *para* ellas.
-> - **La prioridad es el sistema, no la fecha.** Solidez, velocidad y flujo de
->   trabajo por encima de cualquier módulo nuevo.
+> Lo que fija esta orden:
+> - **`viajeros_evento` ES la lista real y TODAS las pantallas del Palacio le
+>   hablan a ella** — rooming, lista de viajeros, pagos. FASE A.
+> - **La captura es MANUAL y pasa por Bulma y Milk.** Abonos, separos y altas
+>   se capturan a mano en KameHouse. Nada automático decide dinero.
+> - **El careo del Excel cambia de oficio: de ESCRITOR a VIGILANTE.** Vigila
+>   que lo capturado cuadre contra el Excel y NOMBRA diferencias; deja de ser
+>   la puerta de entrada del dinero. El Excel se apaga cuando la captura
+>   manual + el vigilante lleven la delantera, no por decreto.
+> - **COBROS: transferencia, depósito, OXXO y LINKS DE PAGO (Mercado Pago).**
+>   Checkout integrado en el sitio: DESCARTADO — miedo legítimo al fraude; el
+>   link de pago cobra tarjeta/OXXO en la página de Mercado Pago (3DS y
+>   contracargo de su lado) y aquí solo se verifica que cayó. El bloque 💳 de
+>   abajo (Mercado Pago + 3DS obligatorio, Stripe descartado) sigue vigente,
+>   ahora en su forma de LINKS, no de checkout propio.
+> - **El index es la ENTRADA: cotiza y levanta REQUISICIÓN** (forma de pago +
+>   comprobante del cliente) que cae a una bandeja en KameHouse; Bulma/Milk
+>   aprueban, rechazan o señalan faltantes; al aprobar nace el viajero por la
+>   puerta de zonas. FASE B.
+> - **El Portal abre en SOLO-LECTURA** (su plan y sus pagos) con invitación
+>   manual por evento (MIG-1d, ya en main). FASE C.
+> - **Todo se diseña para poder REPLICARSE a las 23 sucursales**: manual +
+>   simple + sin cobro integrado + sin depender de un Excel heredado = se
+>   copia en una tarde. Lo sencillo gana SIEMPRE.
 >
-> Y dos decisiones anteriores que **no se re-litigan** (siguen firmes):
-> - **El cobro en línea va por Mercado Pago con 3D Secure obligatorio.**
->   Stripe está DESCARTADO (ver el bloque 💳 más abajo).
-> - **melanie: las bases siguen en $0; la TARJETA volvió al index** como evento
->   pasado agotado (MEL-REGRESA-1, 28-ago). El sorteo NO vuelve.
+> Sigue firme y no se re-litiga: **melanie** (bases en $0, tarjeta en el index
+> como pasado agotado, el sorteo NO vuelve).
 >
-> ⚰️ *Lo que decía este bloque antes —«todo se mide contra el 1-sep, lo que no
-> sirva para esa fecha es ruido»— queda superado. Se deja dicho para que nadie
-> lo reviva leyendo un commit viejo.*
+> ⚰️ *Lo que decía este bloque antes (30-ago) —KameHouse sólido con el careo
+> diario como camino a la paridad y las sucursales congeladas— queda superado
+> en dos puntos: el careo ya no es el escritor del dinero, y las 23 vuelven a
+> ser criterio de diseño. Lo demás (solidez sobre fecha, lo sencillo primero)
+> sigue siendo la casa. Se deja dicho para que nadie lo reviva leyendo un
+> commit viejo.*
 
 ## El Negocio
 - Nombre: Conecta Reynosa (sucursal de la franquicia Conecta MX)

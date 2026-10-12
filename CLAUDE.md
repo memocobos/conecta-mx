@@ -188,6 +188,41 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔨🔒 **REQ-B1 · FASE B CONSTRUIDA Y DESPLEGADA, APAGADA HASTA LA LUZ VERDE DE MEMO
+  (12-oct-2026, merges 3470fc3 + c48f977).** La requisición del rumbo existe de punta
+  a punta: el modal de pago del index gana el formulario «Aparta tu lugar aquí mismo»
+  (nombre, WhatsApp, forma de pago transferencia/depósito/OXXO/link_pago, comprobante
+  reescalado a 1600px) → `requisicion-crear` (público: el PRECIO lo recalcula
+  `resolverPrecioVenta` y lo no-vendible rebota 409 antes de nacer; comprobante por
+  magia de bytes al bucket privado `abonos-viajeros` bajo `req/`; honeypot; tope 3
+  pendientes por celular) → tabla `requisiciones` en KH (RLS deny-all, 4 CHECKs
+  probados con inserts que rebotaron; acta `migraciones/REQ-B1.sql`) → bandeja
+  **Requisiciones** en KameHouse (maestro_roshi/bulma/milk; tarjeta primera en el
+  inicio de Milk/Bulma, que se calla en cero) → `admin-requisiciones`: aprobar valida
+  la zona POR LA PUERTA antes de reclamar, reclama con `estado=eq.pendiente` (doble
+  clic = 409), crea el viajero (`total_contrato` = el del index, `abonado_previo` 0)
+  + su abono con el MONTO TECLEADO por quien vio el comprobante (`capturado_por` del
+  JWT, `foto_path` heredado del comprobante — por eso sube a ese bucket); viajero
+  falla → reclamo revertido; abono falla → 207 con instrucción, nada se borra jamás.
+  **Careo:** `npm run mide:req-b1` — **52 aserciones** por los DOS handlers reales,
+  catálogo REAL servido, casos elegidos preguntándole al dueño, control del precio
+  tramposo, cero DELETEs. ⚠️ **SIN ANCLA a propósito** (carga del árbol, como
+  `mide:cuadre-aplicar`): no sufre la trampa del commit y no puede traer control
+  positivo por commit — dicho dentro del arnés.
+  🔴🔒 **EL INTERRUPTOR (REQ-B1b), y nació de una pregunta de Memo que me cachó:**
+  el primer merge salió VISIBLE al público (~minutos; medido en la base: **cero**
+  clientes lo usaron). `var REQUISICION_VIVA=false` en el index — apagado, el modal
+  queda byte-funcional como siempre (cuentas + Messenger, que sigue como alternativa
+  también encendido). Override secreto por pestaña: **`?req=1`** (sessionStorage,
+  patrón RESERVA_PORTAL). ✅ **Verificado en navegador real contra producción:**
+  sin override apagado y sección vacía; con `?req=1` el formulario pinta (4 formas);
+  la sonda honeypot contra el endpoint vivo contestó folio de utilería y la base
+  quedó en **0 filas**. **Encender = `REQUISICION_VIVA` a `true` + push, SOLO con
+  la palabra de Memo.** La regla que esto fija: **todo lo que toque al CLIENTE nace
+  detrás de interruptor o de llaves; lo interno del equipo sí sale en vivo.**
+  ⏳ Pendientes de FASE B: prueba humana del circuito (Memo con `?req=1` → requisición
+  de prueba → rechazarla desde la bandeja), y el renglón del Radar si Memo lo pide.
+
 - 💰⏳ **PREVENTA-CORR-1 · LA CORRECCIÓN DEL DATO, EN ESPERA DEL CAREO DE JANE (3-oct-2026).**
   El código ya está en prod ([PREVENTA-DESCUENTO-1](#), merge `b5b134b`). Esta acta
   —`migraciones/PREVENTA-CORR-1-datos.sql`— corrige el dato que quedó atrás.

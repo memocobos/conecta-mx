@@ -9193,6 +9193,19 @@ let _contratosEVCache = null;             // EV array fetched from /index.html
 let _contratosEVPobladoEnSelect = false;
 
 // — Cláusulas legales (idéntico texto que contrato.html) ——————
+// [IMG-VIG-1] La vigencia del uso de imagen (8.3). Default de siempre:
+// "periodo indefinido". Si el contrato trae datos.uso_imagen_meses (whitelist
+// del SERVIDOR en contrato-crear: solo 12/24/36), la frase dice el plazo.
+// Nació del contrato de Melissa Salas (24 meses, 12-oct-2026).
+// ⚠️ GEMELA de _imgVigenciaFrase en contrato.html (la página firmable).
+// Tocar una obliga a tocar la otra.
+function _ctrImgVigenciaFrase(c) {
+  const m = Math.round(Number(c && c.datos && c.datos.uso_imagen_meses)) || 0;
+  const letras = { 12: 'doce', 24: 'veinticuatro', 36: 'treinta y seis' }[m];
+  return letras
+    ? `por un periodo de <b>${m} (${letras}) meses</b> contados a partir de la firma del presente contrato`
+    : 'por un periodo indefinido';
+}
 const _CTR_CLAUSULAS = [
   { num:1, t:'Objeto del contrato', body: c => `El presente Contrato regula la colaboración entre <b>CONECTA REYNOSA</b> (en adelante, "la Agencia") y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, "el Creador de Contenido"), mediante un intercambio que incluye beneficios detallados en la cláusula 5, a cambio de la generación y entrega de contenido audiovisual bajo las condiciones descritas en este documento.` },
   { num:2, t:'Detalle del intercambio', body: c => `<b>2.1 Lo que ofrece la Agencia:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:10px">2.2 Lo que se espera del Creador de Contenido:</b>${_ulCtr(c.expectativas)}` },
@@ -9263,7 +9276,7 @@ El Creador de Contenido se compromete a:
 <li>Publicar historias y menciones durante el evento con buena calidad y en redes públicas.</li>
 <li>Cumplir con las fechas y plazos establecidos para entrega y correcciones.</li>
 </ol>` },
-  { num:8, t:'Cláusulas finales', body: () => `
+  { num:8, t:'Cláusulas finales', body: c => `
 <b>8.1 Hashtags</b>
 <ul style="margin:6px 0 12px;padding-left:22px">
 <li><b>#Viajaconexpertos</b></li>
@@ -9273,7 +9286,7 @@ El Creador de Contenido se compromete a:
 
 <b>8.2 Confidencialidad:</b> Toda la información y beneficios otorgados al Creador son confidenciales y no podrán divulgarse sin autorización de la Agencia.<br>
 
-<b>8.3 Datos personales y uso de imagen:</b> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.<br>
+<b>8.3 Datos personales y uso de imagen:</b> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia ${_ctrImgVigenciaFrase(c)}, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.<br>
 
 <b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de <b>Reynosa, Tamaulipas, México</b>, renunciando ambas partes a cualquier otro fuero que pudiera corresponderles.` },
   { num:9, t:'Firmas', body: () => `Yo, <b>el Creador de Contenido</b>, he leído, entendido y aceptado los términos y condiciones de este contrato. Por parte de la Agencia firma <b>Guillermo Alexander Cobos Vizcarra</b>, Representante de Conecta Reynosa. La firma digital del Creador y el envío de su INE constituyen la aceptación plena del presente contrato.` },
@@ -9554,6 +9567,13 @@ function onCtrPlantillaChange() {
   const tw = document.getElementById('ctr-viaje-wrap');
   if (tw) tw.style.display = (p === 'creadora') ? '' : 'none';
   if (p !== 'creadora') { const tv = document.getElementById('ctr-viaje'); if (tv) tv.checked = false; }
+  // [IMG-VIG-1] Uso de imagen (8.3): el selector solo existe para creadora.
+  // Al salir de la plantilla vuelve a '' (Indefinido) para que un valor
+  // elegido para un contrato no se cuele al siguiente — la lección de los
+  // globales que la pantalla reusa (cheapBtn, __nube).
+  const iw = document.getElementById('ctr-img-vigencia-wrap');
+  if (iw) iw.style.display = (p === 'creadora') ? '' : 'none';
+  if (p !== 'creadora') { const iv = document.getElementById('ctr-img-vigencia'); if (iv) iv.value = ''; }
   // 🗼 Anexo de custodia: la casilla solo existe para coordinador.
   const cw = document.getElementById('ctr-cuidador-wrap');
   if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
@@ -9638,6 +9658,15 @@ function _ctrFormData() {
   // el payload lleve la intención de Memo.
   if (plantilla === 'creadora' && (document.getElementById('ctr-viaje') || {}).checked) {
     datosExtra = Object.assign({}, datos, { toma_viaje: true });
+  }
+  // [IMG-VIG-1] Uso de imagen con plazo — solo creadora. '' (Indefinido) no
+  // viaja: ausencia = el contrato de siempre. La AUTORIDAD es contrato-crear
+  // (whitelist 12/24/36 sellada en el servidor); esto lleva la intención.
+  if (plantilla === 'creadora') {
+    const _uim = Math.round(Number((document.getElementById('ctr-img-vigencia') || {}).value)) || 0;
+    if ([12, 24, 36].includes(_uim)) {
+      datosExtra = Object.assign({}, datosExtra || datos, { uso_imagen_meses: _uim });
+    }
   }
   if (plantilla === 'coordinador') {
     datosExtra = Object.assign({}, datos, { exclusividad_dura: true });
@@ -9802,6 +9831,12 @@ function _resetFormUI() {
   if (_pvReset) _pvReset.checked = false;
   const _tvReset = document.getElementById('ctr-viaje');
   if (_tvReset) _tvReset.checked = false;
+  // [IMG-VIG-1] El plazo del uso de imagen NO sobrevive de un contrato al
+  // siguiente: el reset del form lo devuelve a '' (Indefinido). Sin esto, el
+  // "24 meses" de una creadora se colaría al contrato de la próxima — mismo
+  // contrato distinto, misma plantilla, y onCtrPlantillaChange no lo limpia.
+  const _ivReset = document.getElementById('ctr-img-vigencia');
+  if (_ivReset) _ivReset.value = '';
   const _ccReset = document.getElementById('ctr-cuidador');
   if (_ccReset && !_contratosEditingToken) _ccReset.checked = false; // 🗼 anexo
   if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();

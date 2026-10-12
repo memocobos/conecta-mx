@@ -185,6 +185,16 @@ exports.handler = async function (event) {
     if (data.datos && data.datos.toma_viaje === true) {
       datos = { toma_viaje: true };
     }
+    // [IMG-VIG-1] Uso de imagen CON PLAZO (cláusula 8.3): flag OPCIONAL en
+    // datos jsonb, sellado aquí con WHITELIST — solo 12, 24 o 36 meses.
+    // Ausencia = el texto de siempre ("periodo indefinido"), byte-igual.
+    // Nació del contrato de Melissa Salas (pidió 24 meses, 12-oct-2026).
+    // Cualquier otro valor (0, 7, "24x", negativo) NO viaja: ni error ni dato —
+    // el default indefinido es la forma segura, igual que la ausencia.
+    const _uim = Math.round(Number(data.datos && data.datos.uso_imagen_meses));
+    if ([12, 24, 36].includes(_uim)) {
+      datos = Object.assign(datos || {}, { uso_imagen_meses: _uim });
+    }
   } else if (plantilla === "giveaway") {
     // Giveaway pide: desglose del premio (texto) + valor del premio (MXN).
     const desglose_premio = String((data.datos && data.datos.desglose_premio) || "").trim();

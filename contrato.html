@@ -280,6 +280,20 @@ const FOOTER = `
   </footer>`;
 
 // ── Cláusulas legales — replica exacta del PDF + agregados ─────────────
+// [IMG-VIG-1] La vigencia del uso de imagen (8.3). El default es el texto de
+// siempre: "periodo indefinido". Si el contrato trae datos.uso_imagen_meses
+// (whitelist del SERVIDOR en contrato-crear: solo 12/24/36), la frase dice el
+// plazo. Nació del contrato de Melissa Salas (24 meses, 12-oct-2026).
+// ⚠️ GEMELA de _ctrImgVigenciaFrase en kamehouse.js (vista previa): esta página
+// es autosuficiente a propósito, como las propias cláusulas. Tocar una obliga
+// a tocar la otra.
+function _imgVigenciaFrase(c) {
+  const m = Math.round(Number(c && c.datos && c.datos.uso_imagen_meses)) || 0;
+  const letras = { 12: "doce", 24: "veinticuatro", 36: "treinta y seis" }[m];
+  return letras
+    ? `por un periodo de <b>${m} (${letras}) meses</b> contados a partir de la firma del presente contrato`
+    : "por un periodo indefinido";
+}
 const CLAUSULAS = [
   {
     num: 1, titulo: "Objeto del contrato",
@@ -401,7 +415,7 @@ const CLAUSULAS = [
   },
   {
     num: 8, titulo: "Cláusulas finales",
-    cuerpo: () => `
+    cuerpo: c => `
 <div class="subseccion"><span class="num">8.1</span> Hashtags</div>
 <ul>
   <li><b>#Viajaconexpertos</b></li>
@@ -413,7 +427,7 @@ const CLAUSULAS = [
 <p>Toda la información y beneficios otorgados al Creador son confidenciales y no podrán divulgarse sin autorización de la Agencia.</p>
 
 <div class="subseccion"><span class="num">8.3</span> Datos personales y uso de imagen</div>
-<p>El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.</p>
+<p>El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia ${_imgVigenciaFrase(c)}, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.</p>
 
 <div class="subseccion"><span class="num">8.4</span> Jurisdicción</div>
 <p>Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de <b>Reynosa, Tamaulipas, México</b>, renunciando ambas partes a cualquier otro fuero que pudiera corresponderles.</p>`

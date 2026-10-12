@@ -84,11 +84,14 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body || '{}'); }
   catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
-  // Auth: ambas acciones exigen rol admin (maestro_roshi/bulma).
-  const auth = await verifyAdminAuthLive(event, ROLES_ADMIN);
-  if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
-
+  // Auth: [HOME-GZ-1] la acción `mio` la puede pedir CUALQUIER sesión viva —
+  // lee SOLO su propio contrato, filtrado por el correo DEL JWT (jamás por uno
+  // que mande el cliente: el anti-spoofing de capturado_por, aplicado a leer).
+  // Las demás acciones siguen exigiendo rol admin, igual que siempre.
   const accion = body.accion;
+  const ROLES_TODOS = ['maestro_roshi', 'bulma', 'milk', 'mister_popo', 'coordinador', 'cc'];
+  const auth = await verifyAdminAuthLive(event, accion === 'mio' ? ROLES_TODOS : ROLES_ADMIN);
+  if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();
   if (env.error) return { statusCode: 500, headers, body: JSON.stringify({ error: env.error }) };
@@ -101,6 +104,28 @@ exports.handler = async (event) => {
   const base = `${env.KH_SB_URL}/rest/v1/contratos_creadores`;
 
   try {
+    // ── mio · [HOME-GZ-1] EL CONTRATO PROPIO, para la pantalla de inicio ──
+    // El filtro es el correo del JWT. Se ESTRECHA con ilike (insensible a
+    // mayúsculas) y la AUTORIDAD es la comparación exacta en minúsculas aquí
+    // — la forma de PLAN-CASE-1: el `_` de un correo es comodín en ILIKE y
+    // solo puede SOBRE-pescar, así que el filtro exacto de abajo es completo.
+    if (accion === 'mio') {
+      const correo = String((auth.user && auth.user.correo) || '').trim().toLowerCase();
+      if (!correo) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Tu sesión no trae correo; no se puede buscar tu contrato' }) };
+      const sp = new URLSearchParams();
+      sp.set('select', 'plantilla,estado,firmado_at,enviado_at,vigencia_inicio,vigencia_fin,vigencia_meses,evento_nombre,creador_nombre,creador_email');
+      sp.append('creador_email', `ilike.${correo}`);
+      sp.set('order', 'firmado_at.desc.nullslast');
+      sp.set('limit', '10');
+      const r = await fetch(`${base}?${sp.toString()}`, { headers: sbHeaders });
+      if (!r.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer tu contrato', detail: await r.text() }) };
+      const filas = await r.json();
+      const contratos = filas
+        .filter((c) => String(c.creador_email || '').trim().toLowerCase() === correo)
+        .map(({ creador_email, ...resto }) => resto);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, contratos }) };
+    }
+
     // ── listar ────────────────────────────────────────────────────────────
     if (accion === 'listar') {
       const sp = new URLSearchParams();

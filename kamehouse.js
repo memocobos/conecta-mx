@@ -79,18 +79,20 @@ let disenoLoaded = false;
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube'],
+  // [HOME-ROL-1] `inicio` es la pantalla de ENTRADA por rol (RUMBO 12-oct):
+  // todos la pueden ver; a quién ATERRIZA ahí lo decide HOME_PREFERIDO.
+  maestro_roshi: ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
-  mister_popo:   ['inventario','reportes','equipo'],
-  coordinador:   ['inventario','reportes','equipo'],
-  cc:            ['equipo'],
+  bulma:         ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
+  mister_popo:   ['inicio','inventario','reportes','equipo'],
+  coordinador:   ['inicio','inventario','reportes','equipo'],
+  cc:            ['inicio','equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
+  milk:          ['inicio','resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -751,8 +753,14 @@ const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
 // esa pantalla— se cae sola a la siguiente permitida.
 const HOME_PREFERIDO = {
   maestro_roshi: 'resumen',
-  bulma: 'pagos',
-  milk: 'pagos',
+  // [HOME-ROL-1 · orden de Memo, 12-oct] Bulma/Milk y los Guerreros Z entran a
+  // SU resumen: pendientes del día para las auxiliares; contrato, datos, tours
+  // y ranking para coordis/creadoras (antes caían directo a Bodega de Karin).
+  bulma: 'inicio',
+  milk: 'inicio',
+  coordinador: 'inicio',
+  cc: 'inicio',
+  mister_popo: 'inicio',
 };
 
 // Primera pantalla que este usuario SÍ puede ver: su preferencia, luego el
@@ -2315,6 +2323,7 @@ function showPage(name) {
 }
 
 function loadPage(name) {
+ if (name === 'inicio') loadInicio();
  if (name === 'resumen') loadResumen();
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
@@ -10897,3 +10906,187 @@ let n1Noticias = [];
 
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [HOME-ROL-1 · RUMBO 12-oct] INICIO POR ROL — la pantalla de ENTRADA.
+// Orden de Memo: «para milk y bulma… su propia pantalla de resumen de cosas y
+// pendientes al entrar» · «para guerreros z… un resumen con tiempo de su
+// contrato, sus datos, tours pasados, nuevos, posición en el ranking».
+// Dos caras, DOS renders con nombre (no una función con ramas: la ley de
+// renderDocViaB). Todo es LECTURA y todo le pregunta a los dueños que ya
+// existen: cero fórmulas nuevas, cero endpoints nuevos salvo `mio` (el
+// contrato propio, filtrado por el correo del JWT en el servidor).
+// ═══════════════════════════════════════════════════════════════════════════
+function _iniEsc(s) { return _esfEsc(String(s == null ? '' : s)); }
+function _iniHoy() { return (typeof _mxFechaStr === 'function') ? _mxFechaStr() : new Date().toISOString().slice(0, 10); }
+function _iniDias(deISO, aISO) {
+  // días de calendario entre dos YYYY-MM-DD (positivo = a futuro)
+  const a = new Date(aISO + 'T12:00:00'), d = new Date(deISO + 'T12:00:00');
+  return Math.round((a - d) / 86400000);
+}
+function _iniCard(titulo, cuerpo, pie) {
+  return `<div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--panel)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">${titulo}</div>
+    <div>${cuerpo}</div>${pie ? `<div style="margin-top:12px">${pie}</div>` : ''}</div>`;
+}
+
+async function loadInicio() {
+  const cont = document.getElementById('inicio-cards');
+  const tit = document.getElementById('inicio-titulo');
+  const sub = document.getElementById('inicio-sub');
+  if (!cont || !currentUser) return;
+  const nombre = String(currentUser.nombre || '').split(' ')[0] || currentUser.username || '';
+  if (tit) tit.textContent = `Hola, ${nombre}`;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando tu resumen…</div>';
+  const rol = currentUser.rol;
+  try {
+    if (rol === 'bulma' || rol === 'milk') {
+      if (sub) sub.textContent = 'Tus pendientes de hoy';
+      await _inicioMB(cont);
+    } else if (rol === 'coordinador' || rol === 'cc') {
+      if (sub) sub.textContent = 'Tu resumen de Guerrero Z';
+      await _inicioGZ(cont);
+    } else {
+      // Roshi / Popo: atajos simples (su cabina de verdad es el Resumen / la Torre).
+      if (sub) sub.textContent = '';
+      cont.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${_puedeVerTab('resumen') ? `<button class="btn btn-primary" onclick="showPage('resumen')">Ir al Resumen</button>` : ''}
+        ${_puedeVerTab('inventario') ? `<button class="btn btn-ghost" onclick="showPage('inventario')">Torre de Karin</button>` : ''}
+        ${_puedeVerTab('equipo') ? `<button class="btn btn-ghost" onclick="showPage('equipo')">Guerreros Z</button>` : ''}
+      </div>`;
+    }
+  } catch (e) {
+    // El inicio es la primera pantalla del día: un error aquí se DICE, no se
+    // queda el spinner eterno (la ley del paso mudo).
+    cont.innerHTML = `<div class="alert alert-error">No se pudo cargar tu resumen: ${_iniEsc(e.message)}</div>`;
+  }
+}
+
+// ── La cara de BULMA / MILK: pendientes del día ─────────────────────────────
+async function _inicioMB(cont) {
+  const hoy = _iniHoy();
+  // En paralelo y cada una fails-soft POR TARJETA: si la Nube tose, la
+  // cobranza igual se pinta — un inicio que se cae entero por una tarjeta es
+  // peor que una tarjeta que confiesa.
+  const [nube, deud, evs] = await Promise.all([
+    khAdminFetch('/.netlify/functions/admin-nube', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
+      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
+    khViajeros._call({ accion: 'deudores_migrados' }).catch((e) => ({ _err: e.message })),
+    (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+  ]);
+
+  // ① LA NUBE VOLADORA — el encargo directo de Memo: que capturen los vuelos.
+  let nubeHtml;
+  if (nube && nube.ok && nube.modos) {
+    const fila = (etq, m) => {
+      const v = m && m.vigente;
+      if (!v) return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>${etq}</span><b style="color:var(--red)">SIN PRECIO VIGENTE</b></div>`;
+      const precio = (v.precio != null) ? _spFmtMxn(v.precio) : '';
+      let hasta = '';
+      const vh = v.vigente_hasta || v.hasta || null;
+      if (vh) { try { hasta = ' · vence ' + new Date(vh).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short' }); } catch (_) {} }
+      return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>${etq}</span><b style="color:var(--green)">${precio}${_iniEsc(hasta)}</b></div>`;
+    };
+    const faltan = ['bus', 'avion'].filter((k) => !(nube.modos[k] && nube.modos[k].vigente)).length;
+    nubeHtml = _iniCard('☁️ Nube Voladora · vuelos y bus a CDMX',
+      fila('Autobús', nube.modos.bus) + fila('Avión', nube.modos.avion) +
+      (faltan ? `<div style="margin-top:8px;font-size:12px;color:var(--red);font-weight:700">${faltan === 2 ? 'Los dos modos' : 'Un modo'} sin precio vigente — hay que capturar la cotización de la semana.</div>` : ''),
+      `<button class="btn btn-primary btn-sm" onclick="showPage('nube')">Capturar cotización →</button>`);
+  } else {
+    nubeHtml = _iniCard('☁️ Nube Voladora', `<div style="color:var(--ts);font-size:12px">No se pudo leer: ${_iniEsc((nube && nube._err) || (nube && nube.error) || 'sin respuesta')}</div>`,
+      `<button class="btn btn-ghost btn-sm" onclick="showPage('nube')">Abrir la Nube →</button>`);
+  }
+
+  // ② COBRANZA — quién debe, del dueño de siempre (deudores_migrados).
+  let cobHtml;
+  if (deud && !deud._err) {
+    const lista = (deud.deudores || []).filter((d) => Number(d.resta) > 0).sort((a, b) => Number(b.resta) - Number(a.resta));
+    const total = lista.reduce((s, d) => s + Number(d.resta || 0), 0);
+    const top = lista.slice(0, 5).map((d) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(d.nombre)}<i style="color:var(--ts)"> · ${_iniEsc(d.evento_id || '')}</i></span><b style="color:var(--orange)">${_spFmtMxn(d.resta)}</b></div>`).join('');
+    cobHtml = _iniCard('💰 Cobranza pendiente',
+      `<div style="font-size:22px;font-family:'Zen Dots',sans-serif;color:var(--orange);margin-bottom:8px">${_spFmtMxn(total)}</div>
+       <div style="font-size:11px;color:var(--ts);margin-bottom:8px">${lista.length} persona${lista.length === 1 ? '' : 's'} con saldo — las 5 más grandes:</div>${top || '<div style="color:var(--ts);font-size:12px">Nadie debe nada 🎉</div>'}`,
+      `<button class="btn btn-primary btn-sm" onclick="showPage('pagos')">Ir a Cobranza →</button>`);
+  } else {
+    cobHtml = _iniCard('💰 Cobranza', `<div style="color:var(--ts);font-size:12px">No se pudo leer: ${_iniEsc(deud._err || '')}</div>`, `<button class="btn btn-ghost btn-sm" onclick="showPage('pagos')">Abrir Pagos →</button>`);
+  }
+
+  // ③ EVENTOS PRÓXIMOS (7 días) — del catálogo servido, el mismo que ve el sitio.
+  const prox = (evs || []).filter((e) => e && e.ds && e.ds >= hoy && _iniDias(hoy, e.ds) <= 7)
+    .sort((a, b) => a.ds.localeCompare(b.ds));
+  const proxHtml = _iniCard('📅 Eventos en los próximos 7 días',
+    prox.length ? prox.map((e) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(e.a || e.id)}</span><b>${_iniEsc(e.f || e.ds)}</b></div>`).join('')
+      : '<div style="color:var(--ts);font-size:12px">Ninguno esta semana.</div>',
+    `<button class="btn btn-ghost btn-sm" onclick="showPage('capsule')">Ver viajeros →</button>`);
+
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${nubeHtml}${cobHtml}${proxHtml}</div>`;
+}
+
+// ── La cara de GUERREROS Z: contrato · datos · tours · ranking ──────────────
+async function _inicioGZ(cont) {
+  const hoy = _iniHoy();
+  const [ctr, mias, aceptadas, evs] = await Promise.all([
+    khAdminFetch('/.netlify/functions/admin-contratos', { method: 'POST', body: JSON.stringify({ accion: 'mio' }) })
+      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
+    khAsignaciones._call({ accion: 'listar', coordi_id: currentUser.id }).then((j) => j.asignaciones || []).catch(() => []),
+    khAsignaciones._call({ accion: 'listar', status: 'aceptado' }).then((j) => j.asignaciones || []).catch(() => []),
+    (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+  ]);
+  const evMap = {}; (evs || []).forEach((e) => { if (e && e.id) evMap[e.id] = e; });
+  const fechaDe = (slug) => { const e = evMap[slug] || evMap[String(slug).split('#')[0]]; return e ? (e.ds || '') : ''; };
+  const nombreEv = (slug) => { const e = evMap[slug] || evMap[String(slug).split('#')[0]]; return e ? (e.a || slug) : slug; };
+
+  // ① MI CONTRATO — el tiempo que pidió Memo, derivado de la fila real.
+  let ctrHtml;
+  const c = (ctr && ctr.ok && (ctr.contratos || [])[0]) || null;
+  if (c) {
+    let fin = c.vigencia_fin || null;
+    if (!fin && c.vigencia_inicio && c.vigencia_meses) {
+      const d = new Date(c.vigencia_inicio + 'T12:00:00'); d.setMonth(d.getMonth() + Number(c.vigencia_meses)); fin = d.toISOString().slice(0, 10);
+    }
+    let tiempo = '<span style="color:var(--ts)">sin vigencia capturada</span>';
+    if (fin) {
+      const dias = _iniDias(hoy, fin);
+      tiempo = dias >= 0
+        ? `<b style="color:${dias <= 30 ? 'var(--orange)' : 'var(--green)'}">quedan ${dias} día${dias === 1 ? '' : 's'}</b> · vence el ${_iniEsc(fin)}`
+        : `<b style="color:var(--red)">VENCIDO hace ${-dias} día${dias === -1 ? '' : 's'}</b> (${_iniEsc(fin)})`;
+    }
+    ctrHtml = _iniCard('📄 Mi contrato',
+      `<div style="font-size:13px;margin-bottom:6px"><b>${_iniEsc(c.plantilla || 'contrato')}</b> · estado <b>${_iniEsc(c.estado || '—')}</b></div>
+       <div style="font-size:12px;margin-bottom:4px">${tiempo}</div>
+       ${c.firmado_at ? `<div style="font-size:11px;color:var(--ts)">firmado el ${_iniEsc(String(c.firmado_at).slice(0, 10))}</div>` : ''}`);
+  } else {
+    ctrHtml = _iniCard('📄 Mi contrato', `<div style="color:var(--ts);font-size:12px">${(ctr && (ctr._err || ctr.error)) ? 'No se pudo leer: ' + _iniEsc(ctr._err || ctr.error) : 'No encontré un contrato a tu correo — coméntalo con Memo.'}</div>`);
+  }
+
+  // ② MIS DATOS — lo que la casa sabe de ti, con la puerta a corregirlo.
+  const u = currentUser;
+  const datoFila = (k, v) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--ts)">${k}</span><b>${_iniEsc(v || '—')}</b></div>`;
+  const datosHtml = _iniCard('🪪 Mis datos',
+    datoFila('Nombre', u.nombre) + datoFila('Rol', u.rol) + datoFila('Correo', u.correo_notif || u.correo) +
+    datoFila('Celular', u.celular) + datoFila('Talla', u.talla_playera),
+    `<button class="btn btn-ghost btn-sm" onclick="showPage('equipo');setTimeout(()=>{const b=document.querySelector('.gz-tab-btn[onclick*=miperfil]');if(b)b.click();},200)">Editar en Mi Perfil →</button>`);
+
+  // ③ MIS TOURS — próximos y pasados, con el estado que TÚ contestaste.
+  const conFecha = mias.map((a) => ({ ...a, ds: fechaDe(a.evento_id), ev: nombreEv(a.evento_id) }));
+  const proximos = conFecha.filter((a) => !a.ds || a.ds >= hoy).sort((a, b) => String(a.ds).localeCompare(String(b.ds)));
+  const pasados = conFecha.filter((a) => a.ds && a.ds < hoy);
+  const stChip = (s) => s === 'aceptado' ? '<b style="color:var(--green)">aceptado</b>' : (s === 'declinado' ? '<b style="color:var(--red)">declinado</b>' : '<b style="color:var(--orange)">pendiente</b>');
+  const toursHtml = _iniCard(`🎤 Mis tours · ${proximos.length} próximo${proximos.length === 1 ? '' : 's'} · ${pasados.length} pasado${pasados.length === 1 ? '' : 's'}`,
+    proximos.length ? proximos.slice(0, 6).map((a) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(a.ev)}<i style="color:var(--ts)"> · ${_iniEsc(a.ds || 'por confirmar')}</i></span>${stChip(a.status)}</div>`).join('')
+      : '<div style="color:var(--ts);font-size:12px">Sin tours próximos asignados.</div>');
+
+  // ④ RANKING — tours COMPLETADOS (aceptados con fecha ya pasada), contados
+  // sobre las asignaciones de TODOS. No inventa empates: posición = 1 + cuántos
+  // llevan MÁS que tú, que es la regla de cualquier tabla deportiva.
+  const compPor = {};
+  (aceptadas || []).forEach((a) => { const ds = fechaDe(a.evento_id); if (ds && ds < hoy) compPor[a.coordi_id] = (compPor[a.coordi_id] || 0) + 1; });
+  const mios = compPor[currentUser.id] || 0;
+  const todos = Object.values(compPor);
+  const pos = 1 + todos.filter((n) => n > mios).length;
+  const rankHtml = _iniCard('🏆 Ranking de Guerreros Z',
+    `<div style="font-size:26px;font-family:'Zen Dots',sans-serif;margin-bottom:4px">#${pos} <i style="font-size:12px;color:var(--ts)">de ${Math.max(todos.length, 1)}</i></div>
+     <div style="font-size:12px;color:var(--ts)">${mios} tour${mios === 1 ? '' : 's'} completado${mios === 1 ? '' : 's'} (aceptados y ya ocurridos)</div>`);
+
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${ctrHtml}${datosHtml}${toursHtml}${rankHtml}</div>`;
+}

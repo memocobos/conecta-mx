@@ -125,6 +125,11 @@
 
   <div class="nav-group">
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Operación</div>
+   <!-- [HOME-ROL-1 · RUMBO 12-oct] La pantalla de ENTRADA por rol: bulma/milk
+        ven sus pendientes (vuelos de la Nube, cobranza, eventos próximos) y
+        los Guerreros Z su contrato, datos, tours y ranking — antes caían
+        directo a una pantalla de trabajo ajena a su día. -->
+   <button class="nav-btn" onclick="showPage('inicio')" id="nav-inicio"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Inicio</span></button>
    <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
    <!-- [EVT-NAV-1] Vuelve el botón que E5-4 quitó. Sin él, POR EVENTO solo se
@@ -207,6 +212,20 @@
    <div style="font-size:15px;margin-bottom:8px">No tienes ninguna pantalla asignada.</div>
    <div class="k-mono" style="opacity:.7">Habla con Memo para que te den acceso.</div>
   </div>
+ </div>
+
+ <!-- ═══ [HOME-ROL-1] INICIO POR ROL ═══ El contenido lo pinta loadInicio()
+      según el rol: bulma/milk (pendientes del día) · coordinador/cc (contrato,
+      datos, tours, ranking) · otros (atajos). Contenedores vacíos a propósito:
+      el render vive en kamehouse.js con sus datos, no aquí. -->
+ <div class="page" id="page-inicio">
+  <div class="page-header">
+   <div>
+    <h1 id="inicio-titulo">Inicio</h1>
+    <div class="page-sub" id="inicio-sub"></div>
+   </div>
+  </div>
+  <div id="inicio-cards"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
  </div>
 
  <div class="page" id="page-resumen">

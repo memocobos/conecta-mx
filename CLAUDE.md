@@ -257,6 +257,13 @@ está caduco antes de escribirse.
     lee por FileReader→data: (permitido). Careado en navegador real CON el CSP
     de producción servido: BASE reproduce el error de Memo, HEAD envía. 🔒 **Un
     careo de pantalla corre con el CSP real, o mide un sitio que no existe.**
+  - 🔴 **PN27-BANCO-1 (13-oct, cazado por Memo):** la preventa mostraba la
+    cuenta **Banamex** — `getBanco()` manda CHEAP→Banamex y la preventa viaja
+    por el camino CHEAP. Palabra de Memo: **la preventa cobra en BBVA**. Hoy
+    `getBanco` exceptúa a `_esPreventaCiegas`; los demás CHEAP siguen en
+    Banamex. 🔒 **Un paquete con otro nombre HEREDA todas las reglas del camino
+    que usa por dentro: al disfrazar uno, se barren TODAS las reglas de ese
+    camino** (banco, botón de comprobante, filtros de «incluye», etiquetas).
   - ⏳ **Pendientes:** push + publish de Memo · requisición de prueba suya
     (rechazarla en bandeja) · verificación en navegador contra producción
     (tira sin fecha, ficha $300, mide:tira-agotados en su Mac — aquí falta

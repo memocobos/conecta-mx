@@ -4983,6 +4983,11 @@ function _filPinta(){
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
 function getBanco(){
+  // [PN27-BANCO-1] Palabra de Memo (13-oct): la preventa a ciegas cobra en
+  // BBVA, NO en Banamex. Por dentro la preventa viaja por el camino CHEAP y la
+  // regla vieja «CHEAP → Banamex» se la llevaba de paso: un paquete con otro
+  // nombre hereda las reglas del camino que usa, y hay que barrerlas TODAS.
+  if(selPkg==='cheap'&&_esPreventaCiegas(cur))return(cur&&cur.banco)||BANCO_DEFAULT;
   if(selPkg==='cheap')return BANCO_HEY;
   // ride/plus/stay siguen el banco del evento: cur.banco||BANCO_DEFAULT.
   return(cur&&cur.banco)||BANCO_DEFAULT;

@@ -295,6 +295,140 @@ está caduco antes de escribirse.
     reales viven en `REPORTE-BALANCE-12OCT.md` (privado, sin versionar) y en
     las filas de `ingresos` — NO en este libro: el repo se publica.
 
+- 🏆 **PAGOS-MATRIZ-3c (13-oct-2026, noche): los datos del dueño cerraron el
+  análisis financiero.** Detalle e ids en `REPORTE-BALANCE-12OCT.md`.
+  - ✅ **Scorpions cargado y LIQUIDADO**: 6 Beyond Gral ×$4,004 + 6 Platino
+    ×$5,044 = **$54,288 EXACTO** al pago del 17-jul (abono ligado FIN-1a al
+    gasto de MATRIZ-3) → deuda scorpions **$0**. La zona va con la ortografía
+    de la FICHA («Beyond Gral», no «beyond general» de la palabra). Y la ficha
+    confirma el margen de la casa: venta CHEAP = costo + $1,000 en las dos.
+  - ✅ **Niall: compra de 15 Pista a costo $0** (cortesías del trato Leura),
+    proveedor Héctor Leura — el evento aún no existe en catálogo; la compra
+    queda como registro del trato y aparecerá sola cuando nazca la ficha.
+  - ✅ **Efectivo en mano ANCLADO: saldo inicial $40,000 (APROXIMADO, palabra
+    de Memo «unos $40,000, están por traernos más»)** — completa SALDOS-CAJA-1;
+    la nota dice que se ajusta cuando se cuente. **Nómina fija documentada:
+    $53,830/mes** (Memo 15k · Ximena 13k · Sofía 8k · contadora 7.83k ·
+    redes 10k) — vive en el acta privada.
+  - 🔒 **Regla de pagos a Matriz, palabra de Memo: se liquida LA SEMANA PREVIA
+    al evento** (no hay fechas pactadas). El calendario de caja se arma por
+    `fecha_inicio − 7 días`. Medido: el MURO es la ventana 25-nov→10-dic
+    (~$1.67M a liquidar: morat 612k + arjona 330k + eden 181k + bruno 148k +
+    caifanes 128k + humbe 96k + knotfest 55k…) y el apuro INMEDIATO es
+    **Soy Luna: $238,022 que vencen ~14-oct** (evento 21-oct).
+  - ✅ **Morat/JuniorH/Arjona/SoyLuna/Omar: CONFIRMADO por Memo — no se les ha
+    abonado nada.** El hallazgo de MATRIZ-3 queda cerrado: esa deuda es real.
+  - 📋 **Contratos en $0 de ÉPOCA (sin bajas): son solo 30 personas** ($45,905
+    ya abonados; frontera 8 · alvarodiaz 7 · alfredito 3…) — el «1,140» era el
+    global histórico. Lista de una tarde para Ximena/careo, no una montaña.
+  - 💡 **LA CORRIDA DEL RITMO (cierre 13-oct), pregunta de Memo: «¿$1M/mes de
+    cobros nos mantiene a flote?»** — contestada con la corrida de caja mes a
+    mes (vive completa en `REPORTE-BALANCE-12OCT.md`): **$1M/mes aguanta
+    octubre y noviembre y se ESTRELLA en el muro de diciembre** (~$1.1M de
+    faltante hacia el 10-dic). La ley que dejó: **COBRAR no es VENDER** —
+    cobrar solo adelanta el por cobrar (~$2M) contra una deuda mayor (~$3.27M):
+    el hoyo se recorre, no se cierra; dinero NUEVO solo lo mete VENDER los
+    ~491 boletos libres (~$1.13M de costo ya hundido + ~$1,000/boleto de
+    margen). El piso de la operación: ~$150-180k/mes ÷ margen $1,000 =
+    **~150-180 boletos/mes vendidos SOLO para operar**, antes de abonarle al
+    hoyo. Ritmo real medido ≈ $650-700k/mes ($902k de abonos 3-sep→12-oct):
+    el supuesto de $1M ya implica subir ~40%. El mal escenario con nombre: el
+    peligroso no es el estallido sino **pagar diciembre con los clientes de
+    Junior H/2027** — el hoyo se recorre a enero y crece con la operación.
+    Señales semanales y la cadena completa, en el acta privada.
+
+- 🏆 **PAGOS-MATRIZ-3b (13-oct-2026): las 3 correcciones y las 4 respuestas de
+  Memo, ejecutadas — la deuda de época quedó en $3,287,645.30.** Todo con valor
+  esperado en el WHERE, 0 DELETEs; ids y montos en `REPORTE-BALANCE-12OCT.md`.
+  - ⚰️🔒 **HUMBE ANULADO 7/7: los pagos eran del evento de INICIOS de año
+    (época vieja), NO de humbecdmx** — palabra de Memo. Los 2 abonos de KH y
+    los 5 gastos del Portal (gemelos + hotel + bus + kits, $209,194.62 en
+    total) quedaron en **monto $0 con nota ANEXADA** — la fila es el acta,
+    jamás se borra. El CHECK de las DOS tablas es `monto >= 0` (medido): el
+    cero pasa sin ALTER. humbecdmx queda limpio: deuda **$96,300** = su pedido
+    del 23-sep sin un pago — su «deuda negativa» de MATRIZ-3 **no era compra
+    incompleta, era pago ajeno**: neighbourhood, ironmaiden y warped SÍ siguen
+    siendo compras incompletas.
+  - 💰 **KAROL G queda en $265,929.88 = la cifra de Memo ($265,930) al peso**
+    (los −12¢ heredan del SPEI de $352,520.12 del 1-oct). Dos movimientos:
+    (a) **pago en EFECTIVO a Matriz $61,550** — monto DERIVADO de su cifra
+    contra el sistema ($327,479.88 − $265,930), dicho en la nota; (b) los
+    **50 Club Seats son pedido APARTE comprado a HÉCTOR LEURA** (respuesta 3):
+    nació el proveedor «Héctor Leura», la compra 50×$5,500 de karolg#1 se
+    reasignó Matriz→Leura y los $171,000 del 4-may se abonaron ligados a sus
+    gastos (FIN-1a). Partida: **Matriz $161,929.88 + Leura $104,000**.
+    ✅ **La deuda a Leura de $104,000 es REAL — confirmada por Memo el mismo
+    13-oct** («aún falta el pago de $104,000»): el pedido sí es a $275,000
+    ($5,500/boleto) y el costo cargado queda como está.
+  - 💰 **FRONTERA: abono $100,000 en EFECTIVO → deuda $36,138.30.** Memo dijo
+    primero «$80 mil», se capturó así, y **él mismo lo corrigió al revisar**
+    («el pago fue de $100,000, no de $80,000») — monto corregido en abono y
+    gasto gemelo con valor esperado en el WHERE (80000) y nota ANEXADA, 2/2.
+    En la llave padre `frontera`, como el de $85k de EFECTIVO-1 — la deuda
+    agrupa por `baseSlug`, padre e hijas se funden.
+    ⚠️ Lección de la corrección: el SELECT que acompaña a un CTE modificante
+    ve el SNAPSHOT pre-UPDATE — el careo de salida va en una query FRESCA.
+  - 🔒 **Los 2 gastos gemelos de efectivo van en cuenta `Efectivo` con fecha
+    12-oct PRE-ancla — fecha CONFIRMADA por Memo** («así está bien»).
+    **0 filas ≥ 13-oct en todo lo tocado: la caja anclada no se movió un
+    peso** (verificado, saldos iniciales intactos).
+  - ✅ **Respuesta 1 — el préstamo Leura de $30,000 (4-sep) YA FUE DEVUELTO:**
+    nada se captura (salida y devolución son pre-ancla: las dos viven dentro
+    del banco del 12-oct que ancló la caja). ⚠️ **El préstamo de $70,000 del
+    30-sep es OTRO** y sigue vivo ($70k + 15 boletos Niall) salvo palabra.
+  - ✅ **Respuesta 2 — los $35,745 del 6-jul fueron pago a Conecta MATAMOROS**
+    por viajes compartidos PRE-calle24 (Memo no recuerda cuáles): época vieja,
+    NO se captura. El destino que leí como «Matriz ref 86827» era Matamoros.
+  - ✅ **Respuesta 4 — el seguro de Leo ($10,653.55, 20-ago, Seguros Monterrey
+    NYL) es DEL NEGOCIO:** capturado como gasto sin evento, BBVA, cat. Otros,
+    con su fecha real. Pre-época por fecha y pre-ancla — entra por su palabra.
+  - 🔴 **El hallazgo estructural de MATRIZ-3 ENCOGE pero sigue:** karolg y
+    frontera quedaron aclarados por esta tanda (pagos en efectivo sin
+    comprobante en carpeta); **morat $612,700 · juniorh $393,875 · arjona
+    $330,165 · soyluna $238,022 · omar $220,324 siguen sin UN pago** — o se
+    pagaron por vía sin comprobante (como estos dos en efectivo), o se deben.
+
+- 🏆 **PAGOS-MATRIZ-3 (13-oct-2026): la carpeta COMPLETA, incluida `2026/` —
+  la deuda de boletos de época bajó $3,680,753.50 → $3,440,379.68.** Encargo de
+  Memo: «busca pagos de antes de calle 24 de eventos de después de calle 24; en
+  la carpeta 2026 hay más carpetas y tickets».
+  ⚠️ **Corregida el mismo 13-oct por PAGOS-MATRIZ-3b (bloque de arriba):** los
+  pagos de Humbe eran de OTRO evento y se anularon, los Club Seats quedaron
+  resueltos como pedido de Leura, y las 4 preguntas se cerraron. Los renglones
+  de abajo se dejan como acta de lo que esta tanda capturó.
+  - 🔒 **El censo por CITAS, no por memoria:** las notas de abonos/gastos citan
+    su archivo «*.png» — el regexp contra las dos bases demostró que la RAÍZ ya
+    estaba barrida ENTERA por PAGOS-MATRIZ-1 (mi propio resumen decía «calle24
+    en adelante» y era impreciso: los 3 abonos de Karol G del 18-ago/$340k, los
+    pagos a Leura de straykids y TINI a Damián Molina YA estaban). El hueco
+    real: **la carpeta 2026/ (89 archivos, 0 citados)** + sueltos.
+  - **CAPTURADO (0 duplicados, careo por monto y monto+fecha en las DOS bases):
+    7 abonos a Matriz $240,373.82** (humbe $159,815.62 · monlaferte $65,820 ·
+    neighbourhood $8,203 · ironmaiden $3,708 · warped $2,827.20) **+ 16 gastos
+    $563,332.17** (`jane-pagos-matriz-3`, BBVA, fechas reales ene-jul = todas
+    PRE-ancla: la caja anclada no se mueve, verificado 0 filas >= 13-oct):
+    gemelos FIN-1a + Hotel/Bus/Kits Humbe + Hotel/Bus Mon Laferte + Reembolso
+    Karol G $7,000 + **Boletos scorpions $54,288** (17-jul — scorpions es
+    2-sep-2027, SÍ es época; SIN abono: pedido no cargado) + **Club Seats Karol
+    G a LEURA $150,000 + $21,000** (4-may, compra a TERCERO, SIN abono).
+  - ⚠️ **neighbourhood, ironmaiden y warped quedan con deuda NEGATIVA**: sus
+    compras en Kamisama están INCOMPLETAS (dicho en cada nota — misma familia
+    que wweraw −$56k de MATRIZ-1). Al cargar los pedidos completos cuadran.
+    ⚰️ humbe salió de esta lista: su «negativo» era pago de otro evento
+    (anulado en 3b).
+  - ✅ **Las CUATRO PREGUNTAS quedaron CERRADAS por Memo el 13-oct** — las
+    respuestas y su ejecución viven en el bloque PAGOS-MATRIZ-3b de arriba.
+  - 🔴 **Lo que la tanda DESTAPÓ** (encogido por 3b: karolg y frontera se
+    aclararon — eran pagos en efectivo): morat $612,700 · juniorh $393,875 ·
+    arjona $330,165 · soyluna $238,022 · omar $220,324 sin un pago en
+    carpeta/libro. O se pagaron por una vía sin comprobante, o se deben.
+  - **FUERA a propósito** (listado en el acta privada): 2026/Pal Norte (23 =
+    palnorte2026 PASADO) · 2026/EDC (EDC feb-2026 pasado, palabra de Memo) ·
+    eventos sin ficha de época (Kali Uchis, Kanye, Lorde, Rosalía, Ricky
+    Martin, Sin Bandera, MCR, BTS…) · gastos sin evento pre-época (contadora
+    dic-jul, anualidad Conecta, kits global) — capturarlos falsearía la
+    utilidad de la época nueva. Detalle en `REPORTE-BALANCE-12OCT.md`.
+
 - 🏆 **PAGOS-MATRIZ-2 (12-oct-2026, tarde): los 3 pagos nuevos de la carpeta +
   2 rezagados, capturados.** 5 gastos BBVA (`jane-pagos-matriz-2`), careo de
   duplicados por monto+fecha antes de escribir (0 choques): Hotel Alfredo

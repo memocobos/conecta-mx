@@ -238,6 +238,17 @@ está caduco antes de escribirse.
     aprobar crea viajero con `total_contrato=$300` + abono $300 (saldo 0).
     Al publicar fases reales, el contrato se AJUSTA al paquete elegido con su
     descuento — jamás nace un contrato en $0.
+  - 🔴 **PN27-PAQ-1 (13-oct, el primer error, cazado por Memo con la ficha ya
+    publicada y los 79 de la waitlist ya avisados):** el cliente veía «Elige tu
+    paquete → CHEAP · Solo boleto» y luego «Elige tu zona» — se leía como «solo
+    boletos». Hoy, SOLO en el index (sobrevive al publish): un paquete único
+    **PREVENTA A CIEGAS · Separo único $300** con los 5 beneficios, PLUS/RIDE/
+    STAY escondidos, zona puesta sola, sin hotel, sin calendario de pagos en $0,
+    y el nombre del paquete en las TRES imprentas (resumen, WhatsApp, imagen).
+    Por dentro sigue siendo CHEAP (requisición y precio intactos). Probado por
+    la puerta del cliente en navegador real + regresión de otro evento en la
+    misma visita (etiquetas restauradas). 🔒 **La lección: se verifica en
+    navegador ANTES del publish que dispara correos, no después.**
   - ⏳ **Pendientes:** push + publish de Memo · requisición de prueba suya
     (rechazarla en bandeja) · verificación en navegador contra producción
     (tira sin fecha, ficha $300, mide:tira-agotados en su Mac — aquí falta

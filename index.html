@@ -4995,7 +4995,7 @@ function actualizarIncluye(){
     items=cur.inc.slice();
     if(selPkg==='ride') items=cur.noHotel?items.filter(function(i){return i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;}):items.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
     else if(selPkg==='stay') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
-    else if(selPkg==='cheap') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
+    else if(selPkg==='cheap'&&!_esPreventaCiegas(cur)) items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
     // CDMX: normalize transport text
     if(cdmx){
       items=items.map(function(i){
@@ -5354,6 +5354,49 @@ function selViajeros(btn,n){
   scrollToStep(cur&&cur.diaFirst?'w-dia-card':'w-pkg-card');
 }
 
+// ═══ [PN27-PAQ-1] LA PREVENTA A CIEGAS ES UN PAQUETE, NO UN «CHEAP» ═════════
+// Palabra de Memo (13-oct-2026), con la ficha ya publicada delante: «pusiste
+// paquete a elegir CHEAP y la gente lo va a entender como que solo boletos …
+// debiste poner un paquete que fuera preventa a ciegas $300; quitar elige tu
+// zona, hotel y poner lo que trae el paquete». Por DENTRO sigue siendo el
+// camino CHEAP-only ya careado (precio de resolverPrecioVenta, requisición,
+// bandeja); por FUERA el cliente ve UN paquete con su nombre, su precio y sus
+// beneficios — sin elegir zona, sin habitación, sin calendario de pagos en $0.
+// 🔒 Funciones DECLARADAS, no `var`: el deep-link /palnorte llama showDetail()
+// mientras la página se parsea (la ley del hoisting de la serie CARDS).
+// 🔒 Vive en el CÓDIGO del index, no en el EV: el publish de Esferas reescribe
+// el EV y esto sobrevive.
+// 🔒 Exige UNA sola zona vendible: si mañana la ficha trae dos (fases reales),
+// el evento vuelve SOLO al flujo normal en vez de esconder una elección.
+function _esPreventaCiegas(ev){ return !!(ev&&ev.cheapOnly&&['palnorte'].indexOf(ev.id)>-1&&_preventaZona(ev)); }
+function _preventaZona(ev){
+  var z=((ev&&ev.cheapZonas)||[]).filter(function(x){return x&&!x.ag&&!x.prox&&x.p>0;});
+  return z.length===1?z[0]:null;
+}
+function _pvEsc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function _pvPkgNombre(){ return 'PREVENTA A CIEGAS — Pa\'l Norte 2027'; }
+// Etiquetas del botón CHEAP y del título del paso: se guardan una vez y se
+// RESTAURAN en cada evento — los botones son GLOBALES y la pantalla se reusa
+// (la ley de CAT-AGOT-1 / NOCHEAP-1): sin restaurar, Pa'l Norte le pondría
+// «PREVENTA A CIEGAS» al CHEAP de todos los eventos que se miren después.
+function _pkgPreventaEtiquetas(cheapBtn, preventa){
+  var lblBox=document.querySelector('#w-pkg-card .wiz-lbl');
+  var lbl=lblBox&&lblBox.lastChild;
+  if(cheapBtn){
+    var nm=cheapBtn.querySelector('.pkg-name'), tg=cheapBtn.querySelector('.pkg-tag'), ds=cheapBtn.querySelector('.pkg-desde');
+    var dsT=ds&&ds.firstChild;
+    if(nm&&nm.getAttribute('data-orig')==null)nm.setAttribute('data-orig',nm.textContent);
+    if(tg&&tg.getAttribute('data-orig')==null)tg.setAttribute('data-orig',tg.textContent);
+    if(dsT&&dsT.nodeType===3&&ds.getAttribute('data-orig')==null)ds.setAttribute('data-orig',dsT.nodeValue);
+    if(nm)nm.textContent=preventa?'PREVENTA A CIEGAS':nm.getAttribute('data-orig');
+    if(tg)tg.textContent=preventa?'Aparta tu lugar':tg.getAttribute('data-orig');
+    if(dsT&&dsT.nodeType===3)dsT.nodeValue=preventa?'Separo único ':ds.getAttribute('data-orig');
+  }
+  if(lbl&&lbl.nodeType===3){
+    if(lblBox.getAttribute('data-orig')==null)lblBox.setAttribute('data-orig',lbl.nodeValue);
+    lbl.nodeValue=preventa?'Tu paquete':lblBox.getAttribute('data-orig');
+  }
+}
 function updatePkgCards(){
   var cdmx=isCDMX(cur);
   var hl=(cur.hotelOverride&&cur.hotel&&cur.hotel.length)?cur.hotel:hotelList(cur);
@@ -5430,6 +5473,19 @@ function updatePkgCards(){
   // en la misma visita y sin un aviso — exactamente el bug que este bloque
   // documenta para `disabled`, con otra propiedad.
   if(cheapBtn){cheapBtn.style.display='';}
+  // [PN27-PAQ-1] los otros tres también se reencienden en visibilidad (la
+  // preventa los ESCONDE) y las etiquetas vuelven a las de siempre.
+  if(plusBtn)plusBtn.style.display='';
+  if(rideBtn)rideBtn.style.display='';
+  if(stayBtn)stayBtn.style.display='';
+  var _pvZ=_esPreventaCiegas(cur)?_preventaZona(cur):null;
+  _pkgPreventaEtiquetas(cheapBtn,!!_pvZ);
+  if(_pvZ){
+    [plusBtn,rideBtn,stayBtn].forEach(function(b){ if(b){b.style.display='none';b.classList.add('disabled');b.disabled=true;} });
+    $$('pi-cheap').innerHTML=(cur.inc||[]).map(function(i){return '✓ '+_pvEsc(i);}).join('<br>');
+    $$('pp-cheap').textContent=fmt(_pvZ.p);
+    return;
+  }
 
   if(cur.rideOnly){
     // RIDE only (con cheapAlsoOk:true también permite CHEAP)
@@ -5595,7 +5651,7 @@ function selPaquete(btn,pkg){
     var incItems=cur.inc.slice();
     if(pkg==='ride') incItems=cur.noHotel?incItems.filter(function(i){return i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;}):incItems.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
     else if(pkg==='stay') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
-    else if(pkg==='cheap') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
+    else if(pkg==='cheap'&&!_esPreventaCiegas(cur)) incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
     incTxt=incItems.join(' · ');
   } else {
     if(pkg==='plus')incTxt=txtTransporte(cur)+' · Hospedaje · Boleto zona elegida · Kit Conecta';
@@ -5723,6 +5779,21 @@ function selPaquete(btn,pkg){
       calcular();
       setTimeout(scrollToTotal,200);
     }
+  }
+  // [PN27-PAQ-1] LA PREVENTA NO SE ELIGE: SE APARTA. La zona única se pone
+  // sola (es LA preventa, no una opción), sin habitación ni transporte, y el
+  // cliente va directo al total y al «Aparta tu lugar aquí mismo».
+  if(pkg==='cheap'&&_esPreventaCiegas(cur)){
+    var _pvz2=_preventaZona(cur);
+    selZ={n:_pvz2.n,p:_pvz2.p};
+    selH=null;selTransporte=null;
+    $$('w-fecha-card').style.display='none';
+    $$('w-zona-card').style.display='none';
+    $$('w-hotel-card').style.display='none';
+    $$('w-transport-card').style.display='none';
+    calcular();
+    setTimeout(scrollToTotal,250);
+    return;
   }
   // Fix 3: tras elegir paquete, scroll al PRIMER paso visible (normalmente ZONAS,
   // o FECHA si el evento la pide). block:'center' consistente con el resto.
@@ -7136,13 +7207,13 @@ var _lastQuincenas=[],_lastPagoQ=0;
 function generarImagenCotizacion(){
   if(!cur)return;
   var W=420,sc=Math.max(window.devicePixelRatio||1,2);
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'};
 
   // Collect rows
   var rows=[];
   rows.push({l:'Viajeros',v:selViaj+(selViaj===1?' persona':' personas')});
   rows.push({l:'Paquete',v:pkgNames[selPkg]||selPkg});
-  if(selZ)rows.push({l:cur.diaFirst?'Boleto':'Zona',v:selZ.n+' — '+fmt(precioZonaImpreso)});   // [STAY-COPY-1]
+  if(selZ&&!_esPreventaCiegas(cur))rows.push({l:cur.diaFirst?'Boleto':'Zona',v:selZ.n+' — '+fmt(precioZonaImpreso)});   // [STAY-COPY-1]
   if(selH){var hv=selH.n;if(selH.e>0)hv+=' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';else hv+=' (incluida)';rows.push({l:'Habitación',v:hv});}
   if(selTransporte&&selTransporte.cost>0)rows.push({l:'Transporte',v:selTransporte.n+' — '+fmt(selTransporte.cost)+'/persona'});
 
@@ -7572,7 +7643,7 @@ function calcular(){
   // [AIT-1] Con la promo de pareja las dos personas pagan distinto: el rótulo
   // dice PROMEDIO para no vender como "por viajero" una cifra que nadie paga.
   $$('r-np').textContent=_promoSegundoPax?'promedio por viajero':'por viajero';
-  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
+  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'}[selPkg];
   actualizarBankInfo();
   actualizarIncluye();
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
@@ -7581,8 +7652,9 @@ function calcular(){
   $$('r-resto').textContent=fmt(resto);
 
   var zonaRow=$$('r-zona-row');
-  if(zonaRow) zonaRow.style.display=selZ?'flex':'none';
-  if(selZ){
+  var _pvRes=_esPreventaCiegas(cur);
+  if(zonaRow) zonaRow.style.display=(selZ&&!_pvRes)?'flex':'none';
+  if(selZ&&!_pvRes){
     $$('r-zona-lbl').textContent=cur.diaFirst?'Boleto':'Zona';
     $$('r-zona').textContent=selZ.n+' — '+fmt(precioZonaImpreso);   // [STAY-COPY-1] la TERCERA imprenta: el resumen en pantalla tenía el mismo defecto
   }
@@ -7642,6 +7714,7 @@ function calcular(){
   var eventDate=new Date(_dsEfectivo+'T12:00:00');
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);
+  if(_pvRes) quincenas=[];   // [PN27-PAQ-1] $300 = separo = total: no hay pagos que calendarizar
   var nPagos=quincenas.length;
   // [COT-FIX-4 · N11] EL PLAN TIENE QUE SUMAR EXACTO EL RESTO.
   //
@@ -7671,7 +7744,9 @@ function calcular(){
     tH+='<tr><td>Pago '+(i+1)+'</td><td>'+quincenas[i].lbl+'</td><td>'+fmt(mPago)+'</td></tr>';
   }
   if(quincenas.length===0){
-    tH+='<tr><td colspan="3" style="color:#ff283b;text-align:center">Evento próximo — contactar para plan de pago</td></tr>';
+    tH+=_pvRes
+      ?'<tr><td colspan="3" style="text-align:center">Con esto tu lugar queda apartado. El resto se define cuando elijas tu viaje de 1, 2 o 3 días.</td></tr>'
+      :'<tr><td colspan="3" style="color:#ff283b;text-align:center">Evento próximo — contactar para plan de pago</td></tr>';
   }
   $$('r-tabla').innerHTML=tH;
 
@@ -7700,7 +7775,7 @@ function calcular(){
 
 var _lastCotizacion='';
 function buildCotizacionMsg(quincenas,pagoQ){
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'};
   var hoy=new Date();
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;
@@ -7711,7 +7786,7 @@ function buildCotizacionMsg(quincenas,pagoQ){
     '\n📍 '+cur.v+
     '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
     '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
-  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(precioZonaImpreso)+')';   // [STAY-COPY-1]
+  if(selZ&&!_esPreventaCiegas(cur)) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(precioZonaImpreso)+')';   // [STAY-COPY-1]
   if(selH&&selH.e>0) msg+='\n🏨 *Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
   else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
   if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';

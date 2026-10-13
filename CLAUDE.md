@@ -188,6 +188,35 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **CANCEL-UI-1 · «CANCELAR EVENTO» ES UN BOTÓN (12-oct-2026).** Palabra de
+  Memo: *«la idea era hacerlo yo… ajusta todo para que sea a un solo botón y
+  que después confirme realmente deseas cancelar evento»*. Lo que en CANCEL-1
+  fue SQL de Jane, hoy es apretable en Esferas por maestro_roshi.
+  `npm run mide:cancel-ui-1` (**27**, sin ancla — árbol de trabajo).
+  - **El botón vive en la fila de Esferas** (⛔, junto a Despublicar) y orquesta
+    DOS endpoints EN ORDEN: `esferas-cancelar` (nuevo: archiva la ficha —cierra
+    la re-inserción del publish—, apaga pestañas del careo con nota ANEXADA,
+    apaga recordatorios de /rol y archiva promos EXCLUSIVAS del evento) y
+    DESPUÉS `esferas-despublicar` (el PUT a GitHub validado que ya existía).
+    🔒 **El orden es diseño**: si el paso 2 falla, el peor caso es «archivado
+    pero visible» y el MISMO botón completa al reintentar — al revés quedaría
+    invisible pero re-insertable.
+  - 🔒 **El candado de confirmación vive en el SERVIDOR** (`confirmar:true` o
+    400 con cero escrituras); el confirm() del navegador —«¿Realmente deseas
+    CANCELAR…?», literal de Memo— es cortesía. Esconder el botón no basta
+    (COB-MIG-1).
+  - 🔒 **Idempotente por construcción**: todo PATCH lleva su valor esperado en
+    el filtro — el segundo clic escribe CERO filas (medido, con control
+    positivo del contador). CERO DELETEs (la red falsa truena ante uno).
+  - 🔒 **Un prefijo no es un ancla, cableado**: el `like slug*` solo ESTRECHA y
+    la autoridad es `esDelEvento` (exacto o `slug#N`) — el arnés siembra
+    `brunomars2` junto a `bruno` y exige que quede intacto.
+  - 🔒 **Un código MULTI-evento no se archiva: se AVISA con nombre** —
+    apagárselo a otro evento es decisión humana, en Baba. La copia `PROMOS` del
+    index queda huérfana e inerte y el reporte dice que se limpia en el próximo
+    publish de códigos.
+  - Viajeros/abonos/compras NO se tocan; el reporte final manda a Yamcha.
+
 - ⚰️🔒 **CANCEL-1 · TITODOBLE Y NATANAEL CANCELADOS Y FUERA DEL INDEX
   (12-oct-2026).** Palabra de Memo: *«cancélalos y quítalos del index, mis
   clientes ya están avisados y la venta ya deberíamos de pararla»*.

@@ -477,6 +477,13 @@ function _esfPintarLista() {
               : (e.publicado
                 ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
                 : `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`)}
+            ${e.archivado
+              // [CANCEL-UI-1] El botón de la cancelación completa. Vive junto a
+              // Despublicar porque son primos, pero NO son lo mismo: Despublicar
+              // solo lo quita del sitio (y el próximo publish lo regresa);
+              // Cancelar archiva + apaga satélites + lo quita, de un clic.
+              ? ''
+              : `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red);border-color:var(--red)" onclick="cancelarEvento('${s}')">⛔ Cancelar evento</button>`}
           </div>
         </td>
       </tr>`;
@@ -4028,6 +4035,48 @@ async function despublicarEsfera(slug) {
     loadEsferasEventos();
   } catch(e) {
     panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+// [CANCEL-UI-1] CANCELAR EVENTO: un botón que hace todo (palabra de Memo, 12-oct:
+// «ajusta todo para que sea a un solo botón… y que después confirme realmente
+// deseas cancelar evento»). Orquesta DOS endpoints EN ORDEN:
+//   1. esferas-cancelar — archiva la ficha (cierra la re-inserción del publish,
+//      ESF-ARCHIVO-1), apaga pestañas del careo, recordatorios de /rol y promos
+//      EXCLUSIVAS del evento. El candado de confirmación vive en el servidor.
+//   2. esferas-despublicar — el PUT a GitHub con validación de ambos parsers
+//      que ya existía. Va AL FINAL a propósito: si falla, el peor caso es
+//      «archivado pero visible», y el MISMO botón lo completa al reintentar
+//      (todos los PATCH llevan su valor esperado: no re-escriben nada).
+// Los viajeros y su dinero NO se tocan — los reembolsos van por Yamcha.
+async function cancelarEvento(slug) {
+  if (!window.confirm(`¿Realmente deseas CANCELAR el evento "${slug}"?\n\nEsto lo archiva en Esferas, lo QUITA del sitio, apaga sus pestañas del careo, sus recordatorios de pago de /rol y sus códigos de promo exclusivos.\n\nLos viajeros y su dinero NO se tocan: los reembolsos se manejan en La derrota de Yamcha.`)) return;
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>Cancelando ${_esfEsc(slug)}…</div>`;
+  try {
+    const r1 = await khAdminFetch('/.netlify/functions/esferas-cancelar', { method: 'POST', body: JSON.stringify({ slug, confirmar: true }) });
+    const d1 = await r1.json().catch(() => ({}));
+    if (!r1.ok || !d1.ok) {
+      if (panel) panel.innerHTML = `<div class="alert alert-error">${_esfEsc(d1.error || ('Error ' + r1.status))} — nada salió del sitio.</div>`;
+      return;
+    }
+    const r2 = await khAdminFetch('/.netlify/functions/esferas-despublicar', { method: 'POST', body: JSON.stringify({ slug }) });
+    const d2 = await r2.json().catch(() => ({}));
+    const lineas = [`ficha archivada${d1.archivado ? '' : ' (ya lo estaba)'}`];
+    if ((d1.pestanas || []).length) lineas.push(`pestañas del careo apagadas: ${d1.pestanas.map(_esfEsc).join(', ')}`);
+    if (d1.recordatorios) lineas.push(`${d1.recordatorios} recordatorio(s) de pago de /rol apagado(s)`);
+    if ((d1.promos_archivadas || []).length) lineas.push(`códigos archivados: ${d1.promos_archivadas.map(_esfEsc).join(', ')}`);
+    (d1.promos_aviso || []).forEach((a) => lineas.push('⚠️ ' + _esfEsc(a)));
+    (d1.avisos || []).forEach((a) => lineas.push('⚠️ ' + _esfEsc(a)));
+    if (r2.ok && d2.ok) {
+      lineas.push(d2.encontrado === false ? 'ya no estaba en el index' : `fuera del sitio · commit ${_esfEsc(d2.commit || '')}`);
+      if (panel) panel.innerHTML = `<div class="alert alert-success">⛔ ${_esfEsc(slug)} CANCELADO.<br>· ${lineas.join('<br>· ')}<br><span style="font-size:11px;color:var(--ts)">Los viajeros y su dinero quedaron intactos — los reembolsos se registran en La derrota de Yamcha.</span></div>`;
+    } else {
+      const det = (d2 && (d2.error || (d2.validacion && d2.validacion.error))) || ('Error ' + r2.status);
+      if (panel) panel.innerHTML = `<div class="alert alert-error">La ficha quedó archivada y los satélites apagados, pero QUITARLO DEL SITIO falló: ${_esfEsc(det)}.<br>El evento sigue VISIBLE — vuelve a apretar «Cancelar evento» para completar (no duplica nada).</div>`;
+    }
+    loadEsferasEventos();
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
 }
 async function eliminarEsfera(slug) {

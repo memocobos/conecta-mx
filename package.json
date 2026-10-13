@@ -66,6 +66,7 @@
     "mide:careo-zona-1": "node scripts/mide-careo-zona-1.js",
     "mide:req-b1": "node scripts/mide-req-b1.js",
     "mide:epoca-1": "node scripts/mide-epoca-1.js",
-    "mide:cancel-1": "node scripts/mide-cancel-1.js"
+    "mide:cancel-1": "node scripts/mide-cancel-1.js",
+    "mide:cancel-ui-1": "node scripts/mide-cancel-ui-1.js"
   }
 }

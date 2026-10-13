@@ -188,6 +188,63 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y
+  careada; ⏳ PENDIENTE: push de Memo → publish desde Esferas → verificación en
+  navegador → tandas del blast.** Palabra de Memo: separo $300 · fecha 26-28
+  mar 2027 **NO publicable** («si te sirve para el sistema adelante») · cobro
+  por bandeja Y Messenger · «quiero usar TODOS los correos… tú me vas diciendo
+  cada tanto para ir enviando» · copy «Aparta tu lugar en menos de 60 segundos».
+  `npm run mide:preventa-pn27` (**59**, sin ancla — árbol de trabajo).
+  Commits: `fbfc4db` (embudo) + `258a2aa` (blast).
+  - **La ficha (base, YA VIVE):** palnorte pasó de festival/proximamente a
+    **concierto VIVO cheapOnly con UNA zona: «Preventa a ciegas» $300**,
+    sep/sepCheap 300, `fecha_inicio=2027-03-26` + `fecha_fin=28` (época,
+    orden, contador) y **`f_texto='Por confirmar'` tapa la fecha al público**
+    — medido: el override gana en el compilador Y en el correo de waitlist
+    (`fechaDisplayDeEsfera`). Los 5 beneficios del copy viven en `inc`;
+    `static_img` lleva la portada (MEDIA-GUARD contento). 🔒 **El camino del
+    festival NO se estrenó a propósito**: cero fichas con paquetes lo han
+    corrido jamás; la preventa va por el camino CHEAP-only ya careado (t3r).
+  - **El index (espera push):** redirect `/palnorte27→/palnorte 301` ANTES del
+    catchall · **gate de requisición POR EVENTO** (`REQUISICION_EVENTOS=
+    ['palnorte']`; el global sigue false; `?req=1` vive) · **la tira del hero
+    respeta lo que la tarjeta anuncia**: `e.f==='Por confirmar'` → la tira NO
+    pinta `fechaCorta(ds)` (sin este guard, palnorte entrando al top por los
+    clicks del blast habría anunciado «26 mar 2027» en portada).
+  - 🔒 **EL ORDEN DEL ENCENDIDO ES PUSH PRIMERO, PUBLISH DESPUÉS**: publicar
+    antes del push saca el EV nuevo con el código viejo (sin gate por evento y
+    con la tira fugando la fecha). Y **el publish dispara el aviso de WL-1 a
+    los ~79 de la waitlist de palnorte** (esferas-publicar avisa cuando el
+    evento pasa a la venta; el cron de las 14:00 remata) — es la tanda 0,
+    verificado que dice «Por confirmar», y Memo lo sabe al publicar.
+  - **El blast (`admin-preventa-blast` + herramienta «Blast preventa», SOLO
+    maestro_roshi):** bitácora `preventa_blast` en KH (UNIQUE campana+correo,
+    CHECK minúsculas, RLS deny-all; acta `migraciones/PN27-BLAST.sql`).
+    Censo sembrado por Jane: **99 calientes (viajeros palnorte2026) + 1,157
+    viajeros + 421 waitlist-no-palnorte**; giveaway+melanie (~478 brutos del
+    Portal) los siembra la acción `sembrar_giveaway` (cross-base, idempotente).
+    🔒 **La waitlist de palnorte se EXCLUYE del blast**: su canal es el aviso
+    del publish — dos correos el mismo día queman. Las cuatro puertas de
+    MIG-1d-ii: seco default · confirmar:true · tope 30/llamada + presupuesto
+    8s (la pantalla orquesta tandas como khExcelRecorrer, con freno) · y el
+    candado CONSUELO-VERDAD: **ni seco ni enviar corren si el catálogo SERVIDO
+    no honra «Preventa a ciegas» $300 con f 'Por confirmar'** (409 que manda a
+    publicar). Bitácora fila por fila DESPUÉS del envío; línea de BAJA al pie
+    (el dominio del blast es el de la cobranza). La FECHA no viaja en el
+    correo (careado).
+  - **El flujo del cliente:** /palnorte27 → ficha → CHEAP único → zona $300 →
+    modal con «Aparta tu lugar aquí mismo» (transferencia/depósito/OXXO con
+    voucher/link de pago) + Messenger al lado → bandeja de Bulma/Milk →
+    aprobar crea viajero con `total_contrato=$300` + abono $300 (saldo 0).
+    Al publicar fases reales, el contrato se AJUSTA al paquete elegido con su
+    descuento — jamás nace un contrato en $0.
+  - ⏳ **Pendientes:** push + publish de Memo · requisición de prueba suya
+    (rechazarla en bandeja) · verificación en navegador contra producción
+    (tira sin fecha, ficha $300, mide:tira-agotados en su Mac — aquí falta
+    libXdamage) · plan de tandas: día 1 los 99 calientes, luego ~300-400/día
+    con su palabra tanda por tanda · los emojis/acentos del copy viven en el
+    CORREO (el `inc` del sitio va sobrio a propósito).
+
 - 🏆🔒 **SALDOS-CAJA-1 · LA CAJA ARRANCA DEL BANCO REAL (12-oct-2026, noche).
   ⏳ CÓDIGO EN EL ÁRBOL LOCAL, PENDIENTE PUSH DE MEMO; los asientos en la base
   YA VIVEN.** Luz verde citada: *«confío en ti haz lo que creas mejor para

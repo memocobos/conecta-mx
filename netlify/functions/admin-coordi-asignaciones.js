@@ -39,6 +39,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { EPOCA_INICIO, esEpocaNueva } = require('./_lib/epoca'); // [EPOCA-1]
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
 // [CREA-1c] `consumeBoleto` viene de su DUEÑO. La cortesía suma a
@@ -919,8 +920,30 @@ exports.handler = async (event) => {
       ]);
       if (!rv.ok) return upstream(headers, await rv.text(), 'consulta');
       if (!ra.ok) return upstream(headers, await ra.text(), 'consulta');
-      const viajeros = await rv.json();
+      let viajeros = await rv.json();
       const abonos = await ra.json();
+
+      // [EPOCA-1] La cobranza es pantalla OPERATIVA: solo época nueva (palabra
+      // de Memo 12-oct — «solo deja la info de calle 24 en adelante»). La fecha
+      // sale de esferas; slug sin ficha o sin fecha = época vieja. Si esferas
+      // no se puede leer, NO se filtra (mejor cobranza de más que deudores
+      // escondidos por una lectura caída) y se reporta.
+      let epoca_aviso = null;
+      try {
+        const rf = await fetch(`${env.KH_SB_URL}/rest/v1/esferas_eventos?select=slug,fecha_inicio&limit=10000`, { headers: sbHeaders });
+        if (rf.ok) {
+          const filas = await rf.json();
+          const fechaDe = {};
+          (Array.isArray(filas) ? filas : []).forEach((f) => { if (f && f.slug) fechaDe[f.slug] = f.fecha_inicio || null; });
+          const antes = viajeros.length;
+          viajeros = viajeros.filter((v) => esEpocaNueva(fechaDe[String(v.evento_id || '').split('#')[0]], EPOCA_INICIO));
+          epoca_aviso = { desde: EPOCA_INICIO, excluidos: antes - viajeros.length };
+        } else {
+          epoca_aviso = { desde: EPOCA_INICIO, aplicada: false, error: 'esferas ilegible' };
+        }
+      } catch (e) {
+        epoca_aviso = { desde: EPOCA_INICIO, aplicada: false, error: e.message };
+      }
 
       const porViajero = {};
       abonos.forEach((a) => { (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a); });
@@ -957,7 +980,7 @@ exports.handler = async (event) => {
         created_at: a.created_at || null,
       }));
 
-      return ok(headers, { deudores, ultimos, total_abonos: abonos.length });
+      return ok(headers, { deudores, ultimos, total_abonos: abonos.length, epoca: epoca_aviso }); // [EPOCA-1]
     }
     if (accion === 'abono_crear') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {

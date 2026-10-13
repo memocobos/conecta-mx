@@ -188,6 +188,33 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆 **EPOCA-1 · EL CORTE DE ÉPOCA (12-oct-2026, commit d8b2878): el Palacio
+  operativo lee de calle24 (3-sep-2026) en adelante.** Palabra de Memo, citada:
+  *«la migración vieja elimínala para que no marque nada… solo deja la info de
+  calle 24 en adelante, así habíamos quedado»*. Los datos viejos **NO se
+  borraron** (son el archivo histórico): se dejaron de PINTAR.
+  `npm run mide:epoca-1` (**12**, sin ancla a propósito — carga del árbol).
+  - **`_lib/epoca.js` es el dueño**: `EPOCA_INICIO='2026-09-03'` +
+    `esEpocaNueva()`. La fecha sale de `esferas_eventos.fecha_inicio`; un slug
+    **sin ficha o sin fecha es época vieja por definición** (melanie, fanfest,
+    palnorte2026).
+  - **El corte es OPT-IN** (`epocaDesde` en `cuentasDeTodos`): lo piden el
+    Resumen (`admin-utilidad-evento`) y la cobranza (`deudores_migrados` de
+    `admin-coordi-asignaciones`), con excluidos CONTADOS y rótulo `epoca` en la
+    respuesta. 🔒 **`viajeros-contador` NO lo pide a propósito**: el «2,468 y
+    contando» de la portada ES la historia completa.
+  - 🔒 **Esferas ilegible → NO se filtra y se CONFIESA** (`aplicada:false` con
+    error): esconder eventos vivos por una lectura caída sería un cero falso.
+  - 🔒 **MUDANZA PALNORTE, verificada al peso:** los 232 viajeros del Pa'l Norte
+    PASADO (2026) se mudaron de `palnorte` → **`palnorte2026`** (232/232, 0 en
+    el slug viejo, 0 abonos colgando — los satélites estaban en CERO, medido
+    antes). Palabra de Memo: la ficha viva `palnorte` es **el festival 2027, NO
+    es el mismo evento**. `ANIO_A_MANO` del contador los sigue en su slug nuevo.
+  - ⚠️ Saldos y Radar **no enumeran eventos desde `viajeros_evento`** (medido):
+    los únicos que pintaban la época vieja eran los dos cortados. Si Memo ve
+    eventos viejos en otra pantalla, esa pantalla se corta con la misma lib —
+    un renglón, no una tuerca.
+
 - 🔨🔒 **REQ-B1 · FASE B CONSTRUIDA Y DESPLEGADA, APAGADA HASTA LA LUZ VERDE DE MEMO
   (12-oct-2026, merges 3470fc3 + c48f977).** La requisición del rumbo existe de punta
   a punta: el modal de pago del index gana el formulario «Aparta tu lugar aquí mismo»

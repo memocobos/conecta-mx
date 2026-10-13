@@ -40,6 +40,10 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { calcularUtilidadPorEvento } = require('./_lib/utilidad-evento');
 // [AUD-1c] La cuenta de los dos mundos, de la fuente única.
 const { cuentasDeTodos } = require('./_lib/cuenta-evento');
+// [EPOCA-1] El Resumen es pantalla OPERATIVA: pide el corte de época (palabra
+// de Memo 12-oct: «solo deja la info de calle 24 en adelante»). El contador
+// público NO lo pide — ese presume la historia completa a propósito.
+const { EPOCA_INICIO } = require('./_lib/epoca');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -97,6 +101,7 @@ exports.handler = async (event) => {
           // la fecha vive en el catálogo de index.html y el servidor no lo tiene.
           // Un reloj de este lado sería una segunda definición de "ya pasó".
           eventosPasados: leerPasados(body),
+          epocaDesde: EPOCA_INICIO, // [EPOCA-1]
         });
         if (c.error) cuentaError = c.error; else cuenta = c;
       }

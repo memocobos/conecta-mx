@@ -587,7 +587,7 @@ async function cuentasDeTodos(opts) {
   if (k.error) return k;
   if (d.error) return d;
 
-  const slugs = [...new Set([
+  let slugs = [...new Set([
     ...Object.keys(p.data.cobrado || {}),
     ...Object.keys(p.data.facturado || {}),
     ...Object.keys(p.data.viajeros || {}),
@@ -607,6 +607,31 @@ async function cuentasDeTodos(opts) {
   // El navegador clasifica con el helper de la casa y manda la lista; aquí solo
   // se marca. Sin lista, NINGÚN evento es pasado y todo se comporta como antes.
   const pasados = new Set((Array.isArray(o.eventosPasados) ? o.eventosPasados : []).map(baseSlug).filter(Boolean));
+
+  // [EPOCA-1] EL CORTE DE ÉPOCA, opt-in (palabra de Memo, 12-oct: «solo deja
+  // la info de calle 24 en adelante»). Quien lo pide manda `epocaDesde`; sin
+  // él, TODO se comporta como siempre — y así el contador público de la
+  // portada sigue contando la historia completa.
+  // La fecha sale de esferas_eventos (todo evento nuevo nace ahí). Un slug sin
+  // ficha o sin fecha es época vieja. 🔒 Si esferas NO SE PUDO LEER, NO se
+  // filtra y SE DICE (`epoca.error`): esconder eventos vivos por una lectura
+  // caída sería un cero falso — mejor enseñar de más y confesar.
+  let epoca = null;
+  if (o.epocaDesde) {
+    const rf = await leerKH('esferas_eventos', 'select=slug,fecha_inicio&limit=10000');
+    if (rf.error || !Array.isArray(rf.data)) {
+      epoca = { desde: o.epocaDesde, aplicada: false, error: rf.error || 'esferas ilegible' };
+    } else {
+      const fechaDe = {};
+      rf.data.forEach((f) => { if (f && f.slug) fechaDe[f.slug] = f.fecha_inicio || null; });
+      const antes = slugs.length;
+      slugs = slugs.filter((s2) => {
+        const f = fechaDe[baseSlug(s2)];
+        return typeof f === 'string' && f >= o.epocaDesde;
+      });
+      epoca = { desde: o.epocaDesde, aplicada: true, eventos_excluidos: antes - slugs.length };
+    }
+  }
 
   const eventos = {};
   slugs.forEach((slug) => {
@@ -752,6 +777,9 @@ async function cuentasDeTodos(opts) {
     sin_evento: { gastos: n(p.data.gastosSinEvento) },
     totales: tot,
     ve_migrados: veMigrados,
+    // [EPOCA-1] El rótulo del corte: null = no se pidió; aplicada:false con su
+    // error = se pidió y esferas no se pudo leer (NO se filtró, dicho).
+    epoca,
   };
 }
 

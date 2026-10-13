@@ -16,3 +16,19 @@ alter table requisiciones add column if not exists acompanantes jsonb;
 alter table requisiciones drop constraint if exists requisiciones_acompanantes_check;
 alter table requisiciones add constraint requisiciones_acompanantes_check
   check (acompanantes is null or jsonb_typeof(acompanantes) = 'array');
+
+-- =============================================================================
+-- ACOMP-1b (13-oct-2026, Jane) — YA CORRIÓ. Los DATOS DEL VIAJERO del paquete
+-- PLUS/STAY/RIDE (plantilla de Memo: nombre, celular, correo, talla de hombre,
+-- número de emergencia). Los del titular van en columnas; los de cada
+-- acompañante viajan dentro de `acompanantes` (jsonb). Habitación y «compartida
+-- con» ya salen de la cotización (hotel) y del grupo.
+-- =============================================================================
+alter table requisiciones add column if not exists talla_playera text;
+alter table requisiciones add column if not exists num_emergencia text;
+alter table requisiciones drop constraint if exists requisiciones_talla_check;
+alter table requisiciones add constraint requisiciones_talla_check
+  check (talla_playera is null or talla_playera in ('XS','S','M','L','XL','XXL'));
+alter table requisiciones drop constraint if exists requisiciones_emergencia_check;
+alter table requisiciones add constraint requisiciones_emergencia_check
+  check (num_emergencia is null or num_emergencia ~ '^[0-9]{10}$');

@@ -302,6 +302,19 @@ está caduco antes de escribirse.
     fue invitada no recibe otro. 🔒 **Nunca deshace la aprobación**: sin llaves,
     sin bitácora o sin catálogo, aprueba igual y la bandeja DICE por qué no se
     invitó. La invitación de palnorte dice «Por confirmar» (sin fecha, careado).
+  - **ACOMP-1b · LOS DATOS DEL VIAJERO (13-oct, plantilla de Memo):** PLUS/
+    STAY/RIDE piden por persona nombre, WhatsApp, correo, **talla de playera
+    (de hombre)** y **número de emergencia** (de otra persona: igual al propio
+    se rechaza); CHEAP sigue con nombre/WhatsApp/correo. 🔒 **La preventa de
+    Pa'l Norte pide los de VIAJE** aunque por dentro sea CHEAP (el cliente sí
+    viaja; el paquete se elige después) — `_reqPideViaje()` en el index. El
+    formulario manda `datos_viaje:true` y con esa marca el servidor los EXIGE;
+    sin ella (página vieja/CHEAP) son opcionales pero se validan. Titular en
+    columnas `talla_playera`/`num_emergencia` (CHECKs XS…XXL y 10 dígitos, SQL
+    ya corrido, acta en `ACOMP-1.sql`); acompañantes dentro del jsonb. Al
+    aprobar viajan a cada viajero y el puente los lleva al Portal. Habitación y
+    «compartida con» ya salen de la cotización y del grupo. `mide:acomp-1`
+    **51**; navegador con CSP real: Pa'l Norte pide todo, un CHEAP normal no.
   - ⏳ **Primer envío real = la primera aprobación de palnorte tras el push.**
     Render visto en captura (`invitacion-palnorte.png`, fuera del repo) y pasa
     a Memo antes del push. Karina (R-RMZ5P) nació ANTES de ACOMP-1: al

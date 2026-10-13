@@ -325,6 +325,52 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   af(/acompanantes:acomp\.length\?acomp:undefined/.test(IDX), '[D3] el envío manda los acompañantes');
   af(/data-propio/.test(IDX), '[D4] el correo del titular se copia a los que NO se editaron a mano');
 
+  // ── [E] ACOMP-1b: los DATOS DEL VIAJERO (plantilla de Memo) ──────────────
+  console.log('\n[E] datos del viajero — talla y emergencia, del titular y de cada acompañante');
+  const acompV = [
+    { nombre: 'Ana Acompañante', correo: '', celular: '8991110001', talla_playera: 'm', num_emergencia: '8991110002' },
+    { nombre: 'Beto Acompañante', correo: 'beto@otro.mx', celular: '8991110003', talla_playera: 'XL', num_emergencia: '8991110004' },
+  ];
+  const conViaje = (extra) => pedido(Object.assign({ datos_viaje: true, talla_playera: 'l', num_emergencia: '8991119999', acompanantes: acompV }, extra || {}));
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', conViaje()));
+  const rv = red.requisiciones[0] || {};
+  af(r.statusCode === 200 && rv.talla_playera === 'L' && rv.num_emergencia === '8991119999', `[E1] titular: talla normalizada 'l'→'L' y emergencia guardada (${r.statusCode})`);
+  af(rv.acompanantes && rv.acompanantes[0].talla_playera === 'M' && rv.acompanantes[0].celular === '8991110001' && rv.acompanantes[1].num_emergencia === '8991110004',
+    '[E2] cada acompañante guarda su WhatsApp, su talla y su emergencia');
+  const casos = [
+    ['[E3] sin talla del titular → 400', { talla_playera: '' }],
+    ['[E4] talla inventada (XXXL) → 400, no la rechaza el CHECK de la base a media venta', { talla_playera: 'XXXL' }],
+    ['[E5] emergencia = su propio WhatsApp → 400', { num_emergencia: '8991112233' }],
+    ['[E6] acompañante sin WhatsApp → 400', { acompanantes: [Object.assign({}, acompV[0], { celular: '' }), acompV[1]] }],
+    ['[E7] acompañante sin talla → 400', { acompanantes: [acompV[0], Object.assign({}, acompV[1], { talla_playera: '' })] }],
+    ['[E8] emergencia de 9 dígitos → 400', { num_emergencia: '899111999' }],
+  ];
+  for (const [msg, extra] of casos) {
+    red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+    r = await H.crear(evento('POST', conViaje(extra)));
+    af(r.statusCode === 400 && red.requisiciones.length === 0, msg + ` (${r.statusCode})`);
+  }
+  // sin la marca (página vieja / CHEAP) los datos NO se exigen
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk })));
+  af(r.statusCode === 200 && red.requisiciones[0].talla_playera == null, '[E9] sin datos_viaje (página vieja o CHEAP) → nace igual, sin exigir talla');
+  // aprobar: talla y emergencia viajan a cada viajero
+  red = redNueva({ requisiciones: [pend({ talla_playera: 'L', num_emergencia: '8991119999', acompanantes: [
+    { nombre: 'Ana Acompañante', correo: 'karina@prueba.mx', celular: '8991110001', talla_playera: 'M', num_emergencia: '8991110002' },
+    { nombre: 'Beto Acompañante', correo: 'beto@otro.mx', celular: '8991110003', talla_playera: 'XL', num_emergencia: '8991110004' }] })] });
+  global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma));
+  const vv = red.viajeros;
+  af(r.statusCode === 200 && vv.length === 3 && vv[0].talla_playera === 'L' && vv[0].num_emergencia === '8991119999'
+    && vv[1].talla_playera === 'M' && vv[1].celular === '8991110001' && vv[2].num_emergencia === '8991110004',
+    '[E10] al aprobar, cada viajero nace con SU WhatsApp, talla y emergencia');
+  red = redNueva({ requisiciones: [pend({ acompanantes: null, talla_playera: 'S', num_emergencia: '8991119999' })] });
+  global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma));
+  af(red.viajeros.length === 1 && red.viajeros[0].talla_playera === 'S' && red.viajeros[0].num_emergencia === '8991119999', '[E11] camino viejo (un viajero) también lleva talla y emergencia');
+  af(/function _reqPideViaje\(/.test(INDEX_HTML) && /datos_viaje:viaje\|\|undefined/.test(INDEX_HTML), '[E12] el index decide cuándo pedir datos de viaje y lo marca en el envío');
+
   console.log(`\n${R === 0 ? (V ? '✅ VERDE' : '⚠️ NADA MEDIDO · esto NO es un verde') : '🔴 ROJO'} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.log('✗ EL ARNÉS SE CAYÓ: ' + e.stack); process.exit(1); });

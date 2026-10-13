@@ -252,8 +252,11 @@ exports.handler = async (event) => {
     // viajero con N boletos, exactamente como siempre.
     const acomp = (Array.isArray(req.acompanantes) && req.acompanantes.length === Math.max(0, (req.num_personas || 1) - 1))
       ? req.acompanantes : null;
-    const personas = acomp && acomp.length ? [{ nombre: req.nombre, correo: req.correo, celular: req.celular, titular: true }]
-      .concat(acomp.map((a) => ({ nombre: a.nombre, correo: a.correo || req.correo, celular: null, titular: false }))) : null;
+    // [ACOMP-1b] talla y emergencia viajan a cada viajero (el Portal las hereda en el puente).
+    const personas = acomp && acomp.length ? [{ nombre: req.nombre, correo: req.correo, celular: req.celular,
+        talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null, titular: true }]
+      .concat(acomp.map((a) => ({ nombre: a.nombre, correo: a.correo || req.correo, celular: a.celular || null,
+        talla_playera: a.talla_playera || null, num_emergencia: a.num_emergencia || null, titular: false }))) : null;
     const N = personas ? personas.length : 1;
     const repartir = (x) => { const base = Math.floor(x / N); return Array.from({ length: N }, (_, i) => base + (i === 0 ? x - base * N : 0)); };
     const contratos = repartir(total_contrato);
@@ -261,12 +264,14 @@ exports.handler = async (event) => {
     const filasV = personas
       ? personas.map((p, i) => ({
           evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
+          talla_playera: p.talla_playera, num_emergencia: p.num_emergencia,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: 1,
           total_contrato: contratos[i], abonado_previo: 0,
           notas: notaViajero + (p.titular ? ` · titular de ${N} lugares` : ` · acompañante de ${req.nombre}`),
         }))
       : [{
           evento_id: req.evento_id, nombre: req.nombre, celular: req.celular, correo: req.correo,
+          talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: req.num_personas,
           total_contrato, abonado_previo: 0, notas: notaViajero,
         }];

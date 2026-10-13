@@ -37,6 +37,7 @@
 
 const { corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
+const { tallaNormalizada } = require('./_lib/correo-forma');
 
 const BUCKET = 'abonos-viajeros'; // el de los abonos, a propósito — ver encabezado
 const FORMAS_PAGO = ['transferencia', 'deposito', 'oxxo', 'link_pago'];
@@ -137,6 +138,31 @@ exports.handler = async (event) => {
   // la página VIEJA en caché no manda acompañantes (pasó el 13-oct con la
   // foto) y no puede quedarse sin poder reservar. Sin la lista, la requisición
   // nace como siempre (UN viajero con N boletos al aprobar).
+  // ── [ACOMP-1b] DATOS DEL VIAJERO (plantilla de Memo para PLUS/STAY/RIDE):
+  // talla de playera (de hombre) y número de emergencia, del titular y de cada
+  // acompañante (+ el celular de cada acompañante). El formulario los pide y
+  // manda `datos_viaje:true`; con esa marca son OBLIGATORIOS aquí. Sin ella
+  // (página vieja en caché, o CHEAP) son opcionales — pero si vienen, se
+  // validan: una talla rara la rechazaría el CHECK de la base y perderíamos la
+  // requisición entera.
+  const datosViaje = body.datos_viaje === true;
+  const leerTalla = (t, quien) => {
+    if (t == null || String(t).trim() === '') return datosViaje ? { error: `Elige la talla de playera ${quien}` } : { v: null };
+    const v = tallaNormalizada(t);
+    return v ? { v } : { error: `La talla ${quien} no es válida` };
+  };
+  const leerTel = (t, que) => {
+    const d = String(t == null ? '' : t).replace(/\D/g, '');
+    if (!d) return datosViaje ? { error: `Falta ${que}` } : { v: null };
+    return d.length === 10 ? { v: d } : { error: `${que.charAt(0).toUpperCase() + que.slice(1)} va a 10 dígitos` };
+  };
+  const tT = leerTalla(body.talla_playera, '(la tuya)');
+  if (tT.error) return json(400, headers, { ok: false, error: tT.error });
+  const eT = leerTel(body.num_emergencia, 'tu número de emergencia');
+  if (eT.error) return json(400, headers, { ok: false, error: eT.error });
+  if (eT.v && eT.v === celular) return json(400, headers, { ok: false, error: 'Tu número de emergencia tiene que ser de otra persona, no el tuyo' });
+  const talla_playera = tT.v, num_emergencia = eT.v;
+
   let acompanantes = null;
   if (num_personas > 1 && Array.isArray(body.acompanantes)) {
     const lista = body.acompanantes;
@@ -151,7 +177,18 @@ exports.handler = async (event) => {
       let c = String(a.correo || '').trim().toLowerCase().slice(0, 120);
       if (!c) c = correo;
       if (!RE_CORREO.test(c)) return json(400, headers, { ok: false, error: `El correo del acompañante ${i + 1} no se ve bien — revísalo` });
-      acompanantes.push({ nombre: n, correo: c });
+      const fila = { nombre: n, correo: c };
+      // [ACOMP-1b] celular, talla y emergencia de cada acompañante.
+      const cA = leerTel(a.celular, `el WhatsApp del acompañante ${i + 1}`);
+      if (cA.error) return json(400, headers, { ok: false, error: cA.error });
+      const tA = leerTalla(a.talla_playera, `del acompañante ${i + 1}`);
+      if (tA.error) return json(400, headers, { ok: false, error: tA.error });
+      const eA = leerTel(a.num_emergencia, `el número de emergencia del acompañante ${i + 1}`);
+      if (eA.error) return json(400, headers, { ok: false, error: eA.error });
+      if (cA.v) fila.celular = cA.v;
+      if (tA.v) fila.talla_playera = tA.v;
+      if (eA.v) fila.num_emergencia = eA.v;
+      acompanantes.push(fila);
     }
   }
 
@@ -242,7 +279,7 @@ exports.handler = async (event) => {
     num_personas,
     hotel, transporte,
     nombre, celular, correo, forma_pago,
-    acompanantes,
+    acompanantes, talla_playera, num_emergencia,
     total_sistema: precio.total,
     separo_sistema: precio.separo,
     cotizacion_texto,

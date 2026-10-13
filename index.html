@@ -6690,6 +6690,10 @@ function _reqPintar(){
     '<input type="text" id="req-nombre" placeholder="Tu nombre completo *" maxlength="80" style="'+inp+'">'+
     '<input type="tel" id="req-celular" placeholder="Tu WhatsApp (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
     '<input type="email" id="req-correo" placeholder="Tu correo * (ahí te llega tu acceso)" maxlength="120" style="'+inp+'">'+
+    // [ACOMP-1b] Datos del viajero (plantilla de Memo para PLUS/STAY/RIDE):
+    // talla de playera de hombre + número de emergencia.
+    (_reqPideViaje()?_reqTallaSel('req-talla','Tu talla de playera (de hombre) *',inp)+
+      '<input type="tel" id="req-emergencia" placeholder="Número de emergencia (10 dígitos, de otra persona) *" maxlength="14" inputmode="numeric" style="'+inp+'">':'')+
     // [ACOMP-1] Un renglón por acompañante (nombre + correo). Palabra de Memo:
     // el correo viene con el del titular (toda la info le llega a ella) y se
     // puede cambiar para que le llegue a esa persona.
@@ -6744,9 +6748,27 @@ function _reqAcompHtml(inp){
     h+='<div style="border-left:2px solid rgba(232,255,76,.4);padding-left:8px;margin:0 0 6px">'+
       '<input type="text" class="req-acomp-nombre" placeholder="Nombre completo del acompañante '+i+' *" maxlength="80" style="'+inp+'">'+
       '<input type="email" class="req-acomp-correo" placeholder="Correo del acompañante '+i+'" maxlength="120" style="'+inp+'">'+
+      (_reqPideViaje()?
+        '<input type="tel" class="req-acomp-cel" placeholder="WhatsApp del acompañante '+i+' (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
+        _reqTallaSel('','Talla de playera del acompañante '+i+' (de hombre) *',inp,'req-acomp-talla')+
+        '<input type="tel" class="req-acomp-emer" placeholder="Número de emergencia del acompañante '+i+' *" maxlength="14" inputmode="numeric" style="'+inp+'">':'')+
       '</div>';
   }
   return h;
+}
+// [ACOMP-1b] ¿Esta requisición pide los DATOS DEL VIAJERO? Palabra de Memo:
+// PLUS/STAY/RIDE sí (nombre, celular, correo, talla, emergencia); CHEAP solo
+// nombre/celular/correo — y la PREVENTA de Pa'l Norte pide los de viaje,
+// porque el paquete real se elige después y ese cliente SÍ viaja.
+function _reqPideViaje(){
+  if(!selPkg)return false;
+  if(selPkg!=='cheap')return true;
+  try{return !!(cur&&_esPreventaCiegas(cur));}catch(e){return false;}
+}
+function _reqTallaSel(id,ph,inp,clase){
+  var o='<option value="">'+ph+'</option>';
+  ['XS','S','M','L','XL','XXL'].forEach(function(t){o+='<option value="'+t+'">'+t+'</option>';});
+  return '<select'+(id?' id="'+id+'"':'')+(clase?' class="'+clase+'"':'')+' style="'+inp+';appearance:auto">'+o+'</select>';
 }
 function _reqAcompLeer(){
   var titular=((document.getElementById('req-correo')||{value:''}).value||'').trim();
@@ -6754,7 +6776,14 @@ function _reqAcompLeer(){
   var out=[];
   for(var i=0;i<ns.length;i++){
     var c=((cs[i]&&cs[i].value)||'').trim()||titular;
-    out.push({nombre:ns[i].value.trim(),correo:c});
+    var f={nombre:ns[i].value.trim(),correo:c};
+    if(_reqPideViaje()){
+      var ce=document.querySelectorAll('.req-acomp-cel')[i], ta=document.querySelectorAll('.req-acomp-talla')[i], em=document.querySelectorAll('.req-acomp-emer')[i];
+      f.celular=((ce&&ce.value)||'').replace(/\D/g,'');
+      f.talla_playera=(ta&&ta.value)||'';
+      f.num_emergencia=((em&&em.value)||'').replace(/\D/g,'');
+    }
+    out.push(f);
   }
   return out;
 }
@@ -6825,10 +6854,24 @@ function _reqEnviar(){
   if(nombre.length<2)return _reqMsg('Escribe tu nombre completo',true);
   if(cel.length!==10)return _reqMsg('Tu WhatsApp va a 10 dígitos, sin lada de país',true);
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))return _reqMsg('Escribe tu correo: ahí te llega tu acceso para ver tu plan',true);
+  var viaje=_reqPideViaje(), talla='', emer='';
+  if(viaje){
+    talla=(document.getElementById('req-talla')||{value:''}).value;
+    emer=((document.getElementById('req-emergencia')||{value:''}).value||'').replace(/\D/g,'');
+    if(!talla)return _reqMsg('Elige tu talla de playera',true);
+    if(emer.length!==10)return _reqMsg('Tu número de emergencia va a 10 dígitos',true);
+    if(emer===cel)return _reqMsg('Tu número de emergencia tiene que ser de otra persona, no el tuyo',true);
+  }
   var acomp=_reqAcompLeer();
   for(var ai=0;ai<acomp.length;ai++){
-    if(acomp[ai].nombre.length<2)return _reqMsg('Escribe el nombre completo del acompañante '+(ai+1),true);
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acomp[ai].correo))return _reqMsg('Revisa el correo del acompañante '+(ai+1),true);
+    var q=' del acompañante '+(ai+1);
+    if(acomp[ai].nombre.length<2)return _reqMsg('Escribe el nombre completo'+q,true);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acomp[ai].correo))return _reqMsg('Revisa el correo'+q,true);
+    if(viaje){
+      if(acomp[ai].celular.length!==10)return _reqMsg('El WhatsApp'+q+' va a 10 dígitos',true);
+      if(!acomp[ai].talla_playera)return _reqMsg('Elige la talla de playera'+q,true);
+      if(acomp[ai].num_emergencia.length!==10)return _reqMsg('El número de emergencia'+q+' va a 10 dígitos',true);
+    }
   }
   if(!_reqEstado.forma)return _reqMsg('Elige cómo pagaste',true);
   if(_reqEstado.forma!=='link_pago'&&!_reqEstado.archivo)return _reqMsg('Sube la foto de tu comprobante',true);
@@ -6848,6 +6891,9 @@ function _reqEnviar(){
       cotizacion_texto:_lastCotizacion||'',
       nombre:nombre,celular:cel,correo:correo,
       acompanantes:acomp.length?acomp:undefined,
+      datos_viaje:viaje||undefined,
+      talla_playera:viaje?talla:undefined,
+      num_emergencia:viaje?emer:undefined,
       forma_pago:_reqEstado.forma,
       comprobante_base64:b64||''
     };

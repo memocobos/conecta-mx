@@ -93,10 +93,12 @@ function _reqBdjCard(r) {
       <span>Total del sistema: <b style="color:var(--text)">${_reqBdjMxn(r.total_sistema)}</b>${(r.transporte && r.total_sistema != null) ? ' <i style="font-size:10px">(sin transporte CDMX)</i>' : ''}</span>
       <span>WhatsApp: <b style="color:var(--text)">${_reqBdjEsc(r.celular)}</b></span>
       ${r.correo ? `<span>Correo: <b style="color:var(--text)">${_reqBdjEsc(r.correo)}</b></span>` : ''}
+      ${r.talla_playera ? `<span>Talla: <b style="color:var(--text)">${_reqBdjEsc(r.talla_playera)}</b></span>` : ''}
+      ${r.num_emergencia ? `<span>Emergencia: <b style="color:var(--text)">${_reqBdjEsc(r.num_emergencia)}</b></span>` : ''}
     </div>
     ${Array.isArray(r.acompanantes) && r.acompanantes.length ? `<div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6">
       <div style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Acompañantes (al aprobar nace un viajero por persona, el pago repartido)</div>
-      ${r.acompanantes.map((a, i) => `<div>${i + 1}. <b style="color:var(--text)">${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}</div>`).join('')}
+      ${r.acompanantes.map((a, i) => `<div>${i + 1}. <b style="color:var(--text)">${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}${a.celular ? ' · WA ' + _reqBdjEsc(a.celular) : ''}${a.talla_playera ? ' · talla ' + _reqBdjEsc(a.talla_playera) : ''}${a.num_emergencia ? ' · emerg. ' + _reqBdjEsc(a.num_emergencia) : ''}</div>`).join('')}
     </div>` : ''}
     ${r.cotizacion_texto ? `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:11px;color:var(--ts)">Ver la cotización que el cliente vio</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--ts);background:rgba(255,255,255,.04);padding:10px;border-radius:8px;margin:6px 0 0">${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
     ${r.estado === 'rechazada' && r.motivo_rechazo ? `<div style="font-size:12px;color:var(--red);margin-bottom:8px">Motivo: ${_reqBdjEsc(r.motivo_rechazo)}</div>` : ''}

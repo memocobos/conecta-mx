@@ -248,8 +248,15 @@ function extraerObj(contenido, id) {
   af(d1.llamadas.storagePost === 1, 'el comprobante subió al bucket (1 POST storage)');
   af(d1.llamadas.otras.length === 0, 'cero red fuera del guion (ninguna URL sorpresa)');
 
-  // D2 · el index ACTUAL del árbol (palnorte viejo: proximamente, sin zonas) → REBOTA.
-  const d2 = await correr(INDEX, payload());
+  // D2 · el index SIN la preventa publicada (palnorte viejo: proximamente) → REBOTA.
+  // ⚰️ Antes esto servía el index del árbol tal cual, y CADUCÓ el 13-oct: el
+  // publish de Memo metió la preventa al index y el «antes» se volvió «después»
+  // (el verde también caduca). Hoy el «sin publicar» se FABRICA compilando la
+  // FICHA VIEJA — no depende de en qué día se corra.
+  const INDEX_SIN_PUB = require(path.join(RAIZ, 'netlify/functions/_lib/esferas-compile.js'))
+    .compilarEV({ esferas: [FICHA_VIEJA], indexHtml: INDEX }).contenidoNuevo;
+  af(/id:'palnorte'[^}]*st:'proximamente'/.test(INDEX_SIN_PUB), 'premisa: el index fabricado trae palnorte SIN publicar (proximamente)');
+  const d2 = await correr(INDEX_SIN_PUB, payload());
   af(d2.res.statusCode !== 200 || d2.json.ok !== true, 'control: contra el catálogo ACTUAL (preventa aún no publicada) la requisición NO nace (salió ' + d2.res.statusCode + ')');
   af(d2.llamadas.reqPost === 0 && d2.llamadas.storagePost === 0, 'control: y no escribió NADA (0 storage, 0 insert)');
 
@@ -339,9 +346,9 @@ function extraerObj(contenido, id) {
   }
 
   // F3 · el candado del sitio: contra el catálogo ACTUAL (preventa sin publicar), ni seco ni enviar.
-  const f3 = await correrBlast(INDEX, { accion: 'seco' }, tokenRoshi, []);
+  const f3 = await correrBlast(INDEX_SIN_PUB, { accion: 'seco' }, tokenRoshi, []);
   af(f3.res.statusCode === 409, 'control: con el sitio SIN publicar, el seco se rehúsa (409 — CONSUELO-VERDAD) (salió ' + f3.res.statusCode + ')');
-  const f3b = await correrBlast(INDEX, { accion: 'enviar', confirmar: true, tope: 5 }, tokenRoshi, [{ correo: 'uno@x.mx' }]);
+  const f3b = await correrBlast(INDEX_SIN_PUB, { accion: 'enviar', confirmar: true, tope: 5 }, tokenRoshi, [{ correo: 'uno@x.mx' }]);
   af(f3b.res.statusCode === 409 && f3b.n.resend === 0, 'control: enviar contra el sitio sin publicar tampoco manda NADA');
 
   // F4 · enviar: confirmar obligatorio · tope respetado · bitácora tras el envío.

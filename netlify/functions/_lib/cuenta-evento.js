@@ -806,6 +806,16 @@ async function cuentasDeTodos(opts) {
 //     → { por_cuenta: { BBVA: n, Banamex: n }, total, sin_clasificar: { monto,
 //         filas, motivos }, por_evento: { "<slug>": {…} }, ve_migrados }
 //     | { error, detail }
+//
+// ⚰️ [SALDOS-CAJA-1 · 12-oct-2026] PERDIÓ SU ÚNICO LLAMADOR (admin-saldos) con
+// luz verde de Memo: el visor de Saldos ya NO suma el cobrado migrado como
+// caja — la regla paquete→banco es una APROXIMACIÓN del pasado y el gasto de
+// ese dinero nunca se capturó, así que pintaba millones contra bancos reales
+// de miles. Hoy el visor arranca del asiento «Saldo inicial» (ancla en
+// `_lib/cuentas-dinero`). Esta función se CONSERVA como herramienta de
+// dimensionado histórico (contesta «¿cuánto se cobró a migrados, aprox y por
+// cuenta?», que sigue siendo una pregunta legítima) — NO la recables al visor:
+// volvería la brecha de millones que SALDOS-CAJA-1 retiró.
 async function migradosPorCuenta(opts) {
   const o = opts || {};
   const _fetch = o.fetchImpl || fetch;

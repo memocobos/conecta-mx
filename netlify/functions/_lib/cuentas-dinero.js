@@ -32,6 +32,47 @@
 // Las cuatro que el capturista puede elegir.
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// [SALDOS-CAJA-1 · 12-oct-2026] EL ANCLA DE CAJA del visor de Saldos.
+//
+// Luz verde de Memo («confío en ti, haz lo que creas mejor para tener un mejor
+// control financiero»), con la brecha MEDIDA antes de decidir: el visor sumaba
+// como entradas TODO lo cobrado a los migrados con la regla paquete→banco
+// (aproximación del pasado, no registro de dónde cayó cada peso) y el gasto de
+// ese dinero histórico nunca se capturó → pintaba ≈+$1.5M/+$6.4M contra bancos
+// reales de $16.5k/$137k. Un «asiento de ajuste» habría sido un gasto de
+// millones que destroza la utilidad. Era tuerca del visor, no un asiento.
+//
+// La forma elegida — el visor ARRANCA del banco real y de ahí solo lo capturado:
+//   saldo por cuenta = ingresos (incluido el «Saldo inicial» del 13-oct)
+//                      + pagos cobrados − gastos, SOLO con fecha >= ancla.
+// Lo anterior al ancla ya vive DENTRO del saldo inicial (el banco real ya lo
+// descuenta); restarlo otra vez lo contaría doble. Las entradas de clientes
+// posteriores NO se suman solas (los abonos del careo llevan fecha de COSECHA y
+// cuenta APROXIMADA — mentirían sobre el banco): se reflejan capturando un
+// ingreso manual por cuenta, o re-anclando. La conciliación fina sigue siendo
+// CONCILIA-1 + la columna `fuente` pendiente.
+//
+// LOS MONTOS DEL ANCLA NO VIVEN AQUÍ A PROPÓSITO: este repo se publica en
+// conectareynosa.mx y un saldo bancario versionado queda descargable. Viven
+// como filas de `ingresos` del Portal (categoria 'Saldo inicial',
+// registrado_por 'jane-saldos-caja-1'). RE-ANCLAR = asientos nuevos de «Saldo
+// inicial» con la fecha nueva + mover estas constantes (tuerca chica), o un
+// ingreso/gasto de ajuste con la diferencia contra el banco.
+//
+// DOS constantes porque hay DOS tipos de columna, y mezclarlas es la mordida
+// de siempre de los husos:
+//   CAJA_ANCLA_DIA      → columnas `date` (gastos.fecha, ingresos.fecha).
+//   CAJA_ANCLA_INSTANTE → columnas timestamptz (pagos.fecha_pagada):
+//     medianoche del 13-oct-2026 en Reynosa = 05:00Z (Reynosa va en −05:00
+//     hasta el 1-nov; el ancla es UN instante fijo, no una fecha recurrente,
+//     así que el cambio de horario posterior no la mueve). Un gte por el día
+//     UTC pelado habría metido la noche del 12 de Reynosa — la ley de
+//     «toISOString() nunca es hoy en México».
+// ─────────────────────────────────────────────────────────────────────────────
+const CAJA_ANCLA_DIA = '2026-10-13';
+const CAJA_ANCLA_INSTANTE = '2026-10-13T05:00:00Z';
+
 function esValidaCuenta(cuenta) {
   return CUENTAS.includes(cuenta);
 }
@@ -59,4 +100,8 @@ function errorCuentaDeIngreso(cuenta) {
   return null;
 }
 
-module.exports = { CUENTAS, esValidaCuenta, normCuenta, errorCuentaDeGasto, errorCuentaDeIngreso };
+module.exports = {
+  CUENTAS, esValidaCuenta, normCuenta, errorCuentaDeGasto, errorCuentaDeIngreso,
+  // [SALDOS-CAJA-1]
+  CAJA_ANCLA_DIA, CAJA_ANCLA_INSTANTE,
+};

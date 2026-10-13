@@ -667,10 +667,18 @@ async function _renderResumenDinero(porCobrar) {
     heroEl.className = 'res-big dash-click';
     heroEl.setAttribute('onclick', "showPage('saldos')");
     heroEl.setAttribute('title', 'Ver Saldos');
+    // [SALDOS-CAJA-1] El sub dice el ANCLA cuando la fuente la manda: este
+    // número ya no es «toda la historia» — arranca del banco real y suma solo
+    // lo capturado desde entonces. Decirlo sin la fecha sería un saldo que
+    // miente por omisión. La fecha la dice la FUENTE (`d.ancla`); el formato lo
+    // pone `_saldosFechaAncla` (vive en kamehouse-saldos.js, mismo documento).
+    const subCaja = d.ancla
+      ? 'Anclada al banco real · lo capturado desde el ' + _esfEsc(_saldosFechaAncla(d.ancla))
+      : 'Lo que hay hoy, sumando cuentas';
     heroEl.innerHTML = `
       <div class="metric-label">Caja total de la empresa</div>
       <div class="res-big-val" style="color:${heroColor}">${_spFmtMxn(cajaTotal)}</div>
-      <div class="metric-sub">Lo que hay hoy, sumando cuentas</div>`;
+      <div class="metric-sub">${subCaja}</div>`;
   }
   cont.style.display = '';
   cont.innerHTML = `<div class="cob-stats" style="margin-bottom:0">${cuentasHTML}</div>`;

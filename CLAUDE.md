@@ -188,6 +188,134 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🏆🔒 **SALDOS-CAJA-1 · LA CAJA ARRANCA DEL BANCO REAL (12-oct-2026, noche).
+  ⏳ CÓDIGO EN EL ÁRBOL LOCAL, PENDIENTE PUSH DE MEMO; los asientos en la base
+  YA VIVEN.** Luz verde citada: *«confío en ti haz lo que creas mejor para
+  tener un mejor control financiero»*. `npm run mide:saldos-caja-1` (**33**,
+  sin ancla de commit a propósito — árbol de trabajo, como `mide:req-b1`).
+  - **La forma:** el visor de Saldos ya NO suma el cobrado migrado (la regla
+    paquete→banco era aproximación del pasado sin su gasto capturado: pintaba
+    MILLONES contra bancos de miles). Hoy: **saldo por cuenta = ingresos +
+    pagos − gastos, SOLO con fecha >= CAJA_ANCLA (13-oct-2026 = cierre
+    bancario del 12-oct)**, y el arranque es una fila de `ingresos` por cuenta
+    (categoría **'Saldo inicial'**, `jane-saldos-caja-1`) con el saldo real que
+    pasó Memo. Lo anterior al ancla ya vive DENTRO de ese número — el banco lo
+    descuenta; restarlo otra vez sería doble conteo.
+  - 🔒 **El ancla tiene DOS constantes en `_lib/cuentas-dinero`** y no es
+    capricho: `CAJA_ANCLA_DIA` para columnas date · `CAJA_ANCLA_INSTANTE`
+    (`05:00Z` = medianoche del 13-oct en Reynosa) para `pagos.fecha_pagada`
+    (timestamptz) — el día UTC pelado habría metido la noche del 12 («la ley
+    de toISOString»). Los MONTOS no viven en el repo (se publica): viven en
+    las filas y en `REPORTE-BALANCE-12OCT.md` (privado).
+  - 🔒 **El asiento de saldo inicial NO toca utilidad, MEDIDO antes de
+    insertar:** `cuentasDeTodos` (el Resumen/UTIL-C) no lee la tabla
+    `ingresos`, y el front del Resumen solo pinta `.gastos` del bloque
+    sin-evento — incluso en su camino de respaldo. En `concilia` saldrá como
+    «movimiento sin cliente» (montón informativo): correcto, lo es.
+  - 🔴🔒 **DOS GASTOS DE EFECTIVO-1 TRAÍAN LA FECHA DEL EVENTO Y EL ANCLA LOS
+    HABRÍA RESTADO DOS VECES:** camioneta enjambre $5,500 (16-oct) y boletos
+    extras Karol G $25,024 (6-nov) — su dinero YA salió (viven en el libro
+    Banamex capturado; el banco del 12-oct ya los descuenta). Fecha movida a
+    12-oct con nota ANEXADA y valor esperado en el WHERE (2 UPDATEs, 1 fila
+    c/u). **Regla que esto fija: la `fecha` de un gasto es la del PAGO, jamás
+    la del evento.**
+  - `migradosPorCuenta` **perdió su único llamador** y se CONSERVA en
+    `_lib/cuenta-evento` con nota ⚰️ anti-recableo (sigue contestando una
+    pregunta legítima de dimensionado histórico). `.sal1-aviso` podada del CSS
+    (quedó sin pintor). El Resumen hereda el ancla solo (pinta `caja_total`
+    del mismo endpoint) y su hero ahora DICE el ancla en el sub.
+  - **Careo de salida contra la base real (réplica SQL del cálculo nuevo):**
+    con los datos de hoy el visor pintará EXACTO los saldos que pasó Memo, al
+    peso. Vecinos: `mide:epoca-1` 12✅ · `mide:concilia-1` 71✅.
+  - **Operación de aquí en adelante:** entradas reales al banco (depósitos de
+    clientes, devolución Leura) se capturan como INGRESO manual por cuenta
+    cuando Memo quiera verlas — los abonos del careo NO entran a caja (fecha
+    de cosecha + cuenta aproximada mentirían). Re-anclar = asientos nuevos +
+    mover CAJA_ANCLA. Efectivo en mano: sin ancla (Memo no pasó número), pinta
+    $0 + movimientos.
+  - ⚠️ **VENTANA HASTA EL PUSH:** producción corre el handler viejo con los
+    asientos nuevos ya en la base (suma millones + el saldo inicial). Ya
+    mentía por millones; el push lo cierra.
+  - 🔴⏳ **Hallazgo vecino PREEXISTENTE, nombrado sin tocar:**
+    `mide:cuadre-todo` trae 1 rojo («el 2º clic global escribió
+    stock_ajustes:PATCH») que reproduce idéntico en HEAD limpio `a469f0a` — es
+    la guarda vieja «el 2º clic escribe CERO» que CHATARRA-SELLO-1 actualizó
+    en `mide:cuadre-aplicar` y nadie actualizó en `cuadre-todo` (el sello de
+    solo-nota la tumba). Chiquita propia.
+
+- 🏆 **EFECTIVO-1 · EL LIBRO BANAMEX ENTRÓ AL PALACIO (12-oct-2026).** Palabra de
+  Memo: *«en numerología hay una pestaña llamada Efectivo, esa mueve todo el
+  dinero de banamex… revísalo»* → *«todo entra al negocio»*. El PDF (102 págs ·
+  4,249 movs) se parseó por COORDENADAS con candado contra los totales que la
+  propia hoja declara; el eje temporal lo resolvió el marcador «2026» (fila
+  2183) + el ancla «faltante tour calle 24» $241·19-sep. Tramo 3-sep→12-oct:
+  268 movs · E $441,644.36 · S $491,216.
+  - **CAPTURADO: 101 gastos · $466,216 · cuenta Banamex · `registrado_por=
+    'jane-efectivo-1'`** (Otros 60 · Transporte 14 · Salarios 11 · Boletos 7 ·
+    Reembolso 4 · Marketing 3 · Kits 1 · Comida Staff 1). Careo de salida al
+    peso contra la base. Candados que corrieron: idempotencia (0 previas en los
+    DOS lados), alineación por posición (concepto+monto 102/102 o el generador
+    se detiene), 0 choques contra los SPEIs de PAGOS-MATRIZ-1, total
+    reproducido ($466,216 + $25,000 fuera = $491,216).
+  - **4 abonos de boletos en KH (Matriz, $109,084), gasto ligado por `abono_id`
+    — la forma FIN-1a:** sleeping $11,442×2 («dos compras iguales», palabra de
+    Memo; deuda queda $1,116) · frontera $85,000 (deuda $136,138.30) · eslabon
+    $1,200 (deuda $8,600).
+  - 🔒 **Boletos SIN abono (vaiven $7,639 · tiesto $3,090 · karolg extras
+    $25,024): gasto cat. Boletos, caja sí / deuda no** — su pedido NO está
+    cargado en Kamisama; al cargarlo se mete su abono (la nota de cada gasto lo
+    dice). Y **boletos puntuales PARA PERSONAS no son cat. Boletos** (coordis,
+    collabs, María José…): jamás estarán en compras, deben pesar en utilidad.
+  - 🔒 **LAS ENTRADAS NO SE CAPTURAN, y es diseño, no hueco:** el dinero de
+    clientes ya tiene dueño (pestañas → careo → `abonos_viajero`, que llega por
+    TANDAS con fecha de cosecha). Capturarlas desde la caja sería doble conteo.
+    Comparativa dicha: sistema $902,184.50 (815 abonos, todas las vías) vs
+    Banamex $441,644 — coherente, BBVA/OXXO van aparte. La conciliación fina es
+    CONCILIA-1 + la columna `fuente` pendiente.
+  - ✅ **«Envio apertura cuenta Pyme» $25,000: TRASPASO entre cuentas propias
+    (palabra de Memo, 12-oct) — NO se captura.** Un traspaso capturado como
+    gasto falsearía la utilidad; queda fuera del sistema a propósito y con
+    firma, para que nadie lo «rescate» creyendo que se olvidó.
+  - ✅ **Las tres preguntas, CERRADAS por Memo (12-oct):** (1) el Δ ~$399k de
+    «Entradas» son **compras chicas con la tarjeta (OXXO/Seven/comidas) sin
+    renglón, acumuladas desde may-2025** — NO se capturan (sin fecha ni
+    concepto, y mayormente época vieja; meterlas a la época nueva falsearía la
+    utilidad). (2) karolg extras $25,024: compra REAL de boletos faltantes
+    (el Excel marcaba Restan negativo, con esto positivo); «6-nov» es el
+    EVENTO, no dedazo — nota anexada, pedido sigue por cargar en Kamisama.
+    (3) separo camioneta $5,500: ADELANTADO para **enjambre** (evento 16-oct)
+    — gasto reasignado a `evento_id='enjambre'`, fecha correcta.
+  - ✅ **EL ASIENTO DE SALDO INICIAL NO PROCEDÍA COMO AJUSTE, Y LA RAZÓN ESTÁ
+    MEDIDA (12-oct):** el visor sumaba TODO lo cobrado a migrados con la regla
+    paquete→banco (aproximación del pasado, no registro real) y el gasto
+    histórico nunca se capturó — pintaba MILLONES contra bancos reales de
+    miles. Un «ajuste» habría sido un gasto de millones que destroza la
+    utilidad. **Se resolvió como tuerca del visor: SALDOS-CAJA-1, construida
+    el mismo día con luz verde de Memo** (ver su bloque arriba). Los saldos
+    reales viven en `REPORTE-BALANCE-12OCT.md` (privado, sin versionar) y en
+    las filas de `ingresos` — NO en este libro: el repo se publica.
+
+- 🏆 **PAGOS-MATRIZ-2 (12-oct-2026, tarde): los 3 pagos nuevos de la carpeta +
+  2 rezagados, capturados.** 5 gastos BBVA (`jane-pagos-matriz-2`), careo de
+  duplicados por monto+fecha antes de escribir (0 choques): Hotel Alfredo
+  Olivas $9,501.62 (alfredito) · Hotel Enjambre $16,254.05 (enjambre) · Hotel
+  Alejandro Sanz $5,000 (alejandrosanz) — los tres SPEI del 12-oct a Conecta
+  Ride SA de CV · Pago contadora agosto $7,830 (15-sep, sin evento) · Boletos
+  Álvaro Díaz $13,799 (9-oct, **compra a TERCERO Pablo Aldaba** — cat. Boletos
+  SIN abono, no es deuda de Matriz; su abono entra al cargar la compra en
+  Kamisama).
+  ✅🔒 **«PRESTAMO LEURA 2.png» $70,000 (30-sep): ES PRÉSTAMO — NO SE CAPTURA
+  COMO GASTO (palabra de Memo, 12-oct, citada):** *«originalmente le iba a pagar
+  los 15 boletos de Nial pero me pidió prestado $70,000 entonces me va regalar
+  los 15 boletos de niall de pista y me va regresar los $70,000 así fue el
+  trato»*. Misma familia que el traspaso PyME: salida de caja que NO es gasto —
+  capturarla falsearía la utilidad en −$70k. **CUENTA POR COBRAR VIVA: Héctor
+  Leura debe $70,000 + 15 boletos de pista de Niall (regalados).** Cuando
+  regrese el dinero → INGRESO manual de caja («devolución préstamo», no toca
+  utilidad); cuando lleguen los boletos → compra en Kamisama a costo $0 con
+  nota del trato (hoy no existe evento `niall` en el catálogo). Detalle en
+  `REPORTE-BALANCE-12OCT.md`. Nadie lo «rescate» como gasto olvidado.
+
 - 🏆 **CANCEL-UI-1 · «CANCELAR EVENTO» ES UN BOTÓN (12-oct-2026).** Palabra de
   Memo: *«la idea era hacerlo yo… ajusta todo para que sea a un solo botón y
   que después confirme realmente deseas cancelar evento»*. Lo que en CANCEL-1

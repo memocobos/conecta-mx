@@ -1,40 +1,53 @@
 // =============================================================================
 // admin-saldos  (S3 — visor de saldos por cuenta, LECTURA)
 //
-// Suma lo YA capturado agrupado por cuenta y devuelve el saldo que DEBERÍA haber
-// en cada una. NO hay migración: solo LEE las tablas del PORTAL.
+// [SALDOS-CAJA-1 · 12-oct-2026] LA CAJA ARRANCA DEL BANCO REAL Y SOLO SUMA LO
+// CAPTURADO DESDE EL ANCLA. Luz verde de Memo, con la brecha medida antes: el
+// término [SAL-1] (cobrado a migrados repartido por paquete→banco) pintaba
+// ≈+$1.5M/+$6.4M contra bancos reales de $16.5k/$137k — era una APROXIMACIÓN
+// del pasado cuyo gasto histórico nunca se capturó. Se RETIRÓ del cálculo; el
+// razonamiento y el ancla viven en `_lib/cuentas-dinero.js` (CAJA_ANCLA_*).
 //
-//   ENTRADAS = pagos COBRADOS (pagos.estado='pagado', monto real =
-//              COALESCE(monto_pagado, monto)) + ingresos sueltos (tabla ingresos)
-//              + [SAL-1] lo COBRADO A LOS MIGRADOS del Excel (KH), repartido por
-//                cuenta con la regla paquete→banco de `_lib/catalogo-index`
-//   SALIDAS  = gastos (tabla gastos)
+//   ENTRADAS = pagos COBRADOS (estado='pagado', fecha_pagada >= ancla,
+//              monto real = COALESCE(monto_pagado, monto))
+//            + ingresos (fecha >= ancla — el «Saldo inicial» del 13-oct ES el
+//              arranque: una fila de `ingresos` por cuenta, categoría
+//              'Saldo inicial', con el saldo real de banco al cierre del 12-oct)
+//   SALIDAS  = gastos (fecha >= ancla)
 //   saldo por cuenta = entradas − salidas
 //
-// [SAL-1] Antes esto solo miraba el Portal, y con melanie eso dejaba a BBVA en
-// −$147,172: los gastos del evento sin una sola entrada, porque su dinero entró
-// por fuera del Portal. No era un cálculo equivocado, era media pregunta.
+// Lo ANTERIOR al ancla no se suma ni se resta: el banco real ya lo traía
+// descontado cuando se ancló — contarlo otra vez sería doble conteo. Las
+// entradas de clientes posteriores NO entran solas (los abonos del careo llevan
+// fecha de cosecha y cuenta aproximada): se capturan como ingreso manual por
+// cuenta, o se re-ancla. La pantalla lo dice.
+//
+// ⚰️ [SAL-1] queda como historia: ese término existió porque con melanie BBVA
+// pintaba −$147,172 (gastos sin una entrada). La respuesta de hoy es el ancla,
+// no la aproximación. `migradosPorCuenta` sigue en `_lib/cuenta-evento` SIN
+// llamador aquí — no la recables al visor: volvería la brecha de millones.
 //
 // Solo se muestran 3 cuentas: BBVA, Banamex, Efectivo. Filas con cuenta 'Otro' o
-// null se IGNORAN en las tarjetas pero su neto se acumula en `otros_total` para
-// un pie de nota honesto. Solo cuentan los pagos en estado 'pagado'.
+// null se IGNORAN en las tarjetas pero su neto (post-ancla) se acumula en
+// `otros_total` para un pie de nota honesto. Solo cuentan los pagos 'pagado'.
 //
 // El portal consulta SIN embeds: pagos, solicitudes_tour y clientes se leen por
 // separado y se hace el stitch en JS (igual criterio que admin-cobranza-list).
 //
 // Body JSON: {} (sin parámetros).
-// Respuesta: { ok, generado_at, cuentas:{ BBVA:{...}, Banamex:{...}, Efectivo:{...} }, otros_total }
+// Respuesta: { ok, generado_at, ancla, cuentas:{ BBVA:{...}, Banamex:{...},
+//              Efectivo:{...} }, otros_total, caja_total }
 //   Cada cuenta: { entradas_pagos, entradas_ingresos, salidas_gastos, entradas,
 //                  salidas, saldo, pagos:[...], ingresos:[...], gastos:[...] }
 //
-// Seguridad: verifyAdminAuth(['maestro_roshi','bulma']) + corsCheck.
+// Seguridad: verifyAdminAuth(['maestro_roshi','bulma','milk']) + corsCheck.
 // service_role SOLO aquí. Reusa PORTAL_SUPABASE_* — sin env vars nuevas.
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-// [SAL-1] El dinero migrado, repartido por cuenta en la fuente única.
-const { migradosPorCuenta } = require('./_lib/cuenta-evento');
-const { fetchCatalogo } = require('./_lib/catalogo-index');
+// [SALDOS-CAJA-1] El ancla de caja: el día (columnas date) y el instante
+// (timestamptz) viven con las cuentas, en la lib del dinero.
+const { CAJA_ANCLA_DIA, CAJA_ANCLA_INSTANTE } = require('./_lib/cuentas-dinero');
 
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo'];
 
@@ -83,8 +96,10 @@ exports.handler = async (event) => {
   }
 
   try {
-    // 1) Pagos COBRADOS.
-    const pagosRes = await leer('pagos', 'estado=eq.pagado&select=id,cuenta,monto,monto_pagado,fecha_pagada,solicitud_id,cliente_id&limit=5000');
+    // 1) Pagos COBRADOS, desde el ancla. `fecha_pagada` es timestamptz, así que
+    //    el corte va por INSTANTE (medianoche del 13-oct en Reynosa), no por el
+    //    día UTC pelado — ver CAJA_ANCLA_INSTANTE en _lib/cuentas-dinero.
+    const pagosRes = await leer('pagos', `estado=eq.pagado&fecha_pagada=gte.${encodeURIComponent(CAJA_ANCLA_INSTANTE)}&select=id,cuenta,monto,monto_pagado,fecha_pagada,solicitud_id,cliente_id&limit=5000`);
     if (pagosRes.error) return { statusCode: 502, headers, body: JSON.stringify({ error: pagosRes.error, detail: pagosRes.detail }) };
     const pagos = pagosRes.data;
 
@@ -98,13 +113,15 @@ exports.handler = async (event) => {
       solRes.data.forEach(s => { solMap[s.id] = { evento_nombre: s.evento_nombre, cliente_id: s.cliente_id }; });
     }
 
-    // 3) Ingresos sueltos.
-    const ingresosRes = await leer('ingresos', 'select=id,cuenta,monto,concepto,fecha,cliente_id,evento_id&limit=5000');
+    // 3) Ingresos, desde el ancla. El asiento «Saldo inicial» lleva fecha
+    //    CAJA_ANCLA_DIA, así que entra por este mismo filtro — sin caso especial.
+    const ingresosRes = await leer('ingresos', `fecha=gte.${CAJA_ANCLA_DIA}&select=id,cuenta,monto,concepto,fecha,cliente_id,evento_id&limit=5000`);
     if (ingresosRes.error) return { statusCode: 502, headers, body: JSON.stringify({ error: ingresosRes.error, detail: ingresosRes.detail }) };
     const ingresos = ingresosRes.data;
 
-    // 4) Gastos.
-    const gastosRes = await leer('gastos', 'select=id,cuenta,monto,concepto,fecha,evento_id&limit=5000');
+    // 4) Gastos, desde el ancla. Los capturados hasta el 12-oct (EFECTIVO-1,
+    //    PAGOS-MATRIZ-1/2) quedan DENTRO del ancla: el banco ya los descuenta.
+    const gastosRes = await leer('gastos', `fecha=gte.${CAJA_ANCLA_DIA}&select=id,cuenta,monto,concepto,fecha,evento_id&limit=5000`);
     if (gastosRes.error) return { statusCode: 502, headers, body: JSON.stringify({ error: gastosRes.error, detail: gastosRes.detail }) };
     const gastos = gastosRes.data;
 
@@ -119,43 +136,18 @@ exports.handler = async (event) => {
       cliRes.data.forEach(c => { cliMap[c.id] = c.nombre_completo; });
     }
 
-    // [SAL-1] EL DINERO MIGRADO — la mitad que faltaba de la pregunta.
-    //
-    // Fails-soft a propósito (mismo criterio que la cuenta de AUD-1c en
-    // admin-utilidad-evento): si esto truena, Saldos sigue devolviendo lo del
-    // Portal y la pantalla lo DICE, en vez de quedarse en blanco. Lo que NO se
-    // hace es callarlo: un saldo incompleto que se presenta como completo es
-    // exactamente el bug que esta tuerca vino a arreglar.
-    let migrados = null, migradosError = null;
-    try {
-      const envKH = readEnvKH();
-      if (envKH.error) {
-        migradosError = envKH.error;
-      } else {
-        const catalogo = await fetchCatalogo();
-        const m = await migradosPorCuenta({
-          khUrl: envKH.KH_SB_URL, khService: envKH.KH_SB_SERVICE,
-          catalogo, rol: (auth.user || {}).rol,
-        });
-        if (m.error) migradosError = m.error; else migrados = m;
-      }
-    } catch (e) { migradosError = e.message; }
+    // ⚰️ [SALDOS-CAJA-1] Aquí vivía el bloque [SAL-1] que sumaba el cobrado a
+    // migrados (KH) repartido por paquete→banco. Se RETIRÓ con luz verde de
+    // Memo: era una aproximación que pintaba millones contra bancos reales de
+    // miles. La caja arranca del asiento «Saldo inicial» (una fila de
+    // `ingresos` por cuenta, fecha = ancla) y de ahí solo lo capturado.
 
     // Acumuladores por cuenta (solo las 3 visibles).
     const acc = {};
     CUENTAS.forEach(c => {
-      acc[c] = { entradas_pagos: 0, entradas_ingresos: 0, entradas_migrados: 0, salidas_gastos: 0, pagos: [], ingresos: [], gastos: [] };
+      acc[c] = { entradas_pagos: 0, entradas_ingresos: 0, salidas_gastos: 0, pagos: [], ingresos: [], gastos: [] };
     });
     let otrosTotal = 0;
-
-    // Las entradas migradas por cuenta. Una cubeta que no sea de las 3 visibles
-    // NO se manda a `otros_total`: `migradosPorCuenta` solo devuelve cubetas
-    // conocidas, y lo que no pudo clasificar viaja aparte y rotulado.
-    if (migrados && migrados.por_cuenta) {
-      Object.keys(migrados.por_cuenta).forEach((c) => {
-        if (CUENTAS.includes(c)) acc[c].entradas_migrados += Number(migrados.por_cuenta[c] || 0);
-      });
-    }
 
     // Pagos: monto real = COALESCE(monto_pagado, monto).
     for (const p of pagos) {
@@ -214,12 +206,11 @@ exports.handler = async (event) => {
     const cuentas = {};
     CUENTAS.forEach(c => {
       const a = acc[c];
-      const entradas = a.entradas_pagos + a.entradas_ingresos + a.entradas_migrados;
+      const entradas = a.entradas_pagos + a.entradas_ingresos;
       const salidas = a.salidas_gastos;
       cuentas[c] = {
         entradas_pagos:    a.entradas_pagos,
         entradas_ingresos: a.entradas_ingresos,
-        entradas_migrados: a.entradas_migrados,
         salidas_gastos:    a.salidas_gastos,
         entradas,
         salidas,
@@ -236,6 +227,10 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         ok: true,
         generado_at: new Date().toISOString(),
+        // [SALDOS-CAJA-1] El ancla viaja para que la pantalla la DIGA: un saldo
+        // «desde el 13-oct» presentado sin esa palabra se leería como el saldo
+        // de toda la historia. La pantalla no la inventa: la dice la fuente.
+        ancla: CAJA_ANCLA_DIA,
         cuentas,
         otros_total: otrosTotal,
         // [E5-1] LA CAJA TOTAL LA DICE LA FUENTE. Antes la sumaba el navegador
@@ -245,21 +240,11 @@ exports.handler = async (event) => {
         // Se calcula donde viven los datos y se manda hecha.
         //
         // OJO — ESTA CAJA NO ES `caja_total_empresa` de `_lib/utilidad-evento`,
-        // aunque las dos se llamen "caja". Los universos son distintos: ésta
-        // incluye lo cobrado a los MIGRADOS de KH (SAL-1) y aquélla es sólo
-        // Portal. No se comparan ni se "emparejan": son dos respuestas a dos
-        // preguntas, y juntarlas repetiría el $0-contra-$136,391 de AUD-1.
+        // aunque las dos se llamen "caja". Los universos son distintos: ésta es
+        // la caja ANCLADA al banco real y aquélla es la cuenta del Portal. No
+        // se comparan ni se "emparejan": son dos respuestas a dos preguntas, y
+        // juntarlas repetiría el $0-contra-$136,391 de AUD-1.
         caja_total: CUENTAS.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otrosTotal,
-        // [SAL-1] Lo migrado, con su desglose y lo que NO se pudo clasificar. Va
-        // aparte de `cuentas` para que la pantalla pueda decir de dónde salió
-        // cada peso — y para que `sin_clasificar` tenga dónde verse.
-        migrados: migrados ? {
-          total: migrados.total,
-          por_cuenta: migrados.por_cuenta,
-          sin_clasificar: migrados.sin_clasificar,
-          ve_migrados: migrados.ve_migrados,
-        } : null,
-        migrados_error: migradosError,
       }),
     };
   } catch (e) {
@@ -268,15 +253,6 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
-
-// [SAL-1] KH va aparte del Portal: si sus llaves faltan, Saldos sigue dando lo
-// del Portal y lo dice, en vez de tronar entero.
-function readEnvKH() {
-  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
-  const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
-  if (!KH_SB_URL || !KH_SB_SERVICE) return { error: 'Faltan env vars KH' };
-  return { KH_SB_URL, KH_SB_SERVICE };
-}
 
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;

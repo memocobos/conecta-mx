@@ -53,30 +53,30 @@ function _renderSaldos(d) {
    pie = `<div style="font-size:12px;color:var(--ts);margin-top:12px">${_spFmtMxn(d.otros_total)} en Otro/sin cuenta (no mostrado en las tarjetas).</div>`;
  }
 
- // [SAL-1] DOS LETREROS QUE NO SE PUEDEN CALLAR.
- //
- // (1) Si el dinero migrado no se pudo leer, estas tarjetas están incompletas —
- //     y una tarjeta incompleta que se presenta como completa es exactamente el
- //     bug de esta tuerca. Se dice.
- // (2) Lo que no se pudo repartir a una cuenta NO se reparte a ciegas: se
- //     imprime, con su monto, sus filas y el motivo. Si algún día deja de valer
- //     $0, se ve — que es lo contrario de desaparecer.
- const m = d.migrados;
- if (d.migrados_error) {
-   pie += `<div class="sal1-aviso">No pude leer el dinero de los migrados del Excel, así que estos saldos están <b>incompletos</b> (solo el Portal).</div>`;
- } else if (m && m.ve_migrados) {
-   const sc = m.sin_clasificar || {};
-   if (Number(sc.monto || 0) !== 0 || Number(sc.filas || 0) !== 0) {
-     pie += `<div class="sal1-aviso"><b>${_spFmtMxn(sc.monto || 0)}</b> de migrados sin cuenta identificada
-       (${sc.filas} ${sc.filas === 1 ? 'viajero' : 'viajeros'}) — <b>no</b> están repartidos en las tarjetas de arriba.
-       ${(sc.motivos || []).length ? 'Motivo: ' + _esfEsc(sc.motivos.join(' · ')) : ''}</div>`;
-   }
-   if (Number(m.total || 0) !== 0) {
-     pie += `<div style="font-size:12px;color:var(--ts);margin-top:8px">Incluye <b>${_spFmtMxn(m.total)}</b> cobrado a migrados del Excel, repartido por paquete (CHEAP a Banamex, los demás al banco del evento).</div>`;
-   }
+ // [SALDOS-CAJA-1] EL ANCLA SE DICE, O EL SALDO MIENTE POR OMISIÓN. Estas
+ // tarjetas ya no son «toda la historia»: arrancan del saldo real de banco
+ // (el ingreso «Saldo inicial» del ancla) y solo suman lo capturado desde
+ // entonces. Un número así presentado sin esa palabra se leería como el saldo
+ // histórico — que es justo la mentira de millones que esta tuerca retiró.
+ // La fecha la dice la FUENTE (`d.ancla`); la pantalla no la inventa: sin
+ // ancla en la respuesta, no hay rótulo que afirmar.
+ // ⚰️ Aquí vivían los avisos [SAL-1] de migrados (incompletos/sin_clasificar):
+ // el handler ya no manda esos campos — el término se retiró con luz verde de
+ // Memo (ver admin-saldos.js y _lib/cuentas-dinero.js).
+ if (d.ancla) {
+   pie += `<div style="font-size:12px;color:var(--ts);margin-top:12px">Caja anclada al banco real: arranca del «Saldo inicial» del <b>${_esfEsc(_saldosFechaAncla(d.ancla))}</b> y solo suma lo capturado desde entonces. Las entradas de clientes posteriores al ancla <b>no</b> entran solas: se capturan como ingreso por cuenta, o se re-ancla contra el banco.</div>`;
  }
  const stamp = d.generado_at ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Actualizado: ${_spFmtFechaAbs(d.generado_at)}</div>` : '';
  el.innerHTML = grid + pie + stamp;
+}
+// [SALDOS-CAJA-1] Pinta '2026-10-13' como '13-oct-2026' SIN pasar por `new
+// Date`: una fecha `date` por el constructor es medianoche UTC = el día
+// ANTERIOR en México (la mordida de `toISOString()`, en espejo).
+function _saldosFechaAncla(iso) {
+ const p = String(iso || '').split('-');
+ const MES = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+ if (p.length !== 3) return String(iso || '');
+ return `${Number(p[2])}-${MES[Number(p[1])] || p[1]}-${p[0]}`;
 }
 // Abre/cierra el panel de detalle (compartido, debajo de las tarjetas) para una cuenta.
 function _toggleSaldoDetalle(nombre) {
@@ -116,20 +116,14 @@ function _renderSaldoDetalle(c) {
    ? c.gastos.map(g => linea(`${fmtFecha(g.fecha)} · ${_spEscape(g.concepto || '—')}`, '−' + _spFmtMxn(g.monto), 'var(--red)')).join('')
    : '<div style="font-size:12px;color:var(--ts)">Sin gastos</div>';
 
- // [SAL-1] Los migrados NO traen renglones: `abonos_viajero` no guarda la cuenta,
- // así que el reparto se DEDUCE del paquete de cada viajero. Se dice de dónde
- // sale en vez de inventar un detalle fila por fila que no existe. La sección
- // solo aparece cuando hay dinero migrado en ESTA cuenta: sin migrados, el panel
- // queda exactamente como estaba.
- const mig = Number(c.entradas_migrados || 0);
- const migSeccion = mig
-   ? seccion('+ Cobrado a migrados del Excel', _spFmtMxn(mig), 'var(--green)',
-       '<div style="font-size:12px;color:var(--ts)">Repartido por paquete: CHEAP a Banamex, los demás al banco del evento. El detalle por viajero vive en <b>Por evento</b>.</div>')
-   : '';
+ // ⚰️ [SALDOS-CAJA-1] Aquí vivía la sección «+ Cobrado a migrados del Excel»
+ // (`c.entradas_migrados`). El handler retiró ese término con luz verde de
+ // Memo — era una aproximación de millones contra bancos reales de miles — y
+ // ya no manda el campo. El arranque de la caja es el renglón «Saldo inicial»
+ // que se ve entre los ingresos de cada cuenta.
 
  return seccion('+ Pagos cobrados', _spFmtMxn(c.entradas_pagos), 'var(--green)', pagosFilas)
    + seccion('+ Ingresos sueltos', _spFmtMxn(c.entradas_ingresos), 'var(--green)', ingFilas)
-   + migSeccion
    + seccion('− Gastos', '−' + _spFmtMxn(c.salidas_gastos), 'var(--red)', gasFilas)
    + `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
         <span>= Saldo</span><span style="color:${Number(c.saldo) >= 0 ? 'var(--green)' : 'var(--red)'}">${_spFmtMxn(c.saldo)}</span>

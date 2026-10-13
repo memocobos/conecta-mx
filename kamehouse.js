@@ -5585,6 +5585,7 @@ async function loadViajeros() {
   // solicitudes (0 hoy) y pasa a anexo fails-soft. Antes era al revés: el
   // Portal mandaba y la lista real era «un extra» — y Memo no podía operar.
   await _vj2Cargar();
+  grupoWaCargar(); // [GRUPO-WA-1] fails-soft, no frena la lista
 
   // El anexo del Portal: si falla, la pantalla principal ya está pintada.
   const pw = document.getElementById('cc-portal-wrap');
@@ -5601,6 +5602,37 @@ async function loadViajeros() {
   if (pw) pw.style.display = _ccViajeros.length ? '' : 'none';
   if (_ccViajeros.length) _renderViajerosTabla();
   _vjConteoPintar();
+}
+
+// [GRUPO-WA-1] El link del grupo de WhatsApp del evento abierto. Escribe por
+// admin-coordi-asignaciones (grupo_wa_ver / grupo_wa_guardar); la caja solo se
+// enseña a quien puede guardarlo.
+async function grupoWaCargar() {
+  const box = document.getElementById('cc-grupo-wa');
+  if (!box || !_ccEventoActual) return;
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const inp = document.getElementById('cc-grupo-wa-link');
+  const est = document.getElementById('cc-grupo-wa-estado');
+  const msg = document.getElementById('cc-grupo-wa-msg');
+  if (msg) msg.textContent = '';
+  try {
+    const j = await khViajeros._call({ accion: 'grupo_wa_ver', evento_id: _ccEventoActual });
+    if (inp) inp.value = j.propio || '';
+    if (est) est.textContent = j.propio ? '· activo' : (j.heredado ? '· usa el del evento (' + j.base + ')' : '· sin link todavía');
+    if (inp && !j.propio && j.heredado) inp.placeholder = j.link;
+  } catch (e) { if (est) est.textContent = '· no se pudo leer'; }
+}
+async function grupoWaGuardar() {
+  const inp = document.getElementById('cc-grupo-wa-link');
+  const msg = document.getElementById('cc-grupo-wa-msg');
+  const link = String((inp && inp.value) || '').trim();
+  if (!link) { if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Pega el link del grupo (https://chat.whatsapp.com/…).'; } return; }
+  try {
+    await khViajeros._call({ accion: 'grupo_wa_guardar', evento_id: _ccEventoActual, link });
+    showToast('Link del grupo guardado: ya sale en los correos y en el Portal', 'success');
+    await grupoWaCargar();
+  } catch (e) { if (msg) { msg.style.color = 'var(--red)'; msg.textContent = e.message; } }
 }
 
 // [MUNDO-REAL-1] El contador de arriba dice las dos poblaciones por su nombre,

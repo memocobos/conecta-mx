@@ -29,7 +29,7 @@ function red(o) {
       { id: VO, evento_id: 'karolg#1', nombre: 'Otra Persona', correo: 'otra@x.mx', celular: '8990000000', total_contrato: 7450, abonado_previo: 1000 },
       { id: VS, evento_id: 'palnorte', nombre: 'Sin Correo', correo: null, total_contrato: 300, abonado_previo: 0 },
     ],
-    abonos: [], clientes: [], invitaciones: (o.invitaciones || []).slice(), correos: [], log: [],
+    abonos: [], clientes: [], invitaciones: (o.invitaciones || []).slice(), grupos: (o.grupos || []).slice(), correos: [], log: [],
   };
   let seq = 1;
   const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => (typeof b === 'string' ? b : JSON.stringify(b)) });
@@ -46,7 +46,7 @@ function red(o) {
     if (url === 'https://api.resend.com/emails') { st.correos.push(JSON.parse(init.body)); return resp(200, { id: 'em' + st.correos.length }); }
     if (url.includes('/rest/v1/usuarios') || url.includes('sesion')) throw new Error('fail-open');
     const T = url.includes('pt.falso.test/rest/v1/clientes') ? 'clientes' : url.includes('/viajeros_evento') ? 'viajeros'
-      : url.includes('/abonos_viajero') ? 'abonos' : url.includes('/invitaciones_portal') ? 'invitaciones' : null;
+      : url.includes('/abonos_viajero') ? 'abonos' : url.includes('/invitaciones_portal') ? 'invitaciones' : url.includes('/grupos_whatsapp') ? 'grupos' : null;
     if (!T) throw new Error('URL no contemplada ' + m + ' ' + url);
     if (T === 'clientes' && m === 'GET') {
       const v = decodeURIComponent(new URL(url).searchParams.get('correo') || ''); const lista = (v.match(/^in\.\((.*)\)$/) || [, ''])[1].split(',').map((x) => x.replace(/"/g, ''));
@@ -110,6 +110,40 @@ const ev = (b, t) => ({ httpMethod: 'POST', headers: { origin: 'https://conectar
   const rr = H.lib.renderConfirmacion({ tipo: 'reserva', correo: 'a@b.mx', ev: null, nombres: ['A'], recibido: 1 });
   af(!!rr.error, '[E2] sin catálogo no hay correo (no se manda «tu viaje» sin decir cuál)');
   af(!st.log.some((l) => l.startsWith('DELETE')), '[E3] cero DELETEs');
+  console.log('[G] GRUPO-WA-1 · el link del grupo de WhatsApp');
+  const GL = 'https://chat.whatsapp.com/AbCdEfGhIj1234567890xy';
+  const gw = require(path.join(RAIZ, 'netlify/functions/_lib/grupo-whatsapp.js'));
+  af(gw.normalizarLink(' ' + GL + '?mode=ems_copy_t ') === GL && gw.normalizarLink('chat.whatsapp.com/AbCdEfGhIj1234567890xy') === GL,
+    '[G1] normaliza lo que la gente pega (espacios, ?mode=…, sin https)');
+  af(gw.normalizarLink('https://evil.com/AbCdEfGhIj1234567890xy') === null && gw.normalizarLink('https://wa.me/528119771072') === null,
+    '[G2] rechaza lo que no es un grupo de WhatsApp');
+  // Captura por el handler REAL
+  st = red(); global.fetch = st.fetch; H = fresco();
+  r = await H.h(ev({ accion: 'grupo_wa_guardar', evento_id: 'palnorte', link: 'https://evil.com/x' }, tok));
+  af(r.statusCode === 400 && st.grupos.length === 0, '[G3] un link que no es de grupo se rechaza y no se guarda');
+  r = await H.h(ev({ accion: 'grupo_wa_guardar', evento_id: 'palnorte', link: GL + '?mode=x' }, tok)); j = JSON.parse(r.body);
+  af(r.statusCode === 200 && st.grupos.length === 1 && st.grupos[0].link === GL && j.link === GL && j.propio === GL, `[G4] se guarda normalizado (${r.statusCode} ${r.body.slice(0, 100)})`);
+  const GL2 = 'https://chat.whatsapp.com/ZzZzZzZzZz0987654321ab';
+  r = await H.h(ev({ accion: 'grupo_wa_guardar', evento_id: 'palnorte', link: GL2 }, tok));
+  af(st.grupos.length === 1 && st.grupos[0].link === GL2, '[G5] pegar otro lo REEMPLAZA (una fila por evento, sin duplicar)');
+  r = await H.h(ev({ accion: 'grupo_wa_guardar', evento_id: 'palnorte', link: '' }, tok));
+  af(r.statusCode === 400 && st.grupos.length === 1, '[G6] vacío no borra nada (la casa no borra filas)');
+  r = await H.h(ev({ accion: 'grupo_wa_ver', evento_id: 'palnorte#1' }, tok)); j = JSON.parse(r.body);
+  af(j.link === GL2 && j.heredado === true && j.propio === null, '[G7] una fecha (palnorte#1) sin link propio HEREDA el del evento, rotulado');
+  const tokCoordi = H.jwtSign({ id: 'u-c', rol: 'coordinador', correo: 'c@x.mx' }, process.env.JWT_SECRET, 3600);
+  r = await H.h(ev({ accion: 'grupo_wa_guardar', evento_id: 'palnorte', link: GL }, tokCoordi));
+  af(r.statusCode === 403 && st.grupos[0].link === GL2, '[G8] un coordinador no puede cambiarlo (solo Memo/Bulma/Milk)');
+  // El correo con y sin link
+  st = red({ grupos: [{ evento_id: 'palnorte', link: GL }] }); global.fetch = st.fetch; H = fresco();
+  await H.h(ev({ accion: 'abono_crear', viajero_id: VP, monto: 300 }, tok));
+  const cg = st.correos[0] || {};
+  af(cg.html && cg.html.includes('href="' + GL + '"') && /Entrar al grupo de WhatsApp/.test(cg.html), '[G9] con link: el correo trae el botón al grupo');
+  st = red(); global.fetch = st.fetch; H = fresco();
+  await H.h(ev({ accion: 'abono_crear', viajero_id: VP, monto: 300 }, tok));
+  af(st.correos.length === 1 && !/chat\.whatsapp\.com/.test(st.correos[0].html), '[G10] sin link: el correo NO trae el bloque (no se inventa)');
+  af(!/chat\.whatsapp\.com/.test(fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8')), '[G11] el index público NO contiene ningún link de grupo');
+  af(!st.log.some((l) => l.startsWith('DELETE')), '[G12] cero DELETEs');
+
   console.log(`\n${R === 0 ? (V ? '✅ VERDE' : 'NADA MEDIDO') : '🔴 ROJO'} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.log('✗ EL ARNÉS SE CAYÓ: ' + e.stack); process.exit(1); });

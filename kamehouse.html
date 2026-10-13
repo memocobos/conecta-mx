@@ -1185,6 +1185,17 @@
           </div>
           <div class="vj2-cnt" id="cc-kh-count">0</div>
          </div>
+         <!-- [GRUPO-WA-1] El link del grupo de WhatsApp del evento. Privado: sale
+              en el correo de confirmación y en el Portal del viajero, jamás en
+              la página pública. -->
+         <div id="cc-grupo-wa" style="display:none;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px">
+          <div style="font-size:12px;font-weight:700;margin-bottom:6px">💬 Grupo de WhatsApp del evento <span id="cc-grupo-wa-estado" style="font-weight:400;opacity:.7"></span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+           <input id="cc-grupo-wa-link" type="url" placeholder="https://chat.whatsapp.com/…" style="flex:1;min-width:220px">
+           <button type="button" class="btn btn-sm" onclick="grupoWaGuardar()">Guardar link</button>
+          </div>
+          <div id="cc-grupo-wa-msg" style="font-size:12px;margin-top:6px"></div>
+         </div>
          <div id="cc-kh-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
         </div>
 

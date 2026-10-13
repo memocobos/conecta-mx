@@ -3051,6 +3051,7 @@ async function renderToursList(){
 // FAIL-SOFT ESTRICTO: cualquier fallo deja la sección oculta. Este bloque no
 // puede tumbar el portal de nadie.
 async function renderPlanMigrado(){
+  _migGrupoVisto = new Set();
   const cont = document.getElementById('tours-migrados');
   if (!cont) return;
   try {
@@ -3081,7 +3082,7 @@ async function renderPlanMigrado(){
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migDatosHtml(t) + '</div>';
+        + cuenta + _migGrupoHtml(t) + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3108,6 +3109,20 @@ function _migFaltantes(t){
   if (!t.talla_playera) f.push('talla');
   if (!t.num_emergencia) f.push('número de emergencia');
   return f;
+}
+// [GRUPO-WA-1] El botón del grupo de WhatsApp del evento, UNA vez por evento
+// (el titular ve las tarjetas de sus acompañantes del mismo viaje). Solo un
+// link de chat.whatsapp.com — cualquier otra cosa no se pinta.
+let _migGrupoVisto = new Set();
+function _migGrupoHtml(t){
+  const l = String(t.grupo_whatsapp || '');
+  if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/.test(l)) return '';
+  const llave = String(t.evento_id || '').split('#')[0];
+  if (_migGrupoVisto.has(llave)) return '';
+  _migGrupoVisto.add(llave);
+  return '<a href="' + escapeHtml(l) + '" target="_blank" rel="noopener" '
+    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 2px;padding:11px 14px;border-radius:10px;background:#25d366;color:#000;font-weight:800;font-size:13px;text-decoration:none">'
+    + 'Entrar al grupo de WhatsApp del viaje →</a>';
 }
 function _migDatosHtml(t){
   if (!t || !t.viajero_id) return '';

@@ -349,6 +349,23 @@ está caduco antes de escribirse.
     suyo. `mide:confirma-1` **16** · `mide:acomp-1` **54** (su [C] se actualizó
     a la verdad nueva). ⚠️ Un pago que deja saldo a favor se pinta «$0 ·
     ¡pagado!» (no dice el excedente) — anotado.
+  - **GRUPO-WA-1 (13-oct) · EL LINK DEL GRUPO DE WHATSAPP.** Palabra de Memo:
+    «ponemos el link en alguna parte y lo ven en su correo y en el portal»
+    (opción elegida: correo + Portal, solo hacia adelante). Tabla PRIVADA
+    `grupos_whatsapp` en KH (`evento_id` PK, CHECK de chat.whatsapp.com, RLS
+    deny-all; acta `migraciones/GRUPO-WA-1.sql`, ya corrida). 🔒 **Jamás en el
+    index ni en esferas**: es un link que deja ENTRAR y el index es público.
+    `_lib/grupo-whatsapp` es el dueño (normaliza lo pegado; una fecha `slug#N`
+    sin link propio HEREDA el del evento). Se captura en KameHouse arriba de
+    «Viajeros del evento» (maestro_roshi/bulma/milk, `grupo_wa_ver/guardar`);
+    pegar otro lo reemplaza, sin DELETE. Sale en el correo único (bloque verde,
+    solo si hay link) y en el Portal (una vez por evento, al dueño verificado).
+    `mide:confirma-1` **28** (bloque [G]).
+  - **PERFIL-CARRERA-1 (13-oct):** el Portal corría `cargarClienteYRutear` dos
+    veces a la vez; la tardía trataba como NUEVA a quien la otra ya había
+    enlazado, y el guardado chocaba con `clientes_auth_user_id_key` (Linda,
+    primera clienta de palnorte). Hoy se relee antes de declarar «nueva» y el
+    guardado actualiza si la fila ya existe.
   - ⏳ **Primer envío real = la primera aprobación de palnorte tras el push.**
     Render visto en captura (`invitacion-palnorte.png`, fuera del repo) y pasa
     a Memo antes del push. Karina (R-RMZ5P) nació ANTES de ACOMP-1: al

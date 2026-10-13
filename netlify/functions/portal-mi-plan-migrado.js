@@ -131,6 +131,11 @@ exports.handler = async (event) => {
     const porViajero = {};
     (Array.isArray(abonos) ? abonos : []).forEach((a) => { (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a); });
 
+    // [GRUPO-WA-1] El link del grupo de WhatsApp de cada evento. Solo viaja aquí,
+    // al dueño VERIFICADO de la fila (nunca al index público). Sin link → null.
+    const { gruposDe } = require('./_lib/grupo-whatsapp');
+    const linksWA = await gruposDe(viajeros.map((v) => v.evento_id), { KH_URL, KH_KEY });
+
     const tours = viajeros.map((v) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
       return {
@@ -143,6 +148,7 @@ exports.handler = async (event) => {
         num_emergencia: v.num_emergencia || null,
         emergencia_nombre: v.emergencia_nombre || null,
         evento_id: v.evento_id,
+        grupo_whatsapp: linksWA[v.evento_id] || null,
         paquete: v.tipo_paquete || null,
         zona: v.zona_boleto || null,
         // `null` cuando la fila no trae total: «no sé» dicho con su nombre, en

@@ -47,7 +47,7 @@ function esc(s) {
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
 // Devuelve { subject, html, to } | { error }.
-function renderConfirmacion({ tipo, correo, ev, nombres, recibido, total, resta, portal }) {
+function renderConfirmacion({ tipo, correo, ev, nombres, recibido, total, resta, portal, grupo }) {
   const k = llaveCorreo(correo);
   if (!k) return { error: 'sin correo usable' };
   if (!ev || !ev.id) return { error: 'no se pudo leer el evento en el catálogo: no se manda un correo sin decir a qué viaje' };
@@ -76,6 +76,14 @@ function renderConfirmacion({ tipo, correo, ev, nombres, recibido, total, resta,
   } else if (portal === 'existente') {
     bloquePortal = `<p style="margin:0 0 20px;text-align:center"><a href="${PORTAL_URL}" style="display:inline-block;background:#e8ff4c;color:#000;font-weight:800;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px">Ver mi plan en el Portal →</a></p>`;
   }
+  // [GRUPO-WA-1] El grupo de WhatsApp del evento, si Bulma/Milk ya pegaron el
+  // link en KameHouse. Verde de WhatsApp a propósito: se distingue del botón
+  // del Portal. Sin link no hay bloque (no se inventa uno).
+  const bloqueGrupo = grupo ? `<div style="margin:0 0 20px;padding:16px;border:1px solid #25d366;border-radius:10px;background:#0f1a12">
+          <p style="margin:0 0 10px;color:#ffffff;font-weight:700">Únete al grupo de WhatsApp de tu viaje</p>
+          <p style="margin:0 0 12px;font-size:14px;color:#b3b3b3">Ahí mandamos los avisos, horarios y recordatorios de tu evento.</p>
+          <p style="margin:0;text-align:center"><a href="${esc(grupo)}" style="display:inline-block;background:#25d366;color:#000000;font-weight:800;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px">Entrar al grupo de WhatsApp →</a></p>
+        </div>` : '';
   const html = `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff">
         <div style="background:#e8ff4c;color:#000;padding:18px 22px;border-bottom:4px solid #ff283b">
@@ -87,6 +95,7 @@ function renderConfirmacion({ tipo, correo, ev, nombres, recibido, total, resta,
           ${cuentas}
           ${quienes}
           ${bloquePortal}
+          ${bloqueGrupo}
           <p style="margin:0;font-size:13px;color:rgba(255,255,255,.55)">Guarda este correo como comprobante. Si algo no cuadra o tienes dudas, escríbenos por WhatsApp al 81 1977 1072.</p>
         </div>
       </div>`;
@@ -138,14 +147,18 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
     const EV = await fetchEventosRaw();
     const ev = (Array.isArray(EV) ? EV : []).find((e) => e && e.id === evBase) || null;
     if (!ev) return { ok: false, aviso: 'No pude leer el evento en el catálogo: no se mandó el correo.' };
+    // 4b · [GRUPO-WA-1] El link del grupo de WhatsApp (privado, por evento).
+    const { gruposDe } = require('./grupo-whatsapp');
+    const linksWA = await gruposDe(vs.map((v) => v.evento_id).concat([evento_id]), { KH_URL, KH_KEY });
     // 5 · Grupos por correo.
     const grupos = new Map();
     const saltados = [];
     for (const v of vs) {
       const k = llaveCorreo(v.correo);
       if (!k || !esCorreoUsable(v.correo)) { saltados.push(v.nombre || v.id); continue; }
-      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null });
+      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null, grupo: null });
       const g = grupos.get(k);
+      if (!g.grupo) g.grupo = linksWA[v.evento_id] || linksWA[evento_id] || null;
       g.nombres.push(v.nombre);
       const s = saldoMigrado(v, porV[v.id] || []);
       if (s) { g.total += s.total; g.abonado += s.abonado; g.resta += s.resta; } else g.sinPlan = true;
@@ -159,7 +172,7 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
       let portal = null;
       if (portalListo && ya && g.portal_cliente_id) portal = ya.has(g.correo) ? 'existente' : 'nuevo';
       const r = renderConfirmacion({ tipo, correo: g.correo, ev, nombres: g.nombres, recibido: g.recibido,
-        total: g.sinPlan ? null : g.total, resta: g.sinPlan ? null : g.resta, portal });
+        total: g.sinPlan ? null : g.total, resta: g.sinPlan ? null : g.resta, portal, grupo: g.grupo });
       if (r.error) { errores.push({ correo: g.correo, paso: 'render', detail: r.error }); continue; }
       const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
       let resp, data = {};

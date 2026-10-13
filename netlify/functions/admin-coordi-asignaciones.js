@@ -105,6 +105,9 @@ const ACCIONES = {
   // datos captura los abonos.
   abono_crear: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
+  // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
+  grupo_wa_ver: ROLES_EDITA_VIAJERO,
+  grupo_wa_guardar: ROLES_EDITA_VIAJERO,
   deudores_migrados: ROLES_EDITA_VIAJERO,
   // [VJ-5] Acomodar migrados en cuartos.
   viajero_habitacion: ROLES_EDITA_VIAJERO,
@@ -1053,6 +1056,43 @@ exports.handler = async (event) => {
         });
       }
       return ok(headers, { abono: creado, correo });
+    }
+
+    // ── [GRUPO-WA-1] El link del grupo de WhatsApp del evento ─────────────
+    // Tabla privada `grupos_whatsapp` (RLS deny-all). Lo leen el correo de
+    // confirmación y el Portal del dueño verificado; jamás el index público.
+    if (accion === 'grupo_wa_ver' || accion === 'grupo_wa_guardar') {
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || evento_id.length > 80) return bad(headers, 'evento_id inválido');
+      const { normalizarLink, gruposDe, baseSlug } = require('./_lib/grupo-whatsapp');
+      const baseGW = `${env.KH_SB_URL}/rest/v1/grupos_whatsapp`;
+      if (accion === 'grupo_wa_guardar') {
+        const crudo = String(body.link || '').trim();
+        // Sin DELETE (regla de la casa): un link equivocado se REEMPLAZA pegando el bueno.
+        if (!crudo) return bad(headers, 'Pega el link del grupo (https://chat.whatsapp.com/…). Para cambiarlo, pega el nuevo encima.');
+        {
+          const link = normalizarLink(crudo);
+          if (!link) return bad(headers, 'Ese no parece un link de grupo de WhatsApp (debe ser https://chat.whatsapp.com/…)');
+          const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId;
+          // ¿Existe? → PATCH; si no → INSERT. Sin on_conflict (regla de la casa).
+          const pre = await fetch(`${baseGW}?evento_id=eq.${encodeURIComponent(evento_id)}&select=evento_id`, { headers: sbHeaders });
+          if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+          const existe = (await pre.json()).length > 0;
+          const w = await fetch(existe ? `${baseGW}?evento_id=eq.${encodeURIComponent(evento_id)}` : baseGW, {
+            method: existe ? 'PATCH' : 'POST',
+            headers: { ...sbHeaders, Prefer: 'return=minimal' },
+            body: JSON.stringify(existe ? { link, actualizado_por: quien, updated_at: new Date().toISOString() }
+                                        : { evento_id, link, actualizado_por: quien }),
+          });
+          if (!w.ok) return upstream(headers, await w.text(), existe ? 'update' : 'insert');
+        }
+      }
+      // Lo que rige para esta llave (propio o heredado del evento base).
+      const rP = await fetch(`${baseGW}?evento_id=eq.${encodeURIComponent(evento_id)}&select=link`, { headers: sbHeaders });
+      if (!rP.ok) return upstream(headers, await rP.text(), 'consulta');
+      const propio = ((await rP.json())[0] || {}).link || null;
+      const rige = (await gruposDe([evento_id], { KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE }))[evento_id] || null;
+      return ok(headers, { evento_id, propio, link: rige, heredado: !!(rige && !propio), base: baseSlug(evento_id) });
     }
 
     // ── abonos_viajero: listar los de un viajero (admin) ─────────────────

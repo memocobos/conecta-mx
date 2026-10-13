@@ -148,6 +148,13 @@
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
    <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
+   <!-- [SALDOS-NAV-1 · 12-oct-2026] La pantalla de Saldos existía (page-saldos)
+        y su permiso también ('saldos' en PERMISOS_TABS para roshi/bulma/milk),
+        pero el botón del menú NUNCA existió: solo se entraba por el click-through
+        del Resumen («Caja total de la empresa»). Un permiso concedido sin botón
+        es una pantalla huérfana — Memo la buscó y no estaba. El icono reusa
+        #ic-ingresos a propósito: no se estrena arte en una tuerca de un renglón. -->
+   <button class="nav-btn" onclick="showPage('saldos')" id="nav-saldos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Saldos</span></button>
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
 

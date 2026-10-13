@@ -188,6 +188,43 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ⚰️🔒 **CANCEL-1 · TITODOBLE Y NATANAEL CANCELADOS Y FUERA DEL INDEX
+  (12-oct-2026).** Palabra de Memo: *«cancélalos y quítalos del index, mis
+  clientes ya están avisados y la venta ya deberíamos de pararla»*.
+  `npm run mide:cancel-1` (**14**, sin ancla a propósito — y SIN comparar
+  contra HEAD: esa comparación caduca el día de su propio merge).
+  - **Salieron del EV POR EL DUEÑO** (`quitarDelEV` de esferas-compile,
+    validación de AMBOS parsers en cada corte) — no a mano. 119 eventos
+    quedaron; vecinos careados. La venta se para sola en cadena: cotizador,
+    puerta de zonas, requisiciones y /rol beben del catálogo servido.
+  - 🔒 **LA TRAMPA DE LA RE-INSERCIÓN, CERRADA ANTES DE CORTAR:** el publish
+    lee TODAS las esferas y solo respeta **`archivado=true`** (ESF-ARCHIVO-1);
+    `publicado=false` NO filtra. Sin archivar primero, el próximo publish los
+    re-insertaba. Las dos fichas: `archivado=true, publicado=false` (valores
+    esperados en el WHERE, 2/2).
+  - **El código NATA murió en sus DOS copias** (ya estaba VENCIDO desde el
+    1-oct, inerte): podado de `var PROMOS` del index y `archivado=true` en
+    `promos_codigos` — una sola copia viva y un publish de códigos lo revivía.
+  - **Satélites, medidos y cerrados:** 2 pestañas del careo `activa=false` con
+    nota (los reembolsos van por Yamcha, no por careo) · **3 recordatorios de
+    /rol de natanael `active=false`** (un cliente de evento cancelado no puede
+    recibir «te toca pagar») · titodoble con 0 recordatorios · imgs/mapas/
+    lineups sin entradas suyas · deep-link con slug muerto cae a portada por
+    construcción (pase 1 casa por id exacto) · la tira del hero rechaza ids
+    del top sin evento (`meter()` guarda `!e`).
+  - ⚠️ **Hallazgo preexistente NOMBRADO sin arreglar:** PROMOS trae DOS
+    huérfanas vencidas de hace meses — `CIRCLE→aperfectcircle` (abr-2026) y
+    `BEELE→beele` (may-2026). Inertes (promo vencida no aplica); limpiarlas es
+    chiquita propia. El arnés exige que sean EXACTAMENTE esas dos: una tercera
+    sería nueva.
+  - **Los datos de la gente NO se tocaron**: viajeros, abonos y compras siguen
+    enteros — natanael y titodoble SÍ salen en el Resumen (época nueva, dinero
+    real, reembolsos pendientes). Eso es correcto, no un bug.
+  - ⏳ **Siguiente: los 73 reembolsos en Yamcha** ($322,372 = natanael 57
+    vivos/$286,438 + tito 16/$35,934; 4 personas en AMBOS eventos). Crédito
+    Matriz $300,001 se aplica a OTRO evento cuando Matriz lo acredite (mover el
+    abono, no duplicar); kits natanael $4,650 = pérdida ya capturada.
+
 - 🏆 **EPOCA-1 · EL CORTE DE ÉPOCA (12-oct-2026, commit d8b2878): el Palacio
   operativo lee de calle24 (3-sep-2026) en adelante.** Palabra de Memo, citada:
   *«la migración vieja elimínala para que no marque nada… solo deja la info de

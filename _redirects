@@ -20,6 +20,11 @@
 /portal      /portal.html      200
 /portal/*    /portal.html      200
 
+# [PN27] Preventa a ciegas Pa'l Norte 2027: la URL del copy (/palnorte27) es un
+# 301 a la ficha real (/palnorte). El deep link del index casa por id EXACTO
+# (pase 1), así que sin esta regla /palnorte27 caería a la portada en silencio.
+/palnorte27  /palnorte  301
+
 # Archivos especiales (Netlify los sirve directo si existen — protección extra)
 /robots.txt  /robots.txt       200
 /sitemap.xml /sitemap.xml      200

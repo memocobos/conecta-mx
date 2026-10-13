@@ -4489,8 +4489,14 @@ var _landTick = null;
       // [LAND-1d] El rango va DENTRO del nombre, no encima. Suelto ocupaba su
       // propio renglón y crecía la tira 21px — y en producción SIEMPRE está,
       // porque el top sí llega. Ver la nota del CSS.
+      // [PN27] LA TIRA RESPETA LO QUE LA TARJETA ANUNCIA. Una ficha puede traer
+      // su fecha SOLO para el sistema (ds del compilador: época, orden, contador)
+      // con la tarjeta diciendo «Por confirmar» (f_texto la tapa). Si la tira
+      // pintara fechaCorta(ds), anunciaría la fecha que el negocio aún no puede
+      // publicar — palnorte 2027 es el caso que lo estrenó. El hecho que manda
+      // es e.f, que es lo que el cliente lee en la tarjeta.
       b.innerHTML='<div class="hs-name">'+(n?'<span class="hs-rank">#'+n+'</span>':'')+esc(cleanName(e.a))+'</div>'+
-                  '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
+                  '<div class="hs-fecha">'+esc(e.f==='Por confirmar'?'Por confirmar':fechaCorta(dsEfectivo(e)))+'</div>';
       it.appendChild(m); it.appendChild(b);
       pintarPortada(m,e,'hs-img','hs-ini');
       // [LAND-2] EL SELLO NO SE CUELGA DE LA PORTADA. Ver la nota del CSS:
@@ -6560,6 +6566,13 @@ function abrirModalPago(){
 // (?req=0 lo apaga) — el mismo patrón de RESERVA_PORTAL, porque el index
 // reescribe la URL al navegar y el parámetro se perdería sin sessionStorage.
 var REQUISICION_VIVA=false;
+// [PN27] ENCENDIDO POR EVENTO, antes que el global. La preventa a ciegas de
+// Pa'l Norte 2027 (palabra de Memo, 14-oct-2026) vende APARTADOS de $300 por la
+// bandeja, y la regla del rumbo se mantiene: lo que toca al cliente nace detrás
+// de interruptor — aquí el interruptor es la lista. Agregar un slug ENCIENDE la
+// sección del modal solo en ese evento; el resto del sitio sigue como siempre
+// (cuentas + Messenger). Vaciar la lista apaga todo salvo el override ?req=1.
+var REQUISICION_EVENTOS=['palnorte'];
 (function(){
   try{
     var v=new URLSearchParams(location.search).get('req');
@@ -6569,6 +6582,9 @@ var REQUISICION_VIVA=false;
 })();
 function _requisicionActiva(){
   if(REQUISICION_VIVA)return true;
+  // Por evento: `cur` es el evento abierto (puesto por showDetail antes de que
+  // el modal de pago exista). typeof-guard por la ley del orden de parseo.
+  try{ if(typeof cur!=='undefined'&&cur&&REQUISICION_EVENTOS.indexOf(cur.id)>-1)return true; }catch(e){}
   try{ return sessionStorage.getItem('conecta_req_preview')==='1'; }catch(e){ return false; }
 }
 var _reqEstado={forma:null,archivo:null,enviando:false};

@@ -331,6 +331,24 @@ está caduco antes de escribirse.
     funciones. Quien solo tiene tours de KameHouse ya no ve «Sin solicitudes /
     Crea tu primer tour». `mide:portal-edit-1` **28**; navegador: faltantes,
     error de emergencia, guardar y pedir cambio.
+  - **CONFIRMA-1 (13-oct) · EL CORREO ÚNICO.** Palabra de Memo: «correo único
+    primero» — confirmación e invitación al Portal viajan en UN correo.
+    `_lib/correo-confirmacion` es el dueño (`EVENTOS_CORREO=['palnorte']`, fuera
+    de ahí no sale nada) y lo llaman los DOS caminos del dinero: **aprobar en la
+    bandeja** → «¡Tu lugar está confirmado!» y **capturar a mano un pago**
+    (`abono_crear`, `avisar:false` lo apaga) → «Recibimos tu pago». Un correo
+    por CORREO (el grupo suma y nombra a quienes viajan); el saldo lo cuenta
+    `saldoMigrado`; correo no invitado → «Regístrate» + asiento en
+    `invitaciones_portal` DESPUÉS del envío (la misma bitácora del botón);
+    invitado → «Ver mi plan». Sin llaves del Portal o sin bitácora legible la
+    confirmación sale SIN invitar y lo dice; sin catálogo no sale. 🔒 **El
+    correo jamás tumba el dinero** (Resend caído → el abono queda). Reemplaza a
+    `portalAlAprobar` de ACOMP-1 (mandaba la invitación SOLA). 🔴 Cazado en la
+    captura, no en el careo: las celdas de la tabla salían negro sobre negro —
+    **los clientes de correo no heredan el color del div**: cada celda lleva el
+    suyo. `mide:confirma-1` **16** · `mide:acomp-1` **54** (su [C] se actualizó
+    a la verdad nueva). ⚠️ Un pago que deja saldo a favor se pinta «$0 ·
+    ¡pagado!» (no dice el excedente) — anotado.
   - ⏳ **Primer envío real = la primera aprobación de palnorte tras el push.**
     Render visto en captura (`invitacion-palnorte.png`, fuera del repo) y pasa
     a Memo antes del push. Karina (R-RMZ5P) nació ANTES de ACOMP-1: al

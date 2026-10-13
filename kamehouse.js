@@ -4083,11 +4083,11 @@ async function _cobCajaGuardar(id) {
   const btn = document.getElementById(`cbbtn-${id}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    await khViajeros.abonoCrear({
+    const rAb = await khViajeros.abonoCrear({
       viajero_id: id, monto,
       fecha: fecha || undefined, nota: nota || undefined, foto: foto || undefined,
     });
-    showToast(`Abono de ${_spFmtMxn(monto)} registrado`, 'success');
+    showToast(`Abono de ${_spFmtMxn(monto)} registrado${_abonoCorreoTxt(rAb && rAb.correo)}`, 'success');
     // Se RECARGA todo desde el servidor: la resta que queda en pantalla sale de
     // los datos, no de restar aquí y confiar. Es la misma decisión de VJ-3.
     await _cobCajaCargar();
@@ -4095,6 +4095,14 @@ async function _cobCajaGuardar(id) {
     mal(e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar abono'; }
   }
+}
+
+// [CONFIRMA-1] Qué pasó con el correo «Recibimos tu pago» (null = el evento no
+// manda correo todavía, y entonces no se dice nada).
+function _abonoCorreoTxt(c) {
+  if (!c) return '';
+  if (c.ok && c.enviados && c.enviados.length) return ' · correo enviado' + (c.invitados && c.invitados.length ? ' con invitación al Portal' : '');
+  return ' · ⚠️ el correo no salió: ' + (c.aviso || ((c.errores && c.errores[0] && c.errores[0].paso) || 'sin respuesta'));
 }
 
 // El feed: Memo quiere VER la actividad, no solo capturarla. Va tal como lo
@@ -5793,8 +5801,8 @@ async function _vjAbonoGuardar(id) {
   const btn = document.getElementById(`vja-b-${id}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    await khViajeros.abonoCrear({ viajero_id: id, monto, fecha: fecha || undefined, nota: nota || undefined });   // [sec-coordi]
-    showToast(`Abono de ${_spFmtMxn(monto)} registrado`, 'success');
+    const rAb = await khViajeros.abonoCrear({ viajero_id: id, monto, fecha: fecha || undefined, nota: nota || undefined });   // [sec-coordi]
+    showToast(`Abono de ${_spFmtMxn(monto)} registrado${_abonoCorreoTxt(rAb && rAb.correo)}`, 'success');
     // Se RECARGA del servidor: la resta que queda en pantalla sale de los
     // datos, no de restar aquí y confiar (la decisión de VJ-3 y de la caja).
     await loadViajeros();

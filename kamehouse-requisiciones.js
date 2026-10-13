@@ -206,8 +206,9 @@ async function _reqBdjAprobar(id) {
     const nv = Array.isArray(j.viajeros) ? j.viajeros.length : 1;
     let txt = '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' con ' + _reqBdjMxn(j.monto) + ' cobrados. Confírmale al cliente por WhatsApp.';
     const pt = j.portal;
-    if (pt && pt.ok) txt += ' · Portal: ' + (pt.invitados || []).length + ' invitación(es) enviada(s)' + ((pt.ya_invitados || []).length ? ', ' + pt.ya_invitados.length + ' ya tenían' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '');
-    else if (pt && pt.aviso) txt += ' · ⚠️ Portal: ' + pt.aviso;
+    // [CONFIRMA-1] el correo único: confirmación + invitación al Portal adentro.
+    if (pt && (pt.enviados || []).length) txt += ' · Correo de confirmación enviado (' + pt.enviados.length + ')' + ((pt.invitados || []).length ? ', con invitación al Portal' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '') + (pt.aviso ? ' · ⚠️ ' + pt.aviso : '');
+    else if (pt) txt += ' · ⚠️ El correo no salió: ' + (pt.aviso || ((pt.errores && pt.errores[0] && pt.errores[0].paso) || 'sin respuesta'));
     if (msg) { msg.textContent = txt; msg.style.color = 'var(--green)'; }
     setTimeout(() => loadRequisiciones(), pt ? 4000 : 900);
   } else {

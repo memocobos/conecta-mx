@@ -71,6 +71,7 @@
     "mide:saldos-caja-1": "node scripts/mide-saldos-caja-1.js",
     "mide:preventa-pn27": "node scripts/mide-preventa-pn27.js",
     "mide:acomp-1": "node scripts/mide-acomp-1.js",
-    "mide:portal-edit-1": "node scripts/mide-portal-edit-1.js"
+    "mide:portal-edit-1": "node scripts/mide-portal-edit-1.js",
+    "mide:confirma-1": "node scripts/mide-confirma-1.js"
   }
 }

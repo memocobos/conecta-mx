@@ -1036,7 +1036,23 @@ exports.handler = async (event) => {
       });
       if (!r.ok) return upstream(headers, await r.text(), 'insert');
       const creado = (await r.json())[0] || null;
-      return ok(headers, { abono: creado });
+      // [CONFIRMA-1] «Recibimos tu pago» al cliente, con la invitación al Portal
+      // si todavía no la tenía (el MISMO correo de la bandeja, _lib/correo-
+      // confirmacion). Solo en los eventos de EVENTOS_CORREO: fuera de ellos la
+      // lib devuelve null y no sale nada. `avisar:false` lo apaga para una
+      // captura que no debe avisar (p. ej. corregir un dato viejo).
+      // Nunca deshace el abono: si el correo falla, la respuesta lo dice.
+      let correo = null;
+      if (body.avisar !== false && creado) {
+        const { enviarCorreoPago } = require('./_lib/correo-confirmacion');
+        correo = await enviarCorreoPago({
+          tipo: 'abono', evento_id: vRows[0].evento_id, viajeroIds: [viajero_id],
+          recibidoPorViajero: { [viajero_id]: monto },
+          enviado_por: (auth.user && auth.user.correo) || null,
+          KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE,
+        });
+      }
+      return ok(headers, { abono: creado, correo });
     }
 
     // ── abonos_viajero: listar los de un viajero (admin) ─────────────────

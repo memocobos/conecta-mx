@@ -123,6 +123,11 @@ function redNueva(opts) {
       filas.forEach((f) => st.viajeros.push(f));
       return resp(201, filas);
     }
+    if (String(url).includes('/rest/v1/abonos_viajero') && met === 'GET') {
+      // [CONFIRMA-1] el correo lee los abonos para contar el saldo por su dueño.
+      const ids = idsIn(url);
+      return resp(200, st.abonos.filter((a) => !ids || ids.includes(String(a.viajero_id))).map((a) => Object.assign({}, a)));
+    }
     if (String(url).includes('/rest/v1/abonos_viajero') && met === 'POST') {
       if (st.abonoInsertFalla) return resp(500, 'abonos enojados (sembrado)');
       // [ACOMP-1] Fiel a PostgREST: el cuerpo puede ser UNA fila o una LISTA
@@ -284,11 +289,14 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   const pendPn = (extra) => pend(Object.assign({ evento_id: 'palnorte', evento_nombre: 'Pa\'l Norte', paquete: 'cheap', zona: zPn.n,
     total_sistema: rPn.total, separo_sistema: rPn.separo, hotel: null }, extra || {}));
   // sin llaves del Portal → aprobación SÍ queda, el aviso lo DICE
-  delete process.env.PORTAL_SUPABASE_URL; delete process.env.PORTAL_SUPABASE_SERVICE_KEY;
+  delete process.env.PORTAL_SUPABASE_URL; delete process.env.PORTAL_SUPABASE_SERVICE_KEY; process.env.RESEND_API_KEY = 're_falsa';
   red = redNueva({ requisiciones: [pendPn()] }); global.fetch = red.fetch; H = handlersFrescos();
   r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma)); j = JSON.parse(r.body);
-  af(r.statusCode === 200 && red.viajeros.length === 3 && j.portal && j.portal.ok === false && /llaves del Portal/.test(j.portal.aviso), '[C1] sin llaves → aprobado igual y el aviso lo DICE (no se calla)');
-  af(red.correos.length === 0, '[C2] …y sin llaves no sale ni un correo');
+  // [CONFIRMA-1] La verdad nueva: el correo ÚNICO de confirmación sale aunque
+  // falten las llaves del Portal — solo que SIN invitación, y lo DICE.
+  af(r.statusCode === 200 && red.viajeros.length === 3 && j.portal && /llaves del Portal/.test(j.portal.aviso || ''), `[C1] sin llaves del Portal → aprobado igual y el aviso lo DICE (${JSON.stringify(j.portal).slice(0, 120)})`);
+  af(red.correos.length === 2 && red.correos.every((c) => !/[Rr]egístrate/.test(c.html)) && red.invitaciones.length === 0,
+    '[C2] …sale la confirmación (2 correos) pero SIN invitación al Portal y sin asentar bitácora');
   process.env.PORTAL_SUPABASE_URL = 'https://pt.falso.test'; process.env.PORTAL_SUPABASE_SERVICE_KEY = 'pt-falsa'; process.env.RESEND_API_KEY = 're_falsa';
   red = redNueva({ requisiciones: [pendPn()] }); global.fetch = red.fetch; H = handlersFrescos();
   r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma)); j = JSON.parse(r.body);
@@ -296,7 +304,13 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   af(red.clientes.length === 2, `[C4] DOS cuentas del Portal (karina y beto) — Karina y Ana comparten correo = una cuenta (${red.clientes.length})`);
   af(red.viajeros.every((v) => v.portal_cliente_id), '[C5] los TRES viajeros quedan enlazados (portal_cliente_id)');
   const enviosC6 = red.correos.length;
-  af(red.correos.length === 2, `[C6] DOS invitaciones: una por CORREO, no por persona (${red.correos.length})`);
+  af(red.correos.length === 2, `[C6] DOS correos: uno por CORREO, no por persona (${red.correos.length})`);
+  const cK = red.correos.find((c) => (c.to || []).join() === 'karina@prueba.mx') || {};
+  const cB = red.correos.find((c) => (c.to || []).join() === 'beto@otro.mx') || {};
+  af(/¡Tu lugar está confirmado!/.test(cK.subject || '') && /Regístrate/.test(cK.html || ''), '[C6b] UN solo correo hace las dos cosas: confirma Y trae la invitación');
+  af(/\$600/.test(cK.html || '') && /Ana Acompañante/.test(cK.html || '') && /\$300/.test(cB.html || ''),
+    '[C6c] el dinero va por GRUPO de correo: Karina+Ana $600 · Beto $300, con los nombres de quienes viajan');
+  af(!/2027-03|26 de marzo/i.test(cK.html || ''), '[C6d] la fecha de Pa\'l Norte NO viaja en el correo (Por confirmar)');
   const dest = red.correos.map((c) => (c.to || []).join(',')).sort().join('|');
   af(dest === 'beto@otro.mx|karina@prueba.mx', `[C7] a los correos capturados (${dest})`);
   af(red.correos.every((c) => /conectareynosa\.mx\/portal/.test(c.html || '')), '[C8] cada invitación lleva al Portal');
@@ -305,12 +319,16 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   red = redNueva({ requisiciones: [pendPn()], invitaciones: [{ evento_id: 'palnorte', correo: 'karina@prueba.mx' }],
     clientes: [{ id: 'cli-karina', correo: 'karina@prueba.mx', auth_user_id: null }] }); global.fetch = red.fetch; H = handlersFrescos();
   r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma)); j = JSON.parse(r.body);
-  af(red.correos.length === 1 && red.correos[0].to.join() === 'beto@otro.mx', '[C10] quien ya fue invitada NO recibe otro correo; solo el nuevo');
+  const kRe = red.correos.find((c) => c.to.join() === 'karina@prueba.mx') || {};
+  af(red.correos.length === 2 && !/Regístrate/.test(kRe.html || '') && /Ver mi plan en el Portal/.test(kRe.html || '')
+    && red.invitaciones.filter((x) => x.correo === 'karina@prueba.mx').length === 1,
+    '[C10] quien YA estaba invitada recibe su confirmación con «Ver mi plan», sin re-invitarla ni re-asentar');
   af(red.clientes.length === 2 && red.viajeros[0].portal_cliente_id === 'cli-karina', '[C11] su cuenta existente se REUSA (no se duplica el cliente)');
   // bitácora caída → no se invita a nadie, aprobación intacta
   red = redNueva({ requisiciones: [pendPn()], bitacoraCaida: true }); global.fetch = red.fetch; H = handlersFrescos();
   r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma)); j = JSON.parse(r.body);
-  af(r.statusCode === 200 && red.correos.length === 0 && j.portal && j.portal.ok === false, '[C12] bitácora ilegible → CERO correos (sin bitácora no se invita) y la aprobación queda');
+  af(r.statusCode === 200 && red.correos.length === 2 && red.correos.every((c) => !/Regístrate/.test(c.html)) && /bitácora/.test((j.portal && j.portal.aviso) || ''),
+    '[C12] bitácora ilegible → la confirmación sale SIN invitación (sin bitácora no se invita), lo DICE, y la aprobación queda');
   // control positivo del contador: si no viera envíos, sus ceros no dirían nada (ya visto en C6 = 2)
   af(enviosC6 === 2, `[C13] control positivo: el contador de Resend SÍ ve envíos (C6 contó ${enviosC6}), así que los ceros de B10/C2/C12 son medición`);
 

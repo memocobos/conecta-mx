@@ -44,62 +44,14 @@ const ACCIONES = {
   cambios_listar: ROLES_BANDEJA,
   cambio_cerrar: ROLES_BANDEJA,
 };
-// [ACOMP-1] Eventos donde aprobar = dar acceso al Portal (puente + invitación).
-// Palabra de Memo (13-oct): «para los de Pa'l Norte, solo esos por el momento».
-const PORTAL_AL_APROBAR = ['palnorte'];
+// [CONFIRMA-1] Al aprobar sale UN correo: confirmación + invitación al Portal
+// (palabra de Memo: «correo único»). El dueño es _lib/correo-confirmacion; sus
+// eventos viven ahí (EVENTOS_CORREO), no aquí, para que la captura manual de
+// pagos y la bandeja no puedan divergir. Lo que había aquí (portalAlAprobar,
+// ACOMP-1) se reemplazó por esa lib: mandaba la invitación SOLA.
+const { enviarCorreoPago } = require('./_lib/correo-confirmacion');
 const SIGN_EXPIRA = 60 * 60; // 1 hora, como admin-solicitud-comprobante
 const BUCKET = 'abonos-viajeros';
-
-// ── [ACOMP-1] El Portal al aprobar. Usa las MISMAS libs que los botones del
-// puente y de invitar (una sola fuente de «cómo entra alguien al Portal»).
-// Jamás lanza: devuelve un resumen que la bandeja pinta.
-async function portalAlAprobar({ req, nacidos, quien, SB_URL, SB_KEY }) {
-  const PT_URL = process.env.PORTAL_SUPABASE_URL;
-  const PT_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-  const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
-  if (!PT_URL || !PT_KEY) return { ok: false, aviso: 'Faltan las llaves del Portal: no se invitó a nadie. Usa «Invitar al Portal» del evento cuando estén.' };
-  if (!RESEND_KEY) return { ok: false, aviso: 'Falta RESEND_API_KEY: no se mandó ninguna invitación.' };
-  const sbH = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
-  const evento_id = String(req.evento_id).split('#')[0];
-  try {
-    const { puentearViajeros } = require('./_lib/puente-portal');
-    const { aQuienInvitar, enviarInvitaciones } = require('./_lib/invitacion-portal');
-    const { llaveCorreo } = require('./_lib/correo-forma');
-    const ids = nacidos.map((v) => '"' + v.id + '"').join(',');
-    const sel = 'id,nombre,correo,celular,talla_playera,emergencia_nombre,num_emergencia,portal_cliente_id';
-    const leer = async () => {
-      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids)})&select=${sel}`, { headers: sbH });
-      if (!r.ok) throw new Error('no pude releer los viajeros recién creados');
-      return r.json();
-    };
-    // 1 · Puente (alta en `clientes` del Portal + enlace portal_cliente_id).
-    const pu = await puentearViajeros({ evento_id, viajeros: await leer(), KH_URL: SB_URL, KH_KEY: SB_KEY, PT_URL, PT_KEY, ejecutar: true });
-    if (pu.error) return { ok: false, aviso: 'El puente al Portal falló: ' + pu.error + ' — usa «Invitar al Portal» del evento después.' };
-    // 2 · Bitácora: a quién ya se invitó a ESTE evento (sin bitácora no se invita).
-    const bR = await fetch(`${SB_URL}/rest/v1/invitaciones_portal?evento_id=eq.${encodeURIComponent(evento_id)}&select=correo&limit=5000`, { headers: sbH });
-    if (!bR.ok) return { ok: false, aviso: 'No pude leer la bitácora de invitaciones: no se mandó nada (sin bitácora no se invita a nadie).' };
-    const ya = new Set((await bR.json()).map((x) => llaveCorreo(x.correo)).filter(Boolean));
-    const quienes = aQuienInvitar(await leer(), ya);
-    if (quienes.error) return { ok: false, aviso: quienes.error };
-    // 3 · El catálogo: la invitación no sale sin decir a QUÉ viaje (PROMO-DERIVA).
-    const { fetchEventosRaw } = require('./_lib/catalogo-index');
-    const EV = await fetchEventosRaw();
-    const ev = (Array.isArray(EV) ? EV : []).find((e) => e && e.id === evento_id) || null;
-    if (!ev) return { ok: false, aviso: 'No pude leer el evento en el catálogo: no se mandó ninguna invitación.' };
-    // 4 · Envío + bitácora DESPUÉS de cada envío (la lib).
-    const env = await enviarInvitaciones({ lista: quienes.invitar, ev, evento_id, KH_URL: SB_URL, KH_KEY: SB_KEY, RESEND_KEY, enviado_por: quien || null });
-    return {
-      ok: env.errores.length === 0,
-      cuentas_creadas: (pu.creados || []).length,
-      invitados: env.enviados.map((x) => x.correo),
-      ya_invitados: quienes.ya_invitados.map((x) => x.correo),
-      saltados: quienes.saltados,
-      errores: env.errores,
-    };
-  } catch (e) {
-    return { ok: false, aviso: 'El acceso al Portal falló: ' + e.message + ' — la aprobación SÍ quedó; usa «Invitar al Portal» del evento.' };
-  }
-}
 
 function j(status, headers, body) { return { statusCode: status, headers, body: JSON.stringify(body) }; }
 
@@ -374,15 +326,16 @@ exports.handler = async (event) => {
       enlaceOk = rE.ok;
     } catch (_) { enlaceOk = false; }
 
-    // 8 · [ACOMP-1] EL PORTAL: puente + invitación a cada correo, al aprobar.
-    // Solo en los eventos de PORTAL_AL_APROBAR (palabra de Memo: «para los de
-    // Pa'l Norte, solo esos por el momento»). Nada de esto deshace la
-    // aprobación: si falla, la respuesta lo DICE y el botón «Invitar al
-    // Portal» del evento lo completa después (misma lib, misma bitácora).
-    let portal = null;
-    if (PORTAL_AL_APROBAR.includes(String(req.evento_id).split('#')[0])) {
-      portal = await portalAlAprobar({ req, nacidos, quien: auth.user && auth.user.correo, SB_URL, SB_KEY });
-    }
+    // 8 · [CONFIRMA-1] EL CORREO ÚNICO: «¡Tu lugar está confirmado!» con la
+    // invitación al Portal adentro. Solo en los eventos de EVENTOS_CORREO
+    // (la lib decide y devuelve null fuera de ellos). Nunca deshace la
+    // aprobación: si falla, la respuesta lo DICE.
+    const recibidoPorViajero = {};
+    nacidos.forEach((v, i) => { recibidoPorViajero[v.id] = N > 1 ? montos[i] : monto; });
+    const portal = await enviarCorreoPago({
+      tipo: 'reserva', evento_id: req.evento_id, viajeroIds: nacidos.map((v) => v.id), recibidoPorViajero,
+      enviado_por: auth.user && auth.user.correo, KH_URL: SB_URL, KH_KEY: SB_KEY,
+    });
 
     return j(200, headers, {
       ok: true,

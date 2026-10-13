@@ -3044,17 +3044,124 @@ async function renderPlanMigrado(){
           + '<span>Total <b>' + money(t.total) + '</b></span>'
           + '<span>Abonado <b>' + money(t.abonado) + '</b></span>'
           + '<span>Te falta <b>' + money(t.resta) + '</b></span></div>';
-      return '<div class="tour-card" style="padding:16px 18px">'
+      return '<div class="tour-card" style="padding:16px 18px" data-mig-viajero="' + escapeHtml(t.viajero_id || '') + '">'
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
-        + escapeHtml([t.paquete, t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + '</div>';
+        + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
+        + cuenta + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
       + 'Tus tours con nosotros</div>' + filas;
     cont.style.display = '';
+    window.__migTours = j.tours;
+    // Quien solo tiene tours de KameHouse no debe ver «Sin solicitudes todavía /
+    // Crea tu primer tour» debajo de su viaje: se lee como que no tiene nada.
+    if (!(_toursCache || []).length) {
+      const tl = document.getElementById('tours-list'); if (tl) tl.style.display = 'none';
+      const tb = document.getElementById('dash-tabs'); if (tb) tb.style.display = 'none';
+    }
   } catch (e) { /* fail-soft: la sección se queda oculta */ }
+}
+
+// ── [PORTAL-EDIT-1] DATOS DEL VIAJERO Y SOLICITUDES DE CAMBIO ─────────────
+// Palabra de Memo (13-oct): el cliente termina de llenar los datos de sus
+// acompañantes y corrige los suyos; lo editado llega DIRECTO a la lista del
+// evento en KameHouse. Hotel/zona/fecha NO se cambian aquí: se PIDEN y caen a la
+// bandeja de Bulma/Milk (mueven precio). Funciones DECLARADAS (hoisting).
+function _migFaltantes(t){
+  const f = [];
+  if (!t.celular) f.push('WhatsApp');
+  if (!t.talla_playera) f.push('talla');
+  if (!t.num_emergencia) f.push('número de emergencia');
+  return f;
+}
+function _migDatosHtml(t){
+  if (!t || !t.viajero_id) return '';
+  const id = escapeHtml(t.viajero_id);
+  const falt = _migFaltantes(t);
+  const inp = 'width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:13px';
+  const lbl = 'display:block;font-size:11px;opacity:.7;margin:0 0 3px';
+  let tallas = '<option value="">— elige —</option>';
+  ['XS','S','M','L','XL','XXL'].forEach((x) => { tallas += '<option' + (t.talla_playera === x ? ' selected' : '') + '>' + x + '</option>'; });
+  return '<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px">'
+    + (falt.length ? '<div style="font-size:12px;color:#e8ff4c;margin-bottom:8px">⚠️ Falta: ' + escapeHtml(falt.join(', ')) + '</div>' : '')
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + '<button type="button" class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:12px" data-mig-act="datos" data-mig-id="' + id + '">' + (falt.length ? 'Completar datos' : 'Editar datos') + '</button>'
+    + '<button type="button" class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:12px" data-mig-act="cambio" data-mig-id="' + id + '">Pedir un cambio (hotel, zona…)</button>'
+    + '</div>'
+    + '<div data-mig-panel="datos" style="display:none;margin-top:10px">'
+    +   '<label style="' + lbl + '">Nombre completo</label><input data-f="nombre" maxlength="80" style="' + inp + '" value="' + escapeHtml(t.nombre || '') + '">'
+    +   '<label style="' + lbl + '">WhatsApp (10 dígitos)</label><input data-f="celular" inputmode="numeric" maxlength="14" style="' + inp + '" value="' + escapeHtml(t.celular || '') + '">'
+    +   '<label style="' + lbl + '">Talla de playera (de hombre)</label><select data-f="talla_playera" style="' + inp + '">' + tallas + '</select>'
+    +   '<label style="' + lbl + '">Contacto de emergencia (nombre)</label><input data-f="emergencia_nombre" maxlength="80" style="' + inp + '" value="' + escapeHtml(t.emergencia_nombre || '') + '">'
+    +   '<label style="' + lbl + '">Número de emergencia (10 dígitos, de otra persona)</label><input data-f="num_emergencia" inputmode="numeric" maxlength="14" style="' + inp + '" value="' + escapeHtml(t.num_emergencia || '') + '">'
+    +   '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="guardar" data-mig-id="' + id + '">Guardar</button>'
+    +   '<div data-mig-msg style="font-size:12px;margin-top:6px"></div>'
+    + '</div>'
+    + '<div data-mig-panel="cambio" style="display:none;margin-top:10px">'
+    +   '<div style="font-size:12px;opacity:.75;margin-bottom:8px">Los cambios de hotel, zona o fecha pueden mover el precio: el equipo los revisa y te contacta por WhatsApp.</div>'
+    +   '<label style="' + lbl + '">¿Qué quieres cambiar?</label><select data-c="tipo" style="' + inp + '"><option value="">— elige —</option><option value="hotel">Habitación / hotel</option><option value="zona">Zona</option><option value="fecha">Fecha</option><option value="otro">Otra cosa</option></select>'
+    +   '<label style="' + lbl + '">Cuéntanos el cambio</label><textarea data-c="detalle" maxlength="600" rows="3" style="' + inp + '"></textarea>'
+    +   '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="pedir" data-mig-id="' + id + '">Enviar solicitud</button>'
+    +   '<div data-mig-msg style="font-size:12px;margin-top:6px"></div>'
+    + '</div>'
+    + '</div>';
+}
+// Delegación (el script del Portal es MÓDULO: un onclick no vería estas funciones).
+document.addEventListener('click', (ev) => {
+  const b = ev.target && ev.target.closest && ev.target.closest('[data-mig-act]');
+  if (!b) return;
+  const id = b.getAttribute('data-mig-id'), act = b.getAttribute('data-mig-act');
+  if (act === 'datos' || act === 'cambio') _migAbrir(id, act);
+  else if (act === 'guardar') _migGuardar(id);
+  else if (act === 'pedir') _migPedir(id);
+});
+function _migCard(id){ return document.querySelector('[data-mig-viajero="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }
+function _migAbrir(id, cual){
+  const c = _migCard(id); if (!c) return;
+  c.querySelectorAll('[data-mig-panel]').forEach((p) => {
+    p.style.display = (p.getAttribute('data-mig-panel') === cual && p.style.display === 'none') ? '' : 'none';
+  });
+}
+async function _migPost(body){
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session || !session.access_token) return { ok: false, error: 'Tu sesión venció: entra otra vez' };
+  const r = await fetch('/.netlify/functions/portal-viajero', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify(body),
+  });
+  return r.json().catch(() => ({ ok: false, error: 'Sin respuesta' }));
+}
+function _migMsg(panel, txt, bien){ const m = panel && panel.querySelector('[data-mig-msg]'); if (m) { m.textContent = txt; m.style.color = bien ? '#88ea4e' : '#ff6b7a'; } }
+async function _migGuardar(id){
+  const c = _migCard(id); if (!c) return;
+  const p = c.querySelector('[data-mig-panel="datos"]');
+  const campos = {};
+  p.querySelectorAll('[data-f]').forEach((el) => { campos[el.getAttribute('data-f')] = el.value; });
+  if (!campos.emergencia_nombre) delete campos.emergencia_nombre;
+  if (!campos.talla_playera) return _migMsg(p, 'Elige tu talla de playera');
+  _migMsg(p, 'Guardando…', true);
+  try {
+    const j = await _migPost({ accion: 'editar', viajero_id: id, campos });
+    if (j && j.ok) { _migMsg(p, '✓ Guardado. El equipo ya lo ve en tu registro.', true); setTimeout(renderPlanMigrado, 1200); }
+    else _migMsg(p, (j && j.error) || 'No se pudo guardar');
+  } catch (e) { _migMsg(p, 'No se pudo guardar. Revisa tu conexión.'); }
+}
+async function _migPedir(id){
+  const c = _migCard(id); if (!c) return;
+  const p = c.querySelector('[data-mig-panel="cambio"]');
+  const tipo = p.querySelector('[data-c="tipo"]').value;
+  const detalle = p.querySelector('[data-c="detalle"]').value.trim();
+  if (!tipo) return _migMsg(p, 'Elige qué quieres cambiar');
+  if (detalle.length < 3) return _migMsg(p, 'Cuéntanos qué cambio necesitas');
+  _migMsg(p, 'Enviando…', true);
+  try {
+    const j = await _migPost({ accion: 'solicitar_cambio', viajero_id: id, tipo, detalle });
+    if (j && j.ok) { _migMsg(p, '✓ Solicitud enviada. Te contactamos por WhatsApp.', true); p.querySelector('[data-c="detalle"]').value = ''; }
+    else _migMsg(p, (j && j.error) || 'No se pudo enviar');
+  } catch (e) { _migMsg(p, 'No se pudo enviar. Revisa tu conexión.'); }
 }
 
 // [portal-v1] Clasifica _toursCache en próximos/pasados, pinta stats + pestaña activa.

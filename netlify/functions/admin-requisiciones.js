@@ -40,6 +40,9 @@ const ACCIONES = {
   detalle: ROLES_BANDEJA,
   aprobar: ROLES_BANDEJA,
   rechazar: ROLES_BANDEJA,
+  // [PORTAL-EDIT-1] las solicitudes de cambio que el cliente manda desde el Portal.
+  cambios_listar: ROLES_BANDEJA,
+  cambio_cerrar: ROLES_BANDEJA,
 };
 // [ACOMP-1] Eventos donde aprobar = dar acceso al Portal (puente + invitación).
 // Palabra de Memo (13-oct): «para los de Pa'l Norte, solo esos por el momento».
@@ -142,6 +145,46 @@ exports.handler = async (event) => {
     const rows = await r.json();
     const pend = rc.ok ? (await rc.json()).length : null; // null = no se pudo contar (no es 0)
     return j(200, headers, { ok: true, requisiciones: rows, pendientes: pend });
+  }
+
+  // ── [PORTAL-EDIT-1] solicitudes de cambio del Portal ─────────────────────
+  // NO cambian nada solas: el staff las ATIENDE (hace el cambio a mano en
+  // KameHouse y le confirma al cliente por WhatsApp) o las RECHAZA con motivo.
+  if (accion === 'cambios_listar') {
+    const cb = `${SB_URL}/rest/v1/cambios_viajero`;
+    const estado = String(body.estado || 'pendiente');
+    let q = `${cb}?select=*&order=creado_en.desc&limit=200`;
+    if (estado !== 'todas') q += `&estado=eq.${encodeURIComponent(estado)}`;
+    const r = await fetch(q, { headers: sbH });
+    if (!r.ok) return j(502, headers, { error: 'No se pudieron leer las solicitudes de cambio', detail: (await r.text()).slice(0, 300) });
+    const rows = await r.json();
+    // El WhatsApp y el paquete ACTUALES del viajero (para contestarle con su dato de hoy).
+    const ids = [...new Set(rows.map((x) => x.viajero_id))];
+    let vmap = {};
+    if (ids.length) {
+      const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto`, { headers: sbH });
+      if (rv.ok) (await rv.json()).forEach((v) => { vmap[v.id] = v; });
+    }
+    const pc = await fetch(`${cb}?select=id&estado=eq.pendiente&limit=500`, { headers: sbH });
+    const pendientes = pc.ok ? (await pc.json()).length : null;
+    return j(200, headers, { ok: true, cambios: rows.map((x) => Object.assign({}, x, { viajero: vmap[x.viajero_id] || null })), pendientes });
+  }
+  if (accion === 'cambio_cerrar') {
+    const cid = String(body.id || '');
+    if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });
+    const nuevo = String(body.estado || '');
+    if (nuevo !== 'atendida' && nuevo !== 'rechazada') return j(400, headers, { error: 'Estado inválido' });
+    const respuesta = String(body.respuesta || '').trim().slice(0, 500);
+    if (nuevo === 'rechazada' && respuesta.length < 3) return j(400, headers, { error: 'Di por qué no procede (el cliente lo va a preguntar)' });
+    const r = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&estado=eq.pendiente`, {
+      method: 'PATCH',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ estado: nuevo, respuesta: respuesta || null, atendida_por: quien, atendida_at: new Date().toISOString() }),
+    });
+    if (!r.ok) return j(502, headers, { error: 'No se pudo cerrar la solicitud', detail: (await r.text()).slice(0, 300) });
+    const rows = await r.json();
+    if (!rows.length) return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la cerró' });
+    return j(200, headers, { ok: true, cambio: rows[0] });
   }
 
   // Las tres restantes piden el id.

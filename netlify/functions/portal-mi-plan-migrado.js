@@ -111,7 +111,7 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,total_contrato,abonado_previo&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,total_contrato,abonado_previo&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
@@ -134,6 +134,14 @@ exports.handler = async (event) => {
     const tours = viajeros.map((v) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
       return {
+        // [PORTAL-EDIT-1] el id y los datos EDITABLES viajan para que el cliente
+        // los complete/corrija (portal-viajero vuelve a comprobar que son suyos).
+        viajero_id: v.id,
+        nombre: v.nombre || null,
+        celular: v.celular || null,
+        talla_playera: v.talla_playera || null,
+        num_emergencia: v.num_emergencia || null,
+        emergencia_nombre: v.emergencia_nombre || null,
         evento_id: v.evento_id,
         paquete: v.tipo_paquete || null,
         zona: v.zona_boleto || null,

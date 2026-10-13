@@ -315,6 +315,22 @@ está caduco antes de escribirse.
     aprobar viajan a cada viajero y el puente los lleva al Portal. Habitación y
     «compartida con» ya salen de la cotización y del grupo. `mide:acomp-1`
     **51**; navegador con CSP real: Pa'l Norte pide todo, un CHEAP normal no.
+  - **PORTAL-EDIT-1 (13-oct) · EL CLIENTE COMPLETA Y CORRIGE DESDE EL PORTAL.**
+    Reparto firmado por Memo: **datos → DIRECTO** a `viajeros_evento` (nombre,
+    WhatsApp, talla, emergencia; no mueven dinero) · **hotel/zona/fecha →
+    SOLICITUD** a `cambios_viajero` (tabla nueva, RLS deny-all, acta
+    `PORTAL-EDIT-1.sql`, ya corrida) que cae ARRIBA de la bandeja de
+    requisiciones; Bulma/Milk la atienden a mano y la cierran («Ya lo atendí» /
+    «No procede» con motivo). `portal-viajero` decide «suyo» por el correo
+    VERIFICADO del JWT en minúsculas (como `portal-mi-plan-migrado`): fila ajena
+    e inexistente contestan igual (404); contrato/zona/correo jamás se tocan
+    aunque el cuerpo los mande; sello `editado_portal_at`; tope 3 solicitudes
+    pendientes por viajero. El titular ve y edita las filas de sus acompañantes
+    que van a SU correo. 🔒 **El script del Portal es MÓDULO: botones por
+    delegación (`data-mig-act`), jamás `onclick`** — un onclick no vería las
+    funciones. Quien solo tiene tours de KameHouse ya no ve «Sin solicitudes /
+    Crea tu primer tour». `mide:portal-edit-1` **28**; navegador: faltantes,
+    error de emergencia, guardar y pedir cambio.
   - ⏳ **Primer envío real = la primera aprobación de palnorte tras el push.**
     Render visto en captura (`invitacion-palnorte.png`, fuera del repo) y pasa
     a Memo antes del push. Karina (R-RMZ5P) nació ANTES de ACOMP-1: al

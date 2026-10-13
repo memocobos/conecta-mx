@@ -44,6 +44,7 @@ async function _reqBdjCall(body) {
 
 async function loadRequisiciones(filtro) {
   if (filtro) _reqBdjFiltro = filtro;
+  try { loadCambiosPortal(); } catch (_) {}
   const cont = document.getElementById('req-bdj-lista');
   if (!cont) return;
   if (_reqBdjCargando) return;
@@ -68,6 +69,47 @@ async function loadRequisiciones(filtro) {
     return;
   }
   cont.innerHTML = _reqBdjRows.map(_reqBdjCard).join('');
+}
+
+// ── [PORTAL-EDIT-1] Solicitudes de cambio que el cliente manda desde el Portal ──
+// Viven ARRIBA de las requisiciones. No cambian nada solas: se atienden a mano
+// (el cambio se hace en el viajero) y se cierran aquí. Se calla en cero.
+async function loadCambiosPortal() {
+  const lista = document.getElementById('req-bdj-lista');
+  if (!lista) return;
+  let box = document.getElementById('req-cambios');
+  if (!box) { box = document.createElement('div'); box.id = 'req-cambios'; lista.parentNode.insertBefore(box, lista); }
+  const j = await _reqBdjCall({ accion: 'cambios_listar', estado: 'pendiente' }).catch((e) => ({ error: e.message }));
+  if (!j || !j.ok) { box.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:10px">No se pudieron leer las solicitudes de cambio del Portal: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`; return; }
+  const rows = j.cambios || [];
+  if (!rows.length) { box.innerHTML = ''; return; }
+  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro' };
+  box.innerHTML = `<div style="font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin:0 0 8px">Cambios pedidos desde el Portal · ${rows.length}</div>`
+    + rows.map((c) => {
+      const v = c.viajero || {};
+      const wa = String(v.celular || '').replace(/\D/g, '');
+      return `<div class="card" style="padding:12px 14px;margin-bottom:10px;border-left:3px solid var(--yellow, #e8ff4c)">
+        <div style="font-weight:800">${_reqBdjEsc(c.nombre || v.nombre || '—')} · ${_reqBdjEsc(c.evento_id)}</div>
+        <div style="font-size:12px;color:var(--ts);margin:2px 0 6px">${_reqBdjEsc(TIPO[c.tipo] || c.tipo)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        <div style="font-size:13px;margin-bottom:8px">«${_reqBdjEsc(c.detalle)}»</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${wa.length === 10 ? `<a class="btn btn-sm" target="_blank" rel="noopener" href="https://wa.me/52${wa}">WhatsApp</a>` : ''}
+          <button class="btn btn-sm" onclick="_reqCambioCerrar('${c.id}','atendida')">Ya lo atendí</button>
+          <button class="btn btn-sm" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
+        </div></div>`;
+    }).join('');
+}
+async function _reqCambioCerrar(id, estado) {
+  let respuesta = '';
+  if (estado === 'rechazada') {
+    respuesta = prompt('¿Por qué no procede? (el cliente lo va a preguntar)');
+    if (respuesta == null) return;
+  } else {
+    respuesta = prompt('Nota opcional (qué se cambió):') || '';
+  }
+  const j = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado, respuesta }).catch((e) => ({ error: e.message }));
+  if (j && j.ok) loadCambiosPortal();
+  else alert('No se pudo cerrar: ' + ((j && j.error) || 'sin respuesta'));
 }
 
 function _reqBdjCard(r) {

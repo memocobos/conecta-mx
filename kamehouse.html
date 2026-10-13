@@ -201,6 +201,9 @@
         PERMISOS_TABS — manda correo REAL (CORREOS_MODO 'real'), la pluma es
         de Memo. Nace cerrada para todos los demás, igual que la Nube. -->
    <button class="nav-dropdown-item" id="nav-blast" onclick="showHerramienta('blast')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Blast preventa</span></button>
+   <!-- [GENKIDAMA-1] El concentrado de correos y las campañas. Solo maestro_roshi:
+        manda correo REAL. Nace cerrada para los demás (PERMISOS_TABS). -->
+   <button class="nav-dropdown-item" id="nav-genkidama" onclick="showHerramienta('genkidama')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Genkidama</span></button>
   </div>
  </nav>
 
@@ -2815,6 +2818,20 @@
    </div>
  </div>
 
+ <!-- [GENKIDAMA-1] EL CONCENTRADO DE CORREOS · campañas por tandas con energía diaria -->
+ <div class="page" id="page-genkidama">
+   <div class="page-hero">
+    <div>
+     <div class="page-title">GENKIDAMA</div>
+     <div class="page-sub">// todos los correos en uno · campañas por tandas · la energía manda</div>
+    </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <button class="btn btn-ghost btn-sm" onclick="loadGenkidama()">↻ Refrescar</button>
+     </div>
+   </div>
+   <div id="gk-cont"><div class="loading-state">Cargando…</div></div>
+ </div>
+
  <!-- [PN27] EL BLAST DE PREVENTA · tandas de correo con bitácora, solo Memo -->
  <div class="page" id="page-blast">
    <div class="page-hero">
@@ -4182,6 +4199,8 @@
 <script src="kamehouse-nube.js"></script>
 <!-- [PN27] El blast de preventa — antes del tronco, misma regla. -->
 <script src="kamehouse-blast.js"></script>
+<!-- [GENKIDAMA-1] El concentrado y las campañas — antes del tronco, misma regla. -->
+<script src="kamehouse-genkidama.js"></script>
 <script src="kamehouse-requisiciones.js"></script>
 <script src="kamehouse-resumen.js"></script>
 <script src="kamehouse.js"></script>

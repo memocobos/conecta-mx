@@ -299,6 +299,14 @@ function extraerObj(contenido, id) {
       // siembra (select=correo — debe contestar). Dos caminos, una ruta.
       if (u.includes('/rest/v1/usuarios') && u.includes('select=correo')) { return { ok: true, status: 200, json: async () => [] }; }
       if (u.includes('/rest/v1/usuarios') || u.includes('sesion')) { throw new Error('sesion-viva truena a propósito (fail-open documentado: el rol del JWT manda)'); }
+      // [GENKIDAMA-1] El blast gasta la ENERGÍA del día (una sola para todo el
+      // correo masivo): la red falsa contesta el límite y lo enviado HOY.
+      if (u.includes('/rest/v1/genkidama_config')) return { ok: true, status: 200, json: async () => [{ limite_diario: 300 }] };
+      if (u.includes('/rest/v1/genkidama_envios')) return { ok: true, status: 200, json: async () => [], headers: { get: (h) => h === 'content-range' ? '0-0/0' : null }, text: async () => '' };
+      if (u.includes('/rest/v1/preventa_blast') && u.includes('enviado_at=gte.')) {
+        const hoy = filas.filter((f) => f.enviado_at).length;
+        return { ok: true, status: 200, json: async () => [], headers: { get: (h) => h === 'content-range' ? `0-0/${hoy}` : null }, text: async () => '' };
+      }
       if (u.includes('/rest/v1/preventa_blast')) {
         if (metodo === 'GET') {
           const pend = filas.filter((f) => !f.enviado_at && !f.error);

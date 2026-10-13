@@ -231,7 +231,15 @@ exports.handler = async (event) => {
       // 🔒 Dos gestos: sin confirmar:true no sale un correo (el peor caso de
       // un olvido es ver este 400, no un envío).
       if (body.confirmar !== true) return j(400, headers, { error: 'Enviar pide confirmar:true' });
-      const tope = Math.min(Math.max(1, Math.floor(Number(body.tope || TOPE_MAX))), TOPE_MAX);
+      // [GENKIDAMA-1] La energía del día es UNA para todo el correo masivo del
+      // dominio: este blast la gasta igual que Genkidama.
+      let enRest = TOPE_MAX;
+      try {
+        const en = await require('./_lib/genkidama').energia({ KH_URL, KH_KEY });
+        if (en.restante <= 0) return j(429, headers, { error: `Sin energía por hoy: ya salieron ${en.enviados_hoy} de ${en.limite} (Genkidama + blast). Mañana se recarga.` });
+        enRest = en.restante;
+      } catch (e) { return j(502, headers, { error: 'No pude leer la energía del día (Genkidama): no se manda a ciegas', detail: e.message }); }
+      const tope = Math.min(Math.max(1, Math.floor(Number(body.tope || TOPE_MAX))), TOPE_MAX, enRest);
       const r = await fetch(`${BL}?select=id,correo,nombre,caliente&campana=eq.${CAMPANA}&enviado_at=is.null&error=is.null&order=caliente.desc,creado_at.asc&limit=${tope}`, { headers: khH });
       if (!r.ok) return j(502, headers, { error: 'KH rechazó la lectura de pendientes', detail: await r.text() });
       const cola = await r.json();

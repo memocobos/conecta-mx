@@ -361,6 +361,30 @@ está caduco antes de escribirse.
     pegar otro lo reemplaza, sin DELETE. Sale en el correo único (bloque verde,
     solo si hay link) y en el Portal (una vez por evento, al dueño verificado).
     `mide:confirma-1` **28** (bloque [G]).
+  - **GENKIDAMA-1 (13-oct) · EL CONCENTRADO DE CORREOS Y SUS CAMPAÑAS.** Palabra
+    de Memo: «un concentrado de todos los correos de todos lados (eliminar
+    repetidos)… wizard tour, fecha, código, slogan, 4 tipos de correos… y un
+    visualizador de energía: hoy puedes enviar 300 de 1800». Herramienta
+    **Genkidama** (solo maestro_roshi), evolución del blast de PN27 con sus
+    mismas puertas. Tablas en KH con RLS deny-all (acta `migraciones/
+    GENKIDAMA-1.sql`, ya corrida): `genkidama_contactos` (correo PK en
+    minúsculas = el dedup lo hace la base; `baja_at`, jamás DELETE) ·
+    `genkidama_campanas` · `genkidama_envios` (UNIQUE campaña+correo, bitácora
+    DESPUÉS del envío) · `genkidama_config` (el límite diario, lo fija Memo).
+    `_lib/genkidama` es el dueño de la ENERGÍA (enviados HOY en Reynosa —
+    `America/Matamoros`, el corte se mueve solo en invierno— de Genkidama **y**
+    del blast PN27: un dominio, un presupuesto; el blast también se detiene sin
+    energía), de la PROMESA (CONSUELO-VERDAD: se lee el index SERVIDO al
+    ensayar, al crear y en CADA tanda — evento a la venta, código vivo y válido
+    para ese tour, y el slogan no puede prometer otro monto que el del código)
+    y de las 4 plantillas (Promoción · Descuento · Código · Últimos lugares;
+    vigencia y exclusiones derivadas del PROMOS, con el año cuando no es el
+    actual). La siembra junta viajeros (prioridad 1), requisiciones, waitlist,
+    Portal, blast PN27, giveaway y melanie, sin staff ni inválidos, re-corrible.
+    La audiencia excluye a quien YA va a ese tour; **una persona recibe máximo
+    un correo masivo por día** (si no, espera a mañana sin perderse). Medido el
+    13-oct: ~1,800 únicos. `mide:genkidama-1` **39** · `mide:preventa-pn27`
+    **60** (su red falsa aprendió la energía).
   - **PERFIL-CARRERA-1 (13-oct):** el Portal corría `cargarClienteYRutear` dos
     veces a la vez; la tardía trataba como NUEVA a quien la otra ya había
     enlazado, y el guardado chocaba con `clientes_auth_user_id_key` (Linda,

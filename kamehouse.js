@@ -83,7 +83,7 @@ const PERMISOS_TABS = {
   // todos la pueden ver; a quién ATERRIZA ahí lo decide HOME_PREFERIDO.
   // [PN27] `blast` manda correo REAL por tandas: SOLO maestro_roshi. Bulma y
   // Milk NO lo llevan a propósito — la pluma del blast es de Memo.
-  maestro_roshi: ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast'],
+  maestro_roshi: ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
@@ -4711,6 +4711,10 @@ function showHerramienta(name) {
   // [PN27] El blast de preventa: poner el botón no es poner la pantalla.
   if (name === 'blast') {
     loadBlast();
+  }
+  // [GENKIDAMA-1] poner el botón no es poner la pantalla.
+  if (name === 'genkidama') {
+    loadGenkidama();
   }
   // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
   // Si el admin sale de cualquier herramienta, paramos los timers del Radar.

@@ -249,6 +249,14 @@ está caduco antes de escribirse.
     la puerta del cliente en navegador real + regresión de otro evento en la
     misma visita (etiquetas restauradas). 🔒 **La lección: se verifica en
     navegador ANTES del publish que dispara correos, no después.**
+  - 🔴 **REQ-FOTO-1 (13-oct): NINGUNA foto se podía subir en la requisición.**
+    `_reqArchivoB64` abría la foto con `URL.createObjectURL` (un `blob:`) y el
+    CSP de netlify.toml dice `img-src 'self' data: https:` — sin `blob:`. Toda
+    foto caía en «Esa imagen no se pudo abrir». REQ-B1 se «verificó en
+    navegador» SIN subir una foto: el camino del archivo nunca se ejercitó. Hoy
+    lee por FileReader→data: (permitido). Careado en navegador real CON el CSP
+    de producción servido: BASE reproduce el error de Memo, HEAD envía. 🔒 **Un
+    careo de pantalla corre con el CSP real, o mide un sitio que no existe.**
   - ⏳ **Pendientes:** push + publish de Memo · requisición de prueba suya
     (rechazarla en bandeja) · verificación en navegador contra producción
     (tira sin fecha, ficha $300, mide:tira-agotados en su Mac — aquí falta

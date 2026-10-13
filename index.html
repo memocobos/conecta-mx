@@ -6738,22 +6738,32 @@ function _reqArchivoB64(file){
       r.readAsDataURL(file);
       return;
     }
-    if(!/^image\//.test(file.type||''))return rej(new Error('Sube una foto (JPG/PNG) o un PDF'));
-    var url=URL.createObjectURL(file);
-    var img=new Image();
-    img.onload=function(){
-      try{
-        var MAX=1600,w=img.naturalWidth,h=img.naturalHeight;
-        var esc=Math.min(1,MAX/Math.max(w,h));
-        var c=document.createElement('canvas');
-        c.width=Math.max(1,Math.round(w*esc));c.height=Math.max(1,Math.round(h*esc));
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        URL.revokeObjectURL(url);
-        res(c.toDataURL('image/jpeg',.85));
-      }catch(e){URL.revokeObjectURL(url);rej(new Error('No se pudo procesar tu foto'));}
+    // [REQ-FOTO-1] 🔴 ANTES: URL.createObjectURL → un `blob:` que el CSP del
+    // sitio (img-src 'self' data: https:) NO permite — TODA foto caía en
+    // «Esa imagen no se pudo abrir». Lo cazó Memo con su requisición de
+    // prueba (13-oct). Ahora se lee como data: (que el CSP sí permite).
+    // ⚠️ El tipo vacío pasa: algunos celulares no lo mandan.
+    if(file.type&&!/^image\//.test(file.type))return rej(new Error('Sube una foto (JPG/PNG) o un PDF'));
+    if(file.size>15*1024*1024)return rej(new Error('La foto pesa demasiado. Mándanos una captura de pantalla del comprobante.'));
+    var fr=new FileReader();
+    fr.onerror=function(){rej(new Error('No se pudo leer tu foto'));};
+    fr.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var MAX=1600,w=img.naturalWidth,h=img.naturalHeight;
+          var esc=Math.min(1,MAX/Math.max(w,h));
+          var c=document.createElement('canvas');
+          c.width=Math.max(1,Math.round(w*esc));c.height=Math.max(1,Math.round(h*esc));
+          c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+          res(c.toDataURL('image/jpeg',.85));
+        }catch(e){rej(new Error('No se pudo procesar tu foto'));}
+      };
+      // HEIC u otro formato que el navegador no sabe abrir: se dice qué hacer.
+      img.onerror=function(){rej(new Error('Ese formato de foto no se pudo abrir. Toma una captura de pantalla del comprobante y súbela.'));};
+      img.src=String(fr.result||'');
     };
-    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('Esa imagen no se pudo abrir'));};
-    img.src=url;
+    fr.readAsDataURL(file);
   });
 }
 function _reqMsg(t,esError){

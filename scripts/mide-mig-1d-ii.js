@@ -49,7 +49,7 @@ const BASE = process.env.BASE || '09ac540';       // el merge de CONCILIA-1
 // commit de rama sobrevive al borrado de la rama (el objeto queda alcanzable desde
 // el merge) pero apunta a un árbol que NADIE corre — su verde habla de un estado
 // intermedio que nunca fue main.
-const HEAD_SHA = process.env.HEAD_SHA || 'ee98b57';   // el MERGE de PLAN-CASE-1
+const HEAD_SHA = process.env.HEAD_SHA || 'ede0c13';   // ACOMP-1: el envío y el puente se mudaron a libs compartidas (re-anclado)
 // Y el MEDIDOS de abajo gana un archivo por lo mismo: el lector del Portal es
 // ahora parte de lo que este arnés afirma (el testigo de PLAN-CASE-1).
 
@@ -351,7 +351,13 @@ function limpiar(dir) {
   // forma, el cliente se registra y el Portal no lo reconoce — y eso se vería
   // como un problema del cliente.
   console.log('\n[F] el flujo entero cierra por la MISMA llave');
-  const srcPuente = fs.readFileSync(path.join(h.dir, 'netlify/functions/admin-portal-puente.js'), 'utf8');
+  // [ACOMP-1] El puente se MUDÓ a _lib/puente-portal (lo comparten el botón y
+  // la aprobación de requisiciones). Se leen los dos: en commits viejos el lib
+  // no existe y la lógica vive en el handler — el arnés se actualiza a la
+  // verdad nueva sin perder la vieja.
+  const libPuente = path.join(h.dir, 'netlify/functions/_lib/puente-portal.js');
+  const srcPuente = fs.readFileSync(path.join(h.dir, 'netlify/functions/admin-portal-puente.js'), 'utf8')
+    + (fs.existsSync(libPuente) ? fs.readFileSync(libPuente, 'utf8') : '');
   const srcRecl = fs.readFileSync(path.join(h.dir, 'netlify/functions/portal-reclamar-cuenta.js'), 'utf8');
   const srcPlan = fs.readFileSync(path.join(h.dir, 'netlify/functions/portal-mi-plan-migrado.js'), 'utf8');
   const srcLib = fs.readFileSync(path.join(h.dir, 'netlify/functions/_lib/invitacion-portal.js'), 'utf8');

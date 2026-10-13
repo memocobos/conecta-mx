@@ -5127,6 +5127,10 @@ function showDetail(id, _skipHistory){
     var _itinCard=document.getElementById('d-itin-card');
     if(_itinCard) _itinCard.style.display = itinerarioDe(cur) ? '' : 'none';
   }catch(e){}
+  // [PN27-PAQ-2] Las etiquetas de la preventa (barra de progreso incluida) se
+  // ponen/restauran AL ABRIR la ficha, no solo al elegir viajeros: la barra se
+  // ve desde el primer momento.
+  try{ _pkgPreventaEtiquetas(document.getElementById('btn-cheap'), _esPreventaCiegas(cur)); }catch(e){}
   // [NUBE-2] Se pide la cotización viva AL ABRIR EL CARD, no al llegar al paso
   // del transporte: entre una cosa y otra hay cuatro clics (viajeros, paquete,
   // zona, habitación), así que llega con tiempo. Y si no llega, el paso se
@@ -5391,6 +5395,13 @@ function _pkgPreventaEtiquetas(cheapBtn, preventa){
     if(nm)nm.textContent=preventa?'PREVENTA A CIEGAS':nm.getAttribute('data-orig');
     if(tg)tg.textContent=preventa?'Aparta tu lugar':tg.getAttribute('data-orig');
     if(dsT&&dsT.nodeType===3)dsT.nodeValue=preventa?'Separo único ':ds.getAttribute('data-orig');
+  }
+  // [PN27-PAQ-2] El paso 2 de la barra de progreso dice «Zona» y en la
+  // preventa no se elige zona: dice «Separo». Mismo guardar/restaurar.
+  var stZona=document.querySelector('#wiz-progress .wiz-progress-step[data-step="2"] .wiz-progress-lbl');
+  if(stZona){
+    if(stZona.getAttribute('data-orig')==null)stZona.setAttribute('data-orig',stZona.textContent);
+    stZona.textContent=preventa?'Separo':stZona.getAttribute('data-orig');
   }
   if(lbl&&lbl.nodeType===3){
     if(lblBox.getAttribute('data-orig')==null)lblBox.setAttribute('data-orig',lbl.nodeValue);
@@ -7141,6 +7152,12 @@ function itinClase(ev){
   return '';
 }
 function itinerarioDe(ev){
+  // [PN27-PAQ-2] Palabra de Memo (13-oct): en la preventa a ciegas NO hay
+  // viaje definido todavía (1, 2 o 3 días se eligen después), así que la
+  // plantilla de Monterrey describiría un itinerario que nadie compró. Sin
+  // itinerario el card se esconde solo (CARD-ITIN-1) y «Ver itinerario» no abre.
+  // Se apaga solo cuando la ficha deje de ser preventa (zona única).
+  if(_esPreventaCiegas(ev))return '';
   var c=itinClase(ev);
   if(c==='propio')return String(ev.itinerario);
   if(c==='cdmx')return itinCdmx(ev);

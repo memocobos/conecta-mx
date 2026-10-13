@@ -2323,6 +2323,14 @@ $('#form-profile').addEventListener('submit', async (e) => {
   const payload = recolectarPerfil(user);
 
   let resp;
+  // [PERFIL-CARRERA-1] Segundo candado, en el guardado: si la pantalla cree que
+  // no hay perfil pero la base ya tiene uno con este auth_user_id, se ACTUALIZA
+  // ése. Un INSERT aquí solo puede chocar con la llave única.
+  if (!perfilExistente){
+    const { data: yaExiste } = await supabase
+      .from('clientes').select('*').eq('auth_user_id', user.id).maybeSingle();
+    if (yaExiste) perfilExistente = yaExiste;
+  }
   if (perfilExistente){
     // No mando campos inmutables — los protege el trigger pero por higiene
     const { correo, auth_user_id, ...patch } = payload; // eslint-disable-line no-unused-vars
@@ -2485,6 +2493,31 @@ async function cargarClienteYRutear(session){
         }
         return;
       }
+    }
+    // [PERFIL-CARRERA-1] Antes de declararla «nueva», se RELEE: el Portal corre
+    // esta función dos veces a la vez (arranque + onAuthStateChange) y la otra
+    // pudo haber enlazado su walk-in mientras ésta esperaba. Sin esta relectura
+    // el formulario quedaba en modo «crear» y el guardado chocaba con
+    // clientes_auth_user_id_key (caso real: 13-oct, primera clienta de palnorte).
+    const { data: dataTarde } = await supabase
+      .from('clientes').select('*')
+      .eq('auth_user_id', session.user.id).maybeSingle();
+    if (dataTarde){
+      perfilExistente = dataTarde;
+      if (_perfilIncompleto(dataTarde)){
+        prellenarPerfil(dataTarde);
+        $('#btn-cancel-profile').style.display = 'none';
+        showView('profile');
+      } else {
+        renderDashboard(dataTarde);
+        showView('dashboard');
+        renderToursList();
+        renderMisViajesAcomp();
+        loadContratosEstado();
+        _procesarInvitacionPendiente(session);
+        _procesarReservaPendiente();
+      }
+      return;
     }
     // Flujo normal: crear perfil nuevo.
     perfilExistente = null;

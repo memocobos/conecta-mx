@@ -271,6 +271,43 @@ está caduco antes de escribirse.
     con su palabra tanda por tanda · los emojis/acentos del copy viven en el
     CORREO (el `inc` del sitio va sobrio a propósito).
 
+- 👥⏳ **ACOMP-1 · ACOMPAÑANTES EN LA REQUISICIÓN + PORTAL AL APROBAR
+  (13-oct-2026). ⏳ EN EL ÁRBOL LOCAL, PENDIENTE PUSH DE MEMO; el SQL
+  (`migraciones/ACOMP-1.sql`, columna `requisiciones.acompanantes jsonb` +
+  CHECK de arreglo) YA CORRIÓ.** Nació de la primera venta real (Karina, 3
+  lugares). Palabra de Memo: *«que Karina llene los datos al momento… si mete el
+  mismo correo para todos toda la info le llega a ella, pero si quiere modificar
+  el correo para que le llegue a otra persona que tenga esa opción»*. Opciones
+  elegidas: datos AL RESERVAR · invitaciones SOLAS al aprobar · pago REPARTIDO.
+  `npm run mide:acomp-1` (**39**, sin ancla — árbol de trabajo).
+  - **El index:** con 2+ viajeros el formulario pide un renglón por acompañante
+    (nombre + correo); el correo copia en vivo el del titular SALVO los editados
+    a mano (`data-propio`). El correo del titular pasa a OBLIGATORIO en la
+    pantalla y en el servidor (ahí llega su acceso). Probado en navegador real
+    con el CSP de producción: copia, edición, rechazo sin nombre, payload, y 1
+    persona sin sección.
+  - **El servidor:** `acompanantes` es OPCIONAL a propósito — una página vieja en
+    caché que no lo manda nace igual (NULL = camino de siempre). Si viene, largo
+    exacto N−1, nombre ≥2, correo vacío → el del titular, en minúsculas.
+  - **Aprobar con acompañantes:** nace UN viajero por persona (1 boleto c/u,
+    titular primero), contrato y abono REPARTIDOS AL PESO (residuo al titular),
+    cada abono con su comprobante y la nota «pagado por {titular} (i de N)». Sin
+    acompañantes, o con una lista que no casa: un viajero con N boletos, como
+    siempre — nadie se inventa. 207 si fallan los abonos, cero DELETEs.
+  - **El Portal al aprobar, SOLO en `PORTAL_AL_APROBAR=['palnorte']`** (palabra
+    de Memo): puente + invitación por las MISMAS libs que los botones
+    (`_lib/puente-portal` extraída de admin-portal-puente; `enviarInvitaciones`
+    en `_lib/invitacion-portal`, usada también por admin-portal-invitar). Una
+    invitación por CORREO, no por persona; bitácora después del envío; quien ya
+    fue invitada no recibe otro. 🔒 **Nunca deshace la aprobación**: sin llaves,
+    sin bitácora o sin catálogo, aprueba igual y la bandeja DICE por qué no se
+    invitó. La invitación de palnorte dice «Por confirmar» (sin fecha, careado).
+  - ⏳ **Primer envío real = la primera aprobación de palnorte tras el push.**
+    Render visto en captura (`invitacion-palnorte.png`, fuera del repo) y pasa
+    a Memo antes del push. Karina (R-RMZ5P) nació ANTES de ACOMP-1: al
+    aprobarla sale un viajero de 3 boletos + su invitación; sus acompañantes se
+    capturan a mano.
+
 - 🏆🔒 **SALDOS-CAJA-1 · LA CAJA ARRANCA DEL BANCO REAL (12-oct-2026, noche).
   ⏳ CÓDIGO EN EL ÁRBOL LOCAL, PENDIENTE PUSH DE MEMO; los asientos en la base
   YA VIVEN.** Luz verde citada: *«confío en ti haz lo que creas mejor para

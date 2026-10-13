@@ -6689,7 +6689,11 @@ function _reqPintar(){
     '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 10px">Sube tu comprobante y el equipo te confirma por WhatsApp. Sin cuentas ni contraseñas.</div>'+
     '<input type="text" id="req-nombre" placeholder="Tu nombre completo *" maxlength="80" style="'+inp+'">'+
     '<input type="tel" id="req-celular" placeholder="Tu WhatsApp (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
-    '<input type="email" id="req-correo" placeholder="Tu correo (opcional)" maxlength="120" style="'+inp+'">'+
+    '<input type="email" id="req-correo" placeholder="Tu correo * (ahí te llega tu acceso)" maxlength="120" style="'+inp+'">'+
+    // [ACOMP-1] Un renglón por acompañante (nombre + correo). Palabra de Memo:
+    // el correo viene con el del titular (toda la info le llega a ella) y se
+    // puede cambiar para que le llegue a esa persona.
+    _reqAcompHtml(inp)+
     '<div style="font-family:Montserrat,sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:4px 0 6px">¿Cómo pagaste? *</div>'+
     '<div id="req-formas" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></div>'+
     '<div id="req-file-wrap" style="display:none">'+
@@ -6710,12 +6714,49 @@ function _reqPintar(){
     b.onclick=function(){_reqForma(f[0]);};
     fw.appendChild(b);
   });
+  // [ACOMP-1] Mientras el titular escribe su correo, los de sus acompañantes
+  // lo siguen — SALVO los que ya se editaron a mano (data-propio).
+  var rc=document.getElementById('req-correo');
+  if(rc)rc.oninput=function(){
+    var v=rc.value.trim();
+    Array.prototype.forEach.call(document.querySelectorAll('.req-acomp-correo'),function(x){
+      if(x.getAttribute('data-propio')!=='1')x.value=v;
+    });
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('.req-acomp-correo'),function(x){
+    x.oninput=function(){x.setAttribute('data-propio','1');};
+  });
   var fi=document.getElementById('req-file');
   if(fi)fi.onchange=function(){
     _reqEstado.archivo=(fi.files&&fi.files[0])||null;
     var l=document.getElementById('req-file-lbl');
     if(l)l.textContent=_reqEstado.archivo?('✓ '+_reqEstado.archivo.name.slice(0,34)+' — toca para cambiar'):'📎 Subir foto de tu comprobante *';
   };
+}
+// [ACOMP-1] Los acompañantes: uno por persona ADEMÁS de quien paga (selViaj−1).
+// Función DECLARADA (ley del hoisting de la serie CARDS).
+function _reqAcompHtml(inp){
+  var n=Math.max(0,(selViaj||1)-1);
+  if(!n)return '';
+  var h='<div style="font-family:Montserrat,sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:6px 0 4px">Tus acompañantes *</div>'+
+    '<div style="font-family:Montserrat,sans-serif;font-size:10.5px;color:rgba(255,255,255,.6);line-height:1.45;margin:0 0 8px">A cada correo le llega su acceso para ver su lugar y completar sus datos. Si dejas tu correo, todo te llega a ti.</div>';
+  for(var i=1;i<=n;i++){
+    h+='<div style="border-left:2px solid rgba(232,255,76,.4);padding-left:8px;margin:0 0 6px">'+
+      '<input type="text" class="req-acomp-nombre" placeholder="Nombre completo del acompañante '+i+' *" maxlength="80" style="'+inp+'">'+
+      '<input type="email" class="req-acomp-correo" placeholder="Correo del acompañante '+i+'" maxlength="120" style="'+inp+'">'+
+      '</div>';
+  }
+  return h;
+}
+function _reqAcompLeer(){
+  var titular=((document.getElementById('req-correo')||{value:''}).value||'').trim();
+  var ns=document.querySelectorAll('.req-acomp-nombre'), cs=document.querySelectorAll('.req-acomp-correo');
+  var out=[];
+  for(var i=0;i<ns.length;i++){
+    var c=((cs[i]&&cs[i].value)||'').trim()||titular;
+    out.push({nombre:ns[i].value.trim(),correo:c});
+  }
+  return out;
 }
 function _reqForma(f){
   _reqEstado.forma=f;
@@ -6783,6 +6824,12 @@ function _reqEnviar(){
   var correo=(document.getElementById('req-correo')||{value:''}).value.trim();
   if(nombre.length<2)return _reqMsg('Escribe tu nombre completo',true);
   if(cel.length!==10)return _reqMsg('Tu WhatsApp va a 10 dígitos, sin lada de país',true);
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))return _reqMsg('Escribe tu correo: ahí te llega tu acceso para ver tu plan',true);
+  var acomp=_reqAcompLeer();
+  for(var ai=0;ai<acomp.length;ai++){
+    if(acomp[ai].nombre.length<2)return _reqMsg('Escribe el nombre completo del acompañante '+(ai+1),true);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acomp[ai].correo))return _reqMsg('Revisa el correo del acompañante '+(ai+1),true);
+  }
   if(!_reqEstado.forma)return _reqMsg('Elige cómo pagaste',true);
   if(_reqEstado.forma!=='link_pago'&&!_reqEstado.archivo)return _reqMsg('Sube la foto de tu comprobante',true);
   var btn=document.getElementById('req-enviar');
@@ -6800,6 +6847,7 @@ function _reqEnviar(){
       transporte:selTransporte?(selTransporte.n+(selTransporte.cost?(' $'+selTransporte.cost):'')):null,
       cotizacion_texto:_lastCotizacion||'',
       nombre:nombre,celular:cel,correo:correo,
+      acompanantes:acomp.length?acomp:undefined,
       forma_pago:_reqEstado.forma,
       comprobante_base64:b64||''
     };

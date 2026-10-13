@@ -157,4 +157,58 @@ function renderInvitacion({ nombre, correo, ev }) {
   return { subject, html, to: k };
 }
 
-module.exports = { aQuienInvitar, renderInvitacion, escapeHtml, PORTAL_URL };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// enviarInvitaciones — EL ENVÍO, con un dueño (ACOMP-1, 13-oct-2026). Se mudó
+// de admin-portal-invitar TAL CUAL para que la bandeja (al aprobar) mande
+// exactamente lo mismo que el botón. 🔒 Bitácora `invitaciones_portal` se
+// asienta DESPUÉS de cada envío, una por una (MIG-1d-ii): asentar antes
+// marcaría como invitado a quien no recibió nada. Si el asiento falla, se
+// REPORTA — el correo ya salió y el próximo clic se lo mandaría otra vez.
+// lista: [{ correo, nombre, portal_cliente_id }] (salida de aQuienInvitar).
+// ─────────────────────────────────────────────────────────────────────────────
+const FROM_INVITACION = 'Conecta Reynosa <admin@conectareynosa.mx>';
+async function enviarInvitaciones({ lista, ev, evento_id, KH_URL, KH_KEY, RESEND_KEY, enviado_por }) {
+  const FROM = FROM_INVITACION;
+  const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY, 'Content-Type': 'application/json' };
+  const auth = { user: { correo: enviado_por || null } };
+  const quien = { invitar: Array.isArray(lista) ? lista : [] };
+  const enviados = [], errores = [];
+  for (const p of quien.invitar) {
+    const r = renderInvitacion({ nombre: p.nombre, correo: p.correo, ev });
+    if (r.error) { errores.push({ correo: p.correo, paso: 'render', detail: r.error }); continue; }
+    // ⚠️ El desvío de modo prueba se aplica JUSTO antes del body, sobre el
+    // destinatario ya resuelto — como en todos los emisores de la casa.
+    const { aplicarModoPrueba } = require('./correo-guard');
+    const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
+    let resp;
+    try {
+      resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: FROM, to: mp.to, subject: mp.subject, html: r.html }),
+      });
+    } catch (e) { errores.push({ correo: p.correo, paso: 'resend', detail: e.message }); continue; }
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { errores.push({ correo: p.correo, paso: 'resend', status: resp.status, detail: data }); continue; }
+    // 🔒 LA BITÁCORA SE ASIENTA **DESPUÉS** DEL ENVÍO, UNA POR UNA. Asentar
+    // antes dejaría a alguien marcado como invitado sin haber recibido nada —
+    // y el candado de idempotencia le cerraría la puerta para siempre, en
+    // silencio. Si el asiento falla, se REPORTA: el correo ya salió y eso no
+    // se deshace, así que el humano tiene que saber que la bitácora quedó
+    // corta o el próximo clic se lo manda otra vez.
+    const aR = await fetch(`${KH_URL}/rest/v1/invitaciones_portal`, {
+      method: 'POST', headers: { ...hKH, Prefer: 'return=representation' },
+      body: JSON.stringify({ evento_id, correo: p.correo, portal_cliente_id: p.portal_cliente_id,
+                             enviado_por: (auth.user || {}).correo || null, email_id: data.id || null }),
+    });
+    const asentado = aR.ok;
+    if (!asentado) errores.push({ correo: p.correo, paso: 'bitacora', detail: (await aR.text()).slice(0, 200),
+      aviso: 'EL CORREO YA SALIÓ pero no quedó asentado: el próximo clic se lo mandaría otra vez' });
+    enviados.push({ correo: p.correo, nombre: p.nombre, email_id: data.id || null, asentado });
+  }
+
+  return { enviados, errores };
+}
+
+module.exports = { aQuienInvitar, renderInvitacion, escapeHtml, PORTAL_URL, enviarInvitaciones };

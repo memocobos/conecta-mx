@@ -107,11 +107,14 @@ exports.handler = async (event) => {
   const celular = String(body.celular || '').replace(/\D/g, '');
   if (celular.length !== 10) return json(400, headers, { ok: false, error: 'Tu WhatsApp va a 10 dígitos, sin lada de país' });
 
-  let correo = String(body.correo || '').trim().toLowerCase().slice(0, 120);
-  if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-    return json(400, headers, { ok: false, error: 'Ese correo no se ve bien — revísalo o déjalo vacío' });
+  // [ACOMP-1] El correo del titular pasa a OBLIGATORIO: ahí le llega su
+  // acceso al Portal al aprobarse la requisición (palabra de Memo, 13-oct).
+  const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const correo = String(body.correo || '').trim().toLowerCase().slice(0, 120);
+  if (!correo) return json(400, headers, { ok: false, error: 'Escribe tu correo: ahí te llega tu acceso para ver tu plan' });
+  if (!RE_CORREO.test(correo)) {
+    return json(400, headers, { ok: false, error: 'Ese correo no se ve bien — revísalo' });
   }
-  if (!correo) correo = null;
 
   const forma_pago = String(body.forma_pago || '').trim();
   if (!FORMAS_PAGO.includes(forma_pago)) return json(400, headers, { ok: false, error: 'Elige cómo vas a pagar' });
@@ -124,6 +127,33 @@ exports.handler = async (event) => {
 
   const num_personas = Math.floor(Number(body.num_personas || 1));
   if (!(num_personas >= 1 && num_personas <= 20)) return json(400, headers, { ok: false, error: 'Número de viajeros inválido' });
+
+  // ── [ACOMP-1] Los acompañantes: uno por persona ADEMÁS del titular. Cada
+  // uno con nombre y correo; el correo vacío cae al del titular (así «toda la
+  // info le llega a ella», palabra de Memo). El largo tiene que cuadrar con
+  // num_personas — si no, la requisición no nace: repartir boletos sobre una
+  // lista que no cuadra inventaría personas.
+  // 🔒 OPCIONAL EN EL SERVIDOR, OBLIGATORIO EN EL FORMULARIO: un celular con
+  // la página VIEJA en caché no manda acompañantes (pasó el 13-oct con la
+  // foto) y no puede quedarse sin poder reservar. Sin la lista, la requisición
+  // nace como siempre (UN viajero con N boletos al aprobar).
+  let acompanantes = null;
+  if (num_personas > 1 && Array.isArray(body.acompanantes)) {
+    const lista = body.acompanantes;
+    if (lista.length !== num_personas - 1) {
+      return json(400, headers, { ok: false, error: `Faltan los datos de tus acompañantes: son ${num_personas - 1} además de ti` });
+    }
+    acompanantes = [];
+    for (let i = 0; i < lista.length; i++) {
+      const a = lista[i] || {};
+      const n = String(a.nombre || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+      if (n.length < 2) return json(400, headers, { ok: false, error: `Escribe el nombre completo del acompañante ${i + 1}` });
+      let c = String(a.correo || '').trim().toLowerCase().slice(0, 120);
+      if (!c) c = correo;
+      if (!RE_CORREO.test(c)) return json(400, headers, { ok: false, error: `El correo del acompañante ${i + 1} no se ve bien — revísalo` });
+      acompanantes.push({ nombre: n, correo: c });
+    }
+  }
 
   const zona = body.zona == null ? null : String(body.zona).trim().slice(0, 80) || null;
   const hotel = body.hotel == null ? null : String(body.hotel).trim().slice(0, 60) || null;
@@ -212,6 +242,7 @@ exports.handler = async (event) => {
     num_personas,
     hotel, transporte,
     nombre, celular, correo, forma_pago,
+    acompanantes,
     total_sistema: precio.total,
     separo_sistema: precio.separo,
     cotizacion_texto,

@@ -94,6 +94,10 @@ function _reqBdjCard(r) {
       <span>WhatsApp: <b style="color:var(--text)">${_reqBdjEsc(r.celular)}</b></span>
       ${r.correo ? `<span>Correo: <b style="color:var(--text)">${_reqBdjEsc(r.correo)}</b></span>` : ''}
     </div>
+    ${Array.isArray(r.acompanantes) && r.acompanantes.length ? `<div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Acompañantes (al aprobar nace un viajero por persona, el pago repartido)</div>
+      ${r.acompanantes.map((a, i) => `<div>${i + 1}. <b style="color:var(--text)">${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}</div>`).join('')}
+    </div>` : ''}
     ${r.cotizacion_texto ? `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:11px;color:var(--ts)">Ver la cotización que el cliente vio</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--ts);background:rgba(255,255,255,.04);padding:10px;border-radius:8px;margin:6px 0 0">${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
     ${r.estado === 'rechazada' && r.motivo_rechazo ? `<div style="font-size:12px;color:var(--red);margin-bottom:8px">Motivo: ${_reqBdjEsc(r.motivo_rechazo)}</div>` : ''}
     ${r.estado !== 'pendiente' && r.revisada_por ? `<div style="font-size:11px;color:var(--ts);margin-bottom:8px">Revisada por ${_reqBdjEsc(r.revisada_por)}${r.nota_staff ? ' · ' + _reqBdjEsc(r.nota_staff) : ''}</div>` : ''}
@@ -154,8 +158,14 @@ async function _reqBdjAprobar(id) {
   if (zonaEl) body.zona = zonaEl.value;
   const j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
   if (j && j.ok) {
-    if (msg) { msg.innerHTML = '✓ Viajero creado con su abono de ' + _reqBdjMxn(j.monto) + '. Confírmale al cliente por WhatsApp.'; msg.style.color = 'var(--green)'; }
-    setTimeout(() => loadRequisiciones(), 900);
+    // [ACOMP-1] Cuántos viajeros nacieron y qué pasó con el Portal — dicho, no supuesto.
+    const nv = Array.isArray(j.viajeros) ? j.viajeros.length : 1;
+    let txt = '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' con ' + _reqBdjMxn(j.monto) + ' cobrados. Confírmale al cliente por WhatsApp.';
+    const pt = j.portal;
+    if (pt && pt.ok) txt += ' · Portal: ' + (pt.invitados || []).length + ' invitación(es) enviada(s)' + ((pt.ya_invitados || []).length ? ', ' + pt.ya_invitados.length + ' ya tenían' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '');
+    else if (pt && pt.aviso) txt += ' · ⚠️ Portal: ' + pt.aviso;
+    if (msg) { msg.textContent = txt; msg.style.color = 'var(--green)'; }
+    setTimeout(() => loadRequisiciones(), pt ? 4000 : 900);
   } else {
     // El 207 trae instrucción exacta (viajero creado, abono no) — se enseña TAL CUAL.
     if (msg) { msg.textContent = (j && j.error) || 'No se pudo aprobar'; msg.style.color = 'var(--red)'; }

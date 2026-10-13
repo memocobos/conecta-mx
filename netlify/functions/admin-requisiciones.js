@@ -41,8 +41,62 @@ const ACCIONES = {
   aprobar: ROLES_BANDEJA,
   rechazar: ROLES_BANDEJA,
 };
+// [ACOMP-1] Eventos donde aprobar = dar acceso al Portal (puente + invitación).
+// Palabra de Memo (13-oct): «para los de Pa'l Norte, solo esos por el momento».
+const PORTAL_AL_APROBAR = ['palnorte'];
 const SIGN_EXPIRA = 60 * 60; // 1 hora, como admin-solicitud-comprobante
 const BUCKET = 'abonos-viajeros';
+
+// ── [ACOMP-1] El Portal al aprobar. Usa las MISMAS libs que los botones del
+// puente y de invitar (una sola fuente de «cómo entra alguien al Portal»).
+// Jamás lanza: devuelve un resumen que la bandeja pinta.
+async function portalAlAprobar({ req, nacidos, quien, SB_URL, SB_KEY }) {
+  const PT_URL = process.env.PORTAL_SUPABASE_URL;
+  const PT_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+  const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+  if (!PT_URL || !PT_KEY) return { ok: false, aviso: 'Faltan las llaves del Portal: no se invitó a nadie. Usa «Invitar al Portal» del evento cuando estén.' };
+  if (!RESEND_KEY) return { ok: false, aviso: 'Falta RESEND_API_KEY: no se mandó ninguna invitación.' };
+  const sbH = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+  const evento_id = String(req.evento_id).split('#')[0];
+  try {
+    const { puentearViajeros } = require('./_lib/puente-portal');
+    const { aQuienInvitar, enviarInvitaciones } = require('./_lib/invitacion-portal');
+    const { llaveCorreo } = require('./_lib/correo-forma');
+    const ids = nacidos.map((v) => '"' + v.id + '"').join(',');
+    const sel = 'id,nombre,correo,celular,talla_playera,emergencia_nombre,num_emergencia,portal_cliente_id';
+    const leer = async () => {
+      const r = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids)})&select=${sel}`, { headers: sbH });
+      if (!r.ok) throw new Error('no pude releer los viajeros recién creados');
+      return r.json();
+    };
+    // 1 · Puente (alta en `clientes` del Portal + enlace portal_cliente_id).
+    const pu = await puentearViajeros({ evento_id, viajeros: await leer(), KH_URL: SB_URL, KH_KEY: SB_KEY, PT_URL, PT_KEY, ejecutar: true });
+    if (pu.error) return { ok: false, aviso: 'El puente al Portal falló: ' + pu.error + ' — usa «Invitar al Portal» del evento después.' };
+    // 2 · Bitácora: a quién ya se invitó a ESTE evento (sin bitácora no se invita).
+    const bR = await fetch(`${SB_URL}/rest/v1/invitaciones_portal?evento_id=eq.${encodeURIComponent(evento_id)}&select=correo&limit=5000`, { headers: sbH });
+    if (!bR.ok) return { ok: false, aviso: 'No pude leer la bitácora de invitaciones: no se mandó nada (sin bitácora no se invita a nadie).' };
+    const ya = new Set((await bR.json()).map((x) => llaveCorreo(x.correo)).filter(Boolean));
+    const quienes = aQuienInvitar(await leer(), ya);
+    if (quienes.error) return { ok: false, aviso: quienes.error };
+    // 3 · El catálogo: la invitación no sale sin decir a QUÉ viaje (PROMO-DERIVA).
+    const { fetchEventosRaw } = require('./_lib/catalogo-index');
+    const EV = await fetchEventosRaw();
+    const ev = (Array.isArray(EV) ? EV : []).find((e) => e && e.id === evento_id) || null;
+    if (!ev) return { ok: false, aviso: 'No pude leer el evento en el catálogo: no se mandó ninguna invitación.' };
+    // 4 · Envío + bitácora DESPUÉS de cada envío (la lib).
+    const env = await enviarInvitaciones({ lista: quienes.invitar, ev, evento_id, KH_URL: SB_URL, KH_KEY: SB_KEY, RESEND_KEY, enviado_por: quien || null });
+    return {
+      ok: env.errores.length === 0,
+      cuentas_creadas: (pu.creados || []).length,
+      invitados: env.enviados.map((x) => x.correo),
+      ya_invitados: quienes.ya_invitados.map((x) => x.correo),
+      saltados: quienes.saltados,
+      errores: env.errores,
+    };
+  } catch (e) {
+    return { ok: false, aviso: 'El acceso al Portal falló: ' + e.message + ' — la aprobación SÍ quedó; usa «Invitar al Portal» del evento.' };
+  }
+}
 
 function j(status, headers, body) { return { statusCode: status, headers, body: JSON.stringify(body) }; }
 
@@ -181,29 +235,45 @@ exports.handler = async (event) => {
     const claimed = await rClaim.json();
     if (!claimed.length) return j(409, headers, { error: 'Alguien más la revisó primero — refresca la bandeja' });
 
-    // 5 · Nace el viajero. INSERT directo, sin on_conflict.
-    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
     const notaViajero = [
       `Requisición ${req.folio} · ${req.forma_pago}${req.transporte ? ' · ' + req.transporte : ''}${req.hotel ? ' · hotel: ' + req.hotel : ''}`,
       `aprobada por ${quien} ${hoyMX}${zonaConfesion || ''}`,
       notaStaff ? `nota: ${notaStaff}` : '',
     ].filter(Boolean).join(' · ');
-    const viajero = {
-      evento_id: req.evento_id,
-      nombre: req.nombre,
-      celular: req.celular,
-      correo: req.correo,
-      tipo_paquete: req.paquete,
-      zona_boleto: zonaFinal,
-      boletos: req.num_personas,
-      total_contrato,
-      abonado_previo: 0,
-      notas: notaViajero,
-    };
+
+    // 5 · NACEN LOS VIAJEROS. INSERT directo (un solo POST con todas las filas:
+    // PostgREST lo hace en una transacción — o nacen todos o ninguno).
+    // [ACOMP-1] Con acompañantes: UN viajero por persona, boletos=1 cada uno,
+    // y el contrato se REPARTE (palabra de Memo, 13-oct: «repartido — cada
+    // viajero queda con su lugar pagado»). El residuo de la división va al
+    // titular, para que la suma cuadre AL PESO con lo que se tecleó.
+    // Sin acompañantes (requisición de antes de ACOMP-1, o de 1 persona): UN
+    // viajero con N boletos, exactamente como siempre.
+    const acomp = (Array.isArray(req.acompanantes) && req.acompanantes.length === Math.max(0, (req.num_personas || 1) - 1))
+      ? req.acompanantes : null;
+    const personas = acomp && acomp.length ? [{ nombre: req.nombre, correo: req.correo, celular: req.celular, titular: true }]
+      .concat(acomp.map((a) => ({ nombre: a.nombre, correo: a.correo || req.correo, celular: null, titular: false }))) : null;
+    const N = personas ? personas.length : 1;
+    const repartir = (x) => { const base = Math.floor(x / N); return Array.from({ length: N }, (_, i) => base + (i === 0 ? x - base * N : 0)); };
+    const contratos = repartir(total_contrato);
+    const montos = repartir(monto);
+    const filasV = personas
+      ? personas.map((p, i) => ({
+          evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
+          tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: 1,
+          total_contrato: contratos[i], abonado_previo: 0,
+          notas: notaViajero + (p.titular ? ` · titular de ${N} lugares` : ` · acompañante de ${req.nombre}`),
+        }))
+      : [{
+          evento_id: req.evento_id, nombre: req.nombre, celular: req.celular, correo: req.correo,
+          tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: req.num_personas,
+          total_contrato, abonado_previo: 0, notas: notaViajero,
+        }];
     const rV = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
       method: 'POST',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify(viajero),
+      body: JSON.stringify(filasV),
     });
     if (!rV.ok) {
       const det = (await rV.text().catch(() => '')).slice(0, 300);
@@ -215,31 +285,37 @@ exports.handler = async (event) => {
       }).catch(() => {});
       return j(502, headers, { error: 'No se pudo crear el viajero — la requisición sigue PENDIENTE, inténtalo otra vez', detail: det });
     }
-    const vNuevo = (await rV.json())[0];
+    const nacidos = await rV.json();
+    const vNuevo = nacidos[0];
 
-    // 6 · El abono, con el comprobante heredado. capturado_por del JWT.
+    // 6 · LOS ABONOS, con el comprobante heredado. capturado_por del JWT.
+    // Repartidos igual que el contrato: cada viajero ve su lugar cubierto, y
+    // la nota dice QUIÉN pagó (un abono de $300 a nombre del acompañante sin
+    // esa nota se leería como dinero que él puso).
+    const filasA = nacidos.map((v, i) => ({
+      viajero_id: v.id,
+      monto: montos[i],
+      nota: `Requisición ${req.folio} · comprobante verificado al aprobar`
+        + (N > 1 ? ` · pagado por ${req.nombre} (${i + 1} de ${N}, total $${monto})` : ''),
+      foto_path: req.comprobante_path || null,
+      capturado_por: quien,
+    })).filter((a) => a.monto > 0);
     const rA = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
       method: 'POST',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify({
-        viajero_id: vNuevo.id,
-        monto,
-        nota: `Requisición ${req.folio} · comprobante verificado al aprobar`,
-        foto_path: req.comprobante_path || null,
-        capturado_por: quien,
-      }),
+      body: JSON.stringify(filasA),
     });
     if (!rA.ok) {
       const det = (await rA.text().catch(() => '')).slice(0, 300);
-      // El viajero YA nació — no se borra (datos de gente). Instrucción exacta:
+      // Los viajeros YA nacieron — no se borran (datos de gente). Instrucción exacta:
       return j(207, headers, {
-        ok: false, viajero_id: vNuevo.id,
-        error: `El viajero quedó creado pero SU ABONO NO SE REGISTRÓ. Captúralo a mano con ➕ Abono sobre «${req.nombre}» ($${monto}, requisición ${req.folio}).`,
+        ok: false, viajero_id: vNuevo.id, viajeros: nacidos.map((v) => v.id),
+        error: `Los viajeros quedaron creados pero LOS ABONOS NO SE REGISTRARON. Captúralos a mano con ➕ Abono (${nacidos.map((v, i) => `«${v.nombre}» $${montos[i]}`).join(' · ')} — requisición ${req.folio}).`,
         detail: det,
       });
     }
 
-    // 7 · Colgarle el viajero a la requisición (informativo; si falla, se dice).
+    // 7 · Colgarle el viajero TITULAR a la requisición (informativo; si falla, se dice).
     let enlaceOk = true;
     try {
       const rE = await fetch(`${base}?id=eq.${id}`, {
@@ -250,14 +326,26 @@ exports.handler = async (event) => {
       enlaceOk = rE.ok;
     } catch (_) { enlaceOk = false; }
 
+    // 8 · [ACOMP-1] EL PORTAL: puente + invitación a cada correo, al aprobar.
+    // Solo en los eventos de PORTAL_AL_APROBAR (palabra de Memo: «para los de
+    // Pa'l Norte, solo esos por el momento»). Nada de esto deshace la
+    // aprobación: si falla, la respuesta lo DICE y el botón «Invitar al
+    // Portal» del evento lo completa después (misma lib, misma bitácora).
+    let portal = null;
+    if (PORTAL_AL_APROBAR.includes(String(req.evento_id).split('#')[0])) {
+      portal = await portalAlAprobar({ req, nacidos, quien: auth.user && auth.user.correo, SB_URL, SB_KEY });
+    }
+
     return j(200, headers, {
       ok: true,
       viajero_id: vNuevo.id,
+      viajeros: nacidos.map((v, i) => ({ id: v.id, nombre: v.nombre, correo: v.correo, contrato: contratos[i] != null && N > 1 ? contratos[i] : total_contrato, abono: N > 1 ? montos[i] : monto })),
       folio: req.folio,
       zona: zonaFinal,
       total_contrato,
       monto,
       enlace_registrado: enlaceOk,
+      portal,
     });
   }
 

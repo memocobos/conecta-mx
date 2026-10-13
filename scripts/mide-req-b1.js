@@ -103,17 +103,23 @@ function redNueva(opts) {
     }
     if (String(url).includes('/rest/v1/viajeros_evento') && met === 'POST') {
       if (st.viajeroInsertFalla) return resp(500, 'tabla enojada (sembrado)');
-      const fila = JSON.parse(init.body);
-      fila.id = fila.id || uuid();
-      st.viajeros.push(fila);
-      return resp(201, [fila]);
+      // [ACOMP-1] Fiel a PostgREST: el cuerpo puede ser UNA fila o una LISTA
+      // (todas en una transacción). La base de mentira que solo aceptaba un
+      // objeto mentía de un modo que la de verdad no puede.
+      const cuerpo = JSON.parse(init.body);
+      const filas = (Array.isArray(cuerpo) ? cuerpo : [cuerpo]).map((f) => Object.assign({ id: f.id || uuid() }, f));
+      filas.forEach((f) => st.viajeros.push(f));
+      return resp(201, filas);
     }
     if (String(url).includes('/rest/v1/abonos_viajero') && met === 'POST') {
       if (st.abonoInsertFalla) return resp(500, 'abonos enojados (sembrado)');
-      const fila = JSON.parse(init.body);
-      fila.id = fila.id || uuid();
-      st.abonos.push(fila);
-      return resp(201, [fila]);
+      // [ACOMP-1] Fiel a PostgREST: el cuerpo puede ser UNA fila o una LISTA
+      // (todas en una transacción). La base de mentira que solo aceptaba un
+      // objeto mentía de un modo que la de verdad no puede.
+      const cuerpo = JSON.parse(init.body);
+      const filas = (Array.isArray(cuerpo) ? cuerpo : [cuerpo]).map((f) => Object.assign({ id: f.id || uuid() }, f));
+      filas.forEach((f) => st.abonos.push(f));
+      return resp(201, filas);
     }
     // 4 · sesión viva del verify-admin → TRUENA a propósito: la lib hace
     // fail-open documentado y el rol del JWT manda (es el camino medido).

@@ -2105,6 +2105,9 @@ const khViajeros = {
   upsertStaff(asigId) { return this._call({ accion: 'viajero_upsert_staff', asig_id: asigId }).then(j => j.viajero || null); },
   // listar(eventoId) → array de viajeros (whitelist PII)
   listar(eventoId) { return this._call({ accion: 'viajero_listar', evento_id: eventoId }).then(j => j.viajeros || []); },
+  // [COORDI-LISTA-1] La respuesta entera: al coordi el servidor le manda además
+  // `equipo` (coordis asignados + creadoras, y si viajan) y `vista:'coordi'`.
+  listarConEquipo(eventoId) { return this._call({ accion: 'viajero_listar', evento_id: eventoId }); },
   // eliminar(id) → { ok }
   eliminar(id) { return this._call({ accion: 'viajero_eliminar', id }); },
   // [VJ-1] editar(id, campos) → { ok, viajero, tocadas } — whitelist server-side

@@ -76,6 +76,7 @@
     "mide:prueba-archivo-1": "node scripts/mide-prueba-archivo-1.js",
     "mide:acomp-2": "node scripts/mide-acomp-2.js",
     "mide:genkidama-1": "node scripts/mide-genkidama-1.js",
-    "mide:crea-2": "node scripts/mide-crea-2.js"
+    "mide:crea-2": "node scripts/mide-crea-2.js",
+    "mide:coordi-lista-1": "node scripts/mide-coordi-lista-1.js"
   }
 }

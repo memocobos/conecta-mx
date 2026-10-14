@@ -876,6 +876,11 @@ async function exportarViajeros(formato) {
   // Portal, decía «No hay viajeros» con 150 reales a la vista: el mundo vacío
   // mandaba. El dinero sale de `_vj3Saldo` — la MISMA fórmula que pinta la
   // tabla; un export con su propia suma sería la fórmula número doce.
+  // [COORDI-LISTA-1] Quien no ve dinero baja la lista del coordi (sin CHEAP,
+  // sin contactos, sin notas, con el equipo). El servidor ya recorta igual.
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) {
+    return descargarListaViajeros(_ccEventoActual);
+  }
   let lista = [], porViajero = {};
   try {
     lista = await khViajeros.listar(_ccEventoActual) || [];              // [sec-coordi]
@@ -1185,21 +1190,71 @@ async function exportarRooming(formato) {
   }
 }
 // ── Descargar listas desde perfil del coordi ─────────────────
+// 🔒 [COORDI-LISTA-1 13-oct] Palabra de Memo: el coordi ve SOLO nombre · zona ·
+// paquete (PLUS/STAY/RIDE; los CHEAP NO aparecen) · talla · contacto de
+// emergencia — ni celulares, ni correos, ni notas, ni dinero. Y aparte, el
+// EQUIPO del tour: coordis asignados y creadoras, y si viajan o no. El recorte
+// lo hace el SERVIDOR (`viajero_listar` con `vista:'coordi'`); aquí además se
+// pintan solo esas columnas y se filtra el CHEAP también para quien sí recibe
+// todo (un admin que baja la lista del coordi ve lo mismo que el coordi).
+const _CL_VIAJAN = ['PLUS', 'STAY', 'RIDE'];
+function _clEsViajero(v) {
+  const tv = String(v.tipo_viajero || '').toLowerCase();
+  if (tv && tv !== 'cliente') return false;
+  const p = String(v.tipo_paquete || '').toUpperCase();
+  return !p || _CL_VIAJAN.includes(p);
+}
+function _clEquipoDeFilas(filas) {
+  const T = { creadora: 'Creadora de contenido', coordinador: 'Coordinador', staff: 'Staff' };
+  return (filas || []).filter(v => { const tv = String(v.tipo_viajero || '').toLowerCase(); return tv && tv !== 'cliente'; })
+    .map(v => ({ nombre: v.nombre, papel: T[String(v.tipo_viajero).toLowerCase()] || 'Equipo', asignacion: null,
+      viaja: ['PLUS', 'RIDE'].includes(String(v.tipo_paquete || '').toUpperCase()),
+      zona_boleto: v.zona_boleto, talla_playera: v.talla_playera }));
+}
 async function descargarListaViajeros(eventoId) {
   try {
-    const [ev, viajeros] = await Promise.all([
-      khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
-      khViajeros.listar(eventoId), // [sec-coordi]
+    const base = String(eventoId || '').split('#')[0];
+    const [meta, catalogo] = await Promise.all([
+      khEventosMeta.porSlug(base).then(m=>m||{}).catch(()=>({})), // [sec-eventos]
+      (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(()=>[]),
     ]);
-    if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
-    const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
-    const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
-    <h2>${_esfEsc(titulo)}</h2><p>${ev.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev.ciudad||'')} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${_esfEsc(v.nombre)}</strong></td><td>${_esfEsc(v.tipo_paquete||'—')}</td><td>${_esfEsc(v.zona_boleto||'—')}</td><td>${_esfEsc(v.talla_playera||'—')}</td><td>${_esfEsc(v.celular||'—')}</td><td>${_esfEsc(v.num_emergencia||'—')}</td><td>${_esfEsc(v.notas||'—')}</td></tr>`).join('')}</tbody>
-    </table></body></html>`;
-    _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
+    const evCat = (catalogo || []).find(e => e && e.id === base) || null;
+    const nombreEv = (evCat && evCat.a) || meta.nombre || base;
+    // [CC-FECHAS-1] Un multifecha guarda su lista POR FECHA (`karolg#0`…): la
+    // asignación del coordi es al evento base, así que se baja cada fecha.
+    const mf = (!String(eventoId).includes('#') && evCat && Array.isArray(evCat.multifecha) && evCat.multifecha.length > 1) ? evCat.multifecha : null;
+    const partes = mf
+      ? mf.map((f, i) => ({ slug: `${base}#${i}`, titulo: (f && f.lbl) || `Fecha ${i + 1}` }))
+      : [{ slug: eventoId, titulo: null }];
+    const resp = await Promise.all(partes.map(p => khViajeros.listarConEquipo(p.slug).catch(() => ({ viajeros: [] })))); // [sec-coordi]
+
+    const esc = _esfEsc;
+    const tablaViajeros = (lista) => `<table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto de emergencia</th><th>Tel. emergencia</th></tr></thead>
+      <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${esc(v.nombre||'')}</strong>${(v.boletos||1)>1?` <span style="color:#888">(${v.boletos} lugares)</span>`:''}</td><td>${esc(String(v.tipo_paquete||'—').toUpperCase())}</td><td>${esc(v.zona_boleto||'—')}</td><td>${esc(v.talla_playera||'—')}</td><td>${esc(v.emergencia_nombre||'—')}</td><td>${esc(v.num_emergencia||'—')}</td></tr>`).join('')}</tbody></table>`;
+    const VJ = { true: '✅ Viaja con el tour', false: '🎟 Solo concierto (no viaja)', null: '— por confirmar' };
+    const ASIG = { aceptado: 'Aceptó', pendiente: 'Pendiente de aceptar', declinado: 'Declinó' };
+    const tablaEquipo = (eq) => eq.length ? `<table><thead><tr><th>Nombre</th><th>Papel</th><th>Asignación</th><th>¿Viaja?</th><th>Zona</th><th>Talla</th></tr></thead>
+      <tbody>${eq.map(p=>`<tr><td><strong>${esc(p.nombre||'—')}</strong></td><td>${esc(p.papel||'')}</td><td>${esc(p.asignacion ? (ASIG[p.asignacion]||p.asignacion) : '—')}</td><td>${VJ[String(p.viaja)] || VJ.null}</td><td>${esc(p.zona_boleto||'—')}</td><td>${esc(p.talla_playera||'—')}</td></tr>`).join('')}</tbody></table>`
+      : '<p>Sin equipo registrado todavía.</p>';
+
+    let total = 0, cuerpo = '', equipoGlobal = [];
+    resp.forEach((j, k) => {
+      const lista = (j.viajeros || []).filter(_clEsViajero);
+      total += lista.length;
+      const eq = Array.isArray(j.equipo) ? j.equipo : _clEquipoDeFilas(j.viajeros);
+      eq.forEach(p => { if (!equipoGlobal.some(x => x.nombre === p.nombre && x.papel === p.papel)) equipoGlobal.push(p); });
+      cuerpo += `${partes[k].titulo ? `<h3>${esc(partes[k].titulo)} · ${lista.length} viajero${lista.length!==1?'s':''}</h3>` : ''}${lista.length ? tablaViajeros(lista) : '<p>Sin viajeros con paquete PLUS / STAY / RIDE.</p>'}`;
+    });
+    if (!total && !equipoGlobal.length) { alert('No hay viajeros registrados para este evento'); return; }
+
+    const titulo = `Viajeros — ${nombreEv}`;
+    const html = `<html><head><meta charset="utf-8"><title>${esc(titulo)}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}h3{margin:22px 0 8px}p{color:#666;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
+    <h2>${esc(titulo)}</h2><p>${total} viajero${total!==1?'s':''} con el tour (PLUS · STAY · RIDE)</p>
+    ${cuerpo}
+    <h3>Equipo del tour</h3>${tablaEquipo(equipoGlobal)}
+    </body></html>`;
+    _descargarHTML(`viajeros-${nombreEv.replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }
 }
 async function descargarRoomingList(eventoId) {

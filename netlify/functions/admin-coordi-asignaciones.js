@@ -46,7 +46,7 @@ const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // `vendidos_fuera`, y esa contabilidad DESCANSA en que la fila del viajero no
 // descuente por su cuenta: si descontara, el mismo boleto se restaría dos
 // veces. Preguntárselo a la función en vez de copiar la regla.
-const { duerme, motivoNoDuerme, consumeBoleto } = require('./_lib/paquete-viaje');
+const { duerme, motivoNoDuerme, consumeBoleto, viaja, esCliente, normPaquete } = require('./_lib/paquete-viaje');
 // [COB-MIG-1] La fórmula sellada de VJ-3, de su dueño. NO se re-escribe aquí:
 // `resta = total_contrato − abonado_previo − Σ abonos` ya vive en el lib del
 // dinero y la usan la cuenta del evento y los saldos. Una cuarta copia sería la
@@ -690,10 +690,14 @@ exports.handler = async (event) => {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
 
+      // [CC-FECHAS-1] El equipo se asigna al evento BASE; la lista vive por
+      // fecha (`soyluna`, `omar#1`). La puerta pregunta por las dos llaves.
+      const eventoBase = evento_id.split('#')[0];
       if (!esAdmin) {
         // El coordi debe tener una asignación a ese evento.
+        const llaves = [...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',');
         const cr = await fetch(
-          `${baseEC}?coordi_id=eq.${jwtUserId}&evento_id=eq.${encodeURIComponent(evento_id)}&select=id&limit=1`,
+          `${baseEC}?coordi_id=eq.${jwtUserId}&evento_id=in.(${llaves})&select=id&limit=1`,
           { headers: sbHeaders });
         if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
         if (!(await cr.json()).length) {
@@ -707,6 +711,71 @@ exports.handler = async (event) => {
       // consola ve el total de un cliente. Misma filosofía que el desglose de
       // comisiones que el vendedor jamás recibe.
       const puedeDinero = ROLES_EDITA_VIAJERO.includes(jwtRol);
+
+      // 🔒 [COORDI-LISTA-1 13-oct] LA VISTA DEL COORDI, decidida EN EL SERVIDOR.
+      // Palabra de Memo (con la lista de Soy Luna que bajó una coordi enfrente,
+      // que traía celulares, correos, notas internas con montos y a los CHEAP):
+      // el coordi ve SOLO nombre · zona · paquete · talla · emergencia, y solo
+      // de quien VIAJA con el tour (PLUS/STAY/RIDE — `duerme`, la regla de su
+      // dueño). CHEAP no aparece. Esconderlo en la pantalla no basta: lo que
+      // no debe ver no se le MANDA (la consola también es pantalla).
+      // Y aparte, el EQUIPO: coordis asignados (con su estado) y las creadoras
+      // con cortesía, diciendo si viajan con el tour o solo van al concierto.
+      if (!puedeDinero) {
+        const COLS_COORDI = 'id,nombre,zona_boleto,tipo_paquete,tipo_viajero,talla_playera,emergencia_nombre,num_emergencia,boletos,grupo_viaje,usuario_id';
+        const spc = new URLSearchParams();
+        spc.set('select', COLS_COORDI);
+        spc.append('evento_id', `eq.${evento_id}`);
+        spc.set('order', 'nombre.asc');
+        spc.set('limit', '2000');
+        const rc = await fetch(`${baseVE}?${spc.toString()}`, { headers: sbHeaders });
+        if (!rc.ok) return upstream(headers, await rc.text(), 'consulta');
+        const filas = await rc.json();
+        const limpia = (v) => ({
+          id: v.id, nombre: v.nombre, zona_boleto: v.zona_boleto || null,
+          tipo_paquete: normPaquete(v.tipo_paquete) ? String(v.tipo_paquete).toUpperCase() : null,
+          talla_playera: v.talla_playera || null,
+          emergencia_nombre: v.emergencia_nombre || null, num_emergencia: v.num_emergencia || null,
+          boletos: v.boletos || 1, grupo_viaje: v.grupo_viaje || null,
+        });
+        const viajeros = filas.filter((v) => esCliente(v.tipo_viajero) && duerme(v.tipo_paquete)).map(limpia);
+
+        // El equipo: filas de staff/creadoras del evento + asignaciones del
+        // evento base (quien está asignado aunque todavía no tenga fila).
+        const staff = filas.filter((v) => !esCliente(v.tipo_viajero));
+        const ra = await fetch(`${baseEC}?evento_id=in.(${[...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',')})&select=coordi_id,status`, { headers: sbHeaders });
+        const asigs = ra.ok ? await ra.json() : [];
+        const ids = [...new Set(asigs.map((a) => a.coordi_id).filter((x) => UUID_RE.test(String(x))))];
+        let usu = [];
+        if (ids.length) {
+          const ru = await fetch(`${baseUsuarios}?id=in.(${ids.join(',')})&select=id,nombre,rol`, { headers: sbHeaders });
+          if (ru.ok) usu = await ru.json();
+        }
+        const ROL_TXT = { coordinador: 'Coordinador', cc: 'Creadora de contenido', mister_popo: 'Staff', maestro_roshi: 'Staff', bulma: 'Staff', milk: 'Staff' };
+        const TIPO_TXT = { creadora: 'Creadora de contenido', coordinador: 'Coordinador', staff: 'Staff' };
+        const equipo = [];
+        const yaFila = new Set();
+        asigs.forEach((a) => {
+          const u = usu.find((x) => x.id === a.coordi_id) || {};
+          const fila = staff.find((v) => v.usuario_id && v.usuario_id === a.coordi_id);
+          if (fila) yaFila.add(fila.id);
+          equipo.push({
+            nombre: u.nombre || '—', papel: ROL_TXT[u.rol] || 'Equipo',
+            asignacion: a.status || 'pendiente',
+            viaja: fila ? viaja(fila.tipo_paquete) : (a.status === 'aceptado' ? true : null),
+            zona_boleto: fila ? fila.zona_boleto || null : null,
+            talla_playera: fila ? fila.talla_playera || null : null,
+          });
+        });
+        staff.filter((v) => !yaFila.has(v.id)).forEach((v) => {
+          equipo.push({
+            nombre: v.nombre, papel: TIPO_TXT[String(v.tipo_viajero).toLowerCase()] || 'Equipo',
+            asignacion: null, viaja: viaja(v.tipo_paquete),
+            zona_boleto: v.zona_boleto || null, talla_playera: v.talla_playera || null,
+          });
+        });
+        return ok(headers, { viajeros, equipo, vista: 'coordi' });
+      }
       const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo` : VE_READ_COLS;
       const sp = new URLSearchParams();
       sp.set('select', cols);

@@ -39,6 +39,13 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 html,body{overflow-x:hidden;max-width:100vw}
+/* [WEB-UX-1 14-oct] `hidden` en el BODY lo volvía un contenedor con scroll
+   propio (un eje no-visible arrastra al otro a `auto`), y con eso TODO lo
+   `position:sticky` del sitio —la barra de arriba, el progreso del cotizador—
+   se pegaba al body, que no se mueve, y se iba con el scroll. Medido en
+   escritorio: la nav en top=-1266. `clip` recorta igual sin crear caja de
+   scroll; donde no exista (Safari <16) se queda el `hidden` de arriba. */
+@supports (overflow-x:clip){ body{overflow-x:clip} }
 body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#fff;min-height:100vh}
 /* [SCROLL-2a] Aquí vivía el candado del detalle, GLOBAL, junto a un
    `body.scroll-lock` que NADIE añadía nunca (medido en todo el repo: la clase
@@ -8831,5 +8838,166 @@ function skipOnboarding(){
     .catch(fuera);
 })();
 </script>
+<!-- ===================================================================
+     WEB-UX-1 (14-oct-2026) · LA FICHA DEL EVENTO, MÁS AMIGABLE
+     Pedido de Memo: «una mejora en el scroll y una pantalla más amigable
+     para la reserva». Bloque AISLADO (solo presentación + navegación): no
+     toca calcular(), EV, precios ni el envío de la requisición.
+       A) Escritorio (≥1100px): dos columnas — la foto y el título del
+          evento se quedan fijos a la izquierda y el cotizador vive a la
+          derecha. Antes todo iba en una columna de 520px con la pantalla
+          vacía a los lados.
+       B) Pasos contestados se PLIEGAN: queda solo la opción elegida y un
+          «Cambiar». La página deja de crecer hacia abajo con cada paso.
+       C) Avance: al contestar un paso, la pantalla lleva el TOPE del
+          siguiente paso justo debajo de las barras fijas (antes lo
+          centraba, y un paso alto quedaba con su principio fuera de vista).
+       D) La barra del total gana «Reservar» que abre la ventana de pago.
+     Para revertir: borrar el bloque de estilo «web-ux-1-css» y el de script «web-ux-1-js».
+     =================================================================== -->
+<style id="web-ux-1-css">
+/* ── A · ESCRITORIO EN DOS COLUMNAS ─────────────────────────────────── */
+@media (min-width:1100px){
+  #page-detail .detail{
+    max-width:1200px;display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(440px,540px);
+    column-gap:40px;align-items:start;padding:28px 28px 80px;
+  }
+  #page-detail .d-hero{grid-column:1;grid-row:1 / span 2;position:sticky;top:84px;align-self:start}
+  #page-detail .d-hero-img-wrap,#page-detail .d-hero-img{height:min(52vh,460px)}
+  #page-detail .d-hero-content{margin-top:-120px;padding:0 28px 28px}
+  #page-detail .d-artist{font-size:clamp(32px,3.2vw,52px)}
+  #page-detail .wiz-progress{grid-column:2;grid-row:1;border-radius:var(--r-card,16px) var(--r-card,16px) 0 0}
+  #page-detail .d-body{grid-column:2;grid-row:2;padding:14px 0}
+  /* La pastilla de la radio flotaba ENCIMA del cotizador: en la ficha baja
+     a la esquina inferior izquierda, donde no tapa ningún paso. */
+  body.wizard-open .rcp{top:auto;bottom:24px;right:auto;left:24px}
+}
+
+/* ── B · PASOS CONTESTADOS, PLEGADOS ────────────────────────────────── */
+.wiz-card.wiz-hecho:has(.active) :is(.wiz-btn,.f-btn,.z-btn,.h-btn):not(.active){display:none !important}
+.wiz-card.wiz-hecho:has(.active) .mapa-btn{display:none !important}
+.wiz-card.wiz-hecho:has(.active) :is(.wiz-grid5,.wiz-pkg-wrap,.zona-grid,.hotel-grid,.fecha-sel){display:flex !important;flex-wrap:wrap;gap:8px}
+.wiz-card.wiz-hecho:has(.active) .active{flex:1 1 auto;max-width:100%}
+.wiz-card.wiz-hecho:has(.active){padding-bottom:12px}
+.wiz-cambiar{display:none;margin-left:auto;background:none;border:1px solid rgba(255,255,255,.22);color:rgba(255,255,255,.8);
+  font:800 10px/1 'Montserrat',sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border-radius:999px;cursor:pointer}
+.wiz-cambiar:hover{border-color:#e8ff4c;color:#e8ff4c}
+.wiz-card.wiz-hecho:has(.active) .wiz-cambiar{display:inline-flex}
+.wiz-card .wiz-lbl{display:flex;align-items:center;gap:8px}
+
+/* ── D · «RESERVAR» EN LA BARRA DEL TOTAL ───────────────────────────── */
+.pf-bar .pf-bar-cta.wux-reservar{background:#88ea4e;font-size:11px;padding:12px 16px}
+.pf-bar .pf-bar-ver{flex-shrink:0;color:rgba(255,255,255,.7);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px}
+@media (min-width:1100px){
+  /* En escritorio la barra ocupa solo el ancho de la columna del cotizador */
+  .pf-bar{left:auto;right:max(28px,calc((100vw - 1200px)/2 + 28px));width:min(540px,40vw);border-radius:var(--r-card,16px) var(--r-card,16px) 0 0}
+}
+</style>
+<script id="web-ux-1-js">
+(function(){
+  var ELEGIBLE='.wiz-btn,.f-btn,.z-btn,.h-btn';
+  var ORDEN=['w-transmodo-card','w-viajeros-card','w-dia-card','w-boleto-card','w-pkg-card',
+             'w-fecha-card','w-zona-card','w-hotel-card','w-transport-card'];
+  var reducido=function(){try{return matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}};
+  var visible=function(el){return !!el&&getComputedStyle(el).display!=='none'&&el.offsetParent!==null;};
+
+  // Lo que tapan las barras fijas arriba (nav, Volver, progreso). Medido en vivo.
+  function tope(){
+    var t=0;
+    ['.nav','#wiz-volver','#wiz-progress'].forEach(function(s){
+      var el=document.querySelector(s); if(!el)return;
+      var cs=getComputedStyle(el);
+      if(cs.display==='none'||(cs.position!=='fixed'&&cs.position!=='sticky'))return;
+      var r=el.getBoundingClientRect(); if(r.top<=150&&r.bottom>t)t=r.bottom;
+    });
+    return t;
+  }
+  // scrollIntoView y no window.scrollTo: en móvil quien scrollea es el
+  // #page-detail (contenedor fijo), no la ventana. El margen se calcula en vivo
+  // para que el tope del paso quede justo debajo de las barras.
+  function llevarArriba(el){
+    if(!el)return;
+    el.style.scrollMarginTop=(tope()+12)+'px';
+    try{el.scrollIntoView({block:'start',behavior:reducido()?'auto':'smooth'});}catch(e){el.scrollIntoView(true);}
+  }
+
+  // El botón «Cambiar» de cada paso: se crea una vez, vive en su rótulo.
+  function ponerCambiar(card){
+    var lbl=card.querySelector('.wiz-lbl'); if(!lbl||lbl.querySelector('.wiz-cambiar'))return;
+    var b=document.createElement('button');
+    b.type='button';b.className='wiz-cambiar';b.textContent='Cambiar';
+    b.addEventListener('click',function(ev){ev.stopPropagation();card.classList.remove('wiz-hecho');
+      try{card.scrollIntoView({behavior:reducido()?'auto':'smooth',block:'nearest'});}catch(e){}});
+    lbl.appendChild(b);
+  }
+
+  // El siguiente paso SIN contestar después de `card` (o el total si ya no hay).
+  function siguiente(card){
+    var i=ORDEN.indexOf(card.id);
+    for(var j=i+1;j<ORDEN.length;j++){
+      var c=document.getElementById(ORDEN[j]);
+      if(visible(c)&&!c.querySelector('.active'))return c;
+    }
+    var tot=document.querySelector('#d-result .big-pago');
+    return visible(document.getElementById('d-result'))?tot:null;
+  }
+
+  var ultimoAvance=0;
+  document.addEventListener('click',function(ev){
+    var btn=ev.target&&ev.target.closest&&ev.target.closest(ELEGIBLE);
+    if(!btn||btn.disabled)return;
+    var card=btn.closest('.wiz-card'); if(!card||ORDEN.indexOf(card.id)<0)return;
+    if(btn.id==='w-viaj-mas')return;          // «5+» abre la fila, no contesta
+    // Las funciones del wizard ya corrieron (son onclick del botón); se espera a
+    // que pinten el siguiente paso antes de plegar y de mover la pantalla.
+    setTimeout(function(){
+      if(!card.querySelector('.active'))return;
+      ponerCambiar(card);
+      card.classList.add('wiz-hecho');
+      ultimoAvance=Date.now();
+      setTimeout(function(){ var s=siguiente(card); if(s)llevarArriba(s); },60);
+    },320);
+  });
+
+  // Los autoscrolls viejos (centrar) chocaban con este: dentro de la ventana
+  // de un avance se dejan pasar sin mover nada.
+  ['scrollToStep','scrollToTotal'].forEach(function(n){
+    var orig=window[n]; if(typeof orig!=='function')return;
+    window[n]=function(){ if(Date.now()-ultimoAvance<1200)return; return orig.apply(this,arguments); };
+  });
+
+  // Al abrir otro evento los pasos vuelven a nacer desplegados.
+  var _show=window.showDetail;
+  if(typeof _show==='function'){
+    window.showDetail=function(){
+      document.querySelectorAll('.wiz-card.wiz-hecho').forEach(function(c){c.classList.remove('wiz-hecho');});
+      return _show.apply(this,arguments);
+    };
+  }
+
+  // ── D · «Reservar» en la barra del total ─────────────────────────────
+  var barra=document.getElementById('pf-bar');
+  if(barra){
+    var cta=barra.querySelector('.pf-bar-cta');
+    if(cta){
+      var ver=document.createElement('span');
+      ver.className='pf-bar-ver';ver.textContent='Ver desglose';
+      cta.parentNode.insertBefore(ver,cta);
+      cta.textContent='Reservar';
+      cta.classList.add('wux-reservar');
+      cta.setAttribute('role','button');
+      cta.addEventListener('click',function(ev){
+        // Mismo camino que el botón «Reservar mi lugar» del desglose.
+        if(typeof abrirModalPago!=='function')return;
+        ev.stopPropagation();ev.preventDefault();
+        abrirModalPago();
+      });
+      barra.setAttribute('aria-label','Tu total — ver desglose o reservar');
+    }
+  }
+})();
+</script>
+
 </body>
 </html>

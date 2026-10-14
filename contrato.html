@@ -2068,6 +2068,14 @@ async function loadContrato() {
   if (creadorEl) creadorEl.textContent = c.creador_nombre;
   renderItemList(root.querySelector(".item-list-ofrecimiento"), c.ofrecimiento);
   renderItemList(root.querySelector(".item-list-expectativas"), c.expectativas);
+  // [CREA-BAJA-1] Colaboración cancelada: el documento se puede leer, pero se
+  // dice arriba que ya no tiene efecto y no se ofrece firma.
+  if (c.estado === "cancelado") {
+    const aviso = document.createElement("div");
+    aviso.style.cssText = "background:#ff283b;color:#fff;padding:14px 16px;margin:0 0 18px;font-weight:700;font-size:14px;border-radius:8px;text-align:center";
+    aviso.textContent = "Esta colaboración fue CANCELADA. Este contrato ya no tiene efecto.";
+    root.insertBefore(aviso, root.firstChild);
+  }
 
   if (c.estado === "pendiente") {
     // 🎁 Giveaway con paso previo (sin cuenta/perfil del Portal): no hay flujo

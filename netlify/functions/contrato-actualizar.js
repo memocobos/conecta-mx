@@ -71,6 +71,7 @@ exports.handler = async function (event) {
   }
   if (!actual) return bad(404, "Contrato no encontrado");
   if (actual.estado === "firmado") return bad(409, "No se puede editar un contrato ya firmado");
+  if (actual.estado === "cancelado") return bad(409, "Este contrato está cancelado");
 
   // Construir patch solo con campos provistos y válidos.
   const patch = {};

@@ -190,6 +190,8 @@ exports.handler = async function (event) {
   }
   if (!contrato) return bad(404, "Contrato no encontrado");
   if (contrato.estado === "firmado") return bad(409, "El contrato ya fue firmado");
+  // [CREA-BAJA-1] Una colaboración cancelada no se puede firmar con el link viejo.
+  if (contrato.estado === "cancelado") return bad(410, "Esta colaboración fue cancelada y el contrato ya no tiene efecto");
 
   // VÍA B: CAPTURA AL FIRMAR de la plantilla 'creadora' (decisión de Memo:
   // "no más por tenerlas"). fecha de nacimiento + contacto de emergencia son

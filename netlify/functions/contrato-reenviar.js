@@ -171,6 +171,7 @@ exports.handler = async function (event) {
   }
   if (!row) return bad(404, "Contrato no encontrado");
   if (row.estado === "firmado") return bad(409, "El contrato ya está firmado");
+  if (row.estado === "cancelado") return bad(409, "Este contrato está cancelado");
 
   const link = `${SITE}/contrato?t=${token}`;
   try {

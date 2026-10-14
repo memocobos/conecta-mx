@@ -10393,7 +10393,13 @@ function _ctrPintarLista() {
     }
     tbody.innerHTML = visibles.map(c => {
       const firmado = c.estado === 'firmado';
-      const badge = firmado
+      const cancelado = c.estado === 'cancelado';   // [CREA-BAJA-1]
+      const esCreadora = c.plantilla === 'creadora' || c.plantilla === 'creadora_team';
+      const bajaBtn = (esCreadora && typeof currentUser !== 'undefined' && currentUser && currentUser.rol === 'maestro_roshi')
+        ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" title="Cancelar la colaboración y avisarle por correo" onclick="ctrBajaAbrir('${_escCtr(c.id)}')">${cancelado ? '✉ Aviso de baja' : '⛔ Dar de baja'}</button>` : '';
+      const badge = cancelado
+        ? `<span style="background:rgba(255,68,68,.15);color:#ff6666;border:1px solid rgba(255,68,68,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⛔ Cancelado</span>`
+        : firmado
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
         : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
       const fechaEnviado = c.enviado_at
@@ -10401,11 +10407,14 @@ function _ctrPintarLista() {
         : '—';
       const tokenSafe = _escCtr(c.token);
       const nombreSafe = _attrJs(c.creador_nombre);   // [CAP5-1] va dentro de onclick
-      const acciones = firmado
+      const acciones = cancelado
+        ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>${bajaBtn}`
+        : firmado
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
           ${CORT_PAQUETE[c.plantilla] ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#3ddc84;border-color:rgba(61,220,132,.35)" onclick="cortAbrir('${_escCtr(c.id)}')">${c.cortesia_evento ? '🎟 ✓' : '🎟 Cortesía'}</button>` : ''}
           ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
+          ${bajaBtn}
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`
         : `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>

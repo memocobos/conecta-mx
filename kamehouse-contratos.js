@@ -276,3 +276,87 @@ async function cortGuardar(opcion) {
     btn.disabled = false; btn.textContent = 'Asignar cortesía';
   }
 }
+// ═══ [CREA-BAJA-1] DAR DE BAJA LA COLABORACIÓN DE UNA CREADORA ════════════
+// Palabra de Memo (14-oct): si una creadora no cumple lo pactado antes del
+// evento, se cancela la colaboración y se le avisa por correo que el contrato
+// queda sin efecto. Primero se ENSEÑA el correo exacto (seco) y solo con
+// «Cancelar y enviar» se escribe y se manda. Solo maestro_roshi.
+const _BAJA_MOTIVOS = [
+  'No entregaste el contenido previo al evento acordado en el contrato (reel previo e historias de promoción).',
+  'No respondiste a nuestros mensajes para coordinar el contenido previo al evento.',
+  'El contenido entregado no cumple los requisitos acordados en el contrato.',
+];
+let _bajaCtr = null;
+function _bajaEl(id) { return document.getElementById(id); }
+function ctrBajaAbrir(contratoId) {
+  _bajaCtr = (typeof _contratosCache !== 'undefined' ? _contratosCache : []).find((c) => c.id === contratoId) || { id: contratoId };
+  let bg = _bajaEl('baja-bg');
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.id = 'baja-bg';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    bg.addEventListener('click', (e) => { if (e.target === bg) ctrBajaCerrar(); });
+    document.body.appendChild(bg);
+  }
+  bg.style.display = 'flex';
+  bg.innerHTML = `<div style="background:var(--bg2,#121214);border:1px solid var(--border,#333);border-radius:14px;max-width:620px;width:100%;max-height:90vh;overflow:auto;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="font-size:16px">⛔ Dar de baja la colaboración</b>
+      <button class="btn btn-ghost btn-sm" onclick="ctrBajaCerrar()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">${_escCtr(_bajaCtr.creador_nombre || '')} · ${_escCtr(_bajaCtr.evento_nombre || '')} — el contrato queda <b>cancelado</b> (no se borra), si tenía cortesía sus lugares regresan al inventario, y le llega un correo diciendo que el contrato queda sin efecto.</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">Motivo (lo va a leer ella)</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">${_BAJA_MOTIVOS.map((m, i) => `<button type="button" class="btn btn-ghost btn-sm" style="text-align:left;white-space:normal;line-height:1.35" onclick="document.getElementById('baja-motivo').value=_BAJA_MOTIVOS[${i}]">${_escCtr(m)}</button>`).join('')}</div>
+    <textarea id="baja-motivo" rows="3" maxlength="600" placeholder="Toca un motivo o escríbelo" style="width:100%;box-sizing:border-box;background:var(--bg3,#18181b);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);padding:10px;font:inherit;font-size:13px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary" id="baja-ver" onclick="ctrBajaVer()">Ver el correo antes de enviar</button>
+      <button class="btn btn-ghost" onclick="ctrBajaCerrar()">Cancelar</button>
+    </div>
+    <div id="baja-res" style="margin-top:12px"></div>
+  </div>`;
+}
+function ctrBajaCerrar() { const bg = _bajaEl('baja-bg'); if (bg) bg.style.display = 'none'; }
+async function _bajaLlamar(confirmar) {
+  const motivo = ((_bajaEl('baja-motivo') || {}).value || '').trim();
+  if (motivo.length < 5) throw new Error('Escribe el motivo');
+  const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+    method: 'POST',
+    body: JSON.stringify({ accion: 'contrato_cancelar', contrato_id: _bajaCtr.id, motivo, confirmar: confirmar === true }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+async function ctrBajaVer() {
+  const res = _bajaEl('baja-res'), btn = _bajaEl('baja-ver');
+  btn.disabled = true; btn.textContent = 'Preparando…';
+  try {
+    const j = await _bajaLlamar(false);
+    const p = j.plan || {};
+    const cort = (p.cortesia_baja || []);
+    res.innerHTML = `
+      <div style="font-size:12px;margin-bottom:8px">Para: <b>${_escCtr(p.correo && p.correo.para)}</b><br>Asunto: <b>${_escCtr(p.correo && p.correo.asunto)}</b></div>
+      <div style="font-size:12px;color:var(--ts);margin-bottom:8px">${cort.length ? `Se dan de baja de la lista de viajeros: ${cort.map((v) => `<b>${_escCtr(v.nombre)}</b> (${_escCtr(v.zona || '—')})`).join(', ')} — sus lugares regresan al inventario.` : 'No tenía cortesía asignada: no se mueve ningún boleto.'}</div>
+      <div style="background:#fff;border-radius:8px;overflow:hidden;margin-bottom:12px">${(p.correo && p.correo.html) || ''}</div>
+      ${j.ya_cancelado ? '<div style="font-size:12px;color:#ffb020;margin-bottom:8px">Este contrato ya estaba cancelado: si el correo no había salido, se reintenta.</div>' : ''}
+      <button class="btn" id="baja-go" style="background:#ff4444;color:#fff;border-color:#ff4444" onclick="ctrBajaConfirmar()">Cancelar la colaboración y enviar el correo</button>`;
+  } catch (e) {
+    res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
+  } finally { btn.disabled = false; btn.textContent = 'Ver el correo antes de enviar'; }
+}
+async function ctrBajaConfirmar() {
+  if (!confirm(`¿Seguro? Se cancela la colaboración de ${_bajaCtr.creador_nombre || 'esta creadora'} y le llega el correo.`)) return;
+  const res = _bajaEl('baja-res'), btn = _bajaEl('baja-go');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const j = await _bajaLlamar(true);
+    const c = j.correo || {};
+    res.innerHTML = `<div style="color:#3ddc84;font-size:13px;font-weight:700">✓ Colaboración cancelada.</div>
+      <div style="font-size:12px;margin-top:4px">${(j.bajas || []).length ? `Bajas de viajeros: ${(j.bajas).map((b) => _escCtr(b.nombre) + (b.ok ? ' ✓' : ' ⚠️ no se pudo')).join(', ')}. ` : ''}${c.enviado ? (c.ya ? 'El correo ya había salido antes.' : 'Correo enviado ✓') : `<span style="color:#ff5f56">⚠️ El correo NO salió (${_escCtr(c.error || 'sin respuesta')}). Vuelve a abrir «Dar de baja» para reintentarlo.</span>`}</div>`;
+    if (typeof cargarContratos === 'function') cargarContratos();
+    else if (typeof loadContratosList === 'function') loadContratosList();
+  } catch (e) {
+    res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Cancelar la colaboración y enviar el correo'; }
+  }
+}

@@ -126,6 +126,9 @@ const ACCIONES = {
   alarmas_operacion: ROLES_EDITA_VIAJERO,
   // [CC-CARDS-1] Lo que cada tarjeta de Capsule dice ANTES de abrirla.
   capsule_resumen: ROLES_EDITA_VIAJERO,
+  // [CREA-BAJA-1] Dar de baja la colaboración de una creadora: escribe en su
+  // contrato, le quita la cortesía y le MANDA UN CORREO. Solo Memo.
+  contrato_cancelar: ['maestro_roshi'],
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -597,6 +600,134 @@ exports.handler = async (event) => {
     // asiento deja de estar disponible para vender, no que salga dinero.
     // Capturar un gasto aquí lo contaría DOS VECES. Por eso esta acción toca
     // `viajeros_evento` y `stock_ajustes`, y NADA de dinero.
+    // ── [CREA-BAJA-1] DAR DE BAJA LA COLABORACIÓN DE UNA CREADORA ─────────
+    // Palabra de Memo (14-oct): si una creadora no cumple lo pactado antes del
+    // evento, se cancela la colaboración y se le avisa por correo que el
+    // contrato queda sin efecto. Tres cosas, en este orden:
+    //   1) el contrato pasa a estado 'cancelado' (NO se borra: es la prueba de
+    //      lo que firmó) con `datos.cancelacion` = motivo, quién y cuándo;
+    //   2) si tenía cortesía, sus filas (ella + acompañante) quedan de BAJA
+    //      (boletos 0, zona NULL) y el lugar regresa al inventario — sin DELETE;
+    //   3) el correo sale DESPUÉS de escribir: si Resend falla, la baja queda y
+    //      se DICE que el correo no salió (se reintenta con el mismo botón).
+    // 🔒 `seco:true` es el DEFAULT: enseña el correo exacto y lo que se va a
+    // tocar, sin escribir ni mandar. Para hacerlo hace falta `confirmar:true`.
+    // 🔒 Idempotente: un contrato ya cancelado no se vuelve a cancelar; el 2º
+    // clic solo reintenta el correo si no había salido.
+    if (accion === 'contrato_cancelar') {
+      const contratoId = String(body.contrato_id || '').trim();
+      if (!UUID_RE.test(contratoId)) return bad(headers, 'contrato_id inválido');
+      const motivo = cleanText(body.motivo, 600);
+      if (!motivo || motivo.length < 5) return bad(headers, 'Escribe el motivo (se le manda a la creadora)');
+      const seco = body.confirmar !== true;
+      const cr = await fetch(`${baseContratos}?id=eq.${contratoId}&select=id,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,firmado_at,expectativas,ofrecimiento,datos&limit=1`, { headers: sbHeaders });
+      if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
+      const c = (await cr.json())[0];
+      if (!c) return bad(headers, 'Ese contrato no existe');
+      if (!['creadora', 'creadora_team'].includes(c.plantilla)) return bad(headers, 'Solo se cancelan así los contratos de creadoras');
+      const datos = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+      const yaCancelado = c.estado === 'cancelado';
+      if (!yaCancelado && c.estado !== 'firmado' && c.estado !== 'pendiente') {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: `El contrato está en estado «${c.estado}»` }) };
+      }
+      // Las filas de la cortesía: mismo evento, tipo creadora, nombre de ella o
+      // de su acompañante. Se buscan por grupo_viaje cuando lo hay.
+      const cort = datos.cortesia || null;
+      let filas = [];
+      if (cort && cort.evento_id) {
+        const rv = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(cort.evento_id)}&tipo_viajero=eq.creadora&select=id,nombre,zona_boleto,boletos,grupo_viaje,notas`, { headers: sbHeaders });
+        if (!rv.ok) return upstream(headers, await rv.text(), 'consulta de viajeros');
+        const todas = await rv.json();
+        const norm = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+        const ella = todas.find((v) => norm(v.nombre) === norm(c.creador_nombre));
+        const grupo = ella && ella.grupo_viaje;
+        const acomp = norm(cort.acompanante || (datos.acompanante && datos.acompanante.nombre));
+        filas = todas.filter((v) => v === ella || (grupo && v.grupo_viaje === grupo) || (acomp && norm(v.nombre) === acomp))
+          .filter((v) => !(Number(v.boletos) === 0 && !v.zona_boleto));
+      }
+      const fechaEv = c.evento_fecha ? new Date(c.evento_fecha + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Matamoros' }) : '';
+      const fechaFirma = c.firmado_at ? new Date(c.firmado_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Matamoros' }) : '';
+      const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      const nombre1 = String(c.creador_nombre || '').trim().split(/\s+/)[0] || '';
+      const asunto = `Cancelación de tu colaboración con Conecta Reynosa — ${c.evento_nombre || 'evento'}`;
+      const entregables = Array.isArray(c.expectativas) && c.expectativas.length
+        ? `<p style="margin:0 0 8px">Lo acordado en la cláusula 2.2 de tu contrato era:</p><ul style="margin:0 0 14px;padding-left:18px">${c.expectativas.map((e) => `<li style="margin:0 0 4px">${esc(e)}</li>`).join('')}</ul>` : '';
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
+<div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
+<div style="padding:20px">
+<p style="margin:0 0 12px">Hola ${esc(nombre1)}:</p>
+<p style="margin:0 0 12px">Te escribimos para informarte que <b>tu colaboración con Conecta Reynosa para ${esc(c.evento_nombre || 'el evento')}${fechaEv ? ` (${esc(fechaEv)})` : ''} queda cancelada</b>, y el contrato de colaboración${fechaFirma ? ` que firmaste el ${esc(fechaFirma)}` : ''} queda <b>sin efecto</b> a partir de hoy.</p>
+<p style="margin:0 0 8px"><b>Motivo:</b> ${esc(motivo)}</p>
+${entregables}
+<p style="margin:0 0 12px">Esta decisión se toma con base en la cláusula 5 («Políticas de cancelación») de tu contrato, que contempla la cancelación cuando el contenido no se entrega en tiempo y forma.</p>
+<p style="margin:0 0 12px">Como la colaboración se cancela <b>antes del evento</b>, no recibirás los beneficios del intercambio (${esc((Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join(', ') || 'boletos y kit')}) y <b>no tienes ningún pago ni reembolso pendiente</b> con nosotros.</p>
+<p style="margin:0 0 12px">Si crees que hay un error, respóndenos a este correo.</p>
+<p style="margin:0">Gracias por tu tiempo,<br><b>Conecta Reynosa</b></p>
+</div></div>`;
+      const plan = {
+        contrato: { id: c.id, nombre: c.creador_nombre, correo: c.creador_email, evento: c.evento_nombre, fecha: c.evento_fecha, estado: c.estado },
+        cortesia_baja: filas.map((v) => ({ id: v.id, nombre: v.nombre, zona: v.zona_boleto, boletos: v.boletos })),
+        correo: { para: c.creador_email, asunto, html },
+      };
+      if (seco) return ok(headers, { seco: true, plan, ya_cancelado: yaCancelado });
+
+      const hoy = new Date().toISOString();
+      const ahora = { motivo, por: jwtUserId, at: hoy };
+      // 1) El contrato. Valor esperado en el filtro: dos clics no escriben dos veces.
+      if (!yaCancelado) {
+        const nuevosDatos = { ...datos, cancelacion: ahora, estado_previo: c.estado };
+        const pr = await fetch(`${baseContratos}?id=eq.${c.id}&estado=eq.${encodeURIComponent(c.estado)}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ estado: 'cancelado', datos: nuevosDatos }),
+        });
+        if (!pr.ok) return upstream(headers, await pr.text(), 'cambio del contrato');
+        const out = await pr.json();
+        if (!out.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato cambió mientras tanto; vuelve a abrirlo' }) };
+      }
+      // 2) La cortesía: baja de sus filas, el lugar vuelve al inventario.
+      const bajas = [];
+      for (const v of filas) {
+        const nota = `${v.notas ? v.notas + ' · ' : ''}BAJA ${hoy.slice(0, 10)}: colaboración cancelada (${motivo.slice(0, 120)}) — zona antes: ${v.zona_boleto || '—'}`;
+        const pv = await fetch(`${baseVE}?id=eq.${v.id}&boletos=eq.${Number(v.boletos) || 0}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ boletos: 0, zona_boleto: null, notas: nota }),
+        });
+        bajas.push({ id: v.id, nombre: v.nombre, ok: pv.ok });
+      }
+      // 3) El correo, DESPUÉS de escribir. Un 2º clic sobre uno ya cancelado
+      //    solo reintenta si el correo no había salido.
+      let correo = { enviado: false };
+      const yaSalio = datos.cancelacion && datos.cancelacion.email_id;
+      if (yaSalio) correo = { enviado: true, ya: true, email_id: datos.cancelacion.email_id };
+      else {
+        const RESEND = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+        const FROM = process.env.RESEND_FROM_CONTRATOS || process.env.RESEND_FROM_ROL || 'Conecta Reynosa <admin@conectareynosa.mx>';
+        if (!RESEND || !c.creador_email) correo = { enviado: false, error: !RESEND ? 'Falta RESEND_API_KEY' : 'El contrato no tiene correo' };
+        else {
+          try {
+            const { aplicarModoPrueba } = require('./_lib/correo-guard');
+            const mp = aplicarModoPrueba({ to: c.creador_email, subject: asunto });
+            const er = await fetch('https://api.resend.com/emails', {
+              method: 'POST', headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ from: FROM, to: mp.to, subject: mp.subject, html, reply_to: 'admin@conectareynosa.mx' }),
+            });
+            const ej = await er.json().catch(() => ({}));
+            correo = er.ok ? { enviado: true, email_id: ej.id || null } : { enviado: false, error: ej.message || ('Resend ' + er.status) };
+          } catch (e) { correo = { enviado: false, error: e.message }; }
+        }
+        if (correo.enviado) {
+          // Bitácora del envío en el mismo contrato (lee de nuevo para no pisar).
+          const rr = await fetch(`${baseContratos}?id=eq.${c.id}&select=datos&limit=1`, { headers: sbHeaders });
+          const d2 = rr.ok ? ((await rr.json())[0] || {}).datos || {} : null;
+          if (d2) {
+            d2.cancelacion = { ...(d2.cancelacion || ahora), email_id: correo.email_id, email_at: new Date().toISOString() };
+            await fetch(`${baseContratos}?id=eq.${c.id}`, { method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ datos: d2 }) });
+          }
+        }
+      }
+      return ok(headers, { cancelado: true, ya_cancelado: yaCancelado, bajas, correo });
+    }
+
     if (accion === 'cortesia_asignar') {
       const contratoId = String(body.contrato_id || '').trim();
       if (!UUID_RE.test(contratoId)) return bad(headers, 'contrato_id inválido');

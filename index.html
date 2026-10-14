@@ -6634,7 +6634,11 @@ function abrirModalPago(){
   $$('pago-btn-comprobante').textContent=isHey?'Ya pagué, enviar comprobante por WhatsApp':'Enviar comprobante por Messenger';
   var instr=$$('pago-msg-instruccion');
   if(instr)instr.style.display=isHey?'none':'block';
-  $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
+  // [DUDAS-MSN-1 14-oct] «Tengo dudas» va por el MISMO canal que el comprobante
+  // (Messenger, salvo Hey Banco). Antes iba SIEMPRE al WhatsApp de reservas con
+  // la cotización entera adentro, y las reservaciones de Pa'l Norte le caían a
+  // Memo por WhatsApp en vez de Messenger (reporte de Memo).
+  $$('pago-btn-dudas').href=isHey?'https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas):'https://m.me/ConectaRey?text='+encodeURIComponent(msgDudas);
   // FASE B (REQ-B1): pinta el formulario de requisición. En try para que un
   // tropiezo ahí JAMÁS tire el modal del dinero: sin él queda el camino de
   // siempre (cuentas + Messenger).
@@ -7930,7 +7934,10 @@ function calcular(){
   // Build full message (shared by WA, copy, vuelo)
   _lastCotizacion=buildCotizacionMsg(quincenas,pagoQ);
   try{ trackMainEvent('main_cotizacion_generada', { precio_total: total, paso_wizard: 'cotizacion' }); }catch(e){}
-  $$('r-wa').href='https://wa.me/'+WA+'?text='+encodeURIComponent(_lastCotizacion);
+  // [DUDAS-MSN-1] «Reservar mi lugar» abre el modal de pago (onclick); su href
+  // ya NO es un WhatsApp con la cotización: en un navegador que ignore el
+  // onclick (o «abrir en otra pestaña») mandaba la reservación al WhatsApp.
+  $$('r-wa').href='#';
 
   // Vuelo CTA
   var vueloBox=document.getElementById('r-vuelo-box');

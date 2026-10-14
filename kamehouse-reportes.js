@@ -102,7 +102,10 @@ async function loadMisSalidas() {
   const box = document.getElementById('sal-mis');
   if (!box) return;
   try {
-    const salidas = await khSalidas.listar({ limit: 50 }); // el backend acota: el viajero SOLO ve lo suyo
+    // [GZ-INICIO-3] «Mis salidas» son SOLO las de quien está viendo: el
+    // servidor acota con `mias` y aquí se vuelve a filtrar por la persona de
+    // la pantalla (en «Ver como» el servidor ve el JWT de Memo).
+    const salidas = (await khSalidas.listar({ limit: 50, mias: true })).filter(s => !currentUser || String(s.solicitante_id) === String(currentUser.id));
     if (!salidas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin salidas todavía</div>'; return; }
     box.innerHTML = salidas.map(s => `
       <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 14px;margin-bottom:8px">
@@ -202,6 +205,15 @@ async function loadReportes() {
     // [sec-reportes] El backend acota por rol: si es coordinador, fuerza
     // coordi_id = su id (ve SOLO sus reportes). No mandamos coordi_id desde aquí.
     _reportesCache = await khReportes.listar({ limit: 100 });
+    // [GZ-INICIO-3] El coordinador ve SOLO sus reportes (el servidor ya acota;
+    // esto cubre «Ver como», donde el servidor ve el JWT de Memo).
+    if (rol === 'coordinador' || rol === 'cc') _reportesCache = _reportesCache.filter(r => String(r.coordi_id) === String(currentUser.id));
+    // Y no ve las pestañas de estados de la revisión: eso es de Popo y Memo.
+    const _rf = document.getElementById('rep-filtros');
+    if (_rf) _rf.style.display = (rol === 'coordinador' || rol === 'cc') ? 'none' : 'flex';
+    const _rg = document.getElementById('rep-guia-coordi');
+    if (_rg) _rg.style.display = (rol === 'coordinador' || rol === 'cc') ? '' : 'none';
+    if (rol === 'coordinador' || rol === 'cc') _reportesFiltroActual = 'todos';
 
     // Join manual con eventos y coordis
     if (_reportesCache.length) {
@@ -275,11 +287,11 @@ function renderReportes(lista, filtro) {
     }
     // [KARIN-GZ-1 · 14-oct] «El reporte final lo reviso yo roshi y yo soy quien
     // acepta» (Memo): el botón de aprobar es SOLO suyo (el servidor también).
-    if (rol === 'maestro_roshi' && ['aprobado_popo','enviado'].includes(r.status)) {
+    // [GZ-INICIO-3] Corrección de Memo el mismo día: «bulma y milk también
+    // deben de poder aprobar».
+    if (['maestro_roshi','bulma','milk'].includes(rol) && ['aprobado_popo','enviado'].includes(r.status)) {
       btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar${r.status==='enviado'?' directo':' Definitivo'}</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
-    } else if (rol === 'bulma' && ['aprobado_popo','enviado'].includes(r.status)) {
-      btns = `<button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
     // Popo: marcar kits recibidos cuando aprobado_memo
     if (rol === 'mister_popo' && r.status === 'aprobado_memo' && kits.some(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
@@ -300,7 +312,7 @@ function renderReportes(lista, filtro) {
           ${r.status === 'rechazado' ? '<span style="display:inline-block;background:var(--red);color:#fff;font-size:9px;font-weight:900;letter-spacing:.05em;padding:2px 8px;border-radius:4px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">RECHAZADO · CORREGIR</span>' : ''}
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-bottom:8px">
             ${ev ? new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}
-            ${coo ? ` · ${_esfEsc(coo.nombre)}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
+            ${(coo && !['coordinador','cc'].includes(currentUser?.rol)) ? ` · ${_esfEsc(coo.nombre)}` : ''} · <span style="color:${s.color}">${s.icon} ${['coordinador','cc'].includes(currentUser?.rol) ? ({ enviado: 'Enviado · Popo lo revisa', aprobado_popo: 'Popo lo aprobó · falta Memo' }[r.status] || s.label) : s.label}</span>
           </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap">
             <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.dinero_recibido||0)}</div></div>

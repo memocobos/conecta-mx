@@ -19,3 +19,13 @@ update kits_inventario set retornable = true where pieza in ('Bocina','Hielera')
 
 -- Nota: una columna reportes_evento.devolucion_avisada_at nació y se quitó el
 -- mismo día (la devolución se movió a la salida); quedó sin datos.
+
+-- =============================================================================
+-- GZ-INICIO-3 (14-oct-2026) · LA PLANTILLA DE CADA QUIEN (YA CORRIÓ)
+-- Palabra de Memo: «una opción de poder usar diferentes template en su
+-- Kamehouse o que puedan personalizarlo». Las 7 plantillas de kamehouse.css
+-- (antes amarradas al NOMBRE de una persona) + el Clásico, elegibles por todos.
+-- NULL = nunca eligió (sigue la regla vieja por nombre + su color acento).
+-- =============================================================================
+alter table public.usuarios add column if not exists tema_plantilla text
+  check (tema_plantilla is null or tema_plantilla in ('clasico','tema-ximena','tema-america','tema-reginna','tema-luis','tema-laura','tema-brittany','tema-axel'));

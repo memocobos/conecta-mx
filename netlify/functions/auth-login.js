@@ -130,7 +130,7 @@ exports.handler = async (event) => {
   // El campo `credentials` puede ser un email o un username — probamos ambos.
   const isEmail = credentials.includes('@');
   const filterField = isEmail ? 'correo' : 'username';
-  const lookupUrl = `${SB_URL}/rest/v1/usuarios?${filterField}=eq.${encodeURIComponent(credentials)}&activo=eq.true&select=id,correo,nombre,rol,password_hash,strikes,username,permisos_extra,tema_acento&limit=1`;
+  const lookupUrl = `${SB_URL}/rest/v1/usuarios?${filterField}=eq.${encodeURIComponent(credentials)}&activo=eq.true&select=id,correo,nombre,rol,password_hash,strikes,username,permisos_extra,tema_acento,tema_plantilla&limit=1`;
 
   let user;
   try {
@@ -221,6 +221,7 @@ exports.handler = async (event) => {
         strikes: user.strikes,
         permisos_extra: user.permisos_extra,
         tema_acento: user.tema_acento,
+        tema_plantilla: user.tema_plantilla || null,
       },
     }),
   };

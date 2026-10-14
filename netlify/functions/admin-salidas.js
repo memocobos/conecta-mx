@@ -227,7 +227,9 @@ exports.handler = async (event) => {
         sp.append('evento_id', `eq.${body.evento_id.trim()}`);
       }
       // Anti-escalación: coordinador/cc SOLO ven sus propias salidas.
-      if (!veTodo) sp.append('solicitante_id', `eq.${uid}`);
+      // [GZ-INICIO-3] `mias:true` = «Mis salidas»: aunque quien pregunta vea
+      // todo (Popo, admins), esa lista es SOLO la suya.
+      if (!veTodo || body.mias === true) sp.append('solicitante_id', `eq.${uid}`);
       const r = await fetch(`${baseSalidas}?${sp.toString()}`, { headers: kh });
       if (!r.ok) return json(502, { error: 'KH rechazó la consulta', detail: await r.text() });
       const salidas = await r.json();

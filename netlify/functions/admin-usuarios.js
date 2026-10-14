@@ -54,7 +54,7 @@ const COLS_ADMIN_ARR = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
   'num_emergencia', 'nombre_emergencia', 'parentesco_emergencia', 'template_sugerido', 'tema_acento',
-  'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
+  'tema_plantilla', 'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
 ];
 const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la query)
 
@@ -70,7 +70,7 @@ const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la 
 //   · cualquier otro rol → solo lo mínimo para pintar nombres y vistas de
 //     equipo… salvo SU PROPIA fila, que llega completa (cada quien ve lo suyo).
 const COLS_BASICO_ARR = [
-  'id', 'nombre', 'username', 'rol', 'activo', 'foto_url', 'tema_acento',
+  'id', 'nombre', 'username', 'rol', 'activo', 'foto_url', 'tema_acento', 'tema_plantilla',
   'perfil_completo', 'template_sugerido',
 ];
 const COLS_BASICO = new Set(COLS_BASICO_ARR);
@@ -127,7 +127,7 @@ const CORREO_RE = /^[^\s@,()<>]+@[^\s@,()<>]+\.[a-z]{2,}$/i;
 const SELF_FIELDS = [
   'nombre', 'username', 'celular', 'talla_playera', 'fecha_nacimiento',
   'correo_notif', 'nombre_emergencia', 'num_emergencia', 'parentesco_emergencia', 'template_sugerido',
-  'tema_acento', 'foto_url', 'perfil_completo',
+  'tema_acento', 'tema_plantilla', 'foto_url', 'perfil_completo',
 ];
 // Campos extra que SOLO un admin (maestro_roshi/bulma) puede tocar de otros.
 const ADMIN_FIELDS = ['rol', 'activo', 'strikes', 'correo'];

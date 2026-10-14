@@ -255,7 +255,7 @@ async function gzInicioPintar(cont) {
          ${soloVer ? '' : `<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="gzCambiarFoto()">📷 ${u.foto_url ? 'Cambiar foto' : 'Subir foto'}</button>`}
        </div>
      </div>` + datoFila('Correo', u.correo) + datoFila('Celular', u.celular) + datoFila('Talla', u.talla_playera),
-    soloVer ? '' : `<button class="btn btn-ghost btn-sm" onclick="gzEditarPerfil()">Editar mis datos →</button>`);
+    soloVer ? `<span style="font-size:11px;color:var(--ts)">✏️ Aquí la persona edita su perfil y su plantilla (en «Ver como» no se edita)</span>` : `<button class="btn btn-primary btn-sm" onclick="gzEditarPerfil()">✏️ Editar mi perfil y plantilla</button>`);
 
   // ── ③ MIS TOURS: próximos y pasados, separados ──
   const stChip = (s) => s === 'aceptado' ? '<b style="color:var(--green)">aceptado</b>' : (s === 'declinado' ? '<b style="color:var(--red)">declinado</b>' : '<b style="color:var(--orange)">por responder</b>');
@@ -300,11 +300,49 @@ async function gzInicioPintar(cont) {
     }).join(''),
     `<button class="btn btn-ghost btn-sm" onclick="showPage('inventario')">Ir a la Torre</button>`) : '';
 
+  // ── ⑥ RADIO CONECTA: el mismo reproductor de la barra de arriba ──
+  const radioHtml = _iniCard('📻 Radio Conecta · en vivo',
+    `<div style="display:flex;gap:12px;align-items:center">
+       <div id="gz-radio-art" style="width:64px;height:64px;flex:0 0 64px;border-radius:10px;background:var(--bg3,#111) center/cover;border:1px solid var(--border)"></div>
+       <div style="min-width:0;flex:1">
+         <div id="gz-radio-tit" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sonando ahora…</div>
+         <div id="gz-radio-art2" style="font-size:12px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+         <div id="gz-radio-oy" style="font-size:11px;color:var(--ts);margin-top:2px"></div>
+       </div>
+       <button class="btn btn-primary" id="gz-radio-btn" onclick="gzRadioToggle()" style="border-radius:50%;width:48px;height:48px;padding:0;font-size:18px">${(typeof _tbPlaying !== 'undefined' && _tbPlaying) ? '⏸' : '▶'}</button>
+     </div>`,
+    `<a class="btn btn-ghost btn-sm" href="/radio" target="_blank" rel="noopener">🎶 Pide una canción</a>`);
+
   cont.innerHTML = `${soloVer ? '<div style="margin-bottom:12px;font-size:12px;color:var(--gold,#ffb703)">👁 Modo «Ver como»: estos son los datos reales de esta persona. Solo lectura.</div>' : ''}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">${alertasHtml}${ctrHtml}${perfilHtml}${prestHtml}${toursHtml}${rankHtml}</div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">${alertasHtml}${ctrHtml}${perfilHtml}${prestHtml}${toursHtml}${rankHtml}${radioHtml}</div>`;
   _gzRelojArrancar();
+  gzRadioAhora();
 }
 
+// [GZ-INICIO-3] Radio Conecta en su Inicio. Comparte el <audio> de la barra de
+// arriba (un solo reproductor: si cambian de pantalla, sigue sonando).
+async function gzRadioAhora() {
+  if (typeof RADIO_NOWPLAYING === 'undefined') return;
+  try {
+    const r = await fetch(RADIO_NOWPLAYING, { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const s = (d && d.now_playing && d.now_playing.song) || {};
+    const t = document.getElementById('gz-radio-tit'); if (t) t.textContent = s.title || 'En vivo';
+    const a = document.getElementById('gz-radio-art2'); if (a) a.textContent = s.artist || '';
+    const o = document.getElementById('gz-radio-oy'); const n = d && d.listeners && d.listeners.current;
+    if (o) o.textContent = (n != null) ? `${n} escuchando ahora` : '';
+    const img = document.getElementById('gz-radio-art');
+    if (img && s.art && /^https:\/\//.test(s.art)) img.style.backgroundImage = `url("${String(s.art).replace(/"/g, '')}")`;
+  } catch (e) { /* la radio no tumba el Inicio */ }
+}
+function gzRadioToggle() {
+  if (typeof _tbRadioToggle !== 'function') return;
+  _tbRadioToggle();
+  const b = document.getElementById('gz-radio-btn');
+  if (b) b.textContent = (typeof _tbPlaying !== 'undefined' && _tbPlaying) ? '⏸' : '▶';
+  setTimeout(gzRadioAhora, 400);
+}
 function gzCambiarFoto() {
   if (_gzVerComoId()) return;
   if (typeof subirFoto !== 'function') return;
@@ -326,12 +364,32 @@ async function gzDevolucionAvisar(id) {
   try { await khSalidas.devolucionAvisar(id); showToast('Listo — Popo ya sabe que lo regresaste', 'success'); loadInicio(); }
   catch (e) { showToast(e.message, 'error'); }
 }
-function gzEditarPerfil() {
-  showPage('equipo');
-  setTimeout(() => {
-    const b = document.querySelector('.gz-tab-btn[onclick*=miperfil]');
-    showGZTab('miperfil', b, true);
-  }, 250);
+// [GZ-INICIO-3 · 14-oct] «En su inicio, en lo de perfil, deben poder editar su
+// perfil» (Memo): el MISMO formulario de Mi Perfil (un dueño: renderFormPerfil
+// + guardarMiPerfil), abierto en una ventana aquí mismo. Incluye la plantilla
+// de su Kamehouse, el color, emergencia y contraseña.
+async function gzEditarPerfil() {
+  if (_gzVerComoId()) { showToast('En «Ver como» no se edita el perfil de otra persona', 'error'); return; }
+  if (typeof renderFormPerfil !== 'function') return;
+  crearModal('gz-perfil', 'Mi perfil', '<div id="gz-perfil-form" style="max-height:78vh;overflow-y:auto"></div>');
+  const box = document.getElementById('gz-perfil-form');
+  if (!box) return;
+  const md = box.closest('.modal'); if (md) md.style.maxWidth = '760px';
+  box.innerHTML = renderFormPerfil();
+  // Guardar → regresa al Inicio; Cancelar → deshace la vista previa y cierra.
+  box.querySelectorAll('button').forEach((b) => {
+    const oc = b.getAttribute('onclick') || '';
+    if (/guardarMiPerfil\(/.test(oc)) b.setAttribute('onclick', 'guardarMiPerfil({inicio:true})');
+    else if (/renderMiPerfil\(false\)/.test(oc)) b.setAttribute('onclick', "_plantillaRestaurar();cerrarModal('gz-perfil')");
+  });
+  const card = box.querySelector('.perfil-card'); if (card) card.style.maxWidth = '100%';
+  try {
+    const u = (await khUsuarios.obtener(currentUser.id)) || currentUser;
+    ['nombre', 'correo_notif', 'celular', 'num_emergencia', 'nombre_emergencia', 'parentesco_emergencia', 'talla_playera', 'fecha_nacimiento', 'template_sugerido', 'username'].forEach((campo) => {
+      const inp = document.getElementById('mp-' + campo);
+      if (inp && u[campo]) inp.value = u[campo];
+    });
+  } catch (e) { /* se queda con lo que la sesión trae */ }
 }
 
 // ═══ TOURS ═══════════════════════════════════════════════════════════════════

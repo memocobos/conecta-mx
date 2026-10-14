@@ -726,6 +726,21 @@ function _kmSearchInit() {
 // ── TEMA DE ACENTO PERSONALIZADO (DC1) ──
 // Cada usuario elige su color de acento; se guarda en usuarios.tema_acento.
 // Solo presets brillantes (texto oscuro legible encima). null = lima por defecto.
+// [GZ-PLANTILLA-1 · 14-oct] Las plantillas completas de Kamehouse que cada quien
+// elige en su perfil (palabra de Memo: «una opción de poder usar diferentes
+// template en su Kamehouse o que puedan personalizarlo»). Son las 7 que ya
+// existían en kamehouse.css —antes amarradas al NOMBRE de una persona— más el
+// Clásico. La lista vive aquí; la base las valida con su CHECK (misma lista).
+const PLANTILLAS_KH = [
+  { id: 'clasico',       nombre: 'Clásico Kamehouse', bg: '#0a0a0f', a: '#e8ff4c', b: '#ff6b00' },
+  { id: 'tema-ximena',   nombre: 'Rosa neón',         bg: '#1a0f1c', a: '#FF6BCB', b: '#FFB6E1' },
+  { id: 'tema-reginna',  nombre: 'Fucsia nocturno',   bg: '#14090f', a: '#FF4D8D', b: '#FFB3CC' },
+  { id: 'tema-brittany', nombre: 'Rosa y ámbar',      bg: '#150d12', a: '#F472B6', b: '#F59E0B' },
+  { id: 'tema-luis',     nombre: 'Morado y verde',    bg: '#0e0a1a', a: '#7C3AED', b: '#3DDC84' },
+  { id: 'tema-axel',     nombre: 'Plata',             bg: '#0c0f16', a: '#94A3C8', b: '#E8F0FF' },
+  { id: 'tema-america',  nombre: 'Rosa claro',        bg: '#F8F4F6', a: '#E8739A', b: '#D4688A' },
+  { id: 'tema-laura',    nombre: 'Dorado claro',      bg: '#F5F0E8', a: '#C9973A', b: '#DDB86A' },
+];
 const TEMA_PRESETS = [
   { hex: '#e8ff4c', nombre: 'Lima' },
   { hex: '#ff3ea5', nombre: 'Magenta' },

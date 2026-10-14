@@ -151,13 +151,19 @@ const reset = () => { DB = base(); MAILS = []; ESCRITURAS = []; };
   r = await llamar(SAL, { accion: 'devolucion_recibir', id: SAL1 }, POPO, 'mister_popo', 'popo@x.mx');
   af(r.s === 200 && DB.salidas_bodega[0].devolucion_recibida_at && r.j.recargar_ahora === false, '[D6] Popo recibe; el reporte aún no tiene aprobación final → recargar_ahora=false');
   af(DB.kits_inventario.map((k) => k.cantidad).join(',') === stockAntes && !ESCRITURAS.some((e) => e.t === 'kits_inventario'), '[D7] RECIBIR NO SUMA STOCK (un solo camino suma)');
+  DB.salidas_bodega.push({ id: 'cccccccc-0000-4000-8000-000000000009', evento_id: 'dalemix', solicitante_id: POPO, solicitante_rol: 'mister_popo', estado: 'autorizada', detalle: [] });
+  r = await llamar(SAL, { accion: 'listar', mias: true }, POPO, 'mister_popo');
+  af(r.s === 200 && r.j.salidas.length === 1 && r.j.salidas[0].solicitante_id === POPO, '[D8] «Mis salidas» de Popo trae SOLO las suyas (aunque él vea todas en su bandeja)');
+  r = await llamar(SAL, { accion: 'listar' }, POPO, 'mister_popo');
+  af(r.j.salidas.length === 2, '[D9] sin `mias`, Popo sigue viendo todas (su bandeja)');
 
   // ── [F] aprobación final ──
-  r = await llamar(REP, { accion: 'aprobar_final', id: REP1 }, BULMA, 'bulma');
-  af(r.s === 403, '[F1] Bulma ya no puede dar la aprobación final');
-  r = await llamar(REP, { accion: 'aprobar_final', id: REP1 }, ROSHI, 'maestro_roshi', 'memo@x.mx');
+  r = await llamar(REP, { accion: 'aprobar_final', id: REP1 }, LESLY, 'coordinador');
+  af(r.s === 403, '[F1] el coordinador no puede dar la aprobación final');
+  // [GZ-INICIO-3] corrección de Memo: Bulma y Milk SÍ aprueban.
+  r = await llamar(REP, { accion: 'aprobar_final', id: REP1 }, BULMA, 'bulma', 'bulma@x.mx');
   const boc = DB.kits_inventario.find((k) => k.id === KBOC), vas = DB.kits_inventario.find((k) => k.id === KVASO);
-  af(r.s === 200 && DB.reportes_evento[0].status === 'aprobado_memo', '[F2] Memo aprueba');
+  af(r.s === 200 && DB.reportes_evento[0].status === 'aprobado_memo', '[F2] Bulma aprueba (también Memo y Milk)');
   af(boc.cantidad === 3 && vas.cantidad === 243, `[F3] como Popo ya recibió, la bodega se recarga EN ESE ACTO (bocina 2→3, vasos 241→243: ${boc.cantidad}/${vas.cantidad})`);
   af(DB.salidas_bodega[0].estado === 'cerrada' && (DB.reportes_evento[0].kits_detalle || []).every((k) => k.recibido), '[F4] la salida queda cerrada y el reporte palomeado');
   r = await llamar(REP, { accion: 'aprobar_final', id: REP1 }, ROSHI, 'maestro_roshi', 'memo@x.mx');

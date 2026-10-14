@@ -41,6 +41,11 @@ function aplicarTemaCoordi() {
   };
   // Limpiar temas previos
   document.body.className = document.body.className.replace(/\btema-\w+/g, '').trim();
+  // [GZ-PLANTILLA-1] La plantilla que la persona ELIGIÓ manda sobre todo.
+  // 'clasico' = eligió el de siempre: sin clase, y su color acento aplica.
+  const plantilla = currentUser.tema_plantilla;
+  if (plantilla === 'clasico') return;
+  if (plantilla && /^tema-[a-z]+$/.test(plantilla)) { document.body.classList.add(plantilla); return; }
   // Precedencia DC1: si el usuario eligió acento personal (tema_acento), ESE manda.
   // No aplicamos el tema-coordi viejo (sus colores con !important pisarían el
   // acento que va por variables CSS). El body queda sin clase tema-XXX.
@@ -74,6 +79,17 @@ function applyTema(hex) {
   root.setProperty('--orange2', hex);
   root.setProperty('--border2', _hexAlpha(hex, 0.28));
 }
+// [GZ-PLANTILLA-1] Vista previa al instante; se guarda con «Guardar cambios».
+function seleccionarPlantilla(id, el) {
+  const inp = document.getElementById('mp-tema_plantilla');
+  if (inp) inp.value = id;
+  document.querySelectorAll('.plantilla-op').forEach(b => { b.style.borderColor = 'var(--border)'; });
+  if (el) el.style.borderColor = 'var(--text)';
+  document.body.className = document.body.className.replace(/\btema-\w+/g, '').trim();
+  if (id !== 'clasico') document.body.classList.add(id);
+}
+// Si se cancela la edición, la vista previa se deshace.
+function _plantillaRestaurar() { if (typeof aplicarTemaCoordi === 'function') aplicarTemaCoordi(); }
 // Marca el preset elegido en el formulario de perfil (no guarda hasta "Guardar").
 function seleccionarTema(hex, el) {
   const inp = document.getElementById('mp-tema_acento');
@@ -1324,8 +1340,18 @@ function renderFormPerfil() {
         </div>
       </div>
       <div class="perfil-section">
+        <div class="perfil-section-title">Plantilla de tu Kamehouse</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// toca una para verla al instante · se guarda con «Guardar cambios»</div>
+        <input type="hidden" id="mp-tema_plantilla" value="${_esfEsc(currentUser.tema_plantilla || '')}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">${(typeof PLANTILLAS_KH !== 'undefined' ? PLANTILLAS_KH : []).map(p => `
+          <button type="button" class="plantilla-op" data-id="${p.id}" onclick="seleccionarPlantilla('${p.id}', this)" style="text-align:left;cursor:pointer;border-radius:12px;padding:0;overflow:hidden;border:2px solid ${(currentUser.tema_plantilla || '') === p.id ? 'var(--text)' : 'var(--border)'};background:${p.bg}">
+            <div style="height:44px;background:linear-gradient(135deg,${p.a},${p.b})"></div>
+            <div style="padding:8px 10px;font-size:12px;font-weight:700;color:${/^#F/i.test(p.bg) ? '#2D2D3A' : '#fff'}">${_esfEsc(p.nombre)}</div>
+          </button>`).join('')}</div>
+      </div>
+      <div class="perfil-section">
         <div class="perfil-section-title">Color de tema</div>
-        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// elige el acento de tu Kamehouse</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// el acento de tu Kamehouse (se luce con la plantilla Clásico)</div>
         <input type="hidden" id="mp-tema_acento" value="${temaActual}">
         <div class="tema-dots">${temaDots}</div>
       </div>
@@ -1369,14 +1395,14 @@ function renderFormPerfil() {
       <div class="perfil-section">
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="guardarMiPerfil()">Guardar cambios</button>
-          <button class="btn btn-ghost" onclick="renderMiPerfil(false)">Cancelar</button>
+          <button class="btn btn-ghost" onclick="_plantillaRestaurar();renderMiPerfil(false)">Cancelar</button>
         </div>
         <div id="mp-alert" style="margin-top:12px"></div>
       </div>
     </div>
   `;
 }
-async function guardarMiPerfil() {
+async function guardarMiPerfil(opts) {
   const alertEl = document.getElementById('mp-alert');
   const passNueva = document.getElementById('mp-pass-nueva')?.value;
   const passConfirm = document.getElementById('mp-pass-confirm')?.value;
@@ -1406,6 +1432,9 @@ async function guardarMiPerfil() {
     template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
     tema_acento: document.getElementById('mp-tema_acento')?.value || null,
   };
+  // [GZ-PLANTILLA-1] Solo viaja si eligió una (no se borra lo que no tocó).
+  const _plant = document.getElementById('mp-tema_plantilla')?.value || '';
+  if (_plant) body.tema_plantilla = _plant;
   // [EQ-7] LA TERCERA PUERTA DEL MISMO SELLO. Mi Perfil también estampaba
   // perfil_completo=true a ciegas: guardar con los campos de seguridad vacíos
   // dejaba el sello puesto y la mentira intacta. Ahora el sello es un
@@ -1431,8 +1460,10 @@ async function guardarMiPerfil() {
     }
     // Re-aplica la precedencia (mismo orden que enterApp): al elegir un acento
     // personal se quita la clase tema-XXX para que el acento se vea al instante.
-    aplicarTemaCoordi();
     applyTema(body.tema_acento);
+    aplicarTemaCoordi();
+    // [GZ-INICIO-3] Guardado desde el Inicio: se cierra la ventana y se repinta.
+    if (opts && opts.inicio) { setTimeout(() => { cerrarModal('gz-perfil'); if (typeof loadInicio === 'function') loadInicio(); }, 700); return; }
     setTimeout(() => renderMiPerfil(false), 1200);
     loadEquipo();
   } catch(e) {

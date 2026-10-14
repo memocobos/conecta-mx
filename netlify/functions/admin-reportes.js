@@ -101,9 +101,10 @@ exports.handler = async (event) => {
     guardar_mio: ['coordinador'],
     enviar_mio: ['coordinador'],
     aprobar_popo: ROLES_MOD,
-    // [KARIN-GZ-1 · 14-oct] Palabra de Memo: «el reporte final lo reviso yo
-    // roshi y yo soy quien acepta». Antes lo podían cerrar Bulma y Milk.
-    aprobar_final: ['maestro_roshi'],
+    // [KARIN-GZ-1 → GZ-INICIO-3 · 14-oct] Memo primero pidió que fuera solo
+    // suyo y el mismo día corrigió: «bulma y milk también deben de poder
+    // aprobar». Queda como siempre fue.
+    aprobar_final: ROLES_ADMIN_MILK,
     rechazar: ROLES_MOD,
     marcar_kits_recibidos: ROLES_MOD,
     eliminar: ROLES_ADMIN,          // eliminar reporte = destructivo → milk NO

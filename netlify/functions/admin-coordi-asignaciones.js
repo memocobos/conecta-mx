@@ -960,7 +960,9 @@ exports.handler = async (event) => {
 
         // El equipo: filas de staff/creadoras del evento + asignaciones del
         // evento base (quien está asignado aunque todavía no tenga fila).
-        const staff = filas.filter((v) => !esCliente(v.tipo_viajero));
+        // [AGENCIA-1] Una fila de AGENCIA (Tours Reynosa) no es equipo: solo
+        // carga el dinero de una venta al mayoreo. No se le enseña al coordi.
+        const staff = filas.filter((v) => !esCliente(v.tipo_viajero) && String(v.tipo_viajero).toLowerCase() !== 'agencia');
         const ra = await fetch(`${baseEC}?evento_id=in.(${[...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',')})&select=coordi_id,status`, { headers: sbHeaders });
         const asigs = ra.ok ? await ra.json() : [];
         const ids = [...new Set(asigs.map((a) => a.coordi_id).filter((x) => UUID_RE.test(String(x))))];

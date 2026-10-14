@@ -481,6 +481,7 @@ async function _conexHistorial(uid, nombre) {
   } catch (e) { showToast(e.message || 'Error', 'error'); }
 }
 async function loadResumen() {
+  _loadLogisticaHome();     // [ALARMAS-1] la logística del equipo (roshi/bulma/milk)
   _loadAlertasHome();       // [RES-1] lo que pide atención, arriba de todo (solo Memo; fails-soft)
   _renderAtajosHome();      // [E5-5] atajos del home, filtrados por _puedeVerTab
   _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
@@ -572,7 +573,11 @@ async function loadResumen() {
     const ev = await _fetchEVFromIndex();
     // 1) Primero lo que NO depende de la utilidad, para que aparezca rápido:
     //    Franja 3 (atrasados) + Franja 1 (dinero — prioridad #1, no debe esperar).
-    _renderResumenAtrasados(activos, cancelados);
+    // [ALARMAS-1] «Atrasados» leía las cuotas del Portal (vacío): nunca iba a
+    // decir nada. Ahora la tarjeta es la COBRANZA REAL (viajeros_evento +
+    // abonos) de los tours que vienen. `_renderResumenAtrasados` se queda
+    // sin llamador a propósito: si un día el Portal cobra, vuelve en una línea.
+    _loadCobranzaHome();
     _renderResumenRiesgoBaja(activos);
     _renderResumenDinero(porCobrar);  // reusa el porCobrar ya calculado (= m-porcobrar)
     // [E5-2] La deuda va con la cuenta que ya se cargó arriba (`cta` viene de
@@ -1492,4 +1497,113 @@ async function resumenActualizarConfirmar() {
     if (panel) panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}
       <div style="font-size:11px;margin-top:6px">Lo que ya se guardó, guardado está: vuelve a darle «Actualizar» — no repite nada.</div></div>`;
   } finally { _resumenActCorriendo = false; }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [ALARMAS-1 13-oct] LA LOGÍSTICA DEL EQUIPO Y LA COBRANZA REAL EN EL RESUMEN
+// ═══════════════════════════════════════════════════════════════════════════
+// Palabra de Memo: «un mejor sistema de alarmas de las acciones de los coordis:
+// ya aceptó evento, falta ponerle boleto, creadora firmó, falta ponerle boleto,
+// tallas, etc.». El servidor arma la lista (`alarmas_operacion`, solo lee);
+// aquí se pinta y cada renglón lleva a donde se resuelve.
+const _ALM_ICONO = { por_aceptar: '⏳', sin_contrato: '📝', sin_boleto: '🎟', sin_talla: '👕',
+  creadora_sin_firma: '📝', creadora_sin_boleto: '🎟', creadora_sin_talla: '👕', acomp_sin_talla: '👕' };
+function _almEsc(s) { return (typeof _esfEsc === 'function') ? _esfEsc(s) : String(s == null ? '' : s); }
+function _almIr(a) {
+  if (a.tipo && a.tipo.indexOf('creadora') === 0 && !a.evento_id) { showHerramienta && showHerramienta('contratos'); return; }
+  if (a.evento_id) _almAbrirTour(a.evento_id);
+}
+async function _almAbrirTour(llave) {
+  showPage('capsule');
+  if (!(_ccEventosCache || []).length && typeof loadCapsule === 'function') await loadCapsule();
+  // La llave puede ser la base de un multifecha (asignación vieja): se abre su primera fecha.
+  const c = (_ccEventosCache || []).find(e => e.id === llave) || (_ccEventosCache || []).find(e => String(e.id).split('#')[0] === llave);
+  if (c && typeof abrirDetalleEvento === 'function') abrirDetalleEvento(c.id);
+}
+let _almLista = [];
+async function _loadLogisticaHome() {
+  const box = document.getElementById('resumen-logistica');
+  if (!box) return;
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = '<div class="card"><div class="loading-state"><div class="spinner"></div>Revisando la logística del equipo…</div></div>';
+  let j;
+  try { j = await khViajeros._call({ accion: 'alarmas_operacion' }); }
+  catch (e) { box.innerHTML = `<div class="card"><div class="alert alert-error">No se pudo revisar la logística: ${_almEsc(e.message)}</div></div>`; return; }
+  _almLista = j.alarmas || [];
+  const b = j.bandejas || {};
+  const chip = (n, txt, onclick) => n ? `<button class="btn btn-sm" style="font-size:11px;background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.4);color:#ffb020" onclick="${onclick}">${n} ${txt} →</button>` : '';
+  const chips = [
+    chip(b.requisiciones, b.requisiciones === 1 ? 'requisición por aprobar' : 'requisiciones por aprobar', "showPage('requisiciones')"),
+    chip(b.cambios, b.cambios === 1 ? 'cambio pedido por un cliente' : 'cambios pedidos por clientes', "showPage('requisiciones')"),
+    chip(b.salidas, b.salidas === 1 ? 'salida de bodega por autorizar' : 'salidas de bodega por autorizar', "showPage('inventario')"),
+  ].join('');
+  const rojas = _almLista.filter(a => a.nivel === 'rojo').length;
+  box.innerHTML = `<div class="card" style="border-left:3px solid ${rojas ? 'var(--red)' : (_almLista.length ? '#ffb020' : 'var(--green)')}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Logística del equipo</div>
+      <div style="font-size:11px;color:var(--ts)">${_almLista.length ? `${_almLista.length} pendiente${_almLista.length !== 1 ? 's' : ''}${rojas ? ` · <b style="color:var(--red)">${rojas} urgente${rojas !== 1 ? 's' : ''}</b>` : ''}` : 'Todo en orden ✓'}</div>
+    </div>
+    ${chips ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${chips}</div>` : ''}
+    <div id="alm-lista"></div>
+    ${j.catalogo === false ? '<div style="font-size:11px;color:var(--red);margin-top:6px">No se pudo leer el catálogo: las fechas de los tours pueden faltar.</div>' : ''}
+  </div>`;
+  _almPintar(false);
+}
+function _almPintar(todas) {
+  const el = document.getElementById('alm-lista');
+  if (!el) return;
+  const N = 8;
+  const lista = todas ? _almLista : _almLista.slice(0, N);
+  el.innerHTML = lista.map((a, i) => {
+    const color = a.nivel === 'rojo' ? 'var(--red)' : '#ffb020';
+    const cuando = a.dias == null ? '' : (a.dias === 0 ? 'HOY' : a.dias === 1 ? 'mañana' : `en ${a.dias} días`);
+    return `<div onclick="_almIr(_almLista[${_almLista.indexOf(a)}])" style="display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer">
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>
+      <span style="flex-shrink:0">${_ALM_ICONO[a.tipo] || '•'}</span>
+      <span style="flex:1;font-size:13px">${_almEsc(a.texto)}</span>
+      <span style="font-size:11px;color:var(--ts);text-align:right">${_almEsc(a.evento || '')}${cuando ? `<br><b style="color:${color}">${cuando}</b>` : ''}</span>
+    </div>`;
+  }).join('') + (_almLista.length > N ? `<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_almPintar(${!todas})">${todas ? 'Ver menos' : `Ver las ${_almLista.length}`}</button></div>` : '');
+}
+// La cobranza REAL de los tours que vienen: quién debe, cuánto y de qué tour,
+// con la cuenta de siempre (`deudores_migrados` → saldoMigrado). WhatsApp a la
+// mano. Fails-soft.
+async function _loadCobranzaHome() {
+  const el = document.getElementById('atrasados-lista');
+  if (!el) return;
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) { el.innerHTML = ''; return; }
+  try {
+    const [j, ev] = await Promise.all([khViajeros._call({ accion: 'deudores_migrados' }), _fetchEVFromIndex()]);
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+    const limite = new Date(Date.parse(hoy + 'T12:00:00Z') + 21 * 86400000).toISOString().slice(0, 10);
+    const evDe = {}; (ev || []).forEach(e => { if (e && e.id) evDe[e.id] = e; });
+    const fechaDe = (llave) => {
+      const [b, i] = String(llave || '').split('#'); const e = evDe[b]; if (!e) return null;
+      const mf = (i != null && Array.isArray(e.multifecha)) ? e.multifecha[Number(i)] : null;
+      return (mf && mf.ds) || (i != null && Array.isArray(e.dsList) && e.dsList[Number(i)]) || e.ds || null;
+    };
+    const nombreDe = (llave) => { const [b, i] = String(llave || '').split('#'); const e = evDe[b]; if (!e) return llave; const mf = (i != null && Array.isArray(e.multifecha)) ? e.multifecha[Number(i)] : null; return (e.a || b) + (mf && mf.lbl ? ' · ' + mf.lbl : ''); };
+    const deud = (j.deudores || []).map(d => ({ ...d, _f: fechaDe(d.evento_id) })).filter(d => d._f && d._f >= hoy && d._f <= limite && Number(d.resta || d.saldo || 0) > 0);
+    if (!deud.length) { el.innerHTML = '<div style="font-size:12px;color:var(--ts);text-align:center;padding:14px">Nadie debe en los tours de los próximos 21 días ✓</div>'; return; }
+    const porEv = {};
+    deud.forEach(d => { (porEv[d.evento_id] = porEv[d.evento_id] || []).push(d); });
+    const evs = Object.keys(porEv).sort((a, b) => porEv[a][0]._f.localeCompare(porEv[b][0]._f));
+    const fmt = (n) => (typeof _spFmtMxn === 'function') ? _spFmtMxn(n) : ('$' + Math.round(n).toLocaleString('es-MX'));
+    el.innerHTML = evs.map(k => {
+      const ls = porEv[k].sort((a, b) => Number(b.resta || b.saldo || 0) - Number(a.resta || a.saldo || 0));
+      const tot = ls.reduce((a, d) => a + Number(d.resta || d.saldo || 0), 0);
+      return `<details style="border-bottom:1px solid var(--border);padding:8px 0">
+        <summary style="cursor:pointer;display:flex;justify-content:space-between;gap:10px;font-size:13px">
+          <span><b>${_almEsc(nombreDe(k))}</b> <span style="color:var(--ts)">· ${_almEsc(porEv[k][0]._f)} · ${ls.length} persona${ls.length !== 1 ? 's' : ''}</span></span>
+          <b style="color:#ffb020">${fmt(tot)}</b></summary>
+        ${ls.map(d => { const cel = String(d.celular || '').replace(/\D/g, ''); return `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:4px 0 4px 12px">
+          <span>${_almEsc(d.nombre)}</span>
+          <span>${fmt(Number(d.resta || d.saldo || 0))}${cel.length >= 10 ? ` · <a href="https://wa.me/52${cel.slice(-10)}" target="_blank" rel="noopener" style="color:var(--green)">WhatsApp</a>` : ''}</span></div>`; }).join('')}
+      </details>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">No se pudo leer la cobranza: ${_almEsc(e.message)}</div>`;
+  }
 }

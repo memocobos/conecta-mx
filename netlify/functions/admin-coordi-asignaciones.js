@@ -122,6 +122,8 @@ const ACCIONES = {
   viajero_buscar_parecido: ROLES_EDITA_VIAJERO,
   // [STAFF-BOLETO-1] El boleto de un coordi/staff en UN tour (por fecha).
   staff_boleto: ROLES_EDITA_VIAJERO,
+  // [ALARMAS-1] La logística del equipo en una sola lista para el Resumen.
+  alarmas_operacion: ROLES_EDITA_VIAJERO,
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -369,6 +371,79 @@ exports.handler = async (event) => {
       }
       const insRows = await ins.json();
       return ok(headers, { viajero: insRows[0] || null });
+    }
+
+    // ── [ALARMAS-1 13-oct] la logística del equipo, en una lista ───────────
+    // Palabra de Memo: «un mejor sistema de alarmas de las acciones de los
+    // coordis: ya aceptó evento, falta ponerle boleto, creadora firmó, falta
+    // ponerle boleto, tallas…». SOLO LEE. Cada alarma dice qué falta, de quién,
+    // en qué tour y cuándo es, y a dónde ir a resolverlo. Solo tours que no han
+    // pasado. Rojo = faltan ≤7 días; amarillo = hay tiempo.
+    if (accion === 'alarmas_operacion') {
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const diasA = (f) => f ? Math.round((Date.parse(f + 'T12:00:00Z') - Date.parse(hoy + 'T12:00:00Z')) / 86400000) : null;
+      const leer = async (url) => { const r = await fetch(url, { headers: sbHeaders }); if (!r.ok) throw new Error(url.split('/rest/v1/')[1].split('?')[0] + ' ' + r.status); return r.json(); };
+      let asigs, usus, ctrs, staff, reqs, cambios, salidas, EV = [];
+      try {
+        [asigs, usus, ctrs, staff, reqs, cambios, salidas] = await Promise.all([
+          leer(`${baseEC}?select=id,evento_id,coordi_id,status,asignado_en&limit=5000`),
+          leer(`${baseUsuarios}?select=id,nombre,rol,correo,talla_playera,activo&limit=1000`),
+          leer(`${baseContratos}?select=id,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,datos&limit=2000`),
+          leer(`${baseVE}?tipo_viajero=not.is.null&tipo_viajero=neq.cliente&select=id,evento_id,usuario_id,nombre,zona_boleto,talla_playera,tipo_viajero&limit=5000`),
+          leer(`${env.KH_SB_URL}/rest/v1/requisiciones?estado=eq.pendiente&select=id&limit=1000`),
+          leer(`${env.KH_SB_URL}/rest/v1/cambios_viajero?estado=eq.pendiente&select=id&limit=1000`),
+          leer(`${env.KH_SB_URL}/rest/v1/salidas_bodega?estado=eq.solicitada&select=id,evento_id,solicitante_id&limit=500`),
+        ]);
+      } catch (e) { return upstream(headers, e.message, 'consulta'); }
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = []; }
+      const evDe = {}; (EV || []).forEach((e) => { if (e && e.id) evDe[e.id] = e; });
+      // Fecha y nombre de una llave (`omar#1` → la fecha de esa función).
+      const infoEv = (llave) => {
+        const [b, i] = String(llave || '').split('#'); const e = evDe[b];
+        if (!e) return { nombre: llave, fecha: null };
+        const mf = (i != null && Array.isArray(e.multifecha)) ? e.multifecha[Number(i)] : null;
+        const fecha = (mf && mf.ds) || (i != null && Array.isArray(e.dsList) && e.dsList[Number(i)]) || e.ds || null;
+        return { nombre: (e.a || b) + (mf && mf.lbl ? ' · ' + mf.lbl : ''), fecha };
+      };
+      const uDe = {}; (usus || []).forEach((u) => { uDe[u.id] = u; });
+      const firmado = new Set((ctrs || []).filter((c) => c.plantilla === 'coordinador' && c.estado === 'firmado').map((c) => String(c.creador_email || '').toLowerCase()));
+      const alarmas = [];
+      const push = (a) => { a.nivel = a.nivel || ((a.dias != null && a.dias <= 7) ? 'rojo' : 'amarillo'); alarmas.push(a); };
+      // 1) Equipo asignado (coordis/staff) a tours que vienen.
+      (asigs || []).forEach((a) => {
+        if (a.status === 'declinado') return;
+        const ev = infoEv(a.evento_id); const dias = diasA(ev.fecha);
+        if (dias == null || dias < 0) return;
+        const u = uDe[a.coordi_id] || {}; const quien = u.nombre || 'Alguien';
+        const base = { evento_id: a.evento_id, evento: ev.nombre, fecha: ev.fecha, dias, persona: quien };
+        if (a.status !== 'aceptado') push({ ...base, tipo: 'por_aceptar', texto: `${quien} no ha aceptado el tour` });
+        if (u.rol === 'coordinador' && !firmado.has(String(u.correo || '').toLowerCase())) push({ ...base, tipo: 'sin_contrato', nivel: 'rojo', texto: `${quien} va asignada(o) y NO ha firmado contrato` });
+        const fila = (staff || []).find((v) => v.usuario_id === a.coordi_id && (v.evento_id === a.evento_id || String(v.evento_id).split('#')[0] === a.evento_id));
+        if (!fila || !fila.zona_boleto) push({ ...base, tipo: 'sin_boleto', texto: `${quien} no tiene boleto asignado` });
+        if (!((fila && fila.talla_playera) || u.talla_playera)) push({ ...base, tipo: 'sin_talla', nivel: 'amarillo', texto: `${quien} no tiene talla de playera` });
+      });
+      // 2) Creadoras: contrato del tour (por fecha del contrato).
+      // Un contrato reenviado deja dos filas pendientes de la misma persona: se
+      // avisa una vez (gana la firmada, si la hay).
+      const vistos = new Set();
+      (ctrs || []).filter((c) => c.plantilla === 'creadora' && c.estado !== 'cancelado')
+        .sort((x, y) => (x.estado === 'firmado' ? 0 : 1) - (y.estado === 'firmado' ? 0 : 1)).forEach((c) => {
+        const dias = diasA(c.evento_fecha);
+        if (dias == null || dias < 0) return;
+        const llaveC = String(c.creador_email || c.creador_nombre).toLowerCase() + '|' + c.evento_fecha;
+        if (vistos.has(llaveC)) return; vistos.add(llaveC);
+        const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+        const base = { contrato_id: c.id, evento: c.evento_nombre, fecha: c.evento_fecha, dias, persona: c.creador_nombre, evento_id: (d.cortesia && d.cortesia.evento_id) || null };
+        if (c.estado !== 'firmado') { push({ ...base, tipo: 'creadora_sin_firma', texto: `${c.creador_nombre} (creadora) no ha firmado su contrato` }); return; }
+        if (!d.cortesia) push({ ...base, tipo: 'creadora_sin_boleto', texto: `${c.creador_nombre} (creadora) ya firmó — falta asignarle su cortesía` });
+        if (!d.talla) push({ ...base, tipo: 'creadora_sin_talla', nivel: 'amarillo', texto: `${c.creador_nombre} (creadora) sin talla de playera` });
+        if (d.acompanante && d.acompanante.nombre && !d.acompanante.talla) push({ ...base, tipo: 'acomp_sin_talla', nivel: 'amarillo', texto: `Acompañante de ${c.creador_nombre} sin talla` });
+      });
+      // 3) Bandejas que esperan a alguien.
+      const bandejas = { requisiciones: (reqs || []).length, cambios: (cambios || []).length, salidas: (salidas || []).length };
+      const orden = { rojo: 0, amarillo: 1 };
+      alarmas.sort((x, y) => (orden[x.nivel] - orden[y.nivel]) || ((x.dias ?? 999) - (y.dias ?? 999)));
+      return ok(headers, { alarmas, bandejas, hoy, catalogo: EV.length > 0 });
     }
 
     // ── [STAFF-BOLETO-1 13-oct] el boleto de un coordi/staff en un tour ─────

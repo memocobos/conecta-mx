@@ -5264,6 +5264,23 @@ async function abrirDetalleEvento(id) {
 }
 
 // ── EQUIPO ASIGNADO ──────────────────────────────────────────
+// [STAFF-BOLETO-1] Guarda el boleto de staff de una persona en la fecha abierta.
+async function staffBoletoGuardar(coordiId) {
+  const sel = document.getElementById('sb-' + coordiId);
+  const msg = document.getElementById('sb-msg-' + coordiId);
+  if (!sel || !_ccEventoActual) return;
+  if (msg) { msg.textContent = 'Guardando…'; msg.style.color = 'var(--ts)'; }
+  try {
+    const j = await khViajeros._call({ accion: 'staff_boleto', evento_id: _ccEventoActual, coordi_id: coordiId, zona: sel.value });
+    if (msg) {
+      msg.textContent = j.aviso ? ('⚠️ ' + j.aviso) : (j.ya ? 'sin cambios' : (j.zona ? `✓ ${j.zona} — descontado del inventario` : '✓ boleto quitado — regresó al inventario'));
+      msg.style.color = j.aviso ? '#ffb020' : 'var(--green)';
+    }
+    if (typeof loadViajeros === 'function') loadViajeros();
+  } catch (e) {
+    if (msg) { msg.textContent = e.message || 'No se pudo guardar'; msg.style.color = 'var(--red)'; }
+  }
+}
 async function loadCCEquipo() {
   if (!_ccEventoActual) return;
   const container = document.getElementById('cc-coordis-asignados');
@@ -5354,6 +5371,34 @@ async function loadCCEquipo() {
     const statusLabel = { pendiente:'Pendiente', aceptado:'Aceptó', declinado:'Declinó' };
     const COLOR_PEND_FIRMA = '#e8ff4c';
 
+    // [STAFF-BOLETO-1] El boleto de cada quien en ESTA fecha: su lugar de
+    // viajero (por `usuario_id`) y las zonas de la ficha. Solo los roles que
+    // mueven inventario lo ven; un tropiezo aquí no tumba la lista del equipo.
+    const _puedeBoleto = !!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol));
+    let _zonaDe = {}, _zonasEv = [];
+    if (_puedeBoleto && asigs.length) {
+      try {
+        (await khViajeros.listar(_ccEventoActual) || []).forEach(v => { if (v.usuario_id) _zonaDe[v.usuario_id] = v.zona_boleto || ''; });
+      } catch (_) { _zonaDe = null; }
+      const _e = ev._ev || {};
+      const _idx = String(_ccEventoActual).includes('#') ? Number(String(_ccEventoActual).split('#')[1]) : null;
+      const _mf = (_idx != null && Array.isArray(_e.multifecha)) ? (_e.multifecha[_idx] || {}) : {};
+      _zonasEv = [...new Set([].concat(_mf.zonas || [], _mf.cheapZonas || [], _e.zonas || [], _e.cheapZonas || []).map(z => z && z.n).filter(Boolean))];
+    }
+    const _boletoHtml = (a) => {
+      if (!_puedeBoleto || !_zonasEv.length) return '';
+      if (_zonaDe === null) return '<div style="font-size:11px;color:var(--red);margin-top:6px">No se pudo leer su boleto actual — recarga.</div>';
+      const actual = _zonaDe[a.coordi_id] || '';
+      return `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--ts)">🎟 Boleto:</span>
+        <select class="cot-input" id="sb-${a.coordi_id}" style="width:auto;min-width:150px;padding:4px 8px;font-size:12px">
+          <option value="">— sin boleto —</option>
+          ${_zonasEv.map(z => `<option value="${_esfEsc(z)}"${z === actual ? ' selected' : ''}>${_esfEsc(z)}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="staffBoletoGuardar('${a.coordi_id}')">Guardar</button>
+        <span id="sb-msg-${a.coordi_id}" style="font-size:11px;color:var(--ts)">${actual ? '' : 'sin boleto todavía'}</span>
+      </div>`;
+    };
     const htmlAsigs = asigs.map(a => {
       const u = uMap[a.coordi_id]||{};
       const st = a.status||'pendiente';
@@ -5375,6 +5420,7 @@ async function loadCCEquipo() {
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
               ${indicacionesHtml}
               ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${_esfEsc(a.motivo_declinacion)}</div>` : ''}
+              ${st !== 'declinado' ? _boletoHtml(a) : ''}
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">

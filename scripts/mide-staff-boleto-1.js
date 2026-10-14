@@ -1,0 +1,93 @@
+#!/usr/bin/env node
+// =============================================================================
+// mide:staff-boleto-1 — el boleto de un coordi/staff en un tour (13-oct).
+// Por el HANDLER REAL (`staff_boleto`), base falsa con filtros + valor esperado:
+//   [A] sin lugar todavía → nace su fila de staff con la zona y +1 al inventario
+//   [B] 2º clic con la misma zona → CERO escrituras
+//   [C] cambiar de zona → −1 en la vieja, +1 en la nueva
+//   [D] quitar ('') → −1 y la zona en NULL
+//   [E] zona que no es de la ficha → 400 y CERO escrituras
+//   [F] persona no asignada → 409 · fila de cliente → 409
+//   [G] la asignación al evento BASE sirve para una fecha (`omar#0`)
+// Sin ancla de commit a propósito: carga del árbol de trabajo.
+// =============================================================================
+const path = require('path');
+const RAIZ = path.join(__dirname, '..');
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-de-arnes';
+process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.falso.test';
+process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'svc';
+
+// La puerta de zonas sin red: la ficha de mentira de Soy Luna.
+const zf = require.resolve(path.join(RAIZ, 'netlify/functions/_lib/zona-ficha.js'));
+const ZONAS = ['VIP', 'Platino', 'Luneta'];
+require.cache[zf] = { id: zf, filename: zf, loaded: true, exports: {
+  puertaZona: async (ev, z) => {
+    const c = ZONAS.find((x) => x.toLowerCase() === String(z).trim().toLowerCase());
+    return c ? { estado: c === z ? 'exacta' : 'canonizada', zona: c, canonicas: ZONAS } : { estado: 'desconocida', zona: z, canonicas: ZONAS };
+  },
+  zonasCanonicasDe: () => ZONAS, resolverZonaFicha: () => ({}),
+} };
+
+let V = 0, R = 0;
+const af = (c, m) => { let ok = false; try { ok = !!(typeof c === 'function' ? c() : c); } catch (_) {} if (ok) { V++; console.log('  ✓ ' + m); } else { R++; console.log('  ✗ ' + m); } };
+const C1 = 'cccccccc-0000-4000-8000-000000000001', C2 = 'cccccccc-0000-4000-8000-000000000002', C3 = 'cccccccc-0000-4000-8000-000000000003';
+let DB, ESC = 0, SEQ = 0;
+const base = () => ({
+  usuarios: [{ id: C1, nombre: 'Coordi Uno', rol: 'coordinador', correo: 'c1@x.mx', talla_playera: 'M', activo: true },
+             { id: C3, nombre: 'Coordi Tres', rol: 'coordinador', correo: 'c3@x.mx', activo: true },
+             { id: 'u-roshi', nombre: 'Memo', rol: 'maestro_roshi', activo: true }],
+  eventos_coordi: [{ id: 'a1', evento_id: 'soyluna', coordi_id: C1, status: 'aceptado' }, { id: 'a3', evento_id: 'omar', coordi_id: C3, status: 'pendiente' }],
+  viajeros_evento: [{ id: 'cli', evento_id: 'soyluna', nombre: 'Cliente', usuario_id: C2, tipo_viajero: 'cliente', zona_boleto: 'VIP' }],
+  stock_ajustes: [{ id: 's-pl', evento_id: 'soyluna', zona: 'Platino', vendidos_fuera: 7, nota: 'n' }],
+});
+const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b) });
+const casa = (row, k, v) => {
+  const val = row[k] == null ? null : String(row[k]);
+  if (v === 'is.null') return val === null;
+  if (v.startsWith('eq.')) return val === decodeURIComponent(v.slice(3));
+  if (v.startsWith('in.(')) return v.slice(4, -1).split(',').map(decodeURIComponent).includes(val);
+  throw new Error('filtro no modelado ' + k + '=' + v);
+};
+global.fetch = async (url, init) => {
+  init = init || {}; const m = (init.method || 'GET').toUpperCase();
+  const u = new URL(url); const t = u.pathname.replace('/rest/v1/', '');
+  const T = DB[t]; if (!T) throw new Error('tabla no modelada ' + t);
+  if (m === 'DELETE') throw new Error('DELETE prohibido');
+  const sel = (r) => { for (const [k, v] of u.searchParams.entries()) { if (['select', 'order', 'limit'].includes(k)) continue; if (!casa(r, k, v)) return false; } return true; };
+  if (m === 'GET') return resp(200, T.filter(sel).map((r) => ({ ...r })));
+  ESC++;
+  const b = JSON.parse(init.body);
+  if (m === 'POST') { const f = Object.assign({ id: 'n' + (++SEQ) }, b); T.push(f); return resp(201, [f]); }
+  if (m === 'PATCH') { const fs = T.filter(sel); fs.forEach((r) => Object.assign(r, b)); return resp(200, fs); }
+};
+const H = require(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js')).handler;
+const { jwtSign } = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js'));
+const tok = jwtSign({ id: 'u-roshi', rol: 'maestro_roshi', correo: 'memo@x.mx' }, process.env.JWT_SECRET, 3600);
+const pedir = async (b) => { const r = await H({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + tok }, body: JSON.stringify(Object.assign({ accion: 'staff_boleto' }, b)) }); return { s: r.statusCode, j: JSON.parse(r.body) }; };
+const st = (z, ev = 'soyluna') => { const f = DB.stock_ajustes.find((x) => x.evento_id === ev && x.zona === z); return f ? f.vendidos_fuera : 0; };
+const filaDe = (c, ev = 'soyluna') => DB.viajeros_evento.find((v) => v.usuario_id === c && v.evento_id === ev);
+
+(async () => {
+  console.log('══ mide:staff-boleto-1 ══');
+  DB = base();
+  let r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'platino' });
+  af(r.s === 200 && filaDe(C1) && filaDe(C1).zona_boleto === 'Platino' && filaDe(C1).tipo_viajero === 'coordinador' && filaDe(C1).talla_playera === 'M', `[A1] nace su fila de staff con la zona canónica (${r.s}) ${JSON.stringify(r.j)}`);
+  af(st('Platino') === 8, `[A2] Platino 7 → 8 (${st('Platino')})`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Platino' });
+  af(r.j.ya === true && ESC === 0, `[B] 2º clic misma zona → 0 escrituras (${ESC})`);
+  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Luneta' });
+  af(r.s === 200 && filaDe(C1).zona_boleto === 'Luneta' && st('Platino') === 7 && st('Luneta') === 1, `[C] cambio: Platino ${st('Platino')} · Luneta ${st('Luneta')}`);
+  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: '' });
+  af(r.s === 200 && filaDe(C1).zona_boleto === null && st('Luneta') === 0, `[D] quitar: zona null · Luneta ${st('Luneta')}`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Balcón X' });
+  af(r.s === 400 && ESC === 0 && /Zonas: VIP/.test(r.j.error), `[E] zona inventada → 400 nombrando las zonas, 0 escrituras (${r.s}, ${ESC})`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C2, zona: 'VIP' });
+  af(r.s === 409 && ESC === 0, `[F1] no asignado → 409 (${r.s})`);
+  DB.eventos_coordi.push({ id: 'a2', evento_id: 'soyluna', coordi_id: C2, status: 'aceptado' });
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C2, zona: 'Platino' });
+  af(r.s === 409 && ESC === 0 && filaDe(C2).zona_boleto === 'VIP', `[F2] fila de CLIENTE → 409 sin tocarla (${r.s})`);
+  r = await pedir({ evento_id: 'omar#0', coordi_id: C3, zona: 'VIP' });
+  af(r.s === 200 && filaDe(C3, 'omar#0') && filaDe(C3, 'omar#0').zona_boleto === 'VIP' && st('VIP', 'omar#0') === 1, `[G] asignación base abre la fecha omar#0 (${r.s})`);
+  console.log(`\n${R ? '🔴' : '🟢'} ${V} en verde · ${R} en rojo`);
+  process.exit(R ? 1 : 0);
+})().catch((e) => { console.error('💥', e); process.exit(2); });

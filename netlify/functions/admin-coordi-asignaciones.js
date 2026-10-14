@@ -119,6 +119,8 @@ const ACCIONES = {
   viajero_migrar: ROLES_EDITA_VIAJERO,
   precio_sugerido: ROLES_EDITA_VIAJERO,   // [CAP-MIG-FIX] solo sugiere; no escribe nada
   viajero_buscar_parecido: ROLES_EDITA_VIAJERO,
+  // [STAFF-BOLETO-1] El boleto de un coordi/staff en UN tour (por fecha).
+  staff_boleto: ROLES_EDITA_VIAJERO,
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -366,6 +368,104 @@ exports.handler = async (event) => {
       }
       const insRows = await ins.json();
       return ok(headers, { viajero: insRows[0] || null });
+    }
+
+    // ── [STAFF-BOLETO-1 13-oct] el boleto de un coordi/staff en un tour ─────
+    // Palabra de Memo: «hay que empezarles a asignar boletos» (51 asignaciones).
+    // El 🎟 del contrato es de UN evento por contrato y el de coordinador es
+    // anual, así que el boleto de staff vive en la ASIGNACIÓN: { evento_id
+    // (la llave de la tarjeta, `omar#0`), coordi_id, zona } — zona '' = quitar.
+    //   · la zona pasa por la PUERTA de la ficha (desconocida → 400 nombrando
+    //     las que sí hay; mal escrita → se guarda la canónica);
+    //   · se escribe en SU lugar de viajero (`usuario_id` + evento); si todavía
+    //     no aceptó y no tiene lugar, nace igual que al aceptar (staff, PLUS);
+    //   · el inventario: el staff NO descuenta por su cuenta (consumeBoleto),
+    //     así que se suma 1 a `vendidos_fuera` de la zona nueva y se resta 1 de
+    //     la vieja si cambió. Cada PATCH lleva el valor esperado: el 2º clic
+    //     con la misma zona no escribe NADA. Cero DELETEs.
+    if (accion === 'staff_boleto') {
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+      const coordi_id = String(body.coordi_id || '').trim();
+      if (!UUID_RE.test(coordi_id)) return bad(headers, 'coordi_id inválido');
+      const zonaPedida = cleanText(body.zona, 120) || '';
+      const eventoBase = evento_id.split('#')[0];
+      // Tiene que estar asignado a esa fecha o al evento base.
+      const ra = await fetch(`${baseEC}?coordi_id=eq.${coordi_id}&evento_id=in.(${[...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',')})&select=id,status&limit=1`, { headers: sbHeaders });
+      if (!ra.ok) return upstream(headers, await ra.text(), 'consulta');
+      if (!(await ra.json()).length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esa persona no está asignada a este tour' }) };
+
+      let zona = null;
+      if (zonaPedida) {
+        const pz = await puertaZona(evento_id, zonaPedida);
+        if (pz.estado === 'desconocida') return bad(headers, `«${zonaPedida}» no es zona de este evento. Zonas: ${(pz.canonicas || []).join(', ')}`);
+        zona = pz.zona;
+      }
+
+      // Su lugar de viajero en ESTA fecha.
+      const rv = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&usuario_id=eq.${coordi_id}&select=id,zona_boleto,tipo_viajero,notas&limit=1`, { headers: sbHeaders });
+      if (!rv.ok) return upstream(headers, await rv.text(), 'consulta');
+      let fila = (await rv.json())[0] || null;
+      const zonaVieja = fila ? (fila.zona_boleto || null) : null;
+      if (zonaVieja === zona) return ok(headers, { ya: true, zona });
+
+      if (!fila) {
+        if (!zona) return ok(headers, { ya: true, zona: null });
+        const ur = await fetch(`${baseUsuarios}?id=eq.${coordi_id}&select=id,nombre,celular,correo,talla_playera,num_emergencia,nombre_emergencia,rol&limit=1`, { headers: sbHeaders });
+        if (!ur.ok) return upstream(headers, await ur.text(), 'consulta');
+        const u = (await ur.json())[0];
+        if (!u) return bad(headers, 'Usuario no encontrado');
+        const ins = await fetch(baseVE, {
+          method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({
+            evento_id, nombre: u.nombre, celular: u.celular || null, correo: u.correo || null,
+            talla_playera: u.talla_playera || null, num_emergencia: u.num_emergencia || null,
+            emergencia_nombre: u.nombre_emergencia || null, tipo_paquete: 'PLUS',
+            tipo_viajero: u.rol || 'staff', usuario_id: u.id, zona_boleto: zona,
+            notas: `[STAFF:${u.rol || 'staff'}] Boleto de staff asignado en Capsule (${zona})`,
+          }),
+        });
+        if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
+        fila = (await ins.json())[0];
+      } else {
+        if (esCliente(fila.tipo_viajero)) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esa fila es de un cliente, no de staff: el boleto de un cliente se maneja en su compra' }) };
+        const up = await fetch(`${baseVE}?id=eq.${fila.id}&${zonaVieja ? `zona_boleto=eq.${encodeURIComponent(zonaVieja)}` : 'zona_boleto=is.null'}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ zona_boleto: zona, notas: `${fila.notas || ''} · boleto de staff: ${zonaVieja || '—'} → ${zona || '—'}`.slice(0, 4000) }),
+        });
+        if (!up.ok) return upstream(headers, await up.text(), 'update');
+        if (!(await up.json()).length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien la cambió al mismo tiempo: recarga y vuelve a intentar' }) };
+      }
+
+      // Inventario: −1 en la vieja, +1 en la nueva, con valor esperado.
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const mover = async (z, delta) => {
+        const sr = await fetch(`${baseStock}?evento_id=eq.${encodeURIComponent(evento_id)}&zona=eq.${encodeURIComponent(z)}&select=id,vendidos_fuera,nota&limit=1`, { headers: sbHeaders });
+        if (!sr.ok) throw new Error('stock ' + sr.status);
+        const st = (await sr.json())[0];
+        const nota = `boleto de staff ${delta > 0 ? '+1' : '−1'} (${quien})`;
+        if (st) {
+          const nuevo = Math.max(0, Number(st.vendidos_fuera || 0) + delta);
+          const p = await fetch(`${baseStock}?id=eq.${st.id}&vendidos_fuera=eq.${Number(st.vendidos_fuera || 0)}`, {
+            method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+            body: JSON.stringify({ vendidos_fuera: nuevo, nota: `${st.nota || ''} · ${nota}`.slice(0, 2000), updated_por: quien, updated_at: new Date().toISOString() }),
+          });
+          if (!p.ok || !(await p.json()).length) throw new Error('stock cambió al mismo tiempo');
+        } else if (delta > 0) {
+          const p = await fetch(baseStock, {
+            method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+            body: JSON.stringify({ evento_id, zona: z, vendidos_fuera: 1, nota, updated_por: quien }),
+          });
+          if (!p.ok) throw new Error('stock ' + p.status);
+        }
+      };
+      try {
+        if (zonaVieja) await mover(zonaVieja, -1);
+        if (zona) await mover(zona, +1);
+      } catch (e) {
+        return { statusCode: 207, headers, body: JSON.stringify({ ok: true, zona, aviso: `La zona quedó en su lugar, pero el inventario no se movió (${e.message}): revisa la casilla de ${zona || zonaVieja} en Kamisama.` }) };
+      }
+      return ok(headers, { zona, antes: zonaVieja });
     }
 
     // ── [CREA-1b] cortesía: boleto de cortesía a un evento ────────────────

@@ -865,7 +865,7 @@
   <!-- Tabs de estado (Memo/Popo ven todos; coordi ve los suyos) -->
   <div id="rep-filtros" style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
    <button class="gz-filter active" id="rfil-todos" onclick="filtrarReportes('todos',this)">// todos</button>
-   <button class="gz-filter" id="rfil-pendiente" onclick="filtrarReportes('enviado',this)">// pendientes</button>
+   <button class="gz-filter" id="rfil-pendiente" onclick="filtrarReportes('enviado',this)">Pendientes</button>
    <button class="gz-filter" id="rfil-rechazado" onclick="filtrarReportes('rechazado',this)">// rechazados</button>
    <button class="gz-filter" id="rfil-popo" onclick="filtrarReportes('aprobado_popo',this)">// en revisión Roshi</button>
    <button class="gz-filter" id="rfil-aprobado" onclick="filtrarReportes('aprobado_memo',this)">// aprobados</button>
@@ -1335,11 +1335,11 @@
          <button class="btn btn-ghost btn-sm" onclick="loadRequisiciones()">↻ Refrescar</button>
         </div>
        </div>
-       <div class="tabs" id="req-bdj-tabs" style="margin-bottom:14px">
-        <button class="tab-btn active" data-filtro="pendiente" onclick="loadRequisiciones('pendiente')">// pendientes</button>
-        <button class="tab-btn" data-filtro="aprobada" onclick="loadRequisiciones('aprobada')">// aprobadas</button>
-        <button class="tab-btn" data-filtro="rechazada" onclick="loadRequisiciones('rechazada')">// rechazadas</button>
-        <button class="tab-btn" data-filtro="todas" onclick="loadRequisiciones('todas')">// todas</button>
+       <div class="rq-seg" id="req-bdj-tabs">
+        <button class="tab-btn active" data-filtro="pendiente" onclick="loadRequisiciones('pendiente')">Pendientes</button>
+        <button class="tab-btn" data-filtro="aprobada" onclick="loadRequisiciones('aprobada')">Aprobadas</button>
+        <button class="tab-btn" data-filtro="rechazada" onclick="loadRequisiciones('rechazada')">Rechazadas</button>
+        <button class="tab-btn" data-filtro="todas" onclick="loadRequisiciones('todas')">Todas</button>
        </div>
        <div id="req-bdj-lista"><div style="color:var(--ts);padding:20px">Cargando…</div></div>
      </div>
@@ -1446,7 +1446,7 @@
       <!-- TAB: Deudas -->
       <div id="mt-tab-deudas" style="display:none">
        <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
-        <button class="gz-filter active" id="mtd-fil-pendientes" onclick="filtrarMTDeudas('pendientes',this)">// pendientes</button>
+        <button class="gz-filter active" id="mtd-fil-pendientes" onclick="filtrarMTDeudas('pendientes',this)">Pendientes</button>
         <button class="gz-filter" id="mtd-fil-pagadas" onclick="filtrarMTDeudas('pagadas',this)">// pagadas</button>
         <button class="gz-filter" id="mtd-fil-todas" onclick="filtrarMTDeudas('todas',this)">// todas</button>
        </div>
@@ -1457,7 +1457,7 @@
       <div id="mt-tab-reportes" style="display:none">
        <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
         <button class="gz-filter active" id="mtr-fil-todos" onclick="filtrarMTReportes('todos',this)">// todos</button>
-        <button class="gz-filter" id="mtr-fil-enviado" onclick="filtrarMTReportes('enviado',this)">// pendientes</button>
+        <button class="gz-filter" id="mtr-fil-enviado" onclick="filtrarMTReportes('enviado',this)">Pendientes</button>
         <button class="gz-filter" id="mtr-fil-popo" onclick="filtrarMTReportes('aprobado_popo',this)">// en revisión Popo</button>
         <button class="gz-filter" id="mtr-fil-rechazado" onclick="filtrarMTReportes('rechazado',this)">// rechazados</button>
         <button class="gz-filter" id="mtr-fil-aprobado" onclick="filtrarMTReportes('aprobado_memo',this)">// aprobados</button>
@@ -2667,7 +2667,7 @@
           de 25 están firmados y no piden nada. Y // vencidos vive APARTE — no
           sale en pendientes ni en firmados, como el archivo de Esferas. -->
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="gz-filter active" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)">// pendientes</button>
+      <button class="gz-filter active" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)">Pendientes</button>
       <button class="gz-filter" id="ctrf-firmados" onclick="filtrarContratos('firmado',this)">// firmados</button>
       <button class="gz-filter" id="ctrf-vencidos" onclick="filtrarContratos('vencido',this)" title="Vigencia terminada. Se calcula de vigencia_fin — hoy solo la llena la plantilla coordinador.">// vencidos</button>
       <button class="gz-filter" id="ctrf-todos" onclick="filtrarContratos('todos',this)">// todos</button>

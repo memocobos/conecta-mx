@@ -4799,6 +4799,10 @@ let _ccViajeros = [];
 let _ccHabitaciones = [];
 let _vj5KH = [];   // [VJ-5] viajeros KH del evento (para acomodarlos en cuartos)
 let _ccEventosCache = [];
+// [CC-FECHAS-1] El EQUIPO se asigna al evento (slug BASE), no a una fecha: así
+// viven las asignaciones de hoy (karolg, omar, soyluna…) y así las leen Guerreros
+// Z, Montaña Pai y los crons. Viajeros/abonos/rooming sí van por fecha (slug#idx).
+function _ccBase() { return _ccEventoActual ? String(_ccEventoActual).split('#')[0] : null; }
 let _ccAsignados = [];
 let _ccFiltroFecha = 'todos';   // filtro de fecha activo (todos/proximo/pasado); se combina con el buscador
 
@@ -4820,9 +4824,10 @@ async function loadCapsule() {
     // como si fuera «no hay eventos».
     const _fallo = (typeof evCatalogoFallo === 'function') ? evCatalogoFallo() : null;
     if (_fallo) throw _fallo;
+    // [CC-FECHAS-1] Una tarjeta POR FECHA (slug#idx) en los multifecha.
     _ccEventosCache = (ev || [])
       .filter(e => e && e.id && e.a)
-      .map(_ccEvFromEV);
+      .flatMap(_ccEvsFromEV);
     // [ORD-1] Ordenaba DESCENDENTE: el evento más lejano arriba y el próximo a
     // media lista. Es la parrilla de eventos de Capsule, la misma regla que
     // todo lo demás.
@@ -5253,7 +5258,7 @@ async function loadCCEquipo() {
   const countEl   = document.getElementById('cc-equipo-count');
   try {
     const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
-    const asigs = await khAsignaciones.listar({ evento_id: _ccEventoActual }); // [sec-coordi]
+    const asigs = await khAsignaciones.listar({ evento_id: _ccBase() }); // [sec-coordi] [CC-FECHAS-1] equipo = evento base
     _ccAsignados = asigs;
 
     let usuarios = [];

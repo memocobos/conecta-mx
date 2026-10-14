@@ -25,6 +25,9 @@ async function _crearNotif(payload) {
 }
 function _migEl(id) { return document.getElementById(id); }
 function _migSlug() {
+  // [CC-FECHAS-1] La tarjeta de Capsule ya ES una fecha (`omar#1`): esa llave
+  // manda. Solo un evento sin fechas usa el selector interno del wizard.
+  if (_ccEventoActual && String(_ccEventoActual).includes('#')) return _ccEventoActual;
   const base = _ccEventoActual;
   if (!base) return null;
   return (_migFechaIdx == null) ? base : `${base}#${_migFechaIdx}`;
@@ -80,7 +83,9 @@ async function vjAltaAbrir() {
     const a = document.getElementById('vj-alta-alert');
     if (a) a.innerHTML = '<div class="alert alert-error">No se pudo cargar el catálogo de eventos. Intenta de nuevo.</div>';
   }
-  evSelectorPintar(sel, lista, { papel: 'mando', expandirFechas: false });
+  // [CC-FECHAS-1] Ahora SÍ por fecha: cada fecha es su tarjeta en Capsule, y el
+  // wizard toma la fecha de la tarjeta (`slug#idx`) en vez de preguntarla.
+  evSelectorPintar(sel, lista, { papel: 'mando' });
   openModal('modal-vj-alta');
   setTimeout(() => { if (sel) sel.focus(); }, 60);
 }
@@ -99,7 +104,11 @@ async function vjAltaIr() {
   }
   closeModal('modal-vj-alta');
   showPage('capsule');
-  await abrirDetalleEvento(id);
+  if (!(_ccEventosCache || []).length && typeof loadCapsule === 'function') await loadCapsule();
+  // Un multifecha de UNA sola fecha llega como `slug#0` del selector pero su
+  // tarjeta es la base: se cae a ella.
+  const idCard = (_ccEventosCache || []).some(e => e.id === id) ? id : String(id).split('#')[0];
+  await abrirDetalleEvento(idCard);
   const sub = document.getElementById('cc-sub-btn-viajeros');
   // [FLUJO-UX-9b] `true` = la eligió la casa. Este salto a Viajeros es parte del
   // camino del alta, NO la costumbre de quien navega: registrarlo cambiaría el
@@ -124,12 +133,17 @@ async function migAbrir() {
   _migEV = null;
   try {
     const ev = await _fetchEVFromIndex();
-    _migEV = (ev || []).find(e => e && e.id === _ccEventoActual) || null;
+    _migEV = (ev || []).find(e => e && e.id === _ccBase()) || null;   // [CC-FECHAS-1] el catálogo es del evento base
   } catch (_) { /* fails-soft: se avisa abajo */ }
 
   const fw = _migEl('mig-fecha-wrap');
-  const lista = _migEV && Array.isArray(_migEV.dsList) && _migEV.dsList.length > 1 ? _migEV.dsList : null;
-  if (lista) {
+  const fijada = String(_ccEventoActual).includes('#');
+  const lista = !fijada && _migEV && Array.isArray(_migEV.dsList) && _migEV.dsList.length > 1 ? _migEV.dsList : null;
+  if (fijada) {
+    // [CC-FECHAS-1] La fecha ya la eligió la tarjeta: no se vuelve a preguntar.
+    _migFechaIdx = parseInt(String(_ccEventoActual).split('#')[1], 10);
+    if (fw) fw.style.display = 'none';
+  } else if (lista) {
     // Multifecha: la fecha se elige UNA vez y se captura la tanda (firmado).
     const sel = _migEl('mig-fecha');
     sel.innerHTML = lista.map((d, i) => `<option value="${i}">${_esfEsc(_migFechaTxt(d))}</option>`).join('');
@@ -504,7 +518,7 @@ async function guardarAsignacionCoordi() {
   alertEl.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
   try {
     const asig = await khAsignaciones.crear({ // [sec-coordi]
-      evento_id: _ccEventoActual,
+      evento_id: _ccBase(),   // [CC-FECHAS-1] el equipo es del evento, no de una fecha
       coordi_id: coordiId,
       indicaciones,
     });

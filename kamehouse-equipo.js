@@ -1577,6 +1577,34 @@ function _ccEvFromEV(e) {
     _ev:            e,
   };
 }
+// [CC-FECHAS-1 13-oct] «En Capsule no están los eventos por fecha: de Omar
+// Courtz solo está el del 6, el del 7 no» (Memo). Capsule pintaba UNA tarjeta
+// por evento con el slug BASE (`omar`), y los viajeros, abonos y rooming de un
+// multifecha viven en `omar#0` / `omar#1` — la tarjeta base no encontraba a
+// NADIE y la segunda fecha no existía. Hoy cada fecha es su propia tarjeta con
+// la llave `slug#idx` (la misma forma de `_evSelectorOpciones`) y la etiqueta
+// de la fecha. Un evento de una sola fecha queda EXACTAMENTE como antes.
+function _ccEvsFromEV(e) {
+  const mf = Array.isArray(e && e.multifecha) ? e.multifecha : [];
+  if (mf.length < 2) return [_ccEvFromEV(e)];
+  // Un FESTIVAL vende pases de varios días que viven en el slug base (edc27:
+  // «3 días»). Su tarjeta base se queda, rotulada, para que ese viajero no
+  // desaparezca de Capsule.
+  const pases = e.festival ? [Object.assign(_ccEvFromEV(e), { nombre: (e.a || e.id) + ' · pases de varios días' })] : [];
+  return pases.concat(mf.map((f, i) => {
+    const base = _ccEvFromEV(e);
+    const lbl = (f && f.lbl) ? f.lbl : ('Fecha ' + (i + 1));
+    return Object.assign(base, {
+      id: e.id + '#' + i,
+      nombre: (e.a || e.id) + ' · ' + lbl,
+      // `multifecha[i].ds` falta en varios (karolg lo trae vacío): cae a
+      // `dsList[i]` y al final a la fecha del evento — mejor que «sin fecha».
+      fecha: (f && f.ds) || (Array.isArray(e.dsList) && e.dsList[i]) || base.fecha,
+      _base: e.id,
+      _fechaIdx: i,
+    });
+  }));
+}
 // Adjunta a cada asignación (eventos_coordi, por slug) los datos del evento
 // tomados del EV ya cargado en cliente (mapa slug→item). Sustituye el viejo
 // embed PostgREST eventos(...), que dependía de una FK eventos_coordi→eventos

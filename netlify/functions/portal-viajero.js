@@ -6,7 +6,7 @@
 // VERIFICADO del propio JWT, en minúsculas de los dos lados. Nunca por un id que
 // el navegador diga que es suyo sin comprobarlo.
 //
-//   · `editar`          → nombre, celular, talla, número y nombre de emergencia.
+//   · `editar`          → nombre, celular, talla, número, nombre y parentesco de emergencia.
 //                         DIRECTO a la lista del evento (no mueven dinero).
 //   · `solicitar_cambio`→ hotel / zona / fecha / otro: NO se cambia nada; nace una
 //                         fila en `cambios_viajero` que cae a la bandeja de
@@ -123,6 +123,12 @@ exports.handler = async (event) => {
       const n = String(c.emergencia_nombre || '').trim().replace(/\s+/g, ' ').slice(0, 80);
       if (n && n.length < 2) return json(400, headers, { ok: false, error: 'Escribe el nombre de tu contacto de emergencia' });
       cambios.emergencia_nombre = n || null;
+    }
+    // [PARENTESCO-1] «mamá, pareja, hermano…» — llega a la lista del coordi.
+    if (c.emergencia_parentesco !== undefined) {
+      const n = String(c.emergencia_parentesco || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+      if (n && n.length < 2) return json(400, headers, { ok: false, error: 'Escribe el parentesco (mamá, pareja, hermano…)' });
+      cambios.emergencia_parentesco = n || null;
     }
     if (!Object.keys(cambios).length) return json(400, headers, { ok: false, error: 'No hay nada que guardar' });
     cambios.editado_portal_at = new Date().toISOString();

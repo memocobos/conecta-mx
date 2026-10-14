@@ -164,7 +164,7 @@ const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 // Whitelist ESTRICTA de `viajeros_evento` (PII) — solo lo que la descarga usa.
 // [GRUPO-VIAJE-1] + boletos (un titular de 3 lugares se lee distinto que uno
 // de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje';
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -722,7 +722,7 @@ exports.handler = async (event) => {
       // Y aparte, el EQUIPO: coordis asignados (con su estado) y las creadoras
       // con cortesía, diciendo si viajan con el tour o solo van al concierto.
       if (!puedeDinero) {
-        const COLS_COORDI = 'id,nombre,zona_boleto,tipo_paquete,tipo_viajero,talla_playera,emergencia_nombre,num_emergencia,boletos,grupo_viaje,usuario_id';
+        const COLS_COORDI = 'id,nombre,zona_boleto,tipo_paquete,tipo_viajero,talla_playera,emergencia_nombre,emergencia_parentesco,num_emergencia,boletos,grupo_viaje,usuario_id';
         const spc = new URLSearchParams();
         spc.set('select', COLS_COORDI);
         spc.append('evento_id', `eq.${evento_id}`);
@@ -735,7 +735,8 @@ exports.handler = async (event) => {
           id: v.id, nombre: v.nombre, zona_boleto: v.zona_boleto || null,
           tipo_paquete: normPaquete(v.tipo_paquete) ? String(v.tipo_paquete).toUpperCase() : null,
           talla_playera: v.talla_playera || null,
-          emergencia_nombre: v.emergencia_nombre || null, num_emergencia: v.num_emergencia || null,
+          emergencia_nombre: v.emergencia_nombre || null, emergencia_parentesco: v.emergencia_parentesco || null,
+          num_emergencia: v.num_emergencia || null,
           boletos: v.boletos || 1, grupo_viaje: v.grupo_viaje || null,
         });
         const viajeros = filas.filter((v) => esCliente(v.tipo_viajero) && duerme(v.tipo_paquete)).map(limpia);

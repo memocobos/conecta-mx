@@ -3193,6 +3193,7 @@ function _migDatosHtml(t){
     +   '<label style="' + lbl + '">WhatsApp (10 dígitos)</label><input data-f="celular" inputmode="numeric" maxlength="14" style="' + inp + '" value="' + escapeHtml(t.celular || '') + '">'
     +   '<label style="' + lbl + '">Talla de playera (de hombre)</label><select data-f="talla_playera" style="' + inp + '">' + tallas + '</select>'
     +   '<label style="' + lbl + '">Contacto de emergencia (nombre)</label><input data-f="emergencia_nombre" maxlength="80" style="' + inp + '" value="' + escapeHtml(t.emergencia_nombre || '') + '">'
+    +   '<label style="' + lbl + '">Parentesco (mamá, pareja, hermano…)</label><input data-f="emergencia_parentesco" maxlength="40" style="' + inp + '" value="' + escapeHtml(t.emergencia_parentesco || '') + '">'
     +   '<label style="' + lbl + '">Número de emergencia (10 dígitos, de otra persona)</label><input data-f="num_emergencia" inputmode="numeric" maxlength="14" style="' + inp + '" value="' + escapeHtml(t.num_emergencia || '') + '">'
     +   '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="guardar" data-mig-id="' + id + '">Guardar</button>'
     +   '<div data-mig-msg style="font-size:12px;margin-top:6px"></div>'
@@ -3240,6 +3241,7 @@ async function _migGuardar(id){
   const campos = {};
   p.querySelectorAll('[data-f]').forEach((el) => { campos[el.getAttribute('data-f')] = el.value; });
   if (!campos.emergencia_nombre) delete campos.emergencia_nombre;
+  if (!campos.emergencia_parentesco) delete campos.emergencia_parentesco;
   if (!campos.talla_playera) return _migMsg(p, 'Elige tu talla de playera');
   _migMsg(p, 'Guardando…', true);
   try {

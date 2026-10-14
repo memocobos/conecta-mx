@@ -25,7 +25,7 @@ const COORDI = 'aaaaaaaa-0000-4000-8000-000000000001';
 const OTRA = 'aaaaaaaa-0000-4000-8000-000000000002';
 const FUERA = 'aaaaaaaa-0000-4000-8000-000000000009';
 const vj = (o) => Object.assign({ evento_id: 'soyluna', correo: 'x@x.mx', celular: '8990000000', notas: 'nota interna con $11,000', total_contrato: 5000, abonado_previo: 1000,
-  talla_playera: 'M', num_emergencia: '8991112233', emergencia_nombre: 'Mamá', boletos: 1, grupo_viaje: null, usuario_id: null, tipo_viajero: null, creado_en: '2026-10-01' }, o);
+  talla_playera: 'M', num_emergencia: '8991112233', emergencia_nombre: 'Mamá', emergencia_parentesco: 'mamá', boletos: 1, grupo_viaje: null, usuario_id: null, tipo_viajero: null, creado_en: '2026-10-01' }, o);
 const DB = {
   usuarios: [
     { id: COORDI, nombre: 'Coordi Uno', rol: 'coordinador', activo: true },
@@ -90,7 +90,7 @@ const pedir = (id, rol, evento_id) => H({ httpMethod: 'POST', headers: { origin:
   af(!/celular|correo|notas|total_contrato|abonado/.test(ULTIMO_SELECT.viajeros_evento || ''), `[A4] ni siquiera se le PIDEN a la base: ${ULTIMO_SELECT.viajeros_evento}`);
   af(JSON.stringify(j).indexOf('11,000') < 0 && JSON.stringify(j).indexOf('8990000000') < 0, '[A5] ni el monto de la nota ni el celular viajan en el cuerpo');
   const ana = (j.viajeros || []).find((v) => v.nombre === 'Ana Plus') || {};
-  af(ana.zona_boleto === 'VIP' && ana.talla_playera === 'M' && ana.emergencia_nombre === 'Mamá' && ana.num_emergencia === '8991112233' && ana.tipo_paquete === 'PLUS',
+  af(ana.zona_boleto === 'VIP' && ana.talla_playera === 'M' && ana.emergencia_nombre === 'Mamá' && ana.emergencia_parentesco === 'mamá' && ana.num_emergencia === '8991112233' && ana.tipo_paquete === 'PLUS',
     `[A6] lo permitido SÍ viaja: ${JSON.stringify(ana)}`);
 
   const eq = j.equipo || [];

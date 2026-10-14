@@ -1229,8 +1229,8 @@ async function descargarListaViajeros(eventoId) {
     const resp = await Promise.all(partes.map(p => khViajeros.listarConEquipo(p.slug).catch(() => ({ viajeros: [] })))); // [sec-coordi]
 
     const esc = _esfEsc;
-    const tablaViajeros = (lista) => `<table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto de emergencia</th><th>Tel. emergencia</th></tr></thead>
-      <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${esc(v.nombre||'')}</strong>${(v.boletos||1)>1?` <span style="color:#888">(${v.boletos} lugares)</span>`:''}</td><td>${esc(String(v.tipo_paquete||'—').toUpperCase())}</td><td>${esc(v.zona_boleto||'—')}</td><td>${esc(v.talla_playera||'—')}</td><td>${esc(v.emergencia_nombre||'—')}</td><td>${esc(v.num_emergencia||'—')}</td></tr>`).join('')}</tbody></table>`;
+    const tablaViajeros = (lista) => `<table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto de emergencia</th><th>Parentesco</th><th>Tel. emergencia</th></tr></thead>
+      <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${esc(v.nombre||'')}</strong>${(v.boletos||1)>1?` <span style="color:#888">(${v.boletos} lugares)</span>`:''}</td><td>${esc(String(v.tipo_paquete||'—').toUpperCase())}</td><td>${esc(v.zona_boleto||'—')}</td><td>${esc(v.talla_playera||'—')}</td><td>${esc(v.emergencia_nombre||'—')}</td><td>${esc(v.emergencia_parentesco||'—')}</td><td>${esc(v.num_emergencia||'—')}</td></tr>`).join('')}</tbody></table>`;
     const VJ = { true: '✅ Viaja con el tour', false: '🎟 Solo concierto (no viaja)', null: '— por confirmar' };
     const ASIG = { aceptado: 'Aceptó', pendiente: 'Pendiente de aceptar', declinado: 'Declinó' };
     const tablaEquipo = (eq) => eq.length ? `<table><thead><tr><th>Nombre</th><th>Papel</th><th>Asignación</th><th>¿Viaja?</th><th>Zona</th><th>Talla</th></tr></thead>

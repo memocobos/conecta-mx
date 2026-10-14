@@ -1201,6 +1201,7 @@ const _CL_VIAJAN = ['PLUS', 'STAY', 'RIDE'];
 function _clEsViajero(v) {
   const tv = String(v.tipo_viajero || '').toLowerCase();
   if (tv && tv !== 'cliente') return false;
+  if (Number(v.boletos) === 0 && !v.zona_boleto) return false;   // [COORDI-LISTA-1b] una baja no viaja
   const p = String(v.tipo_paquete || '').toUpperCase();
   return !p || _CL_VIAJAN.includes(p);
 }

@@ -33,7 +33,7 @@ function base(o) {
   return {
     contratos_creadores: [{ id: CID, creador_nombre: 'Ximena Lozano', creador_email: 'xime@x.mx', plantilla: 'creadora', estado: 'firmado',
       datos: Object.assign({ talla: 'M', talla_origen: 'contrato' }, o.sinAcomp ? {} : { acompanante: o.acompCtr || { nombre: 'Antonio Esparza', talla: 'L', talla_origen: 'contrato' } }) }],
-    viajeros_evento: [], stock_ajustes: [], escrituras: 0,
+    viajeros_evento: o.viajeros || [], stock_ajustes: [], escrituras: 0,
   };
 }
 let DB, SEQ = 0;
@@ -105,6 +105,37 @@ const pedir = (extra) => H({ httpMethod: 'POST', headers: { origin: 'https://con
   DB = base();
   r = await pedir({ boletos: 2, acompanante: null });
   af(r.statusCode === 200 && DB.viajeros_evento.length === 1 && DB.stock_ajustes[0].vendidos_fuera === 2, '[E] acompanante:null con 2 boletos → va sola (no cae al contrato), igual aparta 2');
+
+  // [CREA-3] el duplicado por NOMBRE (la migración del Excel la dio de alta sin correo)
+  const XID = 'dddddddd-0000-4000-8000-000000000001';
+  const yaEstaba = () => [{ id: XID, evento_id: 'enjambre', nombre: 'Ximena Lozano', correo: null, tipo_paquete: 'CHEAP', tipo_viajero: null, zona_boleto: 'General', boletos: 1, total_contrato: 2500, abonado_previo: 2500 }];
+  DB = base({ viajeros: yaEstaba() });
+  r = await pedir({ boletos: 2 });
+  j = JSON.parse(r.body);
+  af(r.statusCode === 409 && j.posible_duplicado === true && j.creadora.length === 1 && j.creadora[0].id === XID && DB.escrituras === 0,
+    `[I] ya estaba en la lista SIN correo → 409 con su fila y NADA escrito (${r.statusCode} · ${DB.escrituras})`);
+  af(/Ximena Lozano/.test(r.body) && /2500/.test(r.body), '[I2] la respuesta dice quién es y cuánto trae, para decidir con el dato enfrente');
+
+  DB = base({ viajeros: yaEstaba() });
+  r = await pedir({ boletos: 2, viajero_existente_id: XID });
+  const ximes = DB.viajeros_evento.filter((v) => /Ximena/.test(v.nombre));
+  const anto = DB.viajeros_evento.find((v) => v.nombre === 'Antonio Esparza');
+  af(r.statusCode === 200 && ximes.length === 1 && ximes[0].id === XID && ximes[0].tipo_viajero === 'creadora' && ximes[0].talla_playera === 'M',
+    '[J] «es ella» → se COMPLETA su fila (sigue habiendo UNA Ximena, sellada como creadora)');
+  af(ximes[0].total_contrato === 2500 && ximes[0].abonado_previo === 2500, '[J2] su dinero no se toca');
+  af(anto && anto.grupo_viaje && anto.grupo_viaje === ximes[0].grupo_viaje, '[J3] su acompañante nace y viaja con ella');
+
+  DB = base({ viajeros: yaEstaba() });
+  r = await pedir({ boletos: 2, es_otra_persona: true });
+  af(r.statusCode === 200 && DB.viajeros_evento.filter((v) => /Ximena/.test(v.nombre)).length === 2, '[K] «son otras personas» → se crea aparte, porque lo dijo quien asigna');
+
+  DB = base({ viajeros: [{ id: XID, evento_id: 'enjambre', nombre: 'Ximena Gómez Treviño', correo: null, tipo_paquete: 'PLUS', tipo_viajero: 'cliente', zona_boleto: 'General', boletos: 1, total_contrato: 0, abonado_previo: 0 }] });
+  r = await pedir({ boletos: 1 });
+  af(r.statusCode === 200, '[L] mismo primer nombre pero otro apellido → no frena (no es la misma persona)');
+
+  DB = base({ viajeros: [{ id: XID, evento_id: 'otroevento', nombre: 'Ximena Lozano Rangel', correo: null, tipo_paquete: 'CHEAP', tipo_viajero: null, zona_boleto: 'General', boletos: 1, total_contrato: 0, abonado_previo: 0 }] });
+  r = await pedir({ boletos: 1 });
+  af(r.statusCode === 200, '[M] estar en OTRO evento no frena (puede viajar a varios)');
 
   // [G] la proyección de la lista, leída del archivo (no recordada)
   const fs = require('fs');

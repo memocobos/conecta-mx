@@ -212,8 +212,27 @@ function cortCerrar() {
   if (p) p.style.display = 'none';
   _cortCtr = null;
 }
-async function cortGuardar() {
+// [CREA-3] El servidor encontró a alguien con nombre parecido en el evento y
+// NO escribió nada. Se enseña quién es y se elige: completar esa fila o crear
+// una nueva porque es otra persona. Nada se decide solo.
+function _cortDuplicadoHtml(j) {
+  const fila = (v, conBoton) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border)">
+      <span style="font-size:12px"><b>${_escCtr(v.nombre)}</b> · ${_escCtr(v.paquete || '—')} · ${_escCtr(v.zona || 'sin zona')} · ${_escCtr(String(v.boletos || 1))} boleto(s) · contrato $${Number(v.contrato || 0).toLocaleString('es-MX')} · ${_escCtr(v.tipo || 'cliente')}</span>
+      ${conBoton ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="cortGuardar({viajero_existente_id:'${_escCtr(v.id)}'})">Es ella: usar esta fila</button>` : ''}
+    </div>`;
+  const ella = (j.creadora || []).map((v) => fila(v, true)).join('');
+  const el = (j.acompanante || []).map((v) => fila(v, false)).join('');
+  return `<div style="background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.4);border-radius:6px;padding:10px 12px;margin-bottom:10px">
+    <div style="color:#ffb020;font-size:12px;font-weight:700;margin-bottom:4px">⚠ Puede que ya esté en la lista de viajeros de este evento. No se guardó nada.</div>
+    ${ella ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Parecida a ella:</div>${ella}` : ''}
+    ${el ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Parecido a su acompañante:</div>${el}` : ''}
+    <button class="btn" style="margin-top:10px;width:100%;font-size:12px" onclick="cortGuardar({es_otra_persona:true})">No, son otras personas: crear nuevos</button>
+  </div>`;
+}
+
+async function cortGuardar(opcion) {
   if (!_cortCtr) return;
+  opcion = opcion || {};
   const btn = _cortEl('cort-guardar');
   const alert = _cortEl('cort-alert');
   const evento_id = (_cortEl('cort-evento') || {}).value || '';
@@ -237,9 +256,12 @@ async function cortGuardar() {
       body: JSON.stringify({ accion: 'cortesia_asignar', contrato_id: _cortCtr.id, evento_id, zona, boletos, talla: talla || undefined,
         // null EXPLÍCITO = «sin acompañante» (lo borró quien asigna): el
         // servidor no cae a lo del contrato. undefined (1 boleto) sí cae.
-        acompanante: acNombre ? { nombre: acNombre, talla: acTalla } : (boletos >= 2 ? null : undefined) }),
+        acompanante: acNombre ? { nombre: acNombre, talla: acTalla } : (boletos >= 2 ? null : undefined),
+        viajero_existente_id: opcion.viajero_existente_id || undefined,
+        es_otra_persona: opcion.es_otra_persona === true ? true : undefined }),
     });
     const j = await r.json().catch(() => ({}));
+    if (r.status === 409 && j.posible_duplicado) { alert.innerHTML = _cortDuplicadoHtml(j); return; }
     if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
     alert.innerHTML = j.ya
       ? `<div style="color:#ffb020;font-size:12px;margin-bottom:8px">Ya estaba asignada — no se tocó nada.</div>`

@@ -500,6 +500,56 @@ exports.handler = async (event) => {
         existente = (await ex.json())[0] || null;
       }
 
+      // [CREA-3] EL CANDADO DEL DUPLICADO POR NOMBRE. La migración del Excel dio
+      // de alta gente SIN correo, así que buscar solo por correo deja pasar a
+      // quien ya está en la lista (medido 13-oct: Marietta Barrera ya vive en
+      // soyluna con 2 boletos VIP pagados). Antes de CREAR a alguien —ella o su
+      // acompañante— se busca en el evento por nombre parecido (primer nombre +
+      // otra palabra del nombre, sin acentos). Si aparece, NO se escribe nada:
+      // se contesta 409 con las filas, y quien asigna decide:
+      //   · `viajero_existente_id` → es ella: se COMPLETA esa fila (como Victor);
+      //   · `es_otra_persona: true` → son personas distintas: se crea igual.
+      // Un candado que adivina «es la misma» y escribe sería peor que ninguno.
+      const _tok = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length >= 3);
+      const _parecido = (a, b) => {
+        const ta = _tok(a), tb = new Set(_tok(b));
+        if (!ta.length || !tb.has(ta[0])) return false;
+        return ta.length === 1 || ta.slice(1).some((t) => tb.has(t));
+      };
+      let filasEvento = null;
+      const _filasEvento = async () => {
+        if (filasEvento) return filasEvento;
+        const r = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&select=id,nombre,correo,tipo_paquete,tipo_viajero,zona_boleto,boletos,total_contrato,abonado_previo,talla_playera,grupo_viaje&limit=2000`,
+          { headers: sbHeaders });
+        if (!r.ok) throw new Error('consulta ' + r.status);
+        filasEvento = await r.json();
+        return filasEvento;
+      };
+      if (!existente && body.viajero_existente_id) {
+        const vid = String(body.viajero_existente_id);
+        if (!UUID_RE.test(vid)) return bad(headers, 'viajero_existente_id inválido');
+        const fila = (await _filasEvento()).find((v) => v.id === vid);
+        if (!fila) return bad(headers, 'Esa fila no es de este evento');
+        existente = fila;
+      }
+      if (!existente && body.es_otra_persona !== true) {
+        let filas;
+        try { filas = await _filasEvento(); } catch (e) { return upstream(headers, e.message, 'consulta'); }
+        const quien = (n) => filas.filter((v) => _parecido(n, v.nombre)).map((v) => ({
+          id: v.id, nombre: v.nombre, paquete: v.tipo_paquete, tipo: v.tipo_viajero, zona: v.zona_boleto,
+          boletos: v.boletos, contrato: Number(v.total_contrato || 0), pagado_previo: Number(v.abonado_previo || 0),
+        }));
+        const deElla = quien(contrato.creador_nombre);
+        const deEl = acompViaja ? quien(acompNombre) : [];
+        if (deElla.length || deEl.length) {
+          return { statusCode: 409, headers, body: JSON.stringify({
+            error: 'Puede que ya esté en la lista de viajeros de este evento: revisa antes de asignar.',
+            posible_duplicado: true, creadora: deElla, acompanante: deEl,
+          }) };
+        }
+      }
+
       // [CREA-2] El grupo: si ella ya viajaba en uno, se reusa (no se parte un
       // grupo que armó alguien más); si no, nace uno nuevo. Solo si de verdad
       // va acompañada — un grupo de una persona no dice nada.

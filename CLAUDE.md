@@ -460,6 +460,18 @@ está caduco antes de escribirse.
     obligatoria (409 sin escribir nada); `acompanante:null` explícito = va sola;
     reintento lo encuentra por nombre y no duplica. `mide:crea-2` **15** (BASE
     da 11 rojos).
+    🔒 **CREA-3 (13-oct) · EL CANDADO DEL DUPLICADO POR NOMBRE** (pregunta de
+    Memo: «muchas ya estaban en el Excel, ¿cómo sé que no se duplica?»). La
+    cortesía buscaba solo por CORREO y la migración del Excel dio de alta gente
+    SIN correo — medido: **Marietta Barrera ya vive en soyluna** (CHEAP, 2 VIP,
+    $11,000 pagados) y el botón habría creado una segunda + restado 2 boletos de
+    más. Hoy, antes de CREAR a ella o a su acompañante, se busca en EL MISMO
+    evento por nombre parecido (primer nombre + otra palabra, sin acentos); si
+    aparece → **409 sin escribir nada** y la pantalla enseña la fila con dos
+    salidas: «Es ella: usar esta fila» (`viajero_existente_id`, se completa como
+    el caso Victor; su dinero no se toca) o «Son otras personas»
+    (`es_otra_persona`). Otro evento u otro apellido no frenan.
+    `mide:crea-2` **23** (BASE: el duplicado nace con 4 escrituras).
   - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
     escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
     blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede

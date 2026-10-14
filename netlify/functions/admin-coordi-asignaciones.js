@@ -531,6 +531,18 @@ exports.handler = async (event) => {
         if (!UUID_RE.test(vid)) return bad(headers, 'viajero_existente_id inválido');
         const fila = (await _filasEvento()).find((v) => v.id === vid);
         if (!fila) return bad(headers, 'Esa fila no es de este evento');
+        // [CREA-3b] Una COMPRA no se convierte en cortesía (caso Marietta: compró
+        // 2 VIP y aparte le dimos 2 de cortesía). Completarla la sellaría como
+        // creadora y dejaría de descontar SUS boletos comprados del inventario
+        // —que justo se le sumaba aquí como cortesía—: 4 boletos contados como 2.
+        // Si la fila descuenta boleto y trae dinero, la cortesía va APARTE.
+        if (consumeBoleto(fila.tipo_paquete, fila.tipo_viajero) &&
+            (Number(fila.total_contrato || 0) > 0 || Number(fila.abonado_previo || 0) > 0)) {
+          return { statusCode: 409, headers, body: JSON.stringify({
+            error: `«${fila.nombre}» es una COMPRA (${fila.boletos || 1} boleto(s), contrato $${Number(fila.total_contrato || 0).toLocaleString('es-MX')}): la cortesía va aparte. Usa «Son otras personas».`,
+            es_compra: true,
+          }) };
+        }
         existente = fila;
       }
       if (!existente && body.es_otra_persona !== true) {

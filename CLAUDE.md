@@ -472,6 +472,12 @@ está caduco antes de escribirse.
     el caso Victor; su dinero no se toca) o «Son otras personas»
     (`es_otra_persona`). Otro evento u otro apellido no frenan.
     `mide:crea-2` **23** (BASE: el duplicado nace con 4 escrituras).
+    🔒 **CREA-3b (13-oct) · UNA COMPRA NO SE VUELVE CORTESÍA** (caso Marietta,
+    palabra de Memo: le dimos 2 de cortesía Y ella compró 2 CHEAP VIP, 4 kits
+    prometidos). «Es ella» sobre una fila que descuenta boleto y trae dinero la
+    habría sellado como creadora y sus 2 VIP comprados dejaban de restar del
+    inventario: 4 boletos contados como 2. Hoy → 409 `es_compra` sin escribir y
+    la pantalla no ofrece ese botón: la cortesía va aparte. `mide:crea-2` **25**.
   - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
     escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
     blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede

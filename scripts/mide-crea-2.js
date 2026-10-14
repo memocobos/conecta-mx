@@ -116,13 +116,23 @@ const pedir = (extra) => H({ httpMethod: 'POST', headers: { origin: 'https://con
     `[I] ya estaba en la lista SIN correo → 409 con su fila y NADA escrito (${r.statusCode} · ${DB.escrituras})`);
   af(/Ximena Lozano/.test(r.body) && /2500/.test(r.body), '[I2] la respuesta dice quién es y cuánto trae, para decidir con el dato enfrente');
 
+  // [N] CREA-3b · la fila es una COMPRA (caso Marietta: 2 VIP pagados) → «es ella» se rehúsa
   DB = base({ viajeros: yaEstaba() });
+  r = await pedir({ boletos: 2, viajero_existente_id: XID });
+  af(r.statusCode === 409 && JSON.parse(r.body).es_compra === true && DB.escrituras === 0,
+    `[N] «es ella» sobre una COMPRA pagada → 409 y nada escrito (sus boletos comprados no se vuelven cortesía) (${r.statusCode} · ${DB.escrituras})`);
+  const kh2 = require('fs').readFileSync(require('path').join(RAIZ, 'kamehouse-contratos.js'), 'utf8');
+  af(/const esCompra = /.test(kh2) && /fila\(v, !esCompra\(v\)\)/.test(kh2), '[N2] la pantalla no ofrece «Es ella» sobre una compra');
+
+  // [J] «es ella» sobre una fila SIN dinero (el caso Victor: la registraron antes, sin compra)
+  const yaSinDinero = () => [Object.assign(yaEstaba()[0], { total_contrato: 0, abonado_previo: 0 })];
+  DB = base({ viajeros: yaSinDinero() });
   r = await pedir({ boletos: 2, viajero_existente_id: XID });
   const ximes = DB.viajeros_evento.filter((v) => /Ximena/.test(v.nombre));
   const anto = DB.viajeros_evento.find((v) => v.nombre === 'Antonio Esparza');
   af(r.statusCode === 200 && ximes.length === 1 && ximes[0].id === XID && ximes[0].tipo_viajero === 'creadora' && ximes[0].talla_playera === 'M',
     '[J] «es ella» → se COMPLETA su fila (sigue habiendo UNA Ximena, sellada como creadora)');
-  af(ximes[0].total_contrato === 2500 && ximes[0].abonado_previo === 2500, '[J2] su dinero no se toca');
+  af(ximes[0].total_contrato === 0 && ximes[0].abonado_previo === 0, '[J2] su contrato no se toca');
   af(anto && anto.grupo_viaje && anto.grupo_viaje === ximes[0].grupo_viaje, '[J3] su acompañante nace y viaja con ella');
 
   DB = base({ viajeros: yaEstaba() });

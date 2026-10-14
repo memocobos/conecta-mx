@@ -220,7 +220,10 @@ function _cortDuplicadoHtml(j) {
       <span style="font-size:12px"><b>${_escCtr(v.nombre)}</b> · ${_escCtr(v.paquete || '—')} · ${_escCtr(v.zona || 'sin zona')} · ${_escCtr(String(v.boletos || 1))} boleto(s) · contrato $${Number(v.contrato || 0).toLocaleString('es-MX')} · ${_escCtr(v.tipo || 'cliente')}</span>
       ${conBoton ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="cortGuardar({viajero_existente_id:'${_escCtr(v.id)}'})">Es ella: usar esta fila</button>` : ''}
     </div>`;
-  const ella = (j.creadora || []).map((v) => fila(v, true)).join('');
+  // [CREA-3b] Una fila que es COMPRA (cliente con dinero) no se ofrece como
+  // «es ella»: la cortesía va aparte o se contarían mal los boletos.
+  const esCompra = (v) => (!v.tipo || v.tipo === 'cliente') && (Number(v.contrato || 0) > 0 || Number(v.pagado_previo || 0) > 0);
+  const ella = (j.creadora || []).map((v) => fila(v, !esCompra(v)) + (esCompra(v) ? '<div style="font-size:11px;color:var(--ts);padding-bottom:4px">Ésta es una COMPRA suya: se queda como está y la cortesía se registra aparte.</div>' : '')).join('');
   const el = (j.acompanante || []).map((v) => fila(v, false)).join('');
   return `<div style="background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.4);border-radius:6px;padding:10px 12px;margin-bottom:10px">
     <div style="color:#ffb020;font-size:12px;font-weight:700;margin-bottom:4px">⚠ Puede que ya esté en la lista de viajeros de este evento. No se guardó nada.</div>

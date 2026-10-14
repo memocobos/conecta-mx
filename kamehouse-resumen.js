@@ -663,7 +663,7 @@ async function _renderResumenDinero(porCobrar) {
   const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
     // [AUD-1c] El signo, en palabras también aquí: con el neto de los dos mundos
     // este número puede salir negativo, y "Por cobrar −$793" se lee al revés.
-    `<div class="cob-stat dash-click" onclick="showPage('pagos')" title="Ver cobranza"><div class="cob-stat-lbl">${Number(porCobrar || 0) < 0 ? 'A favor' : 'Por cobrar'}</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Math.abs(Number(porCobrar || 0)))}</div></div>` +
+    `<div class="cob-stat dash-click" onclick="(document.getElementById('atrasados-lista')||{}).scrollIntoView&&document.getElementById('atrasados-lista').scrollIntoView({behavior:'smooth'})" title="Ver cobranza"><div class="cob-stat-lbl">${Number(porCobrar || 0) < 0 ? 'A favor' : 'Por cobrar'}</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Math.abs(Number(porCobrar || 0)))}</div></div>` +
     (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
 
   const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
@@ -1295,7 +1295,13 @@ function _renderResumenRiesgoBaja(activos) {
   }).join('');
   el.innerHTML = header + filas;
 }
-function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos'); }
+// [OPS-MIN-1] «Por Evento» se retiró: un clic en un evento del Resumen abre ese
+// tour en Capsule, en su pestaña de Números.
+function _evtIrA(slug) {
+  if (!slug) return;
+  _ccSubElegida = 'numeros';
+  if (typeof _almAbrirTour === 'function') _almAbrirTour(slug);
+}
 // El desfase de la zona EN ESE INSTANTE (los husos con horario de verano no
 // tienen UN desfase: tienen el de ese día). Se pregunta al motor de Intl, que
 // es quien tiene la tabla, en vez de escribir un número.

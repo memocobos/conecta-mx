@@ -514,7 +514,8 @@ function _evtExportCSV() {
 // chatarra, los nombres normalizados) vive en el servidor, en `_lib/excel-careo`,
 // donde un arnés puede carearlo contra filas reales. Aquí solo se pinta.
 async function excelCarear() {
-  const eventoId = (document.getElementById('selector-evento') || {}).value || '';
+  // [CC-NUMEROS-1] El careo vive en Capsule → Números: manda el tour abierto.
+  const eventoId = (typeof _ccEventoActual !== 'undefined' && _ccEventoActual) || (document.getElementById('selector-evento') || {}).value || '';
   const panel = document.getElementById('excel-careo-panel');
   const btn = document.getElementById('excel-careo-btn');
   if (!eventoId) { showToast('Elige primero un evento', 'error'); return; }
@@ -755,7 +756,7 @@ function _excelCareoHtml(d) {
 // del bueno. Por eso la vista previa que se pinta abajo es informativa, y el
 // aplicar NO se la devuelve al servidor.
 async function _excelAplicar(cuerpo) {
-  const eventoId = (document.getElementById('selector-evento') || {}).value || '';
+  const eventoId = (typeof _ccEventoActual !== 'undefined' && _ccEventoActual) || (document.getElementById('selector-evento') || {}).value || '';   // [CC-NUMEROS-1]
   if (!eventoId) { showToast('Elige primero un evento', 'error'); return null; }
   const panel = document.getElementById('excel-aplicar-panel');
   if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Recalculando el careo…</div>';

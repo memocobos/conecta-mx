@@ -83,18 +83,21 @@ const PERMISOS_TABS = {
   // todos la pueden ver; a quién ATERRIZA ahí lo decide HOME_PREFERIDO.
   // [PN27] `blast` manda correo REAL por tandas: SOLO maestro_roshi. Bulma y
   // Milk NO lo llevan a propósito — la pluma del blast es de Memo.
-  maestro_roshi: ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama'],
+  // [OPS-MIN-1 13-oct] Palabra de Memo: «minimizar pantallas». Fuera para los
+  // admins: Inicio (su resumen es Resumen), Pagos y Por Evento (leían el Portal
+  // vacío; la cobranza vive en Resumen y los números en Capsule → Números).
+  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
-  bulma:         ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube'],
+  bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube'],
   mister_popo:   ['inicio','inventario','reportes','equipo'],
   coordinador:   ['inicio','inventario','reportes','equipo'],
   cc:            ['inicio','equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['inicio','resumen','pagos','requisiciones','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas','nube']
+  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -758,8 +761,8 @@ const HOME_PREFERIDO = {
   // [HOME-ROL-1 · orden de Memo, 12-oct] Bulma/Milk y los Guerreros Z entran a
   // SU resumen: pendientes del día para las auxiliares; contrato, datos, tours
   // y ranking para coordis/creadoras (antes caían directo a Bodega de Karin).
-  bulma: 'inicio',
-  milk: 'inicio',
+  bulma: 'resumen',   // [OPS-MIN-1] su resumen ES el Resumen (con las alarmas)
+  milk: 'resumen',
   coordinador: 'inicio',
   cc: 'inicio',
   mister_popo: 'inicio',
@@ -4911,7 +4914,7 @@ function showCCSubTab(sub, btn, deLaCasa) {
   if (!deLaCasa) _ccSubElegida = sub;
   document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['equipo','viajeros','rooming','transporte','pagos'].forEach(s => {
+  ['equipo','viajeros','rooming','transporte','pagos','numeros'].forEach(s => {
     const el = document.getElementById(`cc-sub-${s}`);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
@@ -4920,6 +4923,22 @@ function showCCSubTab(sub, btn, deLaCasa) {
   if (sub === 'transporte' && _ccEventoActual) loadTransporte(_ccEventoActual);
   // [Pagos-T1] Bandeja de separos: carga LAZY al abrir, se refresca en cada visita.
   if (sub === 'pagos' && _ccEventoActual) loadCCPagos(_ccEventoActual);
+  if (sub === 'numeros' && _ccEventoActual) ccNumerosCargar(_ccEventoActual);
+}
+// [CC-NUMEROS-1] La cuenta del evento con las MISMAS piezas de Por Evento
+// (fuente única: no se recalcula nada aquí). Fails-soft por pieza.
+async function ccNumerosCargar(evId) {
+  const base = String(evId).split('#')[0];
+  const nota = document.getElementById('cc-numeros-cargando');
+  if (nota) nota.textContent = 'Calculando la cuenta del evento…';
+  try {
+    await Promise.all([
+      _cobCargarGastos().catch(() => {}), _utilCargar().catch(() => {}), _capfix2CargarKH(evId),
+      _fin1cCargarBodega(base).catch(() => {}), _fin1aCargarDeuda(base).catch(() => {}),
+    ]);
+    _fin1cPintar(base);
+    if (nota) nota.textContent = '';
+  } catch (e) { if (nota) nota.textContent = 'No se pudo calcular la cuenta: ' + (e.message || e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

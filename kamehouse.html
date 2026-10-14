@@ -567,11 +567,8 @@
  <button class="btn btn-ghost btn-sm" onclick="_evtExportCSV()">Exportar CSV</button>
  <!-- [EXCEL-BOTÓN-1b] El careo contra el Excel. SOLO LEE: pinta las diferencias
       nombre por nombre y no toca una sola fila. Aplicarlas es otra tuerca. -->
- <button class="btn btn-ghost btn-sm" id="excel-careo-btn" onclick="excelCarear()">Comparar con Excel</button>
- <button class="btn btn-sm" id="excel-todo-btn" onclick="excelActualizarTodo()">Actualizar TODO</button>
+ <!-- [CC-NUMEROS-1] el careo con el Excel se mudó a Capsule → Números -->
  </div>
- <div id="excel-todo-panel" style="margin-top:12px"></div>
- <div id="excel-careo-panel" style="margin-top:12px"></div>
  </div>
 
  <!-- [SAL-1] LA CAJA DE LA EMPRESA SE RETIRA DE AQUÍ (decisión de Jane).
@@ -606,7 +603,7 @@
 
  <!-- [FIN-1c] El resumen que junta todo: Ventas − Gastos = Ganancia, con la
       bodega al lado (requisito firmado por Memo) y la deuda APARTE. -->
- <div id="fin1c-resumen" class="fin1c" style="display:none"></div>
+ <!-- [CC-NUMEROS-1] #fin1c-resumen se mudó a Capsule → Números -->
 
  <!-- [AUD-1e] AQUÍ VIVÍAN Caja / Proyectado / Falta por cobrar del evento.
       Se retiran porque la cuenta buena está ARRIBA desde FIN-1c, y porque sus
@@ -1047,7 +1044,10 @@
         <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">Viajeros</button>
         <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">Rooming</button>
         <button class="gz-filter" id="cc-sub-btn-transporte" onclick="showCCSubTab('transporte',this)"><svg class="ic"><use href="#ic-bus"/></svg> Transporte</button>
-        <button class="gz-filter" id="cc-sub-btn-pagos" onclick="showCCSubTab('pagos',this)"><svg class="ic"><use href="#ic-pagos"/></svg> Pagos</button>
+        <!-- [CC-NUMEROS-1] «Pagos» leía el Portal (vacío). En su lugar, los NÚMEROS
+             del tour: la cuenta del evento y el careo contra el Excel (lo único
+             que Por Evento tenía de propio). -->
+        <button class="gz-filter" id="cc-sub-btn-numeros" onclick="showCCSubTab('numeros',this)">Números</button>
        </div>
 
        <!-- SUB: EQUIPO ASIGNADO -->
@@ -1078,7 +1078,8 @@
                ponen al alcance de quien ya está mirando el evento. -->
           <button class="btn btn-ghost btn-sm" id="cc-dl-lista" onclick="_vj2Descargar('lista')" style="font-size:10px">↓ Lista viajeros</button>
           <button class="btn btn-ghost btn-sm" id="cc-dl-rooming" onclick="_vj2Descargar('rooming')" style="font-size:10px">↓ Rooming</button>
-          <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
+          <!-- [CC-NUMEROS-1] «+ Viajero» se fue: daba de alta en el Portal (solicitudes),
+               NO en la lista real. El alta es «+ Registrar cliente». -->
           <!-- [MIG-1a] El wizard de captura del Excel. Va AQUÍ y no dentro de
                #cc-kh-wrap porque ese bloque está display:none mientras no haya
                migrados — que es exactamente el estado en el que se estrena. -->
@@ -1285,6 +1286,19 @@
 
        <!-- SUB: PAGOS — Bandeja de separos (T1). Solicitudes aprobadas del evento
             (en_pagos + pagado). El detalle abre el MISMO modal global de solicitud. -->
+       <!-- [CC-NUMEROS-1] Los NÚMEROS del tour: la cuenta completa del evento
+            (ventas − gastos − inversión, deuda aparte) y el careo contra el
+            Excel. Antes vivían en «Por Evento», que se retiró. -->
+       <div id="cc-sub-numeros" style="display:none">
+        <div id="fin1c-resumen" class="fin1c" style="display:none"></div>
+        <div id="cc-numeros-cargando" style="font-size:12px;color:var(--ts);margin:8px 0"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+         <button class="btn btn-ghost btn-sm" id="excel-careo-btn" onclick="excelCarear()">Comparar este tour con el Excel</button>
+         <button class="btn btn-sm" id="excel-todo-btn" onclick="excelActualizarTodo()">Actualizar TODO (todos los tours)</button>
+        </div>
+        <div id="excel-todo-panel" style="margin-top:12px"></div>
+        <div id="excel-careo-panel" style="margin-top:12px"></div>
+       </div>
        <div id="cc-sub-pagos" style="display:none">
         <div id="cc-pagos-header" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--ts)"></div>
         <div id="cc-pagos-list"><div style="color:var(--ts);font-size:12px">Cargando pagos…</div></div>

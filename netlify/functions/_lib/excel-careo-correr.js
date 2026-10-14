@@ -140,6 +140,7 @@ async function correrCareo(eventoId) {
   // [BOLETOS-1 adenda] La chatarra por zona, fundida entre pestañas del mismo
   // evento igual que la gente. Viaja APARTE: no es nadie, pero ocupa boleto.
   const chatarraPorZona = {};
+  const chatarraFilas = [];   // [STAFF-NOMBRE-1]
   // [EXCEL-AG-2] Las filas CRUDAS de cada pestaña, para el bloque «Disponibilidad».
   // Se guardan aquí en vez de volver a cosechar: una segunda cosecha serían dos
   // fotos del Excel en la misma corrida, y la de la disponibilidad podría leer un
@@ -175,6 +176,7 @@ async function correrCareo(eventoId) {
     for (const zc in (p.chatarraPorZona || {})) {
       chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + p.chatarraPorZona[zc];
     }
+    for (const cf of (p.chatarraFilas || [])) chatarraFilas.push(cf);
     detallePestanas.push({ pestana: m.pestana, regla_zona: m.regla_zona || null,
                            personas: p.personas.length, descartes: p.descartes,
                            mapa: p.mapa, notas: m.notas || null,
@@ -322,6 +324,58 @@ async function correrCareo(eventoId) {
     }
     for (const k in chatarraPorZona) delete chatarraPorZona[k];
     Object.assign(chatarraPorZona, canonizada);
+  }
+
+  // ── [STAFF-NOMBRE-1] LA CHATARRA QUE ES STAFF DE KAMEHOUSE ─────────────────
+  // «KameHouse manda» el boleto de coordis y creadoras (STAFF-BOLETO-2). El
+  // Excel a veces los escribe sin la palabra clave («Day Escamilla Hubb» cae en
+  // chatarra por «hubb»), y entonces el careo los contaba en `vendidos_fuera`
+  // ADEMÁS de su fila de staff: el lugar se descontaba dos veces (alfredito,
+  // 13-oct: Barrera Oro salía 0 con 1 libre en el Excel).
+  // Aquí se cruza cada fila de chatarra contra las filas de staff/creadoras del
+  // evento CON zona: si el nombre casa (primer nombre + otra palabra, sin
+  // acentos; el Excel puede abreviar: «Day» por «Dayanna») se descuenta de la chatarra, hasta los
+  // lugares que ese grupo (titular + acompañantes por `grupo_viaje`) ocupa en
+  // esa zona. Nunca más de los que KameHouse ya tiene: lo que sobra sigue
+  // contando. Lectura caída → no se reconoce a nadie y se DICE.
+  let staffReconocido = { filas: [], error: null };
+  if (chatarraFilas.length) {
+    try {
+      const ur = `${SB_URL}/rest/v1/viajeros_evento?select=id,nombre,zona_boleto,boletos,grupo_viaje`
+               + `&evento_id=eq.${encodeURIComponent(eventoId)}&tipo_viajero=neq.cliente&zona_boleto=not.is.null`;
+      const rs = await fetch(ur, { headers: sb });
+      const staff = rs.ok ? await rs.json() : null;
+      if (!Array.isArray(staff)) throw new Error('no pude leer las filas de staff');
+      const grupos = new Map();
+      for (const v of staff) {
+        const g = v.grupo_viaje || v.id;
+        if (!grupos.has(g)) grupos.set(g, { nombres: [], lugares: {} });
+        const G = grupos.get(g);
+        G.nombres.push(normalizarNombre(v.nombre).split(' ').filter((w) => w.length >= 2));
+        const z = normalizarZona(v.zona_boleto);
+        G.lugares[z] = (G.lugares[z] || 0) + (Number(v.boletos) > 0 ? Number(v.boletos) : 1);
+      }
+      // El Excel abrevia («Day» por «Dayanna»): una palabra casa si es igual o
+      // si una es prefijo de la otra con 3+ letras. Se exige el PRIMER nombre
+      // y al menos otra palabra — dos personas distintas casi nunca comparten
+      // las dos, y con una sola palabra no se reconoce a nadie.
+      const pal = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+      const casa = (palabras, ws) => ws.length >= 2 && palabras.some((p) => pal(p, ws[0]))
+        && ws.slice(1).some((w) => w.length >= 3 && palabras.some((p) => pal(p, w)));
+      for (const cf of chatarraFilas) {
+        const palabras = normalizarNombre(cf.nombre).split(' ');
+        let llave = cf.zona;
+        if (zonasCanonicas) { const v = resolverZonaFicha(zonasCanonicas, cf.zona); if (v.estado === 'canonizada') llave = v.zona; }
+        const zN = normalizarZona(llave);
+        for (const G of grupos.values()) {
+          if (!(G.lugares[zN] > 0) || !G.nombres.some((ws) => casa(palabras, ws))) continue;
+          if (!(chatarraPorZona[llave] > 0)) break;
+          G.lugares[zN]--; chatarraPorZona[llave]--;
+          staffReconocido.filas.push({ nombre: cf.nombre, zona: llave });
+          break;
+        }
+      }
+    } catch (err) { staffReconocido.error = err.message; }
   }
 
   // ═══ [CUADRE-FUENTE-1] LOS TRES AVISOS DE LA FUENTE DEL DINERO ════════════
@@ -569,7 +623,7 @@ async function correrCareo(eventoId) {
 
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
            viajeros: base.viajeros, montones, numerologia, zonasCanonicas, avisosFuente,
-           chatarraPorZona, ajustes: Array.isArray(ajustes) ? ajustes : [],
+           chatarraPorZona, staffReconocido, ajustes: Array.isArray(ajustes) ? ajustes : [],
            // [EXCEL-AG-2] `null` = la palomita de este evento-fecha está APAGADA.
            // No es lo mismo que «no había nada»: se distingue a propósito.
            disponibilidad };

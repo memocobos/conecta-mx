@@ -76,6 +76,9 @@ function redFalsa(base, saboteado) {
       if (['select', 'limit', 'order', 'or'].includes(campo)) continue;
       let m;
       if ((m = /^eq\.(.*)$/.exec(expr))) { out = out.filter((f) => String(f[campo]) === decodeURIComponent(m[1])); continue; }
+      // neq de PostgREST: un NULL no pasa (NULL <> x es NULL).
+      if ((m = /^neq\.(.*)$/.exec(expr))) { out = out.filter((f) => f[campo] != null && String(f[campo]) !== decodeURIComponent(m[1])); continue; }
+      if (expr === 'not.is.null') { out = out.filter((f) => f[campo] != null); continue; }
       if ((m = /^is\.(.*)$/.exec(expr))) { const v = m[1] === 'true' ? true : m[1] === 'false' ? false : null; out = out.filter((f) => f[campo] === v); continue; }
       if ((m = /^in\.\((.*)\)$/.exec(expr))) {
         const vals = m[1].split(',').map((v) => decodeURIComponent(v).replace(/^"|"$/g, ''));
@@ -188,6 +191,10 @@ const SEMILLA = () => ({
       // Cancha General saldría en 3 y Zona GNP en 2, y las aserciones caen.
       filaExcel({ 'Nombre': 'Marietta Barrera creadora', 'Boleto': 'Cancha General' }),
       filaExcel({ 'Nombre': 'Coordinadora Renata', 'Boleto': 'Zona GNP' }),
+      // [STAFF-NOMBRE-1] La creadora que el Excel escribe SIN la palabra clave
+      // («… Hubb» la manda a chatarra): su fila de KameHouse (abajo, Zona GNP)
+      // ya ocupa el lugar, así que NO cuenta. Sin el cruce, GNP saldría en 2.
+      filaExcel({ 'Nombre': 'Day Escamilla Hubb', 'Boleto': 'Zona GNP' }),
       // [K] CUADRA en todo → no genera nada.
       filaExcel({ 'Nombre': 'Cris Mora', 'Paquete': 'PLUS', 'Boleto': 'Cancha General', 'Separo': '$500', '1': '$5,450', 'Total': '$5,950', 'TALLA': 'M' }),
       // [I] AMBIGUO: dos viajeros con ese nombre en el sistema → JAMÁS.
@@ -207,6 +214,7 @@ const SEMILLA = () => ({
     { id: 'v-e', evento_id: EVENTO, nombre: 'Rosa Vela',    tipo_viajero: 'cliente', abonado_previo: 2000, total_contrato: 4200, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Zona GNP', tipo_paquete: 'plus' },
     { id: 'v-n', evento_id: EVENTO, nombre: 'Sergio Cuatro',  tipo_viajero: 'cliente', abonado_previo: 4000, total_contrato: 23800, notas: 'Migrado Excel', zona_boleto: 'Cancha General', tipo_paquete: 'plus', boletos: 1 },
     { id: 'v-o', evento_id: EVENTO, nombre: 'Angel Reparto',  tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: 11900, notas: 'Migrado Excel', zona_boleto: 'Cancha General', tipo_paquete: 'plus', boletos: 1 },
+    { id: 'v-day', evento_id: EVENTO, nombre: 'Dayanna Joselyn Prieto Escamilla', tipo_viajero: 'creadora', abonado_previo: 0, total_contrato: 0, notas: 'Cortesía de creadora', zona_boleto: 'Zona GNP', tipo_paquete: 'CHEAP', boletos: 1 },
     { id: 'v-k', evento_id: EVENTO, nombre: 'Cris Mora',    tipo_viajero: 'cliente', abonado_previo: 5950, total_contrato: 5950, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'plus' },
     // [H] BAJA: está en el sistema y ya no en el Excel. JAMÁS se toca.
     { id: 'v-h', evento_id: EVENTO, nombre: 'Zulema Fría',  tipo_viajero: 'cliente', abonado_previo: 3000, total_contrato: 5950, notas: 'Migrado Excel 28-ago (Jane)', zona_boleto: 'Cancha General', tipo_paquete: 'plus' },
@@ -306,7 +314,7 @@ const HOY_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Matamoros',
     const t = a.tablas;
     console.log('    abonos_viajero: 0 → ' + cuenta(t, 'abonos_viajero') + '   viajeros_evento: 9 → ' + cuenta(t, 'viajeros_evento'));
     af(cuenta(t, 'abonos_viajero') === 1, 'se escribieron ' + cuenta(t, 'abonos_viajero') + ' abono(s), se esperaba 1');
-    af(cuenta(t, 'viajeros_evento') === 15, 'viajeros_evento quedó en ' + cuenta(t, 'viajeros_evento') + ', se esperaban 15 (11 + 4 altas)');
+    af(cuenta(t, 'viajeros_evento') === 16, 'viajeros_evento quedó en ' + cuenta(t, 'viajeros_evento') + ', se esperaban 16 (12 + 4 altas; la 12ª es la creadora de STAFF-NOMBRE-1)');
     // CARDINALIDAD: si la corrida buena no escribe, los Δ 0 de abajo no dicen nada.
     af(a.escrituras.length > 0, 'la corrida buena no escribió NADA: los Δ 0 de los candados no valdrían nada');
     const ab = (t.abonos_viajero || [])[0] || {};

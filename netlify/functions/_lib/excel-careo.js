@@ -217,6 +217,10 @@ function parsearPestana(filas, encabezado, reglaZona) {
   // gente, «Vendido Alex» se daría de alta como viajero.
   const chatarraPorZona = {};
   const staffExcelPorZona = {};   // [STAFF-BOLETO-2] informativo: no descuenta
+  // [STAFF-NOMBRE-1] Las filas de chatarra con su NOMBRE, para que el careo
+  // reconozca a la creadora/coordi que el Excel escribe sin la palabra clave
+  // («Day Escamilla Hubb»): si su fila de KameHouse existe, ya ocupa su lugar.
+  const chatarraFilas = [];
   const desde = (encabezado ? encabezado.fila : 0) + 1;
 
   for (let i = desde; i < (filas || []).length; i++) {
@@ -236,7 +240,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
       const zc = mapa.boleto >= 0 ? String(f[mapa.boleto] == null ? '' : f[mapa.boleto]).trim() : '';
       if (zc && (!reglaZona || normalizarNombre(zc) === normalizarNombre(reglaZona))) {
         if (esStaffExcel(nombreCrudo)) staffExcelPorZona[zc] = (staffExcelPorZona[zc] || 0) + 1;
-        else chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + 1;
+        else { chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + 1; chatarraFilas.push({ nombre: nombreCrudo, zona: zc }); }
       }
       continue;
     }
@@ -390,7 +394,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
       + 'La regla de hoy la trata como DESCUENTO (medido 28/28 el 3-oct-2026), así que '
       + 'este caso NO entra al abonado y hay que RE-DECIDIR la regla con estos datos.'
     : null;
-  return { personas, mapa, descartes, chatarraPorZona, staffExcelPorZona, testigo_preventa: testigo };
+  return { personas, mapa, descartes, chatarraPorZona, staffExcelPorZona, chatarraFilas, testigo_preventa: testigo };
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────

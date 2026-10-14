@@ -256,8 +256,12 @@ exports.handler = async (event) => {
     const repartir = (x) => { const base = Math.floor(x / N); return Array.from({ length: N }, (_, i) => base + (i === 0 ? x - base * N : 0)); };
     const contratos = repartir(total_contrato);
     const montos = repartir(monto);
+    // [GRUPO-VIAJE-1] Los que nacen de UNA requisición viajan juntos: misma
+    // llave de grupo para que Bulma/Milk los vean como un solo grupo.
+    const grupoViaje = personas ? require('crypto').randomUUID() : null;
     const filasV = personas
       ? personas.map((p, i) => ({
+          grupo_viaje: grupoViaje,
           evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
           talla_playera: p.talla_playera, num_emergencia: p.num_emergencia,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: 1,

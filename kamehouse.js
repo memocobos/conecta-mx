@@ -5747,22 +5747,49 @@ async function _vj2Cargar() {
       <span class="vj3-tot-i vj3-tot-neto">Neto <b>${_vj3Money(deuda - favor)}</b><i>cobrar − a favor</i></span>
     </div>` : '';
 
-  list.innerHTML = dineroHtml + `<div class="vj2-wrap"><table class="vj2-tabla">
+  // [GRUPO-VIAJE-1] Quien viaja junto se pinta JUNTO: el grupo entra a la
+  // lista donde cae su primer integrante (por nombre) y se lleva a los demás.
+  // Cada grupo con su color, para que Bulma/Milk lo vean sin leer notas.
+  const _grp = {};
+  _vj2Filas.forEach((v) => { if (v.grupo_viaje) (_grp[v.grupo_viaje] = _grp[v.grupo_viaje] || []).push(v); });
+  const _grpColor = {}; let _gi = 0;
+  const _GRP_PAL = ['var(--blue)', 'var(--yellow)', 'var(--green)', 'var(--red)', '#b388ff', '#4dd0e1', '#ffb74d'];
+  const _filasOrden = []; const _vistos = new Set();
+  _vj2Filas.forEach((v) => {
+    if (_vistos.has(v.id)) return;
+    const miembros = (v.grupo_viaje && _grp[v.grupo_viaje] && _grp[v.grupo_viaje].length > 1) ? _grp[v.grupo_viaje] : [v];
+    if (miembros.length > 1 && !(v.grupo_viaje in _grpColor)) _grpColor[v.grupo_viaje] = _GRP_PAL[_gi++ % _GRP_PAL.length];
+    miembros.forEach((m) => { if (!_vistos.has(m.id)) { _vistos.add(m.id); _filasOrden.push(m); } });
+  });
+  const _puedeAgrupar = _vjPuedeEliminar();
+  const _nGrupos = Object.keys(_grpColor).length;
+  const grupoBarra = _puedeAgrupar ? `<div class="vj-grp-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;font-size:12px">
+      <button class="btn btn-ghost btn-sm" onclick="vjGrupoJuntar()" title="Marca con la casilla a quienes viajan juntos">👥 Juntar seleccionados</button>
+      <span style="color:var(--ts)">Marca la casilla de quienes viajan juntos y aprieta «Juntar».${_nGrupos ? ` · ${_nGrupos} grupo${_nGrupos === 1 ? '' : 's'} en este evento` : ''}</span>
+      <span id="vj-grp-msg" style="color:var(--red)"></span>
+    </div>` : '';
+
+  list.innerHTML = dineroHtml + grupoBarra + `<div class="vj2-wrap"><table class="vj2-tabla">
     <thead><tr>
-      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
+      ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
       ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}
       <th>Notas</th>${_vjPuedeEliminar() ? '<th></th>' : ''}
     </tr></thead>
-    <tbody>${_vj2Filas.map((v) => {
+    <tbody>${_filasOrden.map((v) => {
       // El origen, visible por fila: `tipo_viajero` lo pone el alta de staff;
       // lo que viene del Excel no lo trae. Sin la etiqueta, las dos clases de
       // fila se leerían igual y son cosas distintas.
       const staff = v.tipo_viajero && String(v.tipo_viajero) !== 'cliente';
       const contacto = [v.celular, v.correo].filter(Boolean).map(_esfEsc).join('<br>') || '<span class="vj2-vacio">—</span>';
       const emerg = [v.emergencia_nombre, v.num_emergencia].filter(Boolean).join(' · ');
-      return `<tr>
+      const gCol = v.grupo_viaje && _grpColor[v.grupo_viaje];
+      const compas = gCol ? _grp[v.grupo_viaje].filter((x) => x.id !== v.id).map((x) => x.nombre || '—') : [];
+      const lugares = Number(v.boletos) > 1 ? `<span class="vj2-tag" title="Esta fila trae ${Number(v.boletos)} lugares: sus acompañantes aún no tienen ficha propia">${Number(v.boletos)} lugares</span>` : '';
+      return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
+        ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
         <td><b>${_esfEsc(v.nombre || '—')}</b>
-            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span></td>
+            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}
+            ${gCol ? `<div style="font-size:11px;margin-top:3px;color:${gCol}">👥 viaja con: ${compas.map(_esfEsc).join(', ')}${_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : ''}</div>` : ''}</td>
         <td>${_esfEsc(v.tipo_paquete || '—')}</td>
         <td>${_esfEsc(v.zona_boleto || '—')}</td>
         <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
@@ -5794,6 +5821,29 @@ async function _vj2Cargar() {
     }).join('')}</tbody>
   </table></div>`;
   wrap.style.display = '';
+}
+
+// ═══ [GRUPO-VIAJE-1] VIAJAN JUNTOS ═══════════════════════════════════════════
+// Bulma/Milk marcan casillas y aprietan «Juntar». El servidor funde grupos
+// previos y exige el mismo evento; aquí solo se junta lo marcado.
+async function vjGrupoJuntar() {
+  const msg = document.getElementById('vj-grp-msg');
+  const ids = Array.from(document.querySelectorAll('.vj-grp-chk:checked')).map((x) => x.value);
+  if (ids.length < 2) { if (msg) msg.textContent = 'Marca al menos 2 personas.'; return; }
+  if (msg) msg.textContent = '';
+  try {
+    await khViajeros._call({ accion: 'grupo_viaje_juntar', evento_id: _ccEventoActual, ids });
+    showToast(`Listo: ${ids.length} personas quedaron como un grupo`, 'success');
+    await _vj2Cargar();
+  } catch (e) { if (msg) msg.textContent = e.message; }
+}
+async function vjGrupoSeparar(id, nombre) {
+  if (!confirm(`¿Sacar a ${nombre || 'esta persona'} de su grupo? (No se borra nada: solo deja de marcarse como que viaja con ellos.)`)) return;
+  try {
+    await khViajeros._call({ accion: 'grupo_viaje_separar', id });
+    showToast('Separada de su grupo', 'success');
+    await _vj2Cargar();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ═══ [MUNDO-REAL-1 · FASE A2] ABONO MANUAL POR FILA ═════════════════════════

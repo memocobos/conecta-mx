@@ -3082,7 +3082,7 @@ async function renderPlanMigrado(){
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migGrupoHtml(t) + _migDatosHtml(t) + '</div>';
+        + cuenta + _migGrupoHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3124,6 +3124,56 @@ function _migGrupoHtml(t){
     + 'style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 2px;padding:11px 14px;border-radius:10px;background:#25d366;color:#000;font-weight:800;font-size:13px;text-decoration:none">'
     + 'Entrar al grupo de WhatsApp del viaje →</a>';
 }
+// [ACOMP-2] Una fila con VARIOS lugares (reservas de antes, como «3 lugares a
+// nombre de Karina»): el titular anota a sus acompañantes y cada uno nace con su
+// propia ficha, su parte del pago y —si trae correo propio— su invitación.
+function _migAcompHtml(t){
+  const n = Number(t && t.boletos) || 1;
+  if (!t || !t.viajero_id || n < 2) return '';
+  const id = escapeHtml(t.viajero_id);
+  const inp = 'width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:13px';
+  let renglones = '';
+  for (let i = 1; i < n; i++) {
+    renglones += '<div data-acomp-row style="padding:10px;border:1px solid rgba(255,255,255,.12);border-radius:10px;margin-bottom:8px">'
+      + '<div style="font-size:11px;opacity:.7;margin-bottom:6px">Acompañante ' + i + '</div>'
+      + '<input data-a="nombre" maxlength="80" placeholder="Nombre completo" style="' + inp + '">'
+      + '<input data-a="correo" type="email" maxlength="120" placeholder="Su correo (ahí le llega su invitación)" style="' + inp + '">'
+      + '<input data-a="celular" inputmode="numeric" maxlength="14" placeholder="Su WhatsApp (opcional)" style="' + inp + ';margin-bottom:0">'
+      + '</div>';
+  }
+  return '<div style="margin-top:12px;padding:12px;border-radius:10px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.35)">'
+    + '<div style="font-size:13px;font-weight:800;margin-bottom:4px">👥 Tienes ' + n + ' lugares en este registro</div>'
+    + '<div style="font-size:12px;opacity:.8;margin-bottom:8px">Anota a quienes viajan contigo: cada quien tendrá su propia ficha, su parte de lo que ya pagaste, y con su correo recibe su invitación para llenar sus datos. Si dejas el correo vacío, su ficha llega a tu correo y la llenas tú.</div>'
+    + '<button type="button" class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:12px" data-mig-act="acomp" data-mig-id="' + id + '">Agregar a mis acompañantes</button>'
+    + '<div data-mig-panel="acomp" style="display:none;margin-top:10px">' + renglones
+    +   '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="repartir" data-mig-id="' + id + '">Guardar acompañantes</button>'
+    +   '<div data-mig-msg style="font-size:12px;margin-top:6px"></div>'
+    + '</div></div>';
+}
+async function _migRepartir(id){
+  const c = _migCard(id); if (!c) return;
+  const p = c.querySelector('[data-mig-panel="acomp"]');
+  const acompanantes = [];
+  p.querySelectorAll('[data-acomp-row]').forEach((row) => {
+    const g = (k) => (row.querySelector('[data-a="' + k + '"]') || {}).value || '';
+    const a = { nombre: g('nombre').trim(), correo: g('correo').trim(), celular: g('celular').trim() };
+    if (a.nombre || a.correo || a.celular) acompanantes.push(a);
+  });
+  if (!acompanantes.length) return _migMsg(p, 'Escribe al menos un acompañante');
+  if (acompanantes.some((a) => a.nombre.length < 2)) return _migMsg(p, 'Escribe el nombre completo de cada acompañante');
+  const b = p.querySelector('[data-mig-act="repartir"]'); if (b) b.disabled = true;
+  _migMsg(p, 'Guardando…', true);
+  try {
+    const j = await _migPost({ accion: 'repartir', viajero_id: id, acompanantes });
+    if (j && j.ok) {
+      const inv = (j.correo && Array.isArray(j.correo.enviados)) ? j.correo.enviados : [];
+      _migMsg(p, '✓ Listo: ' + j.acompanantes.length + ' acompañante' + (j.acompanantes.length === 1 ? '' : 's') + ' con su propia ficha.'
+        + (inv.length ? ' Les enviamos su invitación a ' + inv.join(', ') + '.' : '')
+        + (j.aviso ? ' ' + j.aviso : ''), true);
+      setTimeout(renderPlanMigrado, 2500);
+    } else { _migMsg(p, (j && j.error) || 'No se pudo guardar'); if (b) b.disabled = false; }
+  } catch (e) { _migMsg(p, 'No se pudo guardar. Revisa tu conexión.'); if (b) b.disabled = false; }
+}
 function _migDatosHtml(t){
   if (!t || !t.viajero_id) return '';
   const id = escapeHtml(t.viajero_id);
@@ -3161,7 +3211,8 @@ document.addEventListener('click', (ev) => {
   const b = ev.target && ev.target.closest && ev.target.closest('[data-mig-act]');
   if (!b) return;
   const id = b.getAttribute('data-mig-id'), act = b.getAttribute('data-mig-act');
-  if (act === 'datos' || act === 'cambio') _migAbrir(id, act);
+  if (act === 'datos' || act === 'cambio' || act === 'acomp') _migAbrir(id, act);
+  else if (act === 'repartir') _migRepartir(id);
   else if (act === 'guardar') _migGuardar(id);
   else if (act === 'pedir') _migPedir(id);
 });

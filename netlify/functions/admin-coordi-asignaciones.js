@@ -108,6 +108,9 @@ const ACCIONES = {
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
   grupo_wa_guardar: ROLES_EDITA_VIAJERO,
+  // [GRUPO-VIAJE-1] «Estas personas viajan juntas» — a mano, por Bulma/Milk.
+  grupo_viaje_juntar: ROLES_EDITA_VIAJERO,
+  grupo_viaje_separar: ROLES_EDITA_VIAJERO,
   deudores_migrados: ROLES_EDITA_VIAJERO,
   // [VJ-5] Acomodar migrados en cuartos.
   viajero_habitacion: ROLES_EDITA_VIAJERO,
@@ -159,7 +162,9 @@ function _normNombre(s) {
 const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 
 // Whitelist ESTRICTA de `viajeros_evento` (PII) — solo lo que la descarga usa.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en';
+// [GRUPO-VIAJE-1] + boletos (un titular de 3 lugares se lee distinto que uno
+// de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -1185,6 +1190,80 @@ exports.handler = async (event) => {
       if (!r.ok) return upstream(headers, await r.text(), 'update');
       const filas = await r.json();
       return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
+    }
+
+    // ── [GRUPO-VIAJE-1] Viajan juntos ──────────────────────────────────────
+    // `juntar` recibe 2+ ids DEL MISMO EVENTO. Si alguno ya tenía grupo, el
+    // grupo nuevo los FUNDE: todos los que compartían cualquiera de esos grupos
+    // quedan en uno solo (juntar a Ana con Bety, cuando Bety ya viajaba con
+    // Caro, deja a las tres juntas — partir el grupo de Bety sería decidir por
+    // Bulma). `separar` saca a UNA persona (grupo → NULL, sin DELETE). Si su
+    // grupo se queda con una sola persona, esa también se suelta: un «grupo»
+    // de uno no le dice nada a nadie.
+    if (accion === 'grupo_viaje_juntar' || accion === 'grupo_viaje_separar') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes agrupar viajeros' }) };
+      }
+      if (accion === 'grupo_viaje_separar') {
+        const id = String(body.id || '').trim();
+        if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+        const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,grupo_viaje&limit=1`, { headers: sbHeaders });
+        if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+        const f = (await pre.json())[0];
+        if (!f) return bad(headers, 'ese viajero no existe');
+        if (!f.grupo_viaje) return ok(headers, { tocadas: 0 });
+        const g = f.grupo_viaje;
+        const r = await fetch(`${baseVE}?id=eq.${id}&grupo_viaje=eq.${g}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ grupo_viaje: null }),
+        });
+        if (!r.ok) return upstream(headers, await r.text(), 'update');
+        let tocadas = (await r.json()).length;
+        const resto = await fetch(`${baseVE}?grupo_viaje=eq.${g}&select=id`, { headers: sbHeaders });
+        if (resto.ok) {
+          const quedan = await resto.json();
+          if (quedan.length === 1) {
+            const r2 = await fetch(`${baseVE}?id=eq.${quedan[0].id}&grupo_viaje=eq.${g}`, {
+              method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+              body: JSON.stringify({ grupo_viaje: null }),
+            });
+            if (r2.ok) tocadas += (await r2.json()).length;
+          }
+        }
+        return ok(headers, { tocadas });
+      }
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+      const ids = Array.from(new Set((Array.isArray(body.ids) ? body.ids : []).map((x) => String(x || '').trim())));
+      if (ids.length < 2) return bad(headers, 'Elige al menos 2 personas para juntar');
+      if (ids.length > 40 || ids.some((x) => !UUID_RE.test(x))) return bad(headers, 'ids inválidos');
+      const pre = await fetch(`${baseVE}?id=in.(${ids.join(',')})&select=id,evento_id,grupo_viaje`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const filas = await pre.json();
+      if (filas.length !== ids.length) return bad(headers, 'Alguna de esas personas ya no existe — recarga la lista');
+      // 🔒 Un grupo es de UN evento: juntar filas de dos eventos sería mentir
+      // en los dos (y `#N` cuenta como otro evento: otra fecha, otro viaje).
+      if (filas.some((f) => f.evento_id !== evento_id)) return bad(headers, 'Todas tienen que ser del mismo evento (y la misma fecha)');
+      const previos = Array.from(new Set(filas.map((f) => f.grupo_viaje).filter(Boolean)));
+      const grupo = previos[0] || _uuid();
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId;
+      let tocadas = 0;
+      // Las filas elegidas…
+      const r = await fetch(`${baseVE}?id=in.(${ids.join(',')})&evento_id=eq.${encodeURIComponent(evento_id)}`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ grupo_viaje: grupo }),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      tocadas += (await r.json()).length;
+      // …y quienes ya viajaban con ellas (funde los grupos previos).
+      for (const g of previos.slice(1)) {
+        const r2 = await fetch(`${baseVE}?grupo_viaje=eq.${g}&evento_id=eq.${encodeURIComponent(evento_id)}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ grupo_viaje: grupo }),
+        });
+        if (r2.ok) tocadas += (await r2.json()).length;
+      }
+      return ok(headers, { grupo_viaje: grupo, tocadas, por: quien });
     }
 
     // ── viajeros_evento: eliminar (admin) ────────────────────────────────

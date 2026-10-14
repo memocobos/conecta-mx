@@ -1587,10 +1587,11 @@ function _ccEvFromEV(e) {
 function _ccEvsFromEV(e) {
   const mf = Array.isArray(e && e.multifecha) ? e.multifecha : [];
   if (mf.length < 2) return [_ccEvFromEV(e)];
-  // Un FESTIVAL vende pases de varios días que viven en el slug base (edc27:
-  // «3 días»). Su tarjeta base se queda, rotulada, para que ese viajero no
-  // desaparezca de Capsule.
-  const pases = e.festival ? [Object.assign(_ccEvFromEV(e), { nombre: (e.a || e.id) + ' · pases de varios días' })] : [];
+  // Un FESTIVAL vende pases de varios días, y el careo de su pestaña escribe en
+  // el slug BASE (edc27: «3 días», mapeo de excel_pestanas a `edc27`). Su
+  // tarjeta base se queda, rotulada, para que esos viajeros no desaparezcan.
+  const esFestival = !!e.festival || mf.some(f => /\bd[ií]as\b/i.test(String((f && f.lbl) || '')));
+  const pases = esFestival ? [Object.assign(_ccEvFromEV(e), { nombre: (e.a || e.id) + ' · pases de varios días' })] : [];
   return pases.concat(mf.map((f, i) => {
     const base = _ccEvFromEV(e);
     const lbl = (f && f.lbl) ? f.lbl : ('Fecha ' + (i + 1));

@@ -10313,7 +10313,7 @@ function _ctrAlertaPintar() {
 // plantilla `coordinador` llena `vigencia_fin` (13 de 13) y todas vencen en
 // ago-2027. No es que la regla falle: es que 12 de 25 contratos no tienen con
 // qué juzgarse. Firmado por Memo sabiéndolo.
-let _ctrFiltro = 'pendiente';
+let _ctrFiltro = 'vigente';
 
 // [CREA-SEG-1] Instagram / TikTok / celular a un clic.
 function _ctrRedesChip(c) {
@@ -10323,12 +10323,29 @@ function _ctrRedesChip(c) {
   if (c.celular_ctr) out.push(`<a href="https://wa.me/52${encodeURIComponent(c.celular_ctr)}" target="_blank" rel="noopener" style="color:#3ddc84;text-decoration:none">WA ${_escCtr(c.celular_ctr)}</a>`);
   return out.length ? `<br><span style="font-size:11px;display:inline-flex;gap:10px;flex-wrap:wrap">${out.join('')}</span>` : '';
 }
+// [CTR-FILTROS-1] Palabra de Memo (14-oct): cuatro cajones que NO se enciman.
+//   cancelado → «Dados de baja» (gana sobre todo)
+//   pasado    → contratos POR EVENTO (creadora, giveaway): el evento fue hace
+//               más de 3 días — el reel posterior vence al 3er día, así que hasta
+//               entonces la creadora sigue activa. Contratos POR VIGENCIA
+//               (coordinador, creadora_team): su vigencia_fin ya pasó.
+//               ⚠️ auxiliar_admin no tiene vigencia y su evento_fecha no es un
+//               evento: nunca cae aquí.
+//   vigente   → firmado y activo · pendiente → «Sin firmar».
+const _CTR_POR_EVENTO = ['creadora', 'giveaway'];
+function _ctrClase(c) {
+  if (String(c.estado || '') === 'cancelado') return 'cancelado';
+  if (_ctrVencido(c)) return 'pasado';
+  if (_CTR_POR_EVENTO.includes(c.plantilla || 'creadora') && !c.vigencia_fin && c.evento_fecha) {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+    const f = String(c.evento_fecha).slice(0, 10);
+    if ((Date.parse(hoy) - Date.parse(f)) / 864e5 > 3) return 'pasado';
+  }
+  return String(c.estado || '') === 'firmado' ? 'vigente' : 'pendiente';
+}
 function _ctrPasaFiltro(c, filtro) {
-  const vencido = _ctrVencido(c);
-  if (filtro === 'vencido') return vencido;
   if (filtro === 'todos') return true;
-  if (vencido) return false;                 // fuera de la vista principal
-  return String(c.estado || '') === filtro;
+  return _ctrClase(c) === filtro;
 }
 // [CREA-SEG-2] Tipo de contrato y cuándo es el evento: se SUMAN al chip.
 let _ctrPlantilla = '', _ctrCuando = '';
@@ -10338,7 +10355,6 @@ function _ctrPasaExtra(c) {
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
     const f = String(c.evento_fecha || '').slice(0, 10);
     if (!f) return false;
-    if (_ctrCuando === 'pasados') return f < hoy;
     if (f < hoy) return false;
     if (_ctrCuando === '30') return (Date.parse(f) - Date.parse(hoy)) / 864e5 <= 30;
   }
@@ -10391,24 +10407,18 @@ function _ctrPintarLista() {
       .filter(c => _ctrCoincide(c, _ctrBusca));
     // Los conteos se cuentan SIN el buscador: el chip dice cuántos hay de cada
     // clase, no cuántos sobreviven al texto.
-    const cuenta = { pendiente: 0, firmado: 0, vencido: 0, cancelado: 0 };
-    _contratosCache.forEach((c) => {
-      if (_ctrPasaFiltro(c, 'vencido')) { cuenta.vencido++; return; }
-      if (_ctrPasaFiltro(c, 'pendiente')) cuenta.pendiente++;
-      else if (_ctrPasaFiltro(c, 'firmado')) cuenta.firmado++;
-      else if (_ctrPasaFiltro(c, 'cancelado')) cuenta.cancelado++;
-    });
+    const cuenta = { vigente: 0, pendiente: 0, pasado: 0, cancelado: 0 };
+    _contratosCache.forEach((c) => { cuenta[_ctrClase(c)]++; });
     const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
-    rot('ctrf-pendientes', '// pendientes', cuenta.pendiente);
-    rot('ctrf-firmados', '// firmados', cuenta.firmado);
-    rot('ctrf-vencidos', '// vencidos', cuenta.vencido);
-    rot('ctrf-cancelados', '// cancelados', cuenta.cancelado);
-    rot('ctrf-todos', '// todos', _contratosCache.length);
+    rot('ctrf-vigentes', 'Vigentes', cuenta.vigente);
+    rot('ctrf-pendientes', 'Sin firmar', cuenta.pendiente);
+    rot('ctrf-pasados', 'Pasados', cuenta.pasado);
+    rot('ctrf-cancelados', 'Dados de baja', cuenta.cancelado);
     _ctrAlertaPintar();
     if (!visibles.length) {
       // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
       // porque si no, no se sabe si no existe o si el texto lo tapó.
-      const etq = { pendiente: 'pendiente', firmado: 'firmado', vencido: 'vencido', todos: '' };
+      const etq = { vigente: 'vigente', pendiente: 'sin firmar', pasado: 'pasado', cancelado: 'dado de baja', todos: '' };
       const q = etq[_ctrFiltro] ? etq[_ctrFiltro] + ' ' : '';
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px">` +
         (_ctrBusca

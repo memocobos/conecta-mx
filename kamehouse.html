@@ -2667,11 +2667,11 @@
           de 25 están firmados y no piden nada. Y // vencidos vive APARTE — no
           sale en pendientes ni en firmados, como el archivo de Esferas. -->
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="gz-filter active" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)">Pendientes</button>
-      <button class="gz-filter" id="ctrf-firmados" onclick="filtrarContratos('firmado',this)">// firmados</button>
-      <button class="gz-filter" id="ctrf-vencidos" onclick="filtrarContratos('vencido',this)" title="Vigencia terminada. Se calcula de vigencia_fin — hoy solo la llena la plantilla coordinador.">// vencidos</button>
-      <button class="gz-filter" id="ctrf-cancelados" onclick="filtrarContratos('cancelado',this)" title="Colaboraciones dadas de baja">// cancelados</button>
-      <button class="gz-filter" id="ctrf-todos" onclick="filtrarContratos('todos',this)">// todos</button>
+      <!-- [CTR-FILTROS-1] Palabra de Memo (14-oct): cuatro cajones y listo. -->
+      <button class="gz-filter active" id="ctrf-vigentes" onclick="filtrarContratos('vigente',this)" title="Firmados y activos">Vigentes</button>
+      <button class="gz-filter" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)" title="Mandados y todavía sin firmar">Sin firmar</button>
+      <button class="gz-filter" id="ctrf-pasados" onclick="filtrarContratos('pasado',this)" title="Creadoras: su evento pasó hace más de 3 días (ya cerró su plazo de entregas). Coordinadores: su vigencia terminó.">Pasados</button>
+      <button class="gz-filter" id="ctrf-cancelados" onclick="filtrarContratos('cancelado',this)" title="Colaboraciones dadas de baja">Dados de baja</button>
       <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="ctrRankingAbrir()" title="Quién cumple y quién no">🏆 Ranking de creadoras</button>
       <button class="btn btn-ghost btn-sm" onclick="ctrAvisoVigentes()" title="Mandar a todas las creadoras vigentes su calendario de entregas">✉ Avisar a creadoras vigentes</button>
@@ -2690,7 +2690,6 @@
        <option value="">Cualquier fecha</option>
        <option value="proximos">Eventos próximos</option>
        <option value="30">Próximos 30 días</option>
-       <option value="pasados">Eventos pasados</option>
       </select>
      </div>
      <div id="ctr-ranking" style="display:none;margin-bottom:14px"></div>

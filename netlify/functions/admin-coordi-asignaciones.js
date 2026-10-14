@@ -124,6 +124,8 @@ const ACCIONES = {
   staff_boleto: ROLES_EDITA_VIAJERO,
   // [ALARMAS-1] La logística del equipo en una sola lista para el Resumen.
   alarmas_operacion: ROLES_EDITA_VIAJERO,
+  // [CC-CARDS-1] Lo que cada tarjeta de Capsule dice ANTES de abrirla.
+  capsule_resumen: ROLES_EDITA_VIAJERO,
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -371,6 +373,60 @@ exports.handler = async (event) => {
       }
       const insRows = await ins.json();
       return ok(headers, { viajero: insRows[0] || null });
+    }
+
+    // ── [CC-CARDS-1 13-oct] el resumen de cada tour para las tarjetas ─────
+    // Palabra de Memo: «en la card antes de abrir el evento que venga info del
+    // tour, coordinador asignado, creadora asignada, cantidad de viajeros». Una
+    // llamada para TODOS los tours (sin N consultas por tarjeta). SOLO LEE.
+    // Llave = la de la tarjeta (`omar#1`); una asignación vieja al evento base
+    // se reparte a todas sus fechas.
+    if (accion === 'capsule_resumen') {
+      const leer = async (url) => { const r = await fetch(url, { headers: sbHeaders }); if (!r.ok) throw new Error(url.split('/rest/v1/')[1].split('?')[0] + ' ' + r.status); return r.json(); };
+      let ve, asigs, usus, ctrs;
+      try {
+        [ve, asigs, usus, ctrs] = await Promise.all([
+          leer(`${baseVE}?select=evento_id,tipo_viajero,tipo_paquete,zona_boleto,boletos,usuario_id,nombre,talla_playera&limit=20000`),
+          leer(`${baseEC}?select=evento_id,coordi_id,status&limit=5000`),
+          leer(`${baseUsuarios}?select=id,nombre,rol&limit=1000`),
+          leer(`${baseContratos}?plantilla=eq.creadora&select=id,creador_nombre,creador_email,estado,evento_nombre,evento_fecha,datos&limit=2000`),
+        ]);
+      } catch (e) { return upstream(headers, e.message, 'consulta'); }
+      const out = {};
+      const de = (k) => (out[k] = out[k] || { viajeros: 0, por_paquete: {}, equipo: [], creadoras: [] });
+      const esBaja = (v) => Number(v.boletos) === 0 && !v.zona_boleto;
+      (ve || []).forEach((v) => {
+        if (!esCliente(v.tipo_viajero) || esBaja(v)) return;
+        const o = de(v.evento_id); const n = Number(v.boletos) > 0 ? Number(v.boletos) : 1;
+        o.viajeros += n;
+        const p = String(v.tipo_paquete || '—').toUpperCase();
+        o.por_paquete[p] = (o.por_paquete[p] || 0) + n;
+      });
+      const uDe = {}; (usus || []).forEach((u) => { uDe[u.id] = u; });
+      const staffDe = (llave, uid) => (ve || []).find((v) => v.usuario_id === uid && !esCliente(v.tipo_viajero) && v.evento_id === llave);
+      (asigs || []).forEach((a) => {
+        if (a.status === 'declinado') return;
+        const u = uDe[a.coordi_id] || {};
+        const fila = staffDe(a.evento_id, a.coordi_id);
+        de(a.evento_id).equipo.push({ nombre: u.nombre || '—', rol: u.rol || null, status: a.status || 'pendiente', boleto: fila ? (fila.zona_boleto || null) : null, base: !String(a.evento_id).includes('#') });
+      });
+      // Creadoras: la cortesía ya dice su tour; las que no, se cuelgan por FECHA
+      // del contrato (la tarjeta casa fecha + nombre en el navegador).
+      const sinTour = [];
+      const vistas = new Set();
+      (ctrs || []).filter((c) => c.estado !== 'cancelado')
+        .sort((x, y) => (x.estado === 'firmado' ? 0 : 1) - (y.estado === 'firmado' ? 0 : 1)).forEach((c) => {
+        const k = String(c.creador_email || c.creador_nombre).toLowerCase() + '|' + c.evento_fecha;
+        if (vistas.has(k)) return; vistas.add(k);
+        const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+        const item = { contrato_id: c.id, nombre: c.creador_nombre, firmado: c.estado === 'firmado',
+          cortesia: d.cortesia ? { zona: d.cortesia.zona, boletos: d.cortesia.boletos } : null,
+          acompanante: (d.cortesia && d.cortesia.acompanante) || (d.acompanante && d.acompanante.nombre) || null,
+          evento_nombre: c.evento_nombre, evento_fecha: c.evento_fecha };
+        if (d.cortesia && d.cortesia.evento_id) de(d.cortesia.evento_id).creadoras.push(item);
+        else sinTour.push(item);
+      });
+      return ok(headers, { tours: out, creadoras_por_fecha: sinTour });
     }
 
     // ── [ALARMAS-1 13-oct] la logística del equipo, en una lista ───────────

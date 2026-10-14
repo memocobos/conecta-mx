@@ -1024,11 +1024,15 @@
       <!-- TAB: Lista de eventos -->
       <div id="cc-tab-lista">
        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="gz-filter active" id="ccf-todos" onclick="filtrarCCEventos('todos',this)">// todos</button>
-        <button class="gz-filter" id="ccf-proximos" onclick="filtrarCCEventos('proximo',this)">// próximos</button>
+        <!-- [CC-CARDS-1] Próximos por default; filtros para OPERAR. -->
+        <button class="gz-filter active" id="ccf-proximos" onclick="filtrarCCEventos('proximo',this)">// próximos</button>
+        <button class="gz-filter" id="ccf-mes" onclick="filtrarCCEventos('mes',this)">// próximos 30 días</button>
+        <button class="gz-filter" id="ccf-pendientes" onclick="filtrarCCEventos('pendientes',this)">// con pendientes de equipo</button>
+        <button class="gz-filter" id="ccf-sincoordi" onclick="filtrarCCEventos('sincoordi',this)">// sin coordi</button>
         <button class="gz-filter" id="ccf-pasados" onclick="filtrarCCEventos('pasado',this)">// pasados</button>
+        <button class="gz-filter" id="ccf-todos" onclick="filtrarCCEventos('todos',this)">// todos</button>
        </div>
-       <input type="text" id="cc-buscar" placeholder="Buscar evento por nombre…" autocomplete="off" oninput="filtrarCapsule()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px;margin-bottom:10px">
+       <input type="text" id="cc-buscar" placeholder="Buscar tour, artista, coordi o creadora…" autocomplete="off" oninput="filtrarCapsule()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px;margin-bottom:10px">
        <div id="cc-eventos-grid"></div>
       </div>
 

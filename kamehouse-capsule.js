@@ -434,8 +434,16 @@ function filtrarCCEventos(filtro, btn) {
 // Texto vacío → solo aplica el filtro de fecha (igual que antes).
 function filtrarCapsule() {
   const q = (document.getElementById('cc-buscar')?.value || '').trim().toLowerCase();
-  const lista = q
-    ? _ccEventosCache.filter(e => String(e.nombre || '').toLowerCase().includes(q))
+  // [CC-CARDS-1] El buscador también encuentra por coordi y creadora, y sin
+  // acentos («sofia» encuentra «Sofía»).
+  const n = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const qn = n(q);
+  const lista = qn
+    ? _ccEventosCache.filter(e => {
+        const r = e._res || {};
+        const hay = [e.nombre, e.ciudad].concat((r.equipo || []).map(p => p.nombre), (r.creadoras || []).map(c => c.nombre + ' ' + (c.acompanante || ''))).map(n).join(' | ');
+        return hay.includes(qn);
+      })
     : _ccEventosCache;
   renderCCEventos(lista, _ccFiltroFecha);
 }

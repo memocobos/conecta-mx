@@ -4844,7 +4844,25 @@ async function loadCapsule() {
     // media lista. Es la parrilla de eventos de Capsule, la misma regla que
     // todo lo demás.
     _ccEventosCache = _evOrdenarPorFecha(_ccEventosCache);
-    renderCCEventos(_ccEventosCache, 'todos');
+    // [CC-CARDS-1] Lo que cada tarjeta dice antes de abrirla. Fails-soft: sin
+    // él las tarjetas se pintan como antes.
+    try {
+      const j = await khViajeros._call({ accion: 'capsule_resumen' });
+      const tours = j.tours || {}, sueltas = j.creadoras_por_fecha || [];
+      const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      _ccEventosCache.forEach(e => {
+        const base = String(e.id).split('#')[0];
+        const propio = tours[e.id] || { viajeros: 0, por_paquete: {}, equipo: [], creadoras: [] };
+        const delBase = (e.id !== base && tours[base]) ? tours[base] : null;
+        const nom = norm(e.nombre).split(' ')[0];
+        const creas = (propio.creadoras || []).concat(sueltas.filter(c => c.evento_fecha === e.fecha && nom && (norm(c.evento_nombre).includes(nom) || norm(e.nombre).includes(norm(c.evento_nombre).split(' ')[0]))));
+        e._res = { viajeros: propio.viajeros, por_paquete: propio.por_paquete,
+          equipo: (propio.equipo || []).concat(delBase ? (delBase.equipo || []) : []), creadoras: creas };
+      });
+    } catch (_) { /* fails-soft */ }
+    _ccFiltroFecha = 'proximo';
+    document.querySelectorAll('#page-capsule .gz-filter[id^="ccf-"]').forEach(b => b.classList.toggle('active', b.id === 'ccf-proximos'));
+    renderCCEventos(_ccEventosCache, 'proximo');
   } catch(e) {
     // [FLUJO-UX-1] Pegaba `e.message` crudo, sin decir QUÉ falló ni cómo
     // reintentar — el mismo mal que EQ-8 ya corrigió en el Radar. Ahora usa el
@@ -5090,11 +5108,17 @@ function renderCCEventos(lista, filtro) {
   const grid = document.getElementById('cc-eventos-grid');
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   let filtrada = lista;
-  if (filtro === 'proximo') filtrada = lista.filter(e => new Date(e.fecha+'T12:00:00') >= hoy);
-  if (filtro === 'pasado')  filtrada = lista.filter(e => new Date(e.fecha+'T12:00:00') < hoy);
+  const _fut = (e) => new Date(e.fecha+'T12:00:00') >= hoy;
+  const _sinBoleto = (e) => ((e._res && e._res.equipo) || []).filter(p => !p.boleto).length;
+  if (filtro === 'proximo') filtrada = lista.filter(_fut);
+  if (filtro === 'pasado')  filtrada = lista.filter(e => !_fut(e));
+  // [CC-CARDS-1] Filtros que ayudan a operar, no solo a mirar.
+  if (filtro === 'mes') { const lim = new Date(hoy.getTime() + 30 * 86400000); filtrada = lista.filter(e => { const f = new Date(e.fecha+'T12:00:00'); return f >= hoy && f <= lim; }); }
+  if (filtro === 'sincoordi') filtrada = lista.filter(e => _fut(e) && !((e._res && e._res.equipo) || []).length && ((e._res && e._res.viajeros) || 0) > 0);
+  if (filtro === 'pendientes') filtrada = lista.filter(e => _fut(e) && (_sinBoleto(e) || ((e._res && e._res.equipo) || []).some(p => p.status !== 'aceptado') || ((e._res && e._res.creadoras) || []).some(c => !c.firmado || !c.cortesia)));
 
   if (!filtrada.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos — crea el primero con "+ Nuevo Evento"</div>';
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Ningún tour con este filtro.</div>';
     return;
   }
   grid.innerHTML = filtrada.map(e => {
@@ -5108,6 +5132,7 @@ function renderCCEventos(lista, filtro) {
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">
             ${e.artista ? _esfEsc(e.artista) + ' · ' : ''}${_esfEsc(e.ciudad||'')} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
           </div>
+          ${_ccTarjetaRes(e, pasado)}
           <div style="margin-top:6px">
             <span style="font-size:10px;padding:2px 8px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.25);border-radius:4px;color:var(--orange);font-family:'JetBrains Mono',monospace">${tipoLabel}</span>
             ${pasado ? `<span style="font-size:10px;padding:2px 8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:4px;color:var(--ts);font-family:'JetBrains Mono',monospace;margin-left:6px">pasado</span>` : ''}
@@ -5126,6 +5151,30 @@ function renderCCEventos(lista, filtro) {
       ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:var(--r-sm,8px);border-left:2px solid var(--border)">${_esfEsc(e.notas_internas)}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// [CC-CARDS-1] El renglón de la tarjeta: viajeros (por paquete), equipo con su
+// estado y boleto, creadoras con su cortesía. Lo que falta, en ámbar.
+function _ccTarjetaRes(e, pasado) {
+  const r = e._res;
+  if (!r) return '';
+  const pq = Object.entries(r.por_paquete || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${_esfEsc(k)}`).join(' · ');
+  const eq = (r.equipo || []).map(p => {
+    const ok = p.status === 'aceptado';
+    const col = !ok ? '#ffb020' : (p.boleto ? 'var(--green)' : '#ffb020');
+    const tip = !ok ? 'no ha aceptado' : (p.boleto ? p.boleto : 'sin boleto');
+    return `<span title="${_esfEsc(tip)}" style="color:${col}">${ok ? '✓' : '⏳'} ${_esfEsc(String(p.nombre || '').split(' ')[0])}${ok && !p.boleto ? ' 🎟?' : ''}</span>`;
+  }).join(' · ');
+  const cr = (r.creadoras || []).map(c => {
+    const col = !c.firmado || !c.cortesia ? '#ffb020' : 'var(--green)';
+    return `<span title="${!c.firmado ? 'sin firmar' : (c.cortesia ? 'cortesía ' + _esfEsc(c.cortesia.zona || '') : 'firmó, falta cortesía')}" style="color:${col}">🎥 ${_esfEsc(String(c.nombre || '').split(' ')[0])}${c.acompanante ? ' +1' : ''}</span>`;
+  }).join(' · ');
+  const sinEquipo = !pasado && !(r.equipo || []).length && (r.viajeros || 0) > 0;
+  return `<div style="font-size:12px;margin-top:8px;line-height:1.7">
+    <div>👥 <b>${r.viajeros || 0}</b> viajero${r.viajeros === 1 ? '' : 's'}${pq ? ` <span style="color:var(--ts)">(${pq})</span>` : ''}</div>
+    <div>🧑‍✈️ ${eq || (sinEquipo ? '<span style="color:var(--red)">sin coordi asignado</span>' : '<span style="color:var(--ts)">sin equipo</span>')}</div>
+    ${cr ? `<div>${cr}</div>` : ''}
+  </div>`;
 }
 
 function abrirModalEditarEvento(id) { abrirModalEvento(id); }
@@ -5362,8 +5411,24 @@ async function loadCCEquipo() {
     const total = asigs.length + pendientesFirma.length;
     if (countEl) countEl.textContent = `${total} asignado${total!==1?'s':''}`;
 
+    // [CC-CARDS-1] Las CREADORAS del tour (palabra de Memo: «Equipo debería
+    // ser el coordi y la creadora que firmó, + acompañante»). Salen del mismo
+    // resumen que pinta las tarjetas; las que ya traen cortesía muestran su
+    // zona, las que firmaron sin cortesía llevan el botón para asignarla.
+    const _creas = ((ev && ev._res && ev._res.creadoras) || []);
+    const htmlCreas = _creas.map(c => {
+      const est = !c.firmado ? '<span style="color:#ffb020">sin firmar</span>'
+        : (c.cortesia ? `<span style="color:var(--green)">🎟 ${_esfEsc(c.cortesia.zona || '')} ×${c.cortesia.boletos || 1}</span>` : '<span style="color:#ffb020">firmó · falta su cortesía</span>');
+      const btn = (c.firmado && !c.cortesia && _puedeVerTab('contratos'))
+        ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="ccIrCortesia('${_attrJs(c.contrato_id)}')">🎟 Asignar cortesía →</button>` : '';
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid #c77dff;border-radius:var(--radius);padding:12px 18px;margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <div><div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(c.nombre || '—')}</div>
+        <div style="font-size:11px;color:var(--ts)">Creadora de contenido${c.acompanante ? ` · + ${_esfEsc(c.acompanante)}` : ''} · ${est}</div></div>${btn}</div>`;
+    }).join('');
+
     if (!total) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
+      container.innerHTML = htmlCreas || '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
+      if (countEl && _creas.length) countEl.textContent = `${_creas.length} creadora${_creas.length !== 1 ? 's' : ''}`;
       return;
     }
 
@@ -5451,8 +5516,17 @@ async function loadCCEquipo() {
       </div>`;
     }).join('');
 
-    container.innerHTML = htmlAsigs + htmlPend;
+    container.innerHTML = htmlAsigs + htmlCreas + htmlPend;
   } catch(e) { container.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+// [CC-CARDS-1] De la creadora en Capsule al panel de cortesía de Contratos.
+async function ccIrCortesia(contratoId) {
+  if (typeof showHerramienta === 'function') showHerramienta('contratos');
+  for (let i = 0; i < 30; i++) {
+    if ((typeof _contratosCache !== 'undefined') && (_contratosCache || []).some(x => x && x.id === contratoId)) { cortAbrir(contratoId); return; }
+    await new Promise(r => setTimeout(r, 150));
+  }
+  showToast && showToast('Abre su contrato en la lista y aprieta 🎟 Cortesía', 'info');
 }
 
 

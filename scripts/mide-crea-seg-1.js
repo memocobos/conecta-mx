@@ -62,7 +62,9 @@ const ents = (cid) => DB.entregables_creadora.filter((e) => e.contrato_id === ci
   let r = await pedir({ accion: 'entregables_listar', contrato_id: C1 });
   const sug = r.j.sugeridos || [];
   af(r.s === 200 && sug.length === 4, `[A1] sugeridos desde la 2.2: el renglón previo+posterior se parte en dos (${sug.length})`);
-  af(sug[0].fase === 'previo' && sug[1].fase === 'posterior' && sug[1].fecha_limite === dia(13) && sug[2].fase === 'evento' && sug[2].fecha_limite === dia(10), '[A2] fases y fechas sugeridas (posterior = evento+3, evento = día del evento)');
+  // [CREA-SEG-7] plazos de Memo (14-oct): reel posterior = el 3er día contando el
+  // del evento (evento+2) · durante = hasta las 12:00 del día siguiente.
+  af(sug[0].fase === 'previo' && sug[1].fase === 'posterior' && sug[1].fecha_limite === dia(12) && sug[2].fase === 'evento' && sug[2].fecha_limite === dia(11) && sug[2].hora_limite === '12:00', '[A2] fases y fechas sugeridas (reel posterior = evento+2, durante = evento+1 a las 12:00)');
   af(ents(C1).length === 0, '[A3] listar no guarda nada');
   const items = sug.map((s, i) => ({ ...s, fecha_limite: s.fase === 'previo' ? dia(3) : s.fecha_limite }));
   MAILS = [];

@@ -24,6 +24,13 @@ function fechaLarga(ymd) {
   if (!ymd) return '';
   return new Date(String(ymd).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
+// [CREA-SEG-7] hora límite opcional ('12:00') → «12:00 del mediodía».
+function horaTxt(h) {
+  const m = /^(\d{2}):(\d{2})$/.exec(String(h || '')); if (!m) return '';
+  const H = +m[1], M = m[2];
+  if (H === 12 && M === '00') return '12:00 del mediodía';
+  return `${((H + 11) % 12) + 1}:${M} ${H < 12 ? 'am' : 'pm'}`;
+}
 function linkColab(token) { return `${SITE}/contrato?t=${encodeURIComponent(token)}`; }
 
 // La fase sugerida a partir del texto del entregable (solo para PRELLENAR; la
@@ -53,7 +60,7 @@ function tablaEntregables(items, hoy) {
     const est = e.estado === 'entregado' ? '<span style="color:#1a8a3a;font-weight:700">✓ Recibido</span>'
       : d == null ? '<span style="color:#666">Fecha por confirmar</span>'
       : d < 0 ? `<span style="color:#d0182f;font-weight:700">Venció ${esc(fechaLarga(e.fecha_limite))}</span>`
-      : `<span style="color:#111">Entrega a más tardar el <b>${esc(fechaLarga(e.fecha_limite))}</b>${d === 0 ? ' (hoy)' : d === 1 ? ' (mañana)' : ` (en ${d} días)`}</span>`;
+      : `<span style="color:#111">Entrega a más tardar el <b>${esc(fechaLarga(e.fecha_limite))}${e.hora_limite ? ` a las ${esc(horaTxt(e.hora_limite))}` : ''}</b>${d === 0 ? ' (hoy)' : d === 1 ? ' (mañana)' : ` (en ${d} días)`}</span>`;
     return `<tr><td style="padding:8px 6px;border-bottom:1px solid #eee;color:#111;vertical-align:top"><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">${esc(FASE_TXT[e.fase] || '')}</div>${esc(e.descripcion)}</td><td style="padding:8px 6px;border-bottom:1px solid #eee;color:#111;text-align:right;vertical-align:top;width:42%">${est}</td></tr>`;
   }).join('')}</table>`;
 }
@@ -121,7 +128,9 @@ function evaluarContrato(c, items, hoy) {
   vivos.forEach((e) => {
     if (e.estado === 'entregado') {
       const dEnt = e.entregado_at ? new Date(e.entregado_at).toLocaleDateString('en-CA', { timeZone: TZ }) : null;
-      if (e.fecha_limite && dEnt && dEnt > e.fecha_limite) r.tarde++; else r.a_tiempo++;
+      const hEnt = e.entregado_at ? new Date(e.entregado_at).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }) : null;
+      const tarde = e.fecha_limite && dEnt && (dEnt > e.fecha_limite || (dEnt === e.fecha_limite && e.hora_limite && hEnt && hEnt > e.hora_limite));
+      if (tarde) r.tarde++; else r.a_tiempo++;
     } else if (e.fecha_limite && e.fecha_limite < hoy) r.vencido++;
     else r.pendiente++;
   });
@@ -151,4 +160,4 @@ async function enviarCorreo(to, asunto, html) {
   } catch (e) { return { enviado: false, error: e.message }; }
 }
 
-module.exports = { enviarCorreo, esc, hoyMx, diasEntre, fechaLarga, linkColab, faseSugerida, correoCreadora, evaluarContrato, PUNTOS, FASE_TXT };
+module.exports = { enviarCorreo, esc, hoyMx, diasEntre, fechaLarga, horaTxt, linkColab, faseSugerida, correoCreadora, evaluarContrato, PUNTOS, FASE_TXT };

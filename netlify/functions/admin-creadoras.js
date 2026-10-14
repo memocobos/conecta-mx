@@ -76,7 +76,10 @@ exports.handler = async (event) => {
             sug.push({ descripcion: 'Reel posterior al evento — ' + t, fase: 'posterior' });
           } else sug.push({ descripcion: t, fase: L.faseSugerida(t) });
         });
-        sug.forEach((s) => { s.fecha_limite = s.fase === 'evento' ? (c.evento_fecha || null) : s.fase === 'posterior' && c.evento_fecha ? sumarDias(c.evento_fecha, 3) : null; });
+        // [CREA-SEG-7] Plazos de Memo (14-oct): durante = día del evento y hasta
+        // las 12:00 del día siguiente · carrusel/post de fotos = día siguiente ·
+        // reel posterior = el TERCER día contando el del evento (evento + 2).
+        sug.forEach((s) => { Object.assign(s, plazoSugerido(s, c.evento_fecha)); });
         out.sugeridos = sug;
       }
       return res(200, out);
@@ -97,16 +100,18 @@ exports.handler = async (event) => {
         if (!['previo', 'evento', 'posterior'].includes(it.fase)) return res(400, { error: `El entregable ${i + 1} no tiene fase` });
         const f = it.fecha_limite ? String(it.fecha_limite) : null;
         if (f && !FECHA_RE.test(f)) return res(400, { error: `Fecha inválida en el entregable ${i + 1}` });
-        limpios.push({ id: UUID_RE.test(String(it.id || '')) ? it.id : null, descripcion: d, fase: it.fase, fecha_limite: f, orden: i });
+        // La hora límite: los de «durante» van hasta las 12:00 del día límite.
+        const h = it.fase === 'evento' && f ? '12:00' : null;
+        limpios.push({ id: UUID_RE.test(String(it.id || '')) ? it.id : null, descripcion: d, fase: it.fase, fecha_limite: f, hora_limite: h, orden: i });
       }
       const actuales = await entregables(cid);
       const ids = new Set(limpios.filter((x) => x.id).map((x) => x.id));
       for (const x of limpios) {
         if (x.id) {
           if (!actuales.some((a) => a.id === x.id)) return res(400, { error: 'Un entregable no es de este contrato' });
-          await send(`${T_E}?id=eq.${x.id}&contrato_id=eq.${cid}`, 'PATCH', { descripcion: x.descripcion, fase: x.fase, fecha_limite: x.fecha_limite, orden: x.orden, ...(actuales.find((a) => a.id === x.id).estado === 'descartado' ? { estado: 'pendiente' } : {}) });
+          await send(`${T_E}?id=eq.${x.id}&contrato_id=eq.${cid}`, 'PATCH', { descripcion: x.descripcion, fase: x.fase, fecha_limite: x.fecha_limite, hora_limite: x.hora_limite, orden: x.orden, ...(actuales.find((a) => a.id === x.id).estado === 'descartado' ? { estado: 'pendiente' } : {}) });
         } else {
-          await send(T_E, 'POST', { contrato_id: cid, descripcion: x.descripcion, fase: x.fase, fecha_limite: x.fecha_limite, orden: x.orden, creado_por: quien });
+          await send(T_E, 'POST', { contrato_id: cid, descripcion: x.descripcion, fase: x.fase, fecha_limite: x.fecha_limite, hora_limite: x.hora_limite, orden: x.orden, creado_por: quien });
         }
       }
       for (const a of actuales) {
@@ -214,6 +219,12 @@ exports.handler = async (event) => {
   return res(400, { error: 'accion inválida' });
 };
 
+function plazoSugerido(s, ev) {
+  if (!ev) return { fecha_limite: null, hora_limite: null };
+  if (s.fase === 'evento') return { fecha_limite: sumarDias(ev, 1), hora_limite: '12:00' };
+  if (s.fase === 'posterior') return { fecha_limite: sumarDias(ev, /reel/i.test(s.descripcion) ? 2 : 1), hora_limite: null };
+  return { fecha_limite: null, hora_limite: null };
+}
 function sumarDias(ymd, n) { const d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function pickRedes(d) {
   d = (d && typeof d === 'object') ? d : {};

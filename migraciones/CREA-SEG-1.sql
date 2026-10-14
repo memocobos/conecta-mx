@@ -39,3 +39,21 @@ alter table public.entregables_creadora enable row level security;
 -- 15-oct y Marietta/Soy Luna 21-oct) van SOLO con durante y después.
 -- Resultado: 16 contratos · 76 entregables · 28 previos. creado_por='jane-crea-seg-6'.
 -- =============================================================================
+
+-- =============================================================================
+-- CREA-SEG-7 (14-oct-2026) · LOS PLAZOS CORREGIDOS POR MEMO (YA CORRIÓ)
+-- Palabra de Memo: «las 4/5 historias tienen que ser durante el evento o máximo
+-- al día siguiente antes de medio día … el post de fotos es al día siguiente
+-- del evento … el reel está bien 3 días, en el tercero lo tienen que entregar,
+-- 4 es mucho».
+--   historias durante = evento + 1 a las 12:00 (columna nueva hora_limite)
+--   carrusel / post de fotos = evento + 1
+--   reel posterior = evento + 2 (el TERCER día contando el del evento)
+-- Solo filas 'pendiente' sembradas por jane-crea-seg-6, con valor esperado en
+-- el WHERE. Resultado: 16 + 16 + 16.
+-- =============================================================================
+alter table public.entregables_creadora add column if not exists hora_limite text
+  check (hora_limite is null or hora_limite ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$');
+-- update … set fecha_limite = ev+1, hora_limite='12:00' where fase='evento' and fecha_limite=ev
+-- update … set fecha_limite = ev+1 where descripcion ilike '1 carrusel%' and fecha_limite=ev+3
+-- update … set fecha_limite = ev+2 where descripcion ilike '%reel%' and fase='posterior' and fecha_limite=ev+3

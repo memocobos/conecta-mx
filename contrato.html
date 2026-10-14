@@ -1925,7 +1925,8 @@ function _miColabPanel(c) {
     const d = e.fecha_limite ? _mcDias(hoy, e.fecha_limite) : null;
     const ok = e.estado === "entregado";
     const col = ok ? "#88ea4e" : d == null ? "rgba(255,255,255,.6)" : d < 0 ? "#ff5a4d" : d <= 3 ? "#ffb020" : "#e8ff4c";
-    const txt = ok ? "✓ Recibido" : d == null ? "Fecha por confirmar" : d < 0 ? "Venció " + _mcFecha(e.fecha_limite) : d === 0 ? "Vence HOY" : d === 1 ? "Vence mañana" : "Faltan " + d + " días · " + _mcFecha(e.fecha_limite);
+    const hr = e.hora_limite === "12:00" ? " a las 12:00 del mediodía" : e.hora_limite ? " a las " + e.hora_limite : "";
+    const txt = ok ? "✓ Recibido" : d == null ? "Fecha por confirmar" : d < 0 ? "Venció " + _mcFecha(e.fecha_limite) : d === 0 ? "Vence HOY" + hr : d === 1 ? "Vence mañana" + hr : "Faltan " + d + " días · " + _mcFecha(e.fecha_limite) + hr;
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)">' +
       '<div style="width:22px;height:22px;flex:0 0 22px;border-radius:50%;border:2px solid ' + col + ';display:flex;align-items:center;justify-content:center;color:' + col + ';font-size:12px;font-weight:900">' + (ok ? "✓" : "") + '</div>' +
       '<div style="flex:1"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">' + escapeHtml(FASE[e.fase] || "") + '</div>' +

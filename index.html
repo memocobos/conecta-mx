@@ -8999,5 +8999,172 @@ function skipOnboarding(){
 })();
 </script>
 
+<!-- ===================================================================
+     WEB-UX-3 (14-oct-2026) · LA VENTANA DE RESERVA, EN TRES PASOS
+     Cuando la requisición está viva (hoy: Pa'l Norte), la ventana de pago era
+     una sola pared: monto, cuentas, nombre, correo, talla, acompañantes,
+     desglose, forma de pago, comprobante… y además NO SCROLLEABA (el modal
+     tiene overflow:hidden y sin alto máximo: en un teléfono el botón de enviar
+     quedaba fuera de la pantalla). Ahora va en tres pasos:
+        1 · Tu reservación  (qué apartas y cuánto pagas hoy)
+        2 · Paga tu separo  (las cuentas, cómo pagaste y tu comprobante)
+        3 · Tus datos       (tú y tus acompañantes) → Enviar
+     🔒 NO cambia lo que se envía: los mismos campos con los mismos ids, y el
+     botón final es el mismo `_reqEnviar()` que valida TODO otra vez. Esto solo
+     ACOMODA los nodos que pinta `_reqPintar()` y agrega «Continuar/Atrás».
+     Sin requisición viva el modal queda exactamente como siempre (solo gana
+     scroll). Si algo truena aquí, el modal se queda como lo pintó _reqPintar.
+     =================================================================== -->
+<style id="web-ux-3-css">
+.pago-modal{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
+.pago-modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.wx3-steps{display:flex;gap:6px;margin:0 0 16px}
+.wx3-dot{flex:1;display:flex;flex-direction:column;gap:5px;font:800 9px/1.2 'Montserrat',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.wx3-dot::before{content:'';height:4px;border-radius:4px;background:rgba(255,255,255,.14)}
+.wx3-dot.on{color:#e8ff4c}.wx3-dot.on::before{background:#e8ff4c}
+.wx3-dot.ok{color:rgba(232,255,76,.6)}.wx3-dot.ok::before{background:rgba(232,255,76,.55)}
+.wx3-paso{display:none}.wx3-paso.on{display:block;animation:wx3in .22s ease-out both}
+@keyframes wx3in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wx3-tit{font:900 15px/1.2 'Montserrat',sans-serif;color:#fff;margin:0 0 4px}
+.wx3-sub{font:500 11.5px/1.45 'Montserrat',sans-serif;color:rgba(255,255,255,.65);margin:0 0 14px}
+.wx3-res{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:4px 14px;margin:0 0 14px}
+.wx3-fila{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font:600 12px/1.35 'Montserrat',sans-serif}
+.wx3-fila:last-child{border-bottom:0}
+.wx3-fila span:first-child{color:rgba(255,255,255,.5);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:800;padding-top:1px}
+.wx3-fila span:last-child{color:#fff;text-align:right}
+.wx3-nav{display:flex;gap:8px;margin:14px 0 4px}
+.wx3-btn{flex:1;padding:14px;border:0;border-radius:10px;background:#e8ff4c;color:#000;font:900 13px/1 'Montserrat',sans-serif;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+.wx3-btn.atras{flex:0 0 auto;background:transparent;color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.22);padding:14px 16px}
+.wx3-err{font:600 11.5px/1.4 'Montserrat',sans-serif;color:#ff6b6b;min-height:1px;margin:6px 0 0}
+.wx3-alt{margin:16px 0 0;padding:14px 0 0;border-top:1px solid rgba(255,255,255,.1)}
+.wx3-alt-lbl{font:800 10px/1.3 'Montserrat',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);text-align:center;margin:0 0 10px}
+.wx3-on .pago-actions .pago-btn-primary{background:transparent !important;border:1px solid rgba(255,255,255,.25) !important;color:#fff !important;font-size:11px !important;padding:12px !important;box-shadow:none !important}
+</style>
+<script id="web-ux-3-js">
+(function(){
+  var orig=window._reqPintar;
+  if(typeof orig!=='function')return;
+  var paso=1;
+  function $(id){return document.getElementById(id);}
+  function txt(id){var e=$(id);return e?String(e.textContent||'').trim():'';}
+  function filaR(l,v){return v?'<div class="wx3-fila"><span>'+l+'</span><span>'+v+'</span></div>':'';}
+
+  function irA(n){
+    paso=n;
+    var body=document.querySelector('#pago-modal-bg .pago-modal-body');
+    if(!body)return;
+    body.querySelectorAll('.wx3-paso').forEach(function(p){p.classList.toggle('on',+p.dataset.paso===n);});
+    body.querySelectorAll('.wx3-dot').forEach(function(d){
+      var k=+d.dataset.paso; d.classList.toggle('on',k===n); d.classList.toggle('ok',k<n);
+    });
+    body.scrollTop=0;
+  }
+  window._wx3Ir=irA;
+
+  // Lo mismo que _reqEnviar exige de la forma de pago, dicho ANTES de pedir datos.
+  function validaPago(){
+    var e=$('wx3-err-2'); var est=window._reqEstado||{};
+    if(!est.forma){e.textContent='Elige cómo pagaste';return false;}
+    if(est.forma!=='link_pago'&&!est.archivo){e.textContent='Sube la foto de tu comprobante';return false;}
+    e.textContent='';return true;
+  }
+
+  window._reqPintar=function(){
+    var body=document.querySelector('#pago-modal-bg .pago-modal-body');
+    var modal=document.querySelector('#pago-modal-bg .pago-modal');
+    // Si quedó una versión en pasos de la apertura anterior, se desarma ANTES
+    // de repintar: si no, _reqPintar encontraría por id los nodos viejos del
+    // paso 2 (van antes en el documento) y pintaría sobre ellos.
+    if(body)desarmar(body);
+    if(modal)modal.classList.remove('wx3-on');
+    orig.apply(this,arguments);
+    var sec=$('req-seccion'), formas=$('req-formas');
+    if(!body||!sec||!formas||!sec.children.length)return;   // requisición apagada
+    try{ armar(body,modal,sec,formas); }catch(e){ try{console.error('[WEB-UX-3]',e);}catch(_){} }
+  };
+
+  var guardado=null;
+  function desarmar(body){
+    // Regresa separo, cuentas, sección y botones de chat al cuerpo, en su orden
+    // de siempre, y tira los pasos (con los nodos viejos de la forma de pago).
+    if(!guardado)return;
+    var orden=guardado; guardado=null;
+    orden.forEach(function(n){ body.appendChild(n); });
+    body.querySelectorAll('.wx3-steps,.wx3-paso,.wx3-alt').forEach(function(n){n.remove();});
+  }
+
+  function armar(body,modal,sec,formas){
+    var separo=body.querySelector('.pago-separo'), bank=$('pago-bank-info'), acciones=body.querySelector('.pago-actions');
+    var lblForma=formas.previousElementSibling, fileWrap=$('req-file-wrap'), linkMsg=$('req-link-msg');
+    // Encabezado decorativo de la sección (raya + título + subtítulo) y la nota
+    // final «¿Prefieres por chat?»: los pasos los reemplazan.
+    var kids=[].slice.call(sec.children);
+    kids.slice(0,3).forEach(function(n){n.style.display='none';});
+    var ult=kids[kids.length-1]; if(ult&&!ult.id)ult.style.display='none';
+
+    guardado=[separo,bank,sec,acciones].filter(Boolean);
+
+    var steps=document.createElement('div');
+    steps.className='wx3-steps';
+    steps.innerHTML='<div class="wx3-dot" data-paso="1">1 · Tu reservación</div><div class="wx3-dot" data-paso="2">2 · Paga tu separo</div><div class="wx3-dot" data-paso="3">3 · Tus datos</div>';
+
+    var p1=document.createElement('div');p1.className='wx3-paso';p1.dataset.paso='1';
+    p1.innerHTML='<div class="wx3-tit">Esto es lo que apartas</div><div class="wx3-sub">Revísalo antes de pagar. Si algo no es lo que quieres, cierra y cámbialo en el cotizador.</div>'+
+      '<div class="wx3-res">'+
+        filaR('Evento',(window.cur&&(cur.a+(cur.f?' · '+cur.f:'')))||'')+
+        filaR('Paquete',txt('r-pkg-lbl'))+
+        filaR($('r-zona-row')&&$('r-zona-row').style.display!=='none'?(txt('r-zona-lbl')||'Zona'):'',
+              $('r-zona-row')&&$('r-zona-row').style.display!=='none'?txt('r-zona'):'')+
+        filaR($('r-hotel-row')&&$('r-hotel-row').style.display!=='none'?'Habitación':'',
+              $('r-hotel-row')&&$('r-hotel-row').style.display!=='none'?txt('r-hotel'):'')+
+        filaR('Viajeros',txt('r-viajeros'))+
+        filaR('Total',txt('r-total'))+
+      '</div>';
+    if(separo)p1.appendChild(separo);
+    p1.insertAdjacentHTML('beforeend','<div class="wx3-nav"><button type="button" class="wx3-btn" onclick="_wx3Ir(2)">Continuar a pagar →</button></div>');
+
+    var p2=document.createElement('div');p2.className='wx3-paso';p2.dataset.paso='2';
+    p2.innerHTML='<div class="wx3-tit">Paga tu separo</div><div class="wx3-sub">Haz tu transferencia, depósito u OXXO a esta cuenta y sube la foto del comprobante. Si prefieres pagar con tarjeta, pide tu link de pago.</div>';
+    if(bank)p2.appendChild(bank);
+    [lblForma,formas,fileWrap,linkMsg].forEach(function(n){if(n)p2.appendChild(n);});
+    p2.insertAdjacentHTML('beforeend','<div class="wx3-err" id="wx3-err-2"></div><div class="wx3-nav"><button type="button" class="wx3-btn atras" onclick="_wx3Ir(1)">←</button><button type="button" class="wx3-btn" id="wx3-a3">Continuar →</button></div>');
+
+    var p3=document.createElement('div');p3.className='wx3-paso';p3.dataset.paso='3';
+    p3.innerHTML='<div class="wx3-tit">Tus datos</div><div class="wx3-sub">Con esto te damos de alta. A tu correo te llega la confirmación y tu acceso para ver tu plan.</div>';
+    p3.appendChild(sec);
+    var envia=$('req-enviar');
+    if(envia){
+      var nav3=document.createElement('div');nav3.className='wx3-nav';nav3.id='wx3-nav3';
+      nav3.innerHTML='<button type="button" class="wx3-btn atras" onclick="_wx3Ir(2)">←</button>';
+      envia.parentNode.insertBefore(nav3,envia);
+      envia.style.flex='1';envia.style.width='auto';envia.style.margin='0';
+      nav3.appendChild(envia);
+    }
+
+    var alt=document.createElement('div');alt.className='wx3-alt';
+    alt.innerHTML='<div class="wx3-alt-lbl">¿Prefieres hacerlo por chat?</div>';
+    if(acciones)alt.appendChild(acciones);
+
+    body.insertBefore(steps,body.firstChild);
+    body.appendChild(p1);body.appendChild(p2);body.appendChild(p3);body.appendChild(alt);
+    if(modal)modal.classList.add('wx3-on');
+
+    var b3=$('wx3-a3'); if(b3)b3.onclick=function(){ if(validaPago())irA(3); };
+    // La foto ya elegida o la forma ya tocada limpian el aviso del paso 2.
+    formas.addEventListener('click',function(){var e=$('wx3-err-2');if(e)e.textContent='';});
+
+    // Al enviar con éxito, _reqEnviar reescribe #req-seccion con el folio: el
+    // «←» ya no tiene a dónde volver.
+    if(typeof MutationObserver==='function'){
+      new MutationObserver(function(){
+        if(!$('req-enviar')){var n=$('wx3-nav3');if(n)n.style.display='none';
+          body.querySelectorAll('.wx3-dot').forEach(function(d){d.classList.add('ok');d.classList.remove('on');});}
+      }).observe(sec,{childList:true});
+    }
+    irA(1);
+  }
+})();
+</script>
+
 </body>
 </html>

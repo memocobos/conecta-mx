@@ -22,7 +22,11 @@ const TIPOS = {
   descuento: { etiqueta: 'Descuento', pideCodigo: true },
   codigo:    { etiqueta: 'Código', pideCodigo: true },
   ultimos:   { etiqueta: 'Últimos lugares', pideCodigo: false },
+  // [GENKIDAMA-2] Memo escribe asunto y mensaje; el slogan es el título grande.
+  libre:     { etiqueta: 'Mensaje libre', pideCodigo: false, libre: true },
 };
+// Montos que un texto promete ($500 · 30%), normalizados para carear.
+function _montosEn(txt) { return (String(txt || '').match(/\$\s?[\d,]+|\d+\s?%/g) || []).map((m) => m.replace(/[\s,]/g, '')); }
 
 function baseSlug(id) { return String(id || '').split('#')[0]; }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -142,6 +146,15 @@ function validarCampana(sitio, c, ahora) {
   const idx = c.fecha_idx === '' || c.fecha_idx == null ? null : Number(c.fecha_idx);
   const malo = eventoVendible(ev, idx, ahora);
   if (malo) return { ok: false, error: malo };
+  // [GENKIDAMA-2] El mensaje libre: asunto y cuerpo de Memo, texto plano.
+  let asuntoLibre = null, mensaje = null;
+  if (TIPOS[tipo].libre) {
+    asuntoLibre = String(c.asunto || '').trim().replace(/\s+/g, ' ');
+    mensaje = String(c.mensaje || '').replace(/\r/g, '').trim();
+    if (asuntoLibre.length < 5 || asuntoLibre.length > 120) return { ok: false, error: 'el asunto va de 5 a 120 caracteres' };
+    if (mensaje.length < 10 || mensaje.length > 2000) return { ok: false, error: 'el mensaje va de 10 a 2,000 caracteres' };
+  }
+  const textos = [slogan, asuntoLibre, mensaje].filter(Boolean).join(' ');
   const codigo = String(c.codigo || '').trim().toUpperCase();
   if (TIPOS[tipo].pideCodigo && !codigo) return { ok: false, error: `el correo de «${TIPOS[tipo].etiqueta}» necesita un código` };
   let promo = null;
@@ -154,13 +167,21 @@ function validarCampana(sitio, c, ahora) {
     if (p.expiresTs && t > p.expiresTs) return { ok: false, error: `el sitio dice que ${codigo} ya venció` + baba };
     if (!_codigoAplica(p, ev.id)) return { ok: false, error: `${codigo} no aplica en ${ev.a} en el sitio: el cliente lo vería rechazado` };
     promo = { codigo, monto: _montoCodigo(p), vence: p.expiresTs || null, excludePkg: (p.excludePkg || []).map((x) => String(x).toUpperCase()) };
-    // 🔒 El slogan no puede prometer otro monto que el del código.
-    const enSlogan = slogan.match(/\$\s?[\d,]+|\d+\s?%/g) || [];
+    // 🔒 Ni el slogan ni (en el libre) el asunto o el mensaje pueden prometer
+    // otro monto que el del código.
     const montoCod = promo.monto ? promo.monto.replace(/[\s,]/g, '') : '';
-    const distinto = enSlogan.map((m) => m.replace(/[\s,]/g, '')).find((m) => m !== montoCod);
-    if (distinto) return { ok: false, error: `el slogan promete ${distinto} pero el código ${codigo} da ${promo.monto} en el sitio` };
+    const distinto = _montosEn(textos).find((m) => m !== montoCod);
+    if (distinto) return { ok: false, error: `el texto promete ${distinto} pero el código ${codigo} da ${promo.monto} en el sitio` };
   }
-  return { ok: true, tipo, slogan, ev, idx, fecha: _fechaDe(ev, idx), promo };
+  // Sin código, un monto en el texto no se puede carear contra nada: no se
+  // bloquea (el separo de $300 de la preventa es un monto legítimo), se AVISA
+  // en el ensayo para que Memo lo confirme con los ojos.
+  const avisos = [];
+  if (!promo) {
+    const ms = Array.from(new Set(_montosEn(textos)));
+    if (ms.length) avisos.push(`tu texto menciona ${ms.join(', ')} sin código que lo respalde: confirma que es lo que el sitio cobra hoy`);
+  }
+  return { ok: true, tipo, slogan, ev, idx, fecha: _fechaDe(ev, idx), promo, asuntoLibre, mensaje, avisos };
 }
 
 // ── 3 · LOS CUATRO CORREOS ───────────────────────────────────────────────────
@@ -169,14 +190,19 @@ function asuntoDe(v) {
   if (v.tipo === 'promocion') return `${v.slogan} · ${n}`;
   if (v.tipo === 'descuento') return `💸 ${v.slogan} — ${n}`;
   if (v.tipo === 'codigo') return `🎟️ Tu código ${v.promo.codigo} para ${n}`;
+  if (v.tipo === 'libre') return v.asuntoLibre;
   return `⏳ Últimos lugares para ${n}`;
 }
 function renderGenkidama(v, nombre) {
   const hola = nombre ? `¡Hola ${esc(String(nombre).trim().split(/\s+/)[0])}!` : '¡Hola!';
   const link = LINK_BASE + baseSlug(v.ev.id);
-  const eyebrow = { promocion: 'Promoción', descuento: 'Descuento', codigo: 'Código exclusivo', ultimos: 'Últimos lugares' }[v.tipo];
+  const eyebrow = { promocion: 'Promoción', descuento: 'Descuento', codigo: 'Código exclusivo', ultimos: 'Últimos lugares', libre: 'Novedades' }[v.tipo];
   const titulo = v.tipo === 'ultimos' ? 'Quedan los últimos lugares' : (v.tipo === 'codigo' ? 'Tienes un código para ti' : v.slogan);
-  const cta = { promocion: 'Ver paquetes →', descuento: 'Aprovechar mi descuento →', codigo: 'Usar mi código →', ultimos: 'Apartar mi lugar →' }[v.tipo];
+  const cta = { promocion: 'Ver paquetes →', descuento: 'Aprovechar mi descuento →', codigo: 'Usar mi código →', ultimos: 'Apartar mi lugar →', libre: 'Apartar mi lugar →' }[v.tipo];
+  // [GENKIDAMA-2] El cuerpo libre: escapado, cada línea en blanco es un párrafo.
+  const cuerpo = (v.tipo === 'libre' && v.mensaje)
+    ? v.mensaje.split(/\n{2,}/).map((par) => `<p style="margin:0 0 12px;font-size:15px;color:#e6e6e6;line-height:1.55">${esc(par).replace(/\n/g, '<br>')}</p>`).join('')
+    : '';
   const detalle = [v.fecha.etiqueta, v.ev.v].filter(Boolean).map(esc).join(' · ');
   const sub = (v.tipo === 'ultimos' || v.tipo === 'codigo') ? `<p style="margin:0 0 16px;font-size:16px;color:#ffffff;font-weight:700">${esc(v.slogan)}</p>` : '';
   let caja = '';
@@ -202,6 +228,7 @@ function renderGenkidama(v, nombre) {
         <p style="margin:0 0 8px;font-size:14px;color:#d9d9d9">${hola}</p>
         <p style="margin:0 0 14px;font-size:22px;color:#ffffff;font-weight:900;line-height:1.25">${esc(titulo)}</p>
         ${sub}
+        ${cuerpo}
         ${caja}
         <a href="${link}" style="display:block;text-align:center;background:#e8ff4c;color:#000000;font-weight:900;font-size:15px;letter-spacing:.04em;text-transform:uppercase;padding:14px;border-radius:10px;text-decoration:none;margin-bottom:8px">${cta}</a>
         <div style="text-align:center;font-size:12px;color:#8c8c8c;margin-bottom:16px">${link.replace('https://', '')}</div>

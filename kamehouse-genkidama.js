@@ -11,7 +11,7 @@
 
 let _gkEstado = null;
 let _gkFreno = false;
-const _gkW = { tipo: '', evento_id: '', fecha_idx: '', codigo: '', slogan: '' };
+const _gkW = { tipo: '', evento_id: '', fecha_idx: '', codigo: '', slogan: '', asunto: '', mensaje: '', excluir_blast: true };
 
 async function _gkApi(body) {
   const r = await khAdminFetch('/.netlify/functions/admin-genkidama', { method: 'POST', body: JSON.stringify(body) });
@@ -78,6 +78,7 @@ const _GK_TIPOS = [
   ['descuento', '💸 Descuento', 'Un monto o % de descuento con su código'],
   ['codigo', '🎟️ Código', 'El código grande al centro, listo para usar'],
   ['ultimos', '⏳ Últimos lugares', 'Urgencia: quedan pocos'],
+  ['libre', '✍️ Mensaje libre', 'Tú escribes asunto y mensaje'],
 ];
 function _gkWizardHtml(j) {
   if (!j.wizard) return '<div class="card" style="margin-bottom:12px"><div class="err-box">' + _gkEsc(j.aviso_sitio || 'No pude leer el sitio.') + '</div></div>';
@@ -102,16 +103,30 @@ function _gkWizardHtml(j) {
     '<div style="font-size:11px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">3 · Código y slogan</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><select id="gk-codigo" onchange="gkSet(\'codigo\',this.value)" style="' + inp + ';min-width:200px">' + opCod + '</select>' +
     '<input id="gk-slogan" maxlength="140" placeholder="Slogan · p. ej. «Recibe un descuento de $500»" value="' + _gkEsc(_gkW.slogan) + '" oninput="_gkW.slogan=this.value" style="' + inp + ';flex:1;min-width:260px"></div>' +
-    '<div style="font-size:11px;color:var(--ts);margin-bottom:12px">Solo salen códigos VIVOS en el sitio y que aplican a ese tour. Si el slogan menciona un monto, tiene que ser el mismo del código.</div>' +
+    '<div style="font-size:11px;color:var(--ts);margin-bottom:12px">Solo salen códigos VIVOS en el sitio y que aplican a ese tour. Si el texto menciona un monto, tiene que ser el mismo del código.' + (_gkW.tipo === 'libre' ? ' En el mensaje libre el slogan es el <b>título grande</b> del correo.' : '') + '</div>' +
+    (_gkW.tipo === 'libre'
+      ? '<div style="font-size:11px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">3b · Tu mensaje</div>' +
+        '<input id="gk-asunto" maxlength="120" placeholder="Asunto del correo · p. ej. «Pa’l Norte 2027: aparta tu lugar con $300»" value="' + _gkEsc(_gkW.asunto) + '" oninput="_gkW.asunto=this.value" style="' + inp + ';width:100%;box-sizing:border-box;margin-bottom:6px">' +
+        '<textarea id="gk-mensaje" maxlength="2000" rows="7" placeholder="Escribe tu mensaje. Deja una línea en blanco para separar párrafos." oninput="_gkW.mensaje=this.value" style="' + inp + ';width:100%;box-sizing:border-box;font:inherit;margin-bottom:12px">' + _gkEsc(_gkW.mensaje) + '</textarea>'
+      : '') +
+    (String(_gkW.evento_id || '').split('#')[0] === 'palnorte'
+      ? '<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:12px"><input type="checkbox" id="gk-exblast"' + (_gkW.excluir_blast ? ' checked' : '') + ' onchange="_gkW.excluir_blast=this.checked"> No mandarle a quien ya recibió el blast de la preventa</label>'
+      : '') +
     '<div style="font-size:11px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">4 · Ver y crear</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="gkEnsayo()">👁 Ver el correo (ensayo)</button>' +
     '<button class="btn btn-sm" onclick="gkCrear()">🌀 Crear campaña</button></div>' +
     '<div id="gk-preview" style="margin-top:10px"></div>' +
   '</div>';
 }
-function gkSet(k, v) {
-  _gkW[k] = v;
+function _gkLeerCampos() {
   const s = document.getElementById('gk-slogan'); if (s) _gkW.slogan = s.value;
+  const a = document.getElementById('gk-asunto'); if (a) _gkW.asunto = a.value;
+  const m = document.getElementById('gk-mensaje'); if (m) _gkW.mensaje = m.value;
+  const x = document.getElementById('gk-exblast'); if (x) _gkW.excluir_blast = x.checked;
+}
+function gkSet(k, v) {
+  _gkLeerCampos();
+  _gkW[k] = v;
   if (k === 'evento_id') { _gkW.fecha_idx = ''; _gkW.codigo = ''; }
   if (_gkEstado) {
     const cont = document.getElementById('gk-cont');
@@ -119,37 +134,47 @@ function gkSet(k, v) {
   }
 }
 function _gkDatos() {
-  const s = document.getElementById('gk-slogan'); if (s) _gkW.slogan = s.value;
+  _gkLeerCampos();
   if (!_gkW.tipo) return 'Elige el tipo de correo';
   if (!_gkW.evento_id) return 'Elige el tour';
   if ((_gkW.tipo === 'descuento' || _gkW.tipo === 'codigo') && !_gkW.codigo) return 'Este tipo de correo necesita un código';
-  if (String(_gkW.slogan || '').trim().length < 3) return 'Escribe el slogan';
+  if (String(_gkW.slogan || '').trim().length < 3) return _gkW.tipo === 'libre' ? 'Escribe el título (slogan)' : 'Escribe el slogan';
+  if (_gkW.tipo === 'libre' && String(_gkW.asunto || '').trim().length < 5) return 'Escribe el asunto del correo';
+  if (_gkW.tipo === 'libre' && String(_gkW.mensaje || '').trim().length < 10) return 'Escribe tu mensaje';
   return null;
+}
+// El excluir_blast solo viaja para Pa'l Norte (en otro tour no significa nada).
+function _gkPayload() {
+  const p = Object.assign({}, _gkW);
+  p.excluir_blast = String(p.evento_id || '').split('#')[0] === 'palnorte' && !!p.excluir_blast;
+  if (p.tipo !== 'libre') { delete p.asunto; delete p.mensaje; }
+  return p;
 }
 async function gkEnsayo() {
   const falta = _gkDatos(); const prev = document.getElementById('gk-preview');
   if (falta) { prev.innerHTML = '<div class="err-box">' + _gkEsc(falta) + '</div>'; return; }
   prev.innerHTML = '<div class="loading-state">Armando el correo contra el sitio servido…</div>';
-  const { st, j } = await _gkApi(Object.assign({ accion: 'seco' }, _gkW));
+  const { st, j } = await _gkApi(Object.assign({ accion: 'seco' }, _gkPayload()));
   if (st !== 200 || !j.ok) { prev.innerHTML = '<div class="err-box">' + _gkEsc(j.error || ('HTTP ' + st)) + '</div>'; return; }
-  prev.innerHTML = '<div style="font-size:12px;color:var(--ts);margin-bottom:6px">ENSAYO — nada se mandó. Asunto: <b style="color:var(--text)">' + _gkEsc(j.asunto) + '</b> · Le llegaría a <b style="color:var(--text)">' + _gkN(j.audiencia) + '</b> personas (' + _gkN(j.excluidos_ya_van) + ' fuera porque ya van a ese tour).</div>' +
+  prev.innerHTML = '<div style="font-size:12px;color:var(--ts);margin-bottom:6px">ENSAYO — nada se mandó. Asunto: <b style="color:var(--text)">' + _gkEsc(j.asunto) + '</b> · Le llegaría a <b style="color:var(--text)">' + _gkN(j.audiencia) + '</b> personas (' + _gkN(j.excluidos_ya_van) + ' fuera porque ya van a ese tour' + (j.excluidos_blast ? ' · ' + _gkN(j.excluidos_blast) + ' fuera porque ya recibieron el blast de la preventa' : '') + ').</div>' +
+    ((j.avisos || []).length ? '<div style="font-size:12px;color:var(--yellow);margin-bottom:6px">⚠️ ' + j.avisos.map(_gkEsc).join(' · ') + '</div>' : '') +
     '<iframe style="width:100%;height:620px;border:1px solid rgba(255,255,255,.15);border-radius:10px;background:#000" sandbox="" srcdoc="' + j.html.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></iframe>';
 }
 async function gkCrear() {
   const falta = _gkDatos(); const prev = document.getElementById('gk-preview');
   if (falta) { prev.innerHTML = '<div class="err-box">' + _gkEsc(falta) + '</div>'; return; }
   if (!confirm('¿Crear la campaña? Todavía NO se manda nada: después eliges cuándo y cuántos enviar.')) return;
-  const { st, j } = await _gkApi(Object.assign({ accion: 'crear', confirmar: true }, _gkW));
+  const { st, j } = await _gkApi(Object.assign({ accion: 'crear', confirmar: true }, _gkPayload()));
   if (st !== 200 || !j.ok) { prev.innerHTML = '<div class="err-box">' + _gkEsc(j.error || ('HTTP ' + st)) + '</div>'; return; }
   showToast('Campaña creada: ' + _gkN(j.campana.pendientes) + ' correos en fila', 'success');
-  Object.assign(_gkW, { tipo: '', evento_id: '', fecha_idx: '', codigo: '', slogan: '' });
+  Object.assign(_gkW, { tipo: '', evento_id: '', fecha_idx: '', codigo: '', slogan: '', asunto: '', mensaje: '', excluir_blast: true });
   loadGenkidama();
 }
 
 // ── Las campañas y sus tandas ─────────────────────────────────────────────────
 function _gkCampanasHtml(cs) {
   if (!cs || !cs.length) return '<div class="card"><div style="font-size:13px;color:var(--ts)">Aún no hay campañas.</div></div>';
-  const tipoLbl = { promocion: '📣 Promoción', descuento: '💸 Descuento', codigo: '🎟️ Código', ultimos: '⏳ Últimos lugares' };
+  const tipoLbl = { promocion: '📣 Promoción', descuento: '💸 Descuento', codigo: '🎟️ Código', ultimos: '⏳ Últimos lugares', libre: '✍️ Mensaje libre' };
   return '<div class="card"><div style="font-family:\'Zen Dots\',sans-serif;font-size:13px;letter-spacing:.06em;margin-bottom:10px">CAMPAÑAS</div>' +
     cs.map((c) => {
       const tot = c.audiencia || (c.enviados + c.pendientes + c.errores);

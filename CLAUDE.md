@@ -385,6 +385,41 @@ está caduco antes de escribirse.
     un correo masivo por día** (si no, espera a mañana sin perderse). Medido el
     13-oct: ~1,800 únicos. `mide:genkidama-1` **39** · `mide:preventa-pn27`
     **60** (su red falsa aprendió la energía).
+  - **ACOMP-2 + GRUPO-VIAJE-1 (13-oct) · LOS ACOMPAÑANTES DE ANTES Y QUIÉN
+    VIAJA CON QUIÉN.** Palabra de Memo: *«que ella anote los datos y correo de
+    las amigas y con los correos reciban su propia invitación… y en kamehouse
+    indicarle a bulma y milk que esas viajeras viajan juntas»*.
+    - **Columna `viajeros_evento.grupo_viaje uuid`** (acta `migraciones/
+      GRUPO-VIAJE-1.sql`, YA CORRIÓ). La llenan: aprobar con acompañantes
+      (ACOMP-1), el reparto del Portal (ACOMP-2) y Bulma/Milk a mano
+      (`grupo_viaje_juntar`/`_separar`: mismo evento, funde grupos previos,
+      separar suelta también al último que queda solo; sin DELETE).
+    - **KameHouse:** las filas del grupo se pintan JUNTAS con su color, «👥 viaja
+      con: …» y chip «N lugares» cuando una fila trae varios; casillas +
+      «👥 Juntar seleccionados» (maestro_roshi/bulma/milk).
+    - **El Portal (`portal-viajero` acción `repartir`):** una fila con 2+
+      lugares le ofrece al titular «Agregar a mis acompañantes» (nombre, correo,
+      WhatsApp opcional). Cada uno nace con 1 lugar y su parte AL PESO del
+      contrato y de lo pagado (residuo al titular); el dinero se QUITA al
+      titular (previo primero, luego abonos de mayor a menor, cada PATCH con
+      valor esperado y nota anexada) y se PONE como abono «pagado por
+      {titular}» con su comprobante y fecha. Reclamo con valor esperado (2º
+      clic/carrera = 409); si no nacen, el titular se revierte; si poner el
+      dinero falla, lo quitado VUELVE y responde 207. Correo único con
+      invitación SOLO a los correos distintos del titular (la lib decide el
+      evento). Caso de uso #1: **Karina R-RMZ5P** al aprobarla.
+      `npm run mide:acomp-2` **43**.
+  - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
+    escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
+    blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede
+    prometer otro monto; sin código un monto no bloquea, se AVISA en el ensayo.
+    **`excluir_blast`** (solo Pa'l Norte, casilla prendida por default): la
+    audiencia deja fuera a quien ya recibió el blast de la preventa. Acta
+    `migraciones/GENKIDAMA-2.sql` (YA CORRIÓ). `mide:genkidama-1` **50** ([L]).
+  - ⚠️ **LA LISTA DE ESPERA DE PALNORTE: 7 de 79 avisados** (medido 13-oct). El
+    publish corta a los 6 s (`PRESUPUESTO_PUBLICAR_MS`); los 72 restantes son
+    huérfanos que el cron de las 8 AM sana ~30 por día. Para no esperar 3 días:
+    KameHouse → Lista de espera → «Notificar a N ahora» (~30 por clic).
   - **PERFIL-CARRERA-1 (13-oct):** el Portal corría `cargarClienteYRutear` dos
     veces a la vez; la tardía trataba como NUEVA a quien la otra ya había
     enlazado, y el guardado chocaba con `clientes_auth_user_id_key` (Linda,

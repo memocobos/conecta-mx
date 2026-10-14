@@ -191,6 +191,31 @@ const P = (r) => JSON.parse(r.body);
   r = await H.blast(ev({ accion: 'enviar', confirmar: true, tope: 5 }, tok)); j = P(r);
   af(r.statusCode === 200 && st.correos.length === 1, `[F2] control positivo: con energía, el mismo blast SÍ manda (${r.statusCode} · ${st.correos.length}) — el 429 de F1 fue la energía, no otra cosa`);
 
+  console.log('[L] GENKIDAMA-2 · el mensaje libre');
+  {
+    const ctos = ['a1@x.com', 'b1@x.com', 'c1@x.com'].map((c, i) => ({ correo: c, nombre: 'Persona ' + i, prioridad: 1, baja_at: null, fuente: 'viajeros' }));
+    st = red({ indexOpts: { conPreventa: true }, contactos: ctos, blast: [{ id: 'pbL', campana: 'pn27', correo: 'b1@x.com', enviado_at: new Date(Date.now() - 3 * 86400e3).toISOString() }] }); global.fetch = st.fetch; H = fresco();
+    const lib = { tipo: 'libre', evento_id: 'palnorte', slogan: 'Pa´l Norte 2027 ya viene', asunto: 'Aparta tu lugar para Pa´l Norte 2027', mensaje: 'Hola <b>banda</b>.\n\nYa abrimos la preventa a ciegas: separas con $300.', excluir_blast: true };
+    r = await H.gk(ev(Object.assign({ accion: 'seco' }, lib), tok)); j = P(r);
+    af(r.statusCode === 200 && j.asunto === lib.asunto, `[L1] el asunto es el que escribió Memo (${r.statusCode} ${j.asunto || j.error})`);
+    af(j.html && /&lt;b&gt;banda&lt;\/b&gt;/.test(j.html) && !/<b>banda<\/b>/.test(j.html), '[L2] el mensaje va ESCAPADO (texto, no HTML)');
+    af(j.html && (j.html.match(/line-height:1\.55">/g) || []).length === 2, '[L3] una línea en blanco = dos párrafos');
+    af(j.html && /Por confirmar/.test(j.html) && !/2027-03|26 de marzo/i.test(j.html), '[L4] Pa´l Norte sale con «Por confirmar»: la fecha no viaja');
+    af(j.audiencia === 2 && j.excluidos_blast === 1, `[L5] excluir_blast deja fuera a quien ya recibió el blast (aud ${j.audiencia}, fuera ${j.excluidos_blast})`);
+    af(Array.isArray(j.avisos) && j.avisos.length === 1 && /\$300/.test(j.avisos[0]), '[L6] un monto sin código no bloquea: se AVISA para que Memo lo confirme');
+    r = await H.gk(ev(Object.assign({ accion: 'seco' }, lib, { excluir_blast: false }), tok)); j = P(r);
+    af(j.audiencia === 3 && !j.excluidos_blast, '[L7] control: sin excluir_blast, la misma persona SÍ entra');
+    r = await H.gk(ev(Object.assign({ accion: 'seco' }, lib, { mensaje: 'corto' }), tok)); j = P(r);
+    af(r.statusCode === 409 && /mensaje/.test(j.error || ''), '[L8] sin mensaje no hay correo libre');
+    r = await H.gk(ev({ accion: 'seco', tipo: 'libre', evento_id: 'karolg', codigo: 'KAROL', slogan: 'Karol G te espera', asunto: 'Tu descuento para Karol G', mensaje: 'Usa tu código y ahórrate $500 al reservar hoy.' }, tok)); j = P(r);
+    af(r.statusCode === 409 && /\$500/.test(j.error || ''), `[L9] con código, el MENSAJE tampoco puede prometer otro monto (${(j.error || '').slice(0, 80)})`);
+    r = await H.gk(ev(Object.assign({ accion: 'crear', confirmar: true }, lib), tok)); j = P(r);
+    const camp = st.kh.genkidama_campanas[0] || {};
+    af(r.statusCode === 200 && camp.tipo === 'libre' && camp.mensaje === lib.mensaje && camp.excluir_blast === true && st.kh.genkidama_envios.length === 2, '[L10] la campaña guarda mensaje y excluir_blast, y su fila deja fuera al del blast');
+    r = await H.gk(ev({ accion: 'enviar', campana_id: camp.id, tope: 5, confirmar: true }, tok)); j = P(r);
+    af(r.statusCode === 200 && st.correos.length === 2 && st.correos.every((c) => c.subject === lib.asunto && /preventa a ciegas/.test(c.html)), `[L11] la tanda manda el asunto y el mensaje de Memo (${r.statusCode} · ${st.correos.length})`);
+  }
+
   console.log('[G] puertas y bajas');
   r = await H.gk(ev({ accion: 'estado' }, tokB));
   af(r.statusCode === 403, '[G1] solo maestro_roshi (Bulma recibe 403)');

@@ -18,7 +18,8 @@
 //
 // Body { accion, ... }:
 //   estado · sembrar{confirmar} · bajas{correos[],confirmar} · energia{limite,confirmar}
-//   seco{tipo,evento_id,fecha_idx,codigo,slogan} · crear{…,confirmar}
+//   seco{tipo,evento_id,fecha_idx,codigo,slogan,[asunto,mensaje],excluir_blast} · crear{…,confirmar}
+//   [GENKIDAMA-2] tipo 'libre': asunto y mensaje los escribe Memo.
 //   enviar{campana_id,tope,confirmar}
 // =============================================================================
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
@@ -174,19 +175,25 @@ exports.handler = async (event) => {
       const v = G.validarCampana(sitio, body);
       if (!v.ok) return j(409, headers, { error: 'EL SITIO NO HONRA ESTE CORREO: ' + v.error });
       // Audiencia: el concentrado vivo MENOS quien ya va a ese evento.
-      const [contactos, yaVan] = await Promise.all([
+      // [GENKIDAMA-2] `excluir_blast`: fuera también quien YA recibió el blast de
+      // la preventa — para seguir la campaña de Pa'l Norte sin repetirle a nadie.
+      const excluirBlast = body.excluir_blast === true;
+      const [contactos, yaVan, blast] = await Promise.all([
         leer(R('genkidama_contactos') + '?select=correo,nombre,prioridad&baja_at=is.null&order=prioridad.asc,creado_at.asc&limit=50000'),
         leer(R('viajeros_evento') + `?select=correo&evento_id=like.${encodeURIComponent(G.baseSlug(v.ev.id))}*&limit=50000`),
+        excluirBlast ? leer(R('preventa_blast') + '?select=correo&enviado_at=not.is.null&limit=50000') : Promise.resolve([]),
       ]);
       const van = new Set(yaVan.map((x) => limpio(x.correo)).filter(Boolean));
-      const audiencia = contactos.filter((c) => !van.has(c.correo));
+      const yaBlast = new Set(blast.map((x) => limpio(x.correo)).filter(Boolean));
+      const sinVan = contactos.filter((c) => !van.has(c.correo));
+      const audiencia = sinVan.filter((c) => !yaBlast.has(c.correo));
       const asunto = G.asuntoDe(v);
       if (accion === 'seco') {
-        return j(200, headers, { ok: true, seco: true, asunto, html: G.renderGenkidama(v, (audiencia[0] || {}).nombre || 'Lucero'), audiencia: audiencia.length, excluidos_ya_van: contactos.length - audiencia.length, energia: await G.energia({ KH_URL, KH_KEY }) });
+        return j(200, headers, { ok: true, seco: true, asunto, html: G.renderGenkidama(v, (audiencia[0] || {}).nombre || 'Lucero'), audiencia: audiencia.length, excluidos_ya_van: contactos.length - sinVan.length, excluidos_blast: sinVan.length - audiencia.length, avisos: v.avisos || [], energia: await G.energia({ KH_URL, KH_KEY }) });
       }
       if (body.confirmar !== true) return j(400, headers, { error: 'Crear la campaña pide confirmar:true' });
       if (!audiencia.length) return j(409, headers, { error: 'La audiencia está vacía: siembra el concentrado primero' });
-      const rc = await fetch(R('genkidama_campanas'), { method: 'POST', headers: { ...h, Prefer: 'return=representation' }, body: JSON.stringify({ tipo: v.tipo, evento_id: v.ev.id, fecha_idx: v.idx, codigo: v.promo ? v.promo.codigo : null, slogan: v.slogan, asunto, audiencia: audiencia.length, creado_por: quien }) });
+      const rc = await fetch(R('genkidama_campanas'), { method: 'POST', headers: { ...h, Prefer: 'return=representation' }, body: JSON.stringify({ tipo: v.tipo, evento_id: v.ev.id, fecha_idx: v.idx, codigo: v.promo ? v.promo.codigo : null, slogan: v.slogan, asunto, mensaje: v.mensaje || null, excluir_blast: excluirBlast, audiencia: audiencia.length, creado_por: quien }) });
       if (!rc.ok) return j(502, headers, { error: 'KH rechazó la campaña', detail: (await rc.text()).slice(0, 200) });
       const camp = (await rc.json())[0];
       for (let i = 0; i < audiencia.length; i += 500) {

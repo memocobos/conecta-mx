@@ -24,7 +24,7 @@
 // que no se pueden calcular, el caller debe fallar-ruidoso (mejor no vender).
 // =============================================================================
 
-const { consumeBoleto } = require('./paquete-viaje');
+const { consumeBoleto, ocupaLugar } = require('./paquete-viaje');
 
 const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado']; // cancelado excluido en el query
 
@@ -282,7 +282,7 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   const conDineroPorZona = {};
   (Array.isArray(migrados) ? migrados : []).forEach((m) => {
     if (!m) return;
-    if (!consumeBoleto(m.tipo_paquete, m.tipo_viajero)) return;
+    if (!ocupaLugar(m.tipo_paquete, m.tipo_viajero)) return;   // [STAFF-BOLETO-2] staff/creadora con zona SÍ ocupa
     const z = (m.zona_boleto != null) ? String(m.zona_boleto).trim() : '';
     if (!z) return;   // sin zona no se le puede descontar a ninguna
     // `boletos` es NOT NULL DEFAULT 1 en la base, pero el respaldo se escribe

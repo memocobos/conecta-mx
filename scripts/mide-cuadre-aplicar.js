@@ -181,6 +181,11 @@ const SEMILLA = () => ({
       //     Cancha General tiene 2 (y `stock_ajustes` ya trae una fila en 1 →
       //     PATCH al valor absoluto). Zona GNP tiene 1 y NO tiene fila → INSERT.
       filaExcel({ 'Nombre': 'Vendido Alex', 'Boleto': 'Cancha General' }),
+      filaExcel({ 'Nombre': 'Viagogo lote', 'Boleto': 'Cancha General' }),
+      filaExcel({ 'Nombre': 'Hubb reventa', 'Boleto': 'Zona GNP' }),
+      // [STAFF-BOLETO-2] Los renglones de staff del Excel YA NO cuentan en
+      // `vendidos_fuera` (KameHouse manda su boleto, por su fila): si contaran,
+      // Cancha General saldría en 3 y Zona GNP en 2, y las aserciones caen.
       filaExcel({ 'Nombre': 'Marietta Barrera creadora', 'Boleto': 'Cancha General' }),
       filaExcel({ 'Nombre': 'Coordinadora Renata', 'Boleto': 'Zona GNP' }),
       // [K] CUADRA en todo → no genera nada.

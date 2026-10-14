@@ -2,10 +2,12 @@
 // =============================================================================
 // mide:staff-boleto-1 — el boleto de un coordi/staff en un tour (13-oct).
 // Por el HANDLER REAL (`staff_boleto`), base falsa con filtros + valor esperado:
-//   [A] sin lugar todavía → nace su fila de staff con la zona y +1 al inventario
+//   [A] sin lugar todavía → nace su fila de staff con la zona; NO toca
+//       `vendidos_fuera` (STAFF-BOLETO-2: la fila ES el boleto)
 //   [B] 2º clic con la misma zona → CERO escrituras
-//   [C] cambiar de zona → −1 en la vieja, +1 en la nueva
-//   [D] quitar ('') → −1 y la zona en NULL
+//   [C] cambiar de zona → la fila cambia, el inventario sigue intacto
+//   [D] quitar ('') → la zona en NULL
+//   [H] zona AGOTADA en Kamisama → 409 sin escribir · zona sin compras → 409
 //   [E] zona que no es de la ficha → 400 y CERO escrituras
 //   [F] persona no asignada → 409 · fila de cliente → 409
 //   [G] la asignación al evento BASE sirve para una fecha (`omar#0`)
@@ -16,10 +18,12 @@ const RAIZ = path.join(__dirname, '..');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-de-arnes';
 process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.falso.test';
 process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'svc';
+process.env.PORTAL_SUPABASE_URL = 'https://portal.falso.test';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = 'psvc';
 
 // La puerta de zonas sin red: la ficha de mentira de Soy Luna.
 const zf = require.resolve(path.join(RAIZ, 'netlify/functions/_lib/zona-ficha.js'));
-const ZONAS = ['VIP', 'Platino', 'Luneta'];
+const ZONAS = ['VIP', 'Platino', 'Luneta', 'Plata'];
 require.cache[zf] = { id: zf, filename: zf, loaded: true, exports: {
   puertaZona: async (ev, z) => {
     const c = ZONAS.find((x) => x.toLowerCase() === String(z).trim().toLowerCase());
@@ -38,7 +42,11 @@ const base = () => ({
              { id: 'u-roshi', nombre: 'Memo', rol: 'maestro_roshi', activo: true }],
   eventos_coordi: [{ id: 'a1', evento_id: 'soyluna', coordi_id: C1, status: 'aceptado' }, { id: 'a3', evento_id: 'omar', coordi_id: C3, status: 'pendiente' }],
   viajeros_evento: [{ id: 'cli', evento_id: 'soyluna', nombre: 'Cliente', usuario_id: C2, tipo_viajero: 'cliente', zona_boleto: 'VIP' }],
-  stock_ajustes: [{ id: 's-pl', evento_id: 'soyluna', zona: 'Platino', vendidos_fuera: 7, nota: 'n' }],
+  stock_ajustes: [{ id: 's-pl', evento_id: 'soyluna', zona: 'Platino', vendidos_fuera: 7, nota: 'n' }, { id: 's-lu', evento_id: 'soyluna', zona: 'Luneta', vendidos_fuera: 1, nota: 'n' }],
+  // Kamisama: Platino 10 (7 fuera → 3 libres) · Luneta 1 (1 fuera → AGOTADA) · VIP 5 · sin compras de Plata
+  compras: [{ evento_id: 'soyluna', zona: 'Platino', cantidad: 10 }, { evento_id: 'soyluna', zona: 'Luneta', cantidad: 1 },
+            { evento_id: 'soyluna', zona: 'VIP', cantidad: 5 }, { evento_id: 'omar#0', zona: 'VIP', cantidad: 5 }],
+  solicitudes_tour: [],
 });
 const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b) });
 const casa = (row, k, v) => {
@@ -72,13 +80,17 @@ const filaDe = (c, ev = 'soyluna') => DB.viajeros_evento.find((v) => v.usuario_i
   DB = base();
   let r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'platino' });
   af(r.s === 200 && filaDe(C1) && filaDe(C1).zona_boleto === 'Platino' && filaDe(C1).tipo_viajero === 'coordinador' && filaDe(C1).talla_playera === 'M', `[A1] nace su fila de staff con la zona canónica (${r.s}) ${JSON.stringify(r.j)}`);
-  af(st('Platino') === 8, `[A2] Platino 7 → 8 (${st('Platino')})`);
+  af(st('Platino') === 7, `[A2] vendidos_fuera de Platino NO se toca (${st('Platino')})`);
   ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Platino' });
   af(r.j.ya === true && ESC === 0, `[B] 2º clic misma zona → 0 escrituras (${ESC})`);
-  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Luneta' });
-  af(r.s === 200 && filaDe(C1).zona_boleto === 'Luneta' && st('Platino') === 7 && st('Luneta') === 1, `[C] cambio: Platino ${st('Platino')} · Luneta ${st('Luneta')}`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Luneta' });
+  af(r.s === 409 && r.j.agotada === true && ESC === 0 && filaDe(C1).zona_boleto === 'Platino', `[H1] Luneta AGOTADA en Kamisama → 409 sin escribir (${r.s}) ${r.j.error || ''}`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Plata' });
+  af(r.s === 409 && r.j.sin_stock === true && ESC === 0, `[H2] Plata sin compras cargadas → 409 (${r.s})`);
+  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'VIP' });
+  af(r.s === 200 && filaDe(C1).zona_boleto === 'VIP' && st('Platino') === 7, `[C] cambio a VIP: la fila cambia, el inventario guardado no (${r.s})`);
   r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: '' });
-  af(r.s === 200 && filaDe(C1).zona_boleto === null && st('Luneta') === 0, `[D] quitar: zona null · Luneta ${st('Luneta')}`);
+  af(r.s === 200 && filaDe(C1).zona_boleto === null, `[D] quitar: zona null (${r.s})`);
   ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Balcón X' });
   af(r.s === 400 && ESC === 0 && /Zonas: VIP/.test(r.j.error), `[E] zona inventada → 400 nombrando las zonas, 0 escrituras (${r.s}, ${ESC})`);
   ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C2, zona: 'VIP' });
@@ -87,7 +99,11 @@ const filaDe = (c, ev = 'soyluna') => DB.viajeros_evento.find((v) => v.usuario_i
   ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C2, zona: 'Platino' });
   af(r.s === 409 && ESC === 0 && filaDe(C2).zona_boleto === 'VIP', `[F2] fila de CLIENTE → 409 sin tocarla (${r.s})`);
   r = await pedir({ evento_id: 'omar#0', coordi_id: C3, zona: 'VIP' });
-  af(r.s === 200 && filaDe(C3, 'omar#0') && filaDe(C3, 'omar#0').zona_boleto === 'VIP' && st('VIP', 'omar#0') === 1, `[G] asignación base abre la fecha omar#0 (${r.s})`);
+  af(r.s === 200 && filaDe(C3, 'omar#0') && filaDe(C3, 'omar#0').zona_boleto === 'VIP', `[G] asignación base abre la fecha omar#0 (${r.s}) ${r.j.error || ''}`);
+  // [I] la fila de staff con zona OCUPA lugar en la disponibilidad (la regla de su dueño)
+  const { ocupaLugar, consumeBoleto } = require(path.join(RAIZ, 'netlify/functions/_lib/paquete-viaje.js'));
+  af(ocupaLugar('PLUS', 'coordinador') === true && ocupaLugar('CHEAP', 'creadora') === true && ocupaLugar('RIDE', 'cliente') === false && ocupaLugar('PLUS', null) === true && consumeBoleto('PLUS', 'coordinador') === false,
+    '[I] ocupaLugar: staff y creadora SÍ, RIDE no, cliente como siempre; consumeBoleto intacto');
   console.log(`\n${R ? '🔴' : '🟢'} ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.error('💥', e); process.exit(2); });

@@ -59,6 +59,17 @@ function esZonaUtil(z) {
 // meter a una creadora como viajera.
 const CHATARRA = ['vendido', 'coordinador', 'coordi', 'coodinador', 'hubb',
                   'viagogo', 'creadora', 'tours reynosa', 'cambio por oro'];
+// [STAFF-BOLETO-2 13-oct] «KameHouse manda» el boleto de coordis y creadoras
+// (palabra de Memo): su renglón del Excel («Coordinadora Renata», «Marietta
+// creadora») sigue sin ser viajero, pero YA NO cuenta en `vendidos_fuera` —
+// su boleto lo pone la FILA del staff en KameHouse (botón 🎟 de Capsule y la
+// cortesía). Contarlo aquí también lo descontaría dos veces. Se cuenta aparte
+// (`staffExcel`) para que el careo pueda AVISAR si no cuadran.
+const STAFF_EXCEL = ['coordinador', 'coordi', 'coodinador', 'creadora'];
+function esStaffExcel(nombre) {
+  const n = normalizarNombre(nombre);
+  return !!n && STAFF_EXCEL.some((p) => n.includes(p));
+}
 function esChatarra(nombre) {
   const n = normalizarNombre(nombre);
   if (!n) return true;                       // una fila sin nombre no es nadie
@@ -205,6 +216,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
   // 🔒 VIAJA APARTE, JAMÁS FUNDIDA CON LAS PERSONAS. Si entrara al montón de
   // gente, «Vendido Alex» se daría de alta como viajero.
   const chatarraPorZona = {};
+  const staffExcelPorZona = {};   // [STAFF-BOLETO-2] informativo: no descuenta
   const desde = (encabezado ? encabezado.fila : 0) + 1;
 
   for (let i = desde; i < (filas || []).length; i++) {
@@ -223,7 +235,8 @@ function parsearPestana(filas, encabezado, reglaZona) {
       // OTRA zona no es de este evento, y contarla le restaría stock ajeno.
       const zc = mapa.boleto >= 0 ? String(f[mapa.boleto] == null ? '' : f[mapa.boleto]).trim() : '';
       if (zc && (!reglaZona || normalizarNombre(zc) === normalizarNombre(reglaZona))) {
-        chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + 1;
+        if (esStaffExcel(nombreCrudo)) staffExcelPorZona[zc] = (staffExcelPorZona[zc] || 0) + 1;
+        else chatarraPorZona[zc] = (chatarraPorZona[zc] || 0) + 1;
       }
       continue;
     }
@@ -377,7 +390,7 @@ function parsearPestana(filas, encabezado, reglaZona) {
       + 'La regla de hoy la trata como DESCUENTO (medido 28/28 el 3-oct-2026), así que '
       + 'este caso NO entra al abonado y hay que RE-DECIDIR la regla con estos datos.'
     : null;
-  return { personas, mapa, descartes, chatarraPorZona, testigo_preventa: testigo };
+  return { personas, mapa, descartes, chatarraPorZona, staffExcelPorZona, testigo_preventa: testigo };
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────

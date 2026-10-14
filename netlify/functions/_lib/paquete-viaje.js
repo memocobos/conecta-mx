@@ -60,6 +60,17 @@ function consumeBoleto(tipoPaquete, tipoViajero) {
   return !NO_CONSUMEN_BOLETO.includes(p);
 }
 
+// 🔒 [STAFF-BOLETO-2 13-oct] ¿OCUPA UN LUGAR EN LA BODEGA? Palabra de Memo:
+// «KameHouse manda» el boleto de coordis y creadoras. Hasta hoy su boleto se
+// contaba por OTRA puerta (`vendidos_fuera`, que el careo pisa con los
+// renglones «Coordinadora X» del Excel) y su fila no descontaba. Ahora su
+// FILA es el boleto: staff/creadora con zona ocupa lugar; el cliente sigue la
+// regla de siempre (`consumeBoleto`). La zona la mira quien cuenta.
+function ocupaLugar(tipoPaquete, tipoViajero) {
+  if (esCliente(tipoViajero)) return consumeBoleto(tipoPaquete, tipoViajero);
+  return true;
+}
+
 // Normaliza el paquete. Vacío/nulo → null (que NO es lo mismo que desconocido:
 // aquí null significa "sin paquete asignado" y por regla se incluye).
 function normPaquete(tp) {
@@ -90,6 +101,6 @@ function motivoNoDuerme(tp) {
 
 module.exports = {
   VIAJAN, DUERMEN, NO_CONSUMEN_BOLETO,
-  normPaquete, viaja, duerme, esCliente, consumeBoleto,
+  normPaquete, viaja, duerme, esCliente, consumeBoleto, ocupaLugar,
   motivoNoViaja, motivoNoDuerme,
 };

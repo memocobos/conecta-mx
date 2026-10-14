@@ -24,7 +24,7 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { compilarEV, fechaDisplayDeEsfera, extraerEV } = require('./_lib/esferas-compile');
 const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vigentes');
 const { simetrizarLote, avisosDelLote, soltarFichas, disponiblesPorEvento } = require('./_lib/agotado-derivado');
-const { consumeBoleto } = require('./_lib/paquete-viaje');
+const { ocupaLugar } = require('./_lib/paquete-viaje');
 const { derivarLetreros, derivarChips } = require('./_lib/letrero-derivado');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
 // correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
@@ -193,7 +193,7 @@ exports.handler = async (event) => {
         q('stock_ajustes', 'evento_id,zona,vendidos_fuera'),
         q('viajeros_evento', 'evento_id,zona_boleto,tipo_paquete,tipo_viajero,boletos'),   // [BOLETOS-1] cuántos, no cuántas filas
       ]);
-      const stock = disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto });
+      const stock = disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto: ocupaLugar });   // [STAFF-BOLETO-2] staff con zona ocupa
       avisos_stock = avisosDelLote({ filas: esferas, stock });
     } catch (e) {
       // 🔒 SI NO SE PUEDE LEER EL STOCK, NO HAY AVISO — pero SE PUBLICA, con el

@@ -56,6 +56,7 @@ const { saldoMigrado } = require('./_lib/cuenta-evento');
 // de la FICHA o no nace (firmado por Memo, 28-sep). Sin ella, un alta con
 // «GENERAL» descuenta stock de una llave que el aviso de agotado no consulta.
 const { puertaZona } = require('./_lib/zona-ficha');
+const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
@@ -379,10 +380,10 @@ exports.handler = async (event) => {
     //     las que sí hay; mal escrita → se guarda la canónica);
     //   · se escribe en SU lugar de viajero (`usuario_id` + evento); si todavía
     //     no aceptó y no tiene lugar, nace igual que al aceptar (staff, PLUS);
-    //   · el inventario: el staff NO descuenta por su cuenta (consumeBoleto),
-    //     así que se suma 1 a `vendidos_fuera` de la zona nueva y se resta 1 de
-    //     la vieja si cambió. Cada PATCH lleva el valor esperado: el 2º clic
-    //     con la misma zona no escribe NADA. Cero DELETEs.
+    //   · el inventario: [STAFF-BOLETO-2] la FILA del staff con zona ES el
+    //     boleto (`ocupaLugar`); `vendidos_fuera` no se toca (lo pisa el careo).
+    //     Antes de poner una zona se mide en Kamisama: agotada o sin compras
+    //     cargadas → 409. El 2º clic con la misma zona no escribe NADA. Cero DELETEs.
     if (accion === 'staff_boleto') {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
@@ -408,6 +409,19 @@ exports.handler = async (event) => {
       let fila = (await rv.json())[0] || null;
       const zonaVieja = fila ? (fila.zona_boleto || null) : null;
       if (zonaVieja === zona) return ok(headers, { ya: true, zona });
+
+      // 🔒 [STAFF-BOLETO-2] NO SE SOBREVENDE (palabra de Memo): la zona nueva
+      // tiene que tener lugar EN KAMISAMA. La fila del staff ES el boleto
+      // (`ocupaLugar`), así que aquí no se toca `vendidos_fuera` — eso lo pisa
+      // el careo. Zona sin compras cargadas = no se sabe si hay → se rehúsa.
+      if (zona) {
+        if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Faltan llaves del Portal para medir la disponibilidad' }) };
+        const disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id });
+        if (disp.error) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo medir el inventario; intenta de nuevo' }) };
+        const ez = evaluarZona(disp, zona, 1);
+        if (!ez.gestionada) return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» no tiene compras cargadas en Kamisama: no se sabe si hay lugar. Carga el pedido primero.`, sin_stock: true }) };
+        if (ez.restante < 1) return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» está AGOTADA en Kamisama (quedan ${ez.restante}). Elige otra zona.`, agotada: true, restante: ez.restante }) };
+      }
 
       if (!fila) {
         if (!zona) return ok(headers, { ya: true, zona: null });
@@ -437,34 +451,6 @@ exports.handler = async (event) => {
         if (!(await up.json()).length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien la cambió al mismo tiempo: recarga y vuelve a intentar' }) };
       }
 
-      // Inventario: −1 en la vieja, +1 en la nueva, con valor esperado.
-      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
-      const mover = async (z, delta) => {
-        const sr = await fetch(`${baseStock}?evento_id=eq.${encodeURIComponent(evento_id)}&zona=eq.${encodeURIComponent(z)}&select=id,vendidos_fuera,nota&limit=1`, { headers: sbHeaders });
-        if (!sr.ok) throw new Error('stock ' + sr.status);
-        const st = (await sr.json())[0];
-        const nota = `boleto de staff ${delta > 0 ? '+1' : '−1'} (${quien})`;
-        if (st) {
-          const nuevo = Math.max(0, Number(st.vendidos_fuera || 0) + delta);
-          const p = await fetch(`${baseStock}?id=eq.${st.id}&vendidos_fuera=eq.${Number(st.vendidos_fuera || 0)}`, {
-            method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
-            body: JSON.stringify({ vendidos_fuera: nuevo, nota: `${st.nota || ''} · ${nota}`.slice(0, 2000), updated_por: quien, updated_at: new Date().toISOString() }),
-          });
-          if (!p.ok || !(await p.json()).length) throw new Error('stock cambió al mismo tiempo');
-        } else if (delta > 0) {
-          const p = await fetch(baseStock, {
-            method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
-            body: JSON.stringify({ evento_id, zona: z, vendidos_fuera: 1, nota, updated_por: quien }),
-          });
-          if (!p.ok) throw new Error('stock ' + p.status);
-        }
-      };
-      try {
-        if (zonaVieja) await mover(zonaVieja, -1);
-        if (zona) await mover(zona, +1);
-      } catch (e) {
-        return { statusCode: 207, headers, body: JSON.stringify({ ok: true, zona, aviso: `La zona quedó en su lugar, pero el inventario no se movió (${e.message}): revisa la casilla de ${zona || zonaVieja} en Kamisama.` }) };
-      }
       return ok(headers, { zona, antes: zonaVieja });
     }
 
@@ -662,6 +648,18 @@ exports.handler = async (event) => {
         }
       }
 
+      // 🔒 [STAFF-BOLETO-2] NO SE SOBREVENDE: los boletos de la cortesía salen
+      // de Kamisama y se miden ANTES de escribir. Zona sin compras o sin lugar
+      // suficiente → 409 sin tocar nada.
+      if (!existente || existente.zona_boleto !== zona) {
+        if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Faltan llaves del Portal para medir la disponibilidad' }) };
+        const disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id });
+        if (disp.error) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo medir el inventario; intenta de nuevo' }) };
+        const ez = evaluarZona(disp, zona, boletos);
+        if (!ez.gestionada) return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» no tiene compras cargadas en Kamisama: carga el pedido antes de dar cortesías.`, sin_stock: true }) };
+        if (ez.sinCupo) return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» no tiene ${boletos} lugar(es) en Kamisama (quedan ${ez.restante}).`, agotada: true, restante: ez.restante }) };
+      }
+
       // [CREA-2] El grupo: si ella ya viajaba en uno, se reusa (no se parte un
       // grupo que armó alguien más); si no, nace uno nuevo. Solo si de verdad
       // va acompañada — un grupo de una persona no dice nada.
@@ -679,6 +677,7 @@ exports.handler = async (event) => {
           body: JSON.stringify({
             zona_boleto: zona, talla_playera: talla,
             tipo_paquete: paquete.tipo_paquete, tipo_viajero: paquete.tipo_viajero,
+            boletos: acompViaja ? 1 : boletos,   // [STAFF-BOLETO-2] su fila ES el boleto
             ...(grupo ? { grupo_viaje: grupo } : {}),
           }),
         });
@@ -695,6 +694,9 @@ exports.handler = async (event) => {
           tipo_viajero: paquete.tipo_viajero,
           total_contrato: 0,   // no debe nada: es cortesía
           abonado_previo: 0,
+          // [STAFF-BOLETO-2] Su fila ES el boleto: si el acompañante tiene fila
+          // propia, ella lleva 1; si no, lleva todos los de la cortesía.
+          boletos: acompViaja ? 1 : boletos,
           notas: notaViajero,
           ...(grupo ? { grupo_viaje: grupo } : {}),
         };
@@ -739,31 +741,11 @@ exports.handler = async (event) => {
         acompViajero = (await rA.json())[0] || null;
       }
 
-      // STOCK: SUMA sobre la fila (evento_id, zona) — hay UNIQUE ahí, un insert
-      // a secas reventaría en la segunda cortesía de la misma zona.
-      const stR = await fetch(
-        `${baseStock}?evento_id=eq.${encodeURIComponent(evento_id)}&zona=eq.${encodeURIComponent(zona)}&select=id,vendidos_fuera,nota&limit=1`,
-        { headers: sbHeaders });
-      if (!stR.ok) return upstream(headers, await stR.text(), 'consulta');
-      const stock = (await stR.json())[0] || null;
-      const notaStock = `${paquete.nota} ${contrato.creador_nombre} (contrato en KameHouse) — ${paquete.notaStock}`;
-      let stockFinal;
-      if (stock) {
-        const suma = Number(stock.vendidos_fuera || 0) + boletos;
-        const up = await fetch(`${baseStock}?id=eq.${stock.id}`, {
-          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
-          body: JSON.stringify({ vendidos_fuera: suma, nota: notaStock, updated_por: quien, updated_at: new Date().toISOString() }),
-        });
-        if (!up.ok) return upstream(headers, await up.text(), 'update');
-        stockFinal = (await up.json())[0] || null;
-      } else {
-        const ins = await fetch(baseStock, {
-          method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
-          body: JSON.stringify({ evento_id, zona, vendidos_fuera: boletos, nota: notaStock, updated_por: quien }),
-        });
-        if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
-        stockFinal = (await ins.json())[0] || null;
-      }
+      // [STAFF-BOLETO-2] EL INVENTARIO YA NO SE TOCA AQUÍ: la fila de la creadora
+      // (y la de su acompañante) con zona ES el boleto (`ocupaLugar` en
+      // _lib/paquete-viaje). Sumar además a `vendidos_fuera` lo contaría dos
+      // veces — y el careo pisa esa casilla con el Excel de todos modos.
+      const stockFinal = null;
 
       // Sello en el contrato: cierra la idempotencia Y deja el rastro de qué se
       // asignó, sin columna nueva.
@@ -1681,5 +1663,8 @@ function readEnv() {
   if (!KH_SB_URL || !KH_SB_SERVICE) {
     return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };
   }
-  return { KH_SB_URL, KH_SB_SERVICE };
+  // [STAFF-BOLETO-2] El Portal entra solo para la disponibilidad (sus apartados
+  // ocupan lugar); sin él, el boleto de staff se rehúsa en vez de adivinar.
+  return { KH_SB_URL, KH_SB_SERVICE,
+    PORTAL_SB_URL: process.env.PORTAL_SUPABASE_URL, PORTAL_SB_SERVICE: process.env.PORTAL_SUPABASE_SERVICE_KEY };
 }

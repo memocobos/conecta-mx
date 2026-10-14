@@ -774,6 +774,18 @@ const PLANTILLAS_KH = [
   { id: 'tema-axel',     nombre: 'Plata',             bg: '#0c0f16', a: '#94A3C8', b: '#E8F0FF' },
   { id: 'tema-america',  nombre: 'Rosa claro',        bg: '#F8F4F6', a: '#E8739A', b: '#D4688A' },
   { id: 'tema-laura',    nombre: 'Dorado claro',      bg: '#F5F0E8', a: '#C9973A', b: '#DDB86A' },
+  // [GZ-PLANTILLA-2] Temas de colección (paletas originales, sin logos ni personajes).
+  { id: 'tema-ki', nombre: 'Ki Explosivo', bg: '#0b0a14', a: '#FF8A00', b: '#2E7BFF', coleccion: true },
+  { id: 'tema-mutante', nombre: 'Escuadrón Mutante', bg: '#070b18', a: '#FFC20E', b: '#1F4FD8', coleccion: true },
+  { id: 'tema-lunar', nombre: 'Guardiana Lunar', bg: '#0d0b22', a: '#FF7EB6', b: '#FFD86B', coleccion: true },
+  { id: 'tema-campeon', nombre: 'Campeón', bg: '#0a0a0c', a: '#E0262F', b: '#3A6FF7', coleccion: true },
+  { id: 'tema-tiempo', nombre: 'Viaje en el Tiempo', bg: '#0a0c10', a: '#FF6A13', b: '#00E5FF', coleccion: true },
+  { id: 'tema-flamenca', nombre: 'Flamenca', bg: '#090606', a: '#E3002B', b: '#D9D9D9', coleccion: true },
+  { id: 'tema-disco', nombre: 'Disco Futuro', bg: '#0b0716', a: '#FF2BD6', b: '#5CE1FF', coleccion: true },
+  { id: 'tema-bohemia', nombre: 'Bohemia Neón', bg: '#0c0812', a: '#FF6F59', b: '#A06BFF', coleccion: true },
+  { id: 'tema-verano', nombre: 'Verano Tropical', bg: '#06121a', a: '#19D3C5', b: '#FFB347', coleccion: true },
+  { id: 'tema-laboratorio', nombre: 'Laboratorio', bg: '#0a0d0a', a: '#C1121F', b: '#9BE564', coleccion: true },
+  { id: 'tema-codigo', nombre: 'Código Verde', bg: '#000500', a: '#00FF66', b: '#00C853', coleccion: true },
 ];
 const TEMA_PRESETS = [
   { hex: '#e8ff4c', nombre: 'Lima' },

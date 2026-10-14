@@ -29,3 +29,8 @@ update kits_inventario set retornable = true where pieza in ('Bocina','Hielera')
 -- =============================================================================
 alter table public.usuarios add column if not exists tema_plantilla text
   check (tema_plantilla is null or tema_plantilla in ('clasico','tema-ximena','tema-america','tema-reginna','tema-luis','tema-laura','tema-brittany','tema-axel'));
+
+-- GZ-PLANTILLA-2 (14-oct-2026) · 11 temas de colección (YA CORRIÓ). Paletas
+-- originales en kamehouse.css; el CHECK crece con sus ids.
+alter table public.usuarios drop constraint if exists usuarios_tema_plantilla_check;
+alter table public.usuarios add constraint usuarios_tema_plantilla_check check (tema_plantilla is null or tema_plantilla in ('clasico','tema-ximena','tema-america','tema-reginna','tema-luis','tema-laura','tema-brittany','tema-axel','tema-ki','tema-mutante','tema-lunar','tema-campeon','tema-tiempo','tema-flamenca','tema-disco','tema-bohemia','tema-verano','tema-laboratorio','tema-codigo'));

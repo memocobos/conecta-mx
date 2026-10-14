@@ -1343,11 +1343,17 @@ function renderFormPerfil() {
         <div class="perfil-section-title">Plantilla de tu Kamehouse</div>
         <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// toca una para verla al instante · se guarda con «Guardar cambios»</div>
         <input type="hidden" id="mp-tema_plantilla" value="${_esfEsc(currentUser.tema_plantilla || '')}">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">${(typeof PLANTILLAS_KH !== 'undefined' ? PLANTILLAS_KH : []).map(p => `
+        ${(() => {
+          const todas = (typeof PLANTILLAS_KH !== 'undefined' ? PLANTILLAS_KH : []);
+          const op = p => `
           <button type="button" class="plantilla-op" data-id="${p.id}" onclick="seleccionarPlantilla('${p.id}', this)" style="text-align:left;cursor:pointer;border-radius:12px;padding:0;overflow:hidden;border:2px solid ${(currentUser.tema_plantilla || '') === p.id ? 'var(--text)' : 'var(--border)'};background:${p.bg}">
             <div style="height:44px;background:linear-gradient(135deg,${p.a},${p.b})"></div>
             <div style="padding:8px 10px;font-size:12px;font-weight:700;color:${/^#F/i.test(p.bg) ? '#2D2D3A' : '#fff'}">${_esfEsc(p.nombre)}</div>
-          </button>`).join('')}</div>
+          </button>`;
+          const grid = l => `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">${l.map(op).join('')}</div>`;
+          const col = todas.filter(p => p.coleccion);
+          return grid(todas.filter(p => !p.coleccion)) + (col.length ? `<div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin:16px 0 10px;letter-spacing:.08em;text-transform:uppercase">// temas de colección</div>${grid(col)}` : '');
+        })()}
       </div>
       <div class="perfil-section">
         <div class="perfil-section-title">Color de tema</div>

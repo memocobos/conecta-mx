@@ -115,7 +115,8 @@ exports.handler = async function (event) {
 
     // b) Coordis que ACEPTARON el evento (por slug).
     const asigs = await sb(
-      `eventos_coordi?evento_id=eq.${encodeURIComponent(slug)}&status=eq.aceptado&select=coordi_id`
+      // [CC-FECHAS-2] También las asignaciones POR FECHA (`slug#N`).
+      `eventos_coordi?or=(evento_id.eq.${encodeURIComponent(slug)},evento_id.like.${encodeURIComponent(slug)}%23*)&status=eq.aceptado&select=coordi_id`
     ).catch(() => []);
     const coordiIds = (asigs || []).map((a) => a.coordi_id).filter(Boolean);
     if (!coordiIds.length) continue;

@@ -316,7 +316,7 @@ async function loadMTPendientes() {
     // ── 1) Reportes pendientes de levantar (evento ya pasó) ──
     const reportesPendientes = [];
     for (const ec of eventosCoordi) {
-      const ev = evMap[ec.evento_id];
+      const ev = evMap[ec.evento_id] || evMap[String(ec.evento_id || '').split('#')[0]];   // [CC-FECHAS-2] asignación por fecha
       if (!ev || !ev.fecha) continue;
       const u = uMap[ec.coordi_id];
       if (!_aplicaStrike(u)) continue;

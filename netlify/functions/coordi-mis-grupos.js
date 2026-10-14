@@ -111,10 +111,11 @@ exports.handler = async (event) => {
     //    que admin-viajeros-evento: prefijo en DB + match exacto en JS).
     const eventos = [];
     for (const asig of asignaciones) {
+      // [CC-FECHAS-2] Una asignación por fecha (`omar#0`) lee su propia fecha.
       const base = asig.evento_id;
       // El id base de EV es un slug; rechazamos cualquier cosa rara (defensa,
       // aunque el valor viene de KH, no del usuario).
-      if (base.length > 80 || !/^[A-Za-z0-9_.\-]+$/.test(base)) {
+      if (base.length > 80 || !/^[A-Za-z0-9_.\-]+(#\d+)?$/.test(base)) {
         eventos.push({ evento_id: base, nombre: base, indicaciones: asig.indicaciones, viajeros: [] });
         continue;
       }

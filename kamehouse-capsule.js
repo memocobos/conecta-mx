@@ -518,7 +518,7 @@ async function guardarAsignacionCoordi() {
   alertEl.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
   try {
     const asig = await khAsignaciones.crear({ // [sec-coordi]
-      evento_id: _ccBase(),   // [CC-FECHAS-1] el equipo es del evento, no de una fecha
+      evento_id: _ccEventoActual,   // [CC-FECHAS-2] el equipo se asigna a ESTA fecha (`omar#0`)
       coordi_id: coordiId,
       indicaciones,
     });

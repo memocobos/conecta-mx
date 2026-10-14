@@ -1613,8 +1613,12 @@ function _ccEvsFromEV(e) {
 // el slug crudo como nombre para no romper el render.
 function _attachEventoDesdeEV(evAsignados, evMap) {
   (evAsignados || []).forEach(e => {
-    const evItem = e && e.evento_id ? evMap[e.evento_id] : null;
-    e.eventos = evItem ? _ccEvFromEV(evItem) : { id: e.evento_id, nombre: e.evento_id };
+    // [CC-FECHAS-2] Una asignación por FECHA llega como `omar#0`: el catálogo
+    // se busca por la base y la tarjeta sale de esa fecha (su nombre y su día).
+    const base = e && e.evento_id ? String(e.evento_id).split('#')[0] : null;
+    const evItem = base ? evMap[base] : null;
+    const tarjeta = evItem ? (_ccEvsFromEV(evItem).find(x => x.id === e.evento_id) || _ccEvFromEV(evItem)) : null;
+    e.eventos = tarjeta ? tarjeta : { id: e.evento_id, nombre: e.evento_id };
   });
 }
 // Anota cada item de evAsignados con su array .deliverables. Si una asignación

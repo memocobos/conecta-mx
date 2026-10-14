@@ -4806,6 +4806,15 @@ let _ccEventosCache = [];
 // viven las asignaciones de hoy (karolg, omar, soyluna…) y así las leen Guerreros
 // Z, Montaña Pai y los crons. Viajeros/abonos/rooming sí van por fecha (slug#idx).
 function _ccBase() { return _ccEventoActual ? String(_ccEventoActual).split('#')[0] : null; }
+// [CC-FECHAS-2] Nombre legible de una llave de evento (`omar#0` → «Omar · 6 Noviembre»)
+// para las pantallas que buscan el evento en el catálogo por id BASE.
+function _evNombreLlave(evMap, llave) {
+  const [base, idx] = String(llave || '').split('#');
+  const e = evMap && evMap[base];
+  if (!e) return llave;
+  const mf = (idx != null && Array.isArray(e.multifecha)) ? e.multifecha[Number(idx)] : null;
+  return (e.a || base) + (mf ? ' · ' + (mf.lbl || ('Fecha ' + (Number(idx) + 1))) : '');
+}
 let _ccAsignados = [];
 let _ccFiltroFecha = 'todos';   // filtro de fecha activo (todos/proximo/pasado); se combina con el buscador
 
@@ -5261,7 +5270,13 @@ async function loadCCEquipo() {
   const countEl   = document.getElementById('cc-equipo-count');
   try {
     const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
-    const asigs = await khAsignaciones.listar({ evento_id: _ccBase() }); // [sec-coordi] [CC-FECHAS-1] equipo = evento base
+    // [CC-FECHAS-2 13-oct] Palabra de Memo: «Renata va el 6, no el 7». El equipo
+    // se asigna POR FECHA (la llave de la tarjeta, `omar#0`); las asignaciones
+    // viejas al evento BASE (`karolg`) siguen apareciendo en todas sus fechas,
+    // rotuladas «todas las fechas», hasta que alguien las reasigne a una.
+    const _llaves = [...new Set([_ccEventoActual, _ccBase()])];
+    const asigs = [].concat(...await Promise.all(_llaves.map(k => khAsignaciones.listar({ evento_id: k })))) // [sec-coordi]
+      .map(a => Object.assign(a, { _todasFechas: String(_ccEventoActual).includes('#') && a.evento_id === _ccBase() }));
     _ccAsignados = asigs;
 
     let usuarios = [];
@@ -5356,7 +5371,7 @@ async function loadCCEquipo() {
               `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--orange)">${_esfEsc((u.nombre||'?')[0])}</span>`}
             </div>
             <div>
-              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(u.nombre||'—')}</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(u.nombre||'—')}${a._todasFechas ? ' <span style="font-size:10px;color:#ffb020;font-family:\'JetBrains Mono\',monospace">· todas las fechas</span>' : ''}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
               ${indicacionesHtml}
               ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${_esfEsc(a.motivo_declinacion)}</div>` : ''}

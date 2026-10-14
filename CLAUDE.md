@@ -445,6 +445,21 @@ está caduco antes de escribirse.
     sus abonos. 🔒 Si la persona tiene un pago capturado APARTE → 409, nada se
     mueve (eso ya es dinero real). Archivadas a mano el 13-oct: las 3 de Memo/
     Milk y la de Ximena (con sus viajeros y $300 c/u). `mide:prueba-archivo-1` **9**.
+  - **CREA-2 (13-oct) · LA CORTESÍA DE LA CREADORA TRAE A SU ACOMPAÑANTE.**
+    Pregunta de Memo: «no sé qué onda con su acompañante y las tallas no las
+    puedo ver por ningún lado». Medido: 21 creadoras firmadas, 0 cortesías
+    asignadas, 11 con talla y 8 con acompañante (nombre+talla) guardados en
+    `datos` del contrato y SIN pantalla que los pintara; la cortesía metía al
+    acompañante como NOTA de ella (su talla se perdía) aunque descontara 2
+    boletos. Hoy: la lista de contratos pinta «👕 talla · +1 acompañante (talla)
+    · 🎟 asignada/sin asignar» (proyección puntual en `admin-contratos`, jamás el
+    jsonb entero); el panel prellena el acompañante del contrato (editable: lo
+    tecleado MANDA — Marietta escribió a una tercera persona en el nombre) y con
+    2+ boletos nace como VIAJERO propio (su talla, $0, sin correo, mismo
+    paquete/tipo, mismo `grupo_viaje` = «viaja con»). Talla del acompañante
+    obligatoria (409 sin escribir nada); `acompanante:null` explícito = va sola;
+    reintento lo encuentra por nombre y no duplica. `mide:crea-2` **15** (BASE
+    da 11 rojos).
   - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
     escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
     blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede

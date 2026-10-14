@@ -2592,7 +2592,7 @@
        <div class="form-row">
          <div class="form-group">
            <label>Boletos de cortesía</label>
-           <select id="cort-boletos">
+           <select id="cort-boletos" onchange="cortBoletosElegidos()">
              <option value="1">1 · solo quien firma</option>
              <option value="2">2 · con acompañante</option>
              <option value="3">3</option>
@@ -2608,6 +2608,26 @@
              <option value="XL">XL</option><option value="XXL">XXL</option>
            </select>
            <div style="font-size:11px;color:#ffb020;margin-top:6px;line-height:1.5">Este contrato es anterior a la talla en el formulario — se marca «capturada al asignar».</div>
+         </div>
+       </div>
+       <!-- [CREA-2] El acompañante: con 2+ boletos nace como VIAJERO propio con
+            su talla y queda «viaja con» ella. Prellenado con lo que la creadora
+            escribió al firmar; editable porque a veces escriben de más
+            (corrígelo aquí antes de asignar). -->
+       <div class="form-row" id="cort-acomp-wrap" style="display:none">
+         <div class="form-group">
+           <label>Acompañante · nombre</label>
+           <input id="cort-acomp-nombre" type="text" maxlength="120" placeholder="Nombre de quien la acompaña">
+           <div id="cort-acomp-hint" style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5"></div>
+         </div>
+         <div class="form-group">
+           <label>Acompañante · talla</label>
+           <select id="cort-acomp-talla">
+             <option value="">— elegir —</option>
+             <option value="XS">XS</option><option value="S">S</option>
+             <option value="M">M</option><option value="L">L</option>
+             <option value="XL">XL</option><option value="XXL">XXL</option>
+           </select>
          </div>
        </div>
        <!-- 🔒 El recordatorio va A LA VISTA, no solo en el código: la cortesía

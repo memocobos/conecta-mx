@@ -10251,7 +10251,7 @@ function _ctrPintarLista() {
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`;
       return `<tr>
-        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
+        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span>${_ctrKitChip(c)}</td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
         <td>${fechaEnviado}${_ctrAntiguedadFila(c)}</td>
         <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>
@@ -10337,8 +10337,38 @@ async function cortAbrir(contratoId) {
   _cortEl('cort-evento-hint').textContent = sug
     ? 'Derivado del contrato — confírmalo o cámbialo.'
     : 'El contrato no nombra un evento del catálogo: elígelo.';
-  _cortEl('cort-boletos').value = '1';
+  // [CREA-2] Si el contrato trae acompañante, se sugieren 2 boletos y se
+  // prellenan sus datos — sugerido, no impuesto: quien asigna lo cambia.
+  _cortEl('cort-boletos').value = c.acomp_nombre ? '2' : '1';
+  _cortEl('cort-acomp-nombre').value = c.acomp_nombre || '';
+  _cortEl('cort-acomp-talla').value = c.acomp_talla || '';
+  _cortEl('cort-acomp-hint').textContent = c.acomp_nombre
+    ? 'Lo escribió ella al firmar — corrígelo si trae algo de más.'
+    : 'El contrato no trae acompañante: escríbelo si va con alguien.';
+  cortBoletosElegidos();
   cortEventoElegido();
+}
+
+// [CREA-2] Con 2+ boletos el acompañante se pide (y nace como viajero propio);
+// con 1, se esconde: un boleto es solo para quien firmó.
+function cortBoletosElegidos() {
+  const n = parseInt((_cortEl('cort-boletos') || {}).value || '1', 10);
+  const w = _cortEl('cort-acomp-wrap');
+  if (w) w.style.display = n >= 2 ? '' : 'none';
+}
+
+// [CREA-2] La talla y el acompañante A LA VISTA en la lista: es el pedido de
+// playeras, y hasta hoy vivía escondido dentro del contrato firmado.
+function _ctrKitChip(c) {
+  // Solo creadora: es la única plantilla que pide talla y acompañante al
+  // firmar. A un coordinador le diría «sin talla» y su talla vive en su perfil.
+  if (!c || c.plantilla !== 'creadora' || c.estado !== 'firmado') return '';
+  const t = c.talla_contrato ? `👕 ${_escCtr(c.talla_contrato)}` : '👕 <span style="color:#ffb020">sin talla</span>';
+  const a = c.acomp_nombre ? ` · +1 ${_escCtr(c.acomp_nombre)}${c.acomp_talla ? ' (' + _escCtr(c.acomp_talla) + ')' : ''}` : '';
+  const asig = c.cortesia_evento
+    ? ` · <span style="color:#3ddc84">🎟 ${_escCtr(c.cortesia_zona || '')}${c.cortesia_boletos ? ' ×' + _escCtr(c.cortesia_boletos) : ''}</span>`
+    : ` · <span style="color:#ffb020">🎟 sin asignar</span>`;
+  return `<br><span style="font-size:11px;color:var(--ts)">${t}${a}${asig}</span>`;
 }
 
 // El evento se DERIVA del nombre del contrato, y se derive o no, el humano

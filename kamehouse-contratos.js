@@ -221,20 +221,29 @@ async function cortGuardar() {
   const boletos = parseInt((_cortEl('cort-boletos') || {}).value || '0', 10);
   const talla = (_cortEl('cort-talla') || {}).value || '';
   const faltaTalla = !_cortCtr.talla_contrato;
-  const falta = !evento_id ? 'el evento' : !zona ? 'la zona' : (faltaTalla && !talla) ? 'la talla' : '';
+  // [CREA-2] Con 2+ boletos y un nombre, el acompañante nace viajero: su talla
+  // es obligatoria (el kit va por persona). Sin nombre, el boleto extra solo
+  // se aparta, como antes.
+  const acNombre = boletos >= 2 ? ((_cortEl('cort-acomp-nombre') || {}).value || '').trim() : '';
+  const acTalla = acNombre ? ((_cortEl('cort-acomp-talla') || {}).value || '') : '';
+  const falta = !evento_id ? 'el evento' : !zona ? 'la zona' : (faltaTalla && !talla) ? 'la talla'
+    : (acNombre && !acTalla) ? 'la talla del acompañante' : '';
   if (falta) { alert.innerHTML = `<div style="color:#ff5f56;font-size:12px;margin-bottom:8px">Falta ${falta}.</div>`; return; }
 
   btn.disabled = true; btn.textContent = 'Asignando…';
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
       method: 'POST',
-      body: JSON.stringify({ accion: 'cortesia_asignar', contrato_id: _cortCtr.id, evento_id, zona, boletos, talla: talla || undefined }),
+      body: JSON.stringify({ accion: 'cortesia_asignar', contrato_id: _cortCtr.id, evento_id, zona, boletos, talla: talla || undefined,
+        // null EXPLÍCITO = «sin acompañante» (lo borró quien asigna): el
+        // servidor no cae a lo del contrato. undefined (1 boleto) sí cae.
+        acompanante: acNombre ? { nombre: acNombre, talla: acTalla } : (boletos >= 2 ? null : undefined) }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
     alert.innerHTML = j.ya
       ? `<div style="color:#ffb020;font-size:12px;margin-bottom:8px">Ya estaba asignada — no se tocó nada.</div>`
-      : `<div style="color:#3ddc84;font-size:12px;margin-bottom:8px">Listo: ${boletos} boleto${boletos > 1 ? 's' : ''} apartado${boletos > 1 ? 's' : ''} en ${_escCtr(zona)}${j.creada ? ' y viajero registrado' : ' (el viajero ya existía: se le puso la zona)'}.</div>`;
+      : `<div style="color:#3ddc84;font-size:12px;margin-bottom:8px">Listo: ${boletos} boleto${boletos > 1 ? 's' : ''} apartado${boletos > 1 ? 's' : ''} en ${_escCtr(zona)}${j.creada ? ' y viajero registrado' : ' (el viajero ya existía: se le puso la zona)'}${j.acompanante ? ` · ${_escCtr(j.acompanante.nombre || acNombre)} también quedó en viajeros, viajando con ella` : ''}.</div>`;
     if (typeof cargarContratos === 'function') cargarContratos();
   } catch (e) {
     alert.innerHTML = `<div style="color:#ff5f56;font-size:12px;margin-bottom:8px">No se pudo: ${_escCtr(e.message)}</div>`;

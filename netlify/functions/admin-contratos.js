@@ -60,6 +60,14 @@ const COLS = [
   // sin viajar el jsonb entero.
   'cortesia_evento:datos->cortesia->>evento_id',
   'talla_contrato:datos->>talla',
+  // [CREA-2] El acompañante que la creadora declaró al firmar, y si la
+  // cortesía ya le hizo fila. Mismo patrón: sub-campos puntuales, jamás el
+  // jsonb entero. Así la lista pinta el pedido de playeras sin abrir nada.
+  'acomp_nombre:datos->acompanante->>nombre',
+  'acomp_talla:datos->acompanante->>talla',
+  'cortesia_zona:datos->cortesia->>zona',
+  'cortesia_boletos:datos->cortesia->>boletos',
+  'cortesia_acomp_viaja:datos->cortesia->>acompanante_viaja',
 ].join(',');
 // Detalle (accion 'obtener'): whitelist + datos jsonb. Solo admins llegan aquí.
 const COLS_DETALLE = COLS + ',datos';

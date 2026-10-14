@@ -455,8 +455,27 @@ exports.handler = async (event) => {
         }) };
       }
 
+      // [CREA-2] EL ACOMPAÑANTE, de nota a VIAJERO. El contrato lo trae desde
+      // CREA-1a (nombre + talla, en pareja) y hasta hoy se quedaba en una nota
+      // de la creadora: su talla no llegaba a ningún lado y la lista de viajeros
+      // decía 1 persona con 2 boletos descontados. Lo que teclea quien asigna
+      // MANDA sobre el contrato (es la corrección humana: Marietta escribió a
+      // una tercera persona dentro del nombre); vacío → lo del contrato.
       const acomp = (body.acompanante && typeof body.acompanante === 'object') ? body.acompanante : {};
-      const acompNombre = cleanText(acomp.nombre, 120) || cleanText(datos.acompanante && datos.acompanante.nombre, 120);
+      // `acompanante: null` explícito = quien asigna lo BORRÓ: no se cae a lo
+      // del contrato (si no, no habría forma de decir «va sola con 2 boletos»).
+      const acCtr = (body.acompanante !== null && datos.acompanante && typeof datos.acompanante === 'object') ? datos.acompanante : {};
+      const acompNombre = cleanText(acomp.nombre, 120) || cleanText(acCtr.nombre, 120);
+      let acompTalla = String(cleanText(acomp.talla, 8) || cleanText(acCtr.talla, 8) || '').toUpperCase() || null;
+      if (acompTalla && !TALLAS_CORTESIA.includes(acompTalla)) return bad(headers, `Talla de acompañante inválida: ${acompTalla}`);
+      // Solo nace viajero si hay un boleto PARA él: con 1 boleto el acompañante
+      // no viaja por cortesía, y crear su fila diría que sí.
+      const acompViaja = !!acompNombre && boletos >= 2;
+      if (acompViaja && !acompTalla) {
+        return { statusCode: 409, headers, body: JSON.stringify({
+          error: `Falta la talla de ${acompNombre}: captúrala a mano`, falta_talla_acomp: true,
+        }) };
+      }
 
       // Mismo patrón que `abono_crear` en este archivo — el contrato de
       // verifyAdminAuthLive es {valid, user:{id,correo,rol}}, NO auth.nombre.
@@ -464,7 +483,7 @@ exports.handler = async (event) => {
       const notaViajero = [
         paquete.nota,
         'solo boleto + kit',
-        acompNombre ? `acompañante: ${acompNombre}` : null,
+        acompNombre ? `acompañante: ${acompNombre}${acompViaja ? ' (viaja con ella, fila propia)' : ' (sin boleto de cortesía)'}` : null,
         tallaOrigen === 'capturada_al_asignar' ? 'talla capturada al asignar (el contrato no la traía)' : null,
       ].filter(Boolean).join(' · ');
 
@@ -475,11 +494,16 @@ exports.handler = async (event) => {
       let existente = null;
       if (claveCorreo) {
         const ex = await fetch(
-          `${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&correo=eq.${encodeURIComponent(claveCorreo)}&select=id,nombre,zona_boleto,talla_playera&limit=1`,
+          `${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&correo=eq.${encodeURIComponent(claveCorreo)}&select=id,nombre,zona_boleto,talla_playera,grupo_viaje&limit=1`,
           { headers: sbHeaders });
         if (!ex.ok) return upstream(headers, await ex.text(), 'consulta');
         existente = (await ex.json())[0] || null;
       }
+
+      // [CREA-2] El grupo: si ella ya viajaba en uno, se reusa (no se parte un
+      // grupo que armó alguien más); si no, nace uno nuevo. Solo si de verdad
+      // va acompañada — un grupo de una persona no dice nada.
+      const grupo = acompViaja ? ((existente && existente.grupo_viaje) || require('crypto').randomUUID()) : null;
 
       let viajero = null;
       if (existente) {
@@ -493,6 +517,7 @@ exports.handler = async (event) => {
           body: JSON.stringify({
             zona_boleto: zona, talla_playera: talla,
             tipo_paquete: paquete.tipo_paquete, tipo_viajero: paquete.tipo_viajero,
+            ...(grupo ? { grupo_viaje: grupo } : {}),
           }),
         });
         if (!up.ok) return upstream(headers, await up.text(), 'update');
@@ -509,6 +534,7 @@ exports.handler = async (event) => {
           total_contrato: 0,   // no debe nada: es cortesía
           abonado_previo: 0,
           notas: notaViajero,
+          ...(grupo ? { grupo_viaje: grupo } : {}),
         };
         const ins = await fetch(baseVE, {
           method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
@@ -516,6 +542,39 @@ exports.handler = async (event) => {
         });
         if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
         viajero = (await ins.json())[0] || null;
+      }
+
+      // [CREA-2] La fila del acompañante. Mismo paquete y MISMO tipo que ella
+      // (el candado del doble descuento de arriba ya lo cubre: su boleto ya va
+      // en el `vendidos_fuera` de abajo). Sin correo a propósito: el contrato
+      // no lo pide y poner el de ella mezclaría su plan en el Portal.
+      // Reintento seguro: si una corrida anterior lo creó y truena después (el
+      // stock o el sello), se encuentra por nombre en el evento y se COMPLETA en
+      // vez de duplicarlo.
+      let acompViajero = null;
+      if (acompViaja) {
+        const exA = await fetch(
+          `${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&nombre=eq.${encodeURIComponent(acompNombre)}&tipo_viajero=eq.${encodeURIComponent(paquete.tipo_viajero)}&select=id&limit=1`,
+          { headers: sbHeaders });
+        if (!exA.ok) return upstream(headers, await exA.text(), 'consulta');
+        const yaA = (await exA.json())[0] || null;
+        const filaA = {
+          zona_boleto: zona, talla_playera: acompTalla,
+          tipo_paquete: paquete.tipo_paquete, tipo_viajero: paquete.tipo_viajero,
+          grupo_viaje: grupo,
+        };
+        const rA = yaA
+          ? await fetch(`${baseVE}?id=eq.${yaA.id}`, {
+              method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' }, body: JSON.stringify(filaA) })
+          : await fetch(baseVE, {
+              method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+              body: JSON.stringify({
+                ...filaA, evento_id, nombre: acompNombre, correo: null,
+                total_contrato: 0, abonado_previo: 0,
+                notas: `${paquete.nota} · acompañante de ${contrato.creador_nombre} · solo boleto + kit`,
+              }) });
+        if (!rA.ok) return upstream(headers, await rA.text(), yaA ? 'update' : 'insert');
+        acompViajero = (await rA.json())[0] || null;
       }
 
       // STOCK: SUMA sobre la fila (evento_id, zona) — hay UNIQUE ahí, un insert
@@ -550,6 +609,8 @@ exports.handler = async (event) => {
         evento_id, zona, boletos,
         talla, talla_origen: tallaOrigen,
         acompanante: acompNombre || null,
+        acompanante_talla: acompTalla,
+        acompanante_viaja: acompViaja,
         asignado_en: new Date().toISOString(),
         asignado_por: quien,
       };
@@ -559,7 +620,7 @@ exports.handler = async (event) => {
       });
       if (!selloR.ok) return upstream(headers, await selloR.text(), 'update');
 
-      return ok(headers, { viajero, stock: stockFinal, cortesia, creada: !existente });
+      return ok(headers, { viajero, acompanante: acompViajero, stock: stockFinal, cortesia, creada: !existente });
     }
 
     // ── viajeros_evento: listar (descarga) — admin o coordi del evento ────

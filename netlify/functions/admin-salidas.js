@@ -91,9 +91,20 @@ const ACCIONES = {
   // que hoy ven el panel "Prestado ahorita" de la Torre — no abre información
   // nueva a nadie, solo la lleva a Guerreros Z. Solo lectura, sin costos.
   prestado_equipo: ROLES_CUIDADOR,
+  // [KARIN-GZ-1 · 14-oct] La devolución en dos llaves, palabra de Memo: «que
+  // el coordi diga que ya lo regresó y mister popo ponga aceptar la
+  // devolución para que se vuelva a cargar en el sistema».
+  //   devolucion_avisar  → el DUEÑO de la salida: «ya lo regresé» (+ correo a Popo)
+  //   devolucion_recibir → el cuidador: «lo recibí». NO SUMA STOCK aquí: el
+  //     stock regresa por UN solo camino, `sumarRegresoYCerrar` del reporte
+  //     (admin-reportes), para que nada se cuente dos veces. Si el reporte ya
+  //     tiene la aprobación final de Memo, la pantalla palomea el regreso en
+  //     ese momento; si no, lo hace sola la aprobación final.
+  devolucion_avisar: ROLES_VIAJAN,
+  devolucion_recibir: ROLES_CUIDADOR,
 };
 
-const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id,faltantes,faltantes_monto,faltantes_vence,faltantes_pagado_at,faltantes_pagado_por';
+const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id,faltantes,faltantes_monto,faltantes_vence,faltantes_pagado_at,faltantes_pagado_por,devolucion_avisada_at,devolucion_recibida_at,devolucion_recibida_por';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -194,7 +205,8 @@ exports.handler = async (event) => {
       // Correo a TODOS los cuidadores (D-3) — best-effort, jamás bloquea.
       let correo_enviado = false;
       try {
-        correo_enviado = await correoCuidadores(env, kh, auth.user, evento_id, detalle, notas);
+        const nom = await nombreDe(env, kh, uid).catch(() => '');
+        correo_enviado = await correoCuidadores(env, kh, { ...auth.user, nombre: nom }, evento_id, detalle, notas);
       } catch (e) { console.warn('[admin-salidas] correo cuidadores falló (best-effort):', e.message); }
 
       return json(200, { ok: true, salida, correo_enviado });
@@ -418,6 +430,63 @@ exports.handler = async (event) => {
       return json(200, { ok: true });
     }
 
+    // ── [KARIN-GZ-1] devolucion_avisar: «ya lo regresé» (el dueño) ─────────
+    if (accion === 'devolucion_avisar') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return json(400, { error: 'id inválido' });
+      const salida = await leerSalida(baseSalidas, kh, id);
+      if (!salida) return json(404, { error: 'Salida no encontrada' });
+      if (String(salida.solicitante_id) !== uid) return json(403, { error: 'Esta salida no es tuya' });
+      if (salida.estado !== 'autorizada') return json(409, { error: `La salida está ${salida.estado} — no hay nada que regresar` });
+      if (salida.devolucion_avisada_at) return json(200, { ok: true, ya: true, devolucion_avisada_at: salida.devolucion_avisada_at });
+      const ahora = new Date().toISOString();
+      const pR = await fetch(`${baseSalidas}?id=eq.${enc(id)}&estado=eq.autorizada&devolucion_avisada_at=is.null`, {
+        method: 'PATCH', headers: { ...kh, Prefer: 'return=minimal' },
+        body: JSON.stringify({ devolucion_avisada_at: ahora }),
+      });
+      if (!pR.ok) return json(502, { error: 'No se pudo registrar el aviso', detail: await pR.text() });
+      let correo_enviado = false;
+      try {
+        const to = await correosCuidadores(env, kh);
+        const nom = await nombreDe(env, kh, uid);
+        if (to.length) correo_enviado = await enviarCorreo(env, to, `Devolución por recibir · ${salida.evento_id}`, moldeCorreo('Te regresaron material', `
+          <p style="font-size:14px;line-height:1.6;color:#fff;margin:0 0 14px 0">
+            <b>${escapeHtml(nom || auth.user.correo || 'Un coordinador')}</b> dice que ya regresó a la bodega el material de
+            <b style="color:#e8ff4c">${escapeHtml(salida.evento_id)}</b>. Revísalo y confirma en
+            <a href="${SITE}/kamehouse" style="color:#e8ff4c;text-decoration:none;font-weight:700">Kamehouse → Torre de Karin → Devoluciones por confirmar</a>.
+          </p>${tablaPiezas(salida.detalle)}`));
+      } catch (e) { /* best-effort */ }
+      return json(200, { ok: true, devolucion_avisada_at: ahora, correo_enviado });
+    }
+
+    // ── [KARIN-GZ-1] devolucion_recibir: «lo recibí» (el cuidador) ─────────
+    if (accion === 'devolucion_recibir') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return json(400, { error: 'id inválido' });
+      const salida = await leerSalida(baseSalidas, kh, id);
+      if (!salida) return json(404, { error: 'Salida no encontrada' });
+      if (salida.estado !== 'autorizada') return json(409, { error: `La salida está ${salida.estado}` });
+      let recibida_at = salida.devolucion_recibida_at;
+      if (!recibida_at) {
+        recibida_at = new Date().toISOString();
+        const pR = await fetch(`${baseSalidas}?id=eq.${enc(id)}&estado=eq.autorizada&devolucion_recibida_at=is.null`, {
+          method: 'PATCH', headers: { ...kh, Prefer: 'return=minimal' },
+          body: JSON.stringify({ devolucion_recibida_at: recibida_at, devolucion_recibida_por: auth.user.correo || rol }),
+        });
+        if (!pR.ok) return json(502, { error: 'No se pudo registrar la recepción', detail: await pR.text() });
+      }
+      // ¿El reporte de esa persona y ese evento ya trae la aprobación final?
+      const rr = await fetch(`${env.KH_URL}/rest/v1/reportes_evento?evento_id=eq.${enc(salida.evento_id)}&coordi_id=eq.${enc(String(salida.solicitante_id))}&select=id,status&order=created_at.desc&limit=1`, { headers: kh });
+      const [rep] = rr.ok ? ((await rr.json().catch(() => [])) || []) : [];
+      return json(200, {
+        ok: true, devolucion_recibida_at: recibida_at,
+        reporte_id: rep ? rep.id : null,
+        reporte_status: rep ? rep.status : null,
+        // true → la pantalla palomea el regreso del reporte ahora mismo (suma stock y cierra).
+        recargar_ahora: !!(rep && rep.status === 'aprobado_memo'),
+      });
+    }
+
     // ── faltantes_pagado (SOLO Memo): "marcar pagado" descongela ───────────
     if (accion === 'faltantes_pagado') {
       const id = String(body.id || '').trim();
@@ -635,6 +704,14 @@ async function enviarCorreo(env, to, subject, html) {
   return r.ok;
 }
 
+async function nombreDe(env, kh, id) {
+  if (!UUID_RE.test(String(id || ''))) return '';
+  const r = await fetch(`${env.KH_URL}/rest/v1/usuarios?id=eq.${encodeURIComponent(String(id))}&select=nombre&limit=1`, { headers: kh });
+  if (!r.ok) return '';
+  const [u] = (await r.json().catch(() => [])) || [];
+  return (u && u.nombre) || '';
+}
+
 // Correos de los cuidadores: TODOS los usuarios rol mister_popo (D-3).
 async function correosCuidadores(env, kh) {
   const r = await fetch(`${env.KH_URL}/rest/v1/usuarios?rol=eq.mister_popo&select=correo,correo_notif&limit=50`, { headers: kh });
@@ -648,7 +725,7 @@ async function correoCuidadores(env, kh, solicitante, evento_id, detalle, notas)
   if (!to.length) return false;
   const html = moldeCorreo('Salida de bodega solicitada', `
     <p style="font-size:14px;line-height:1.6;color:#fff;margin:0 0 14px 0">
-      <b>${escapeHtml(solicitante.correo || solicitante.rol)}</b> solicita material para
+      <b>${escapeHtml(solicitante.nombre || solicitante.correo || solicitante.rol)}</b> solicita material para
       <b style="color:#e8ff4c">${escapeHtml(evento_id)}</b>. Corrobora y da salida — el stock
       NO baja hasta que tú lo autorices.
     </p>

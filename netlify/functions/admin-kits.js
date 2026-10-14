@@ -52,6 +52,11 @@ const ACCIONES = {
 // form de salidas y la vista de prestado de las fases F2+).
 const COLS_FULL   = 'id,pieza,cantidad,costo_unitario,stock_minimo,proveedor,retornable';
 const COLS_NOCOST = 'id,pieza,cantidad,stock_minimo,proveedor,retornable';
+// [KARIN-GZ-1 · 14-oct] Palabra de Memo: el coordinador «solo debería ver el
+// contenido de la bodega, artículo y cuántos hay, ningún dato más». Lo que no
+// debe ver no se le MANDA (la consola también es pantalla). `retornable` va
+// porque decide si la pieza es PRÉSTAMO o se regala.
+const COLS_COORDI = 'id,pieza,cantidad,retornable';
 
 // Campos que el cliente puede setear (crear/actualizar).
 const KIT_FIELDS = ['pieza', 'cantidad', 'costo_unitario', 'stock_minimo', 'proveedor', 'retornable'];
@@ -100,7 +105,7 @@ exports.handler = async (event) => {
   try {
     // ── listar ──────────────────────────────────────────────────────────────
     if (accion === 'listar') {
-      const cols = esAdmin ? COLS_FULL : COLS_NOCOST; // oculta costo a no-admins
+      const cols = esAdmin ? COLS_FULL : (['coordinador', 'cc'].includes(jwtRol) ? COLS_COORDI : COLS_NOCOST); // oculta costo a no-admins
       const r = await fetch(`${base}?select=${cols}&order=pieza.asc`, { headers: sbHeaders });
       if (!r.ok) {
         const detail = await r.text();

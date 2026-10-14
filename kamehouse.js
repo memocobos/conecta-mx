@@ -91,21 +91,30 @@ const PERMISOS_TABS = {
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
   bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube'],
-  mister_popo:   ['inicio','inventario','reportes','equipo'],
-  coordinador:   ['inicio','inventario','reportes','equipo'],
-  cc:            ['inicio','equipo'],
+  // [GZ-TOURS-1 · 14-oct] `tours`: su tour asignado con lista de viajeros y
+  // rooming. Al coordinador `equipo` le queda SOLO para su Mi Perfil (sin
+  // botón en el menú — ver NAV_SIN_BOTON): «no es necesario que vean la
+  // pestaña de Guerreros Z» (Memo).
+  mister_popo:   ['inicio','tours','inventario','reportes','equipo'],
+  coordinador:   ['inicio','tours','inventario','reportes','equipo'],
+  cc:            ['inicio','tours','equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
   milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube']
 };
 
+// [GZ-TOURS-1] Pantallas que el rol PUEDE abrir pero que no llevan botón en el
+// menú: el permiso sigue en PERMISOS_TABS (la puerta), aquí solo se esconde el
+// botón. El coordinador entra a su Mi Perfil desde su Inicio.
+const NAV_SIN_BOTON = { coordinador: ['equipo'] };
+
 // Qué tabs de Guerreros Z puede ver cada rol
 const GZ_TABS_PERMITIDAS = {
   maestro_roshi: ['lista','invitar','miperfil'],
   bulma:         ['lista','invitar','miperfil'],
   mister_popo:   ['lista','miperfil'],
-  coordinador:   ['lista','miperfil'],
+  coordinador:   ['miperfil'],   // [GZ-TOURS-1] solo su perfil; la lista del equipo no
   cc:            ['lista','miperfil'],
   milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
 };
@@ -1003,6 +1012,9 @@ const khSalidas = {
   darSalida(id) { return this._call({ accion: 'dar_salida', id }); },
   rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
   cancelar(id) { return this._call({ accion: 'cancelar', id }); },
+  // [KARIN-GZ-1] la devolución del préstamo: avisa el dueño, confirma el cuidador
+  devolucionAvisar(id) { return this._call({ accion: 'devolucion_avisar', id }); },
+  devolucionRecibir(id) { return this._call({ accion: 'devolucion_recibir', id }); },
   faltantesPagado(id) { return this._call({ accion: 'faltantes_pagado', id }); }, // [F4b] SOLO Memo
   // [O2] expediente de una pieza → { pieza, resumen, historial, ve_costos }
   kardex(pieza_id) { return this._call({ accion: 'kardex', pieza_id }); },
@@ -2340,6 +2352,7 @@ function loadPage(name) {
  if (name === 'ingresos') loadIngresos();
  if (name === 'saldos') loadSaldos();
  if (name === 'inventario') loadInventario();
+ if (name === 'tours') loadGzTours(); // [GZ-TOURS-1]
  if (name === 'reportes') loadReportes();
  if (name === 'capsule') loadCapsule();
  if (name === 'equipo') loadEquipo();
@@ -11318,7 +11331,7 @@ async function loadInicio() {
     if (rol === 'bulma' || rol === 'milk') {
       if (sub) sub.textContent = 'Tus pendientes de hoy';
       await _inicioMB(cont);
-    } else if (rol === 'coordinador' || rol === 'cc') {
+    } else if (rol === 'coordinador' || rol === 'cc' || rol === 'mister_popo') {
       if (sub) sub.textContent = 'Tu resumen de Guerrero Z';
       await _inicioGZ(cont);
     } else {
@@ -11420,71 +11433,8 @@ async function _inicioMB(cont) {
   cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando
 }
 
-// ── La cara de GUERREROS Z: contrato · datos · tours · ranking ──────────────
-async function _inicioGZ(cont) {
-  const hoy = _iniHoy();
-  const [ctr, mias, aceptadas, evs] = await Promise.all([
-    khAdminFetch('/.netlify/functions/admin-contratos', { method: 'POST', body: JSON.stringify({ accion: 'mio' }) })
-      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
-    khAsignaciones._call({ accion: 'listar', coordi_id: currentUser.id }).then((j) => j.asignaciones || []).catch(() => []),
-    khAsignaciones._call({ accion: 'listar', status: 'aceptado' }).then((j) => j.asignaciones || []).catch(() => []),
-    (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
-  ]);
-  const evMap = {}; (evs || []).forEach((e) => { if (e && e.id) evMap[e.id] = e; });
-  const fechaDe = (slug) => { const e = evMap[slug] || evMap[String(slug).split('#')[0]]; return e ? (e.ds || '') : ''; };
-  const nombreEv = (slug) => { const e = evMap[slug] || evMap[String(slug).split('#')[0]]; return e ? (e.a || slug) : slug; };
-
-  // ① MI CONTRATO — el tiempo que pidió Memo, derivado de la fila real.
-  let ctrHtml;
-  const c = (ctr && ctr.ok && (ctr.contratos || [])[0]) || null;
-  if (c) {
-    let fin = c.vigencia_fin || null;
-    if (!fin && c.vigencia_inicio && c.vigencia_meses) {
-      const d = new Date(c.vigencia_inicio + 'T12:00:00'); d.setMonth(d.getMonth() + Number(c.vigencia_meses)); fin = d.toISOString().slice(0, 10);
-    }
-    let tiempo = '<span style="color:var(--ts)">sin vigencia capturada</span>';
-    if (fin) {
-      const dias = _iniDias(hoy, fin);
-      tiempo = dias >= 0
-        ? `<b style="color:${dias <= 30 ? 'var(--orange)' : 'var(--green)'}">quedan ${dias} día${dias === 1 ? '' : 's'}</b> · vence el ${_iniEsc(fin)}`
-        : `<b style="color:var(--red)">VENCIDO hace ${-dias} día${dias === -1 ? '' : 's'}</b> (${_iniEsc(fin)})`;
-    }
-    ctrHtml = _iniCard('📄 Mi contrato',
-      `<div style="font-size:13px;margin-bottom:6px"><b>${_iniEsc(c.plantilla || 'contrato')}</b> · estado <b>${_iniEsc(c.estado || '—')}</b></div>
-       <div style="font-size:12px;margin-bottom:4px">${tiempo}</div>
-       ${c.firmado_at ? `<div style="font-size:11px;color:var(--ts)">firmado el ${_iniEsc(String(c.firmado_at).slice(0, 10))}</div>` : ''}`);
-  } else {
-    ctrHtml = _iniCard('📄 Mi contrato', `<div style="color:var(--ts);font-size:12px">${(ctr && (ctr._err || ctr.error)) ? 'No se pudo leer: ' + _iniEsc(ctr._err || ctr.error) : 'No encontré un contrato a tu correo — coméntalo con Memo.'}</div>`);
-  }
-
-  // ② MIS DATOS — lo que la casa sabe de ti, con la puerta a corregirlo.
-  const u = currentUser;
-  const datoFila = (k, v) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--ts)">${k}</span><b>${_iniEsc(v || '—')}</b></div>`;
-  const datosHtml = _iniCard('🪪 Mis datos',
-    datoFila('Nombre', u.nombre) + datoFila('Rol', u.rol) + datoFila('Correo', u.correo_notif || u.correo) +
-    datoFila('Celular', u.celular) + datoFila('Talla', u.talla_playera),
-    `<button class="btn btn-ghost btn-sm" onclick="showPage('equipo');setTimeout(()=>{const b=document.querySelector('.gz-tab-btn[onclick*=miperfil]');if(b)b.click();},200)">Editar en Mi Perfil →</button>`);
-
-  // ③ MIS TOURS — próximos y pasados, con el estado que TÚ contestaste.
-  const conFecha = mias.map((a) => ({ ...a, ds: fechaDe(a.evento_id), ev: nombreEv(a.evento_id) }));
-  const proximos = conFecha.filter((a) => !a.ds || a.ds >= hoy).sort((a, b) => String(a.ds).localeCompare(String(b.ds)));
-  const pasados = conFecha.filter((a) => a.ds && a.ds < hoy);
-  const stChip = (s) => s === 'aceptado' ? '<b style="color:var(--green)">aceptado</b>' : (s === 'declinado' ? '<b style="color:var(--red)">declinado</b>' : '<b style="color:var(--orange)">pendiente</b>');
-  const toursHtml = _iniCard(`🎤 Mis tours · ${proximos.length} próximo${proximos.length === 1 ? '' : 's'} · ${pasados.length} pasado${pasados.length === 1 ? '' : 's'}`,
-    proximos.length ? proximos.slice(0, 6).map((a) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(a.ev)}<i style="color:var(--ts)"> · ${_iniEsc(a.ds || 'por confirmar')}</i></span>${stChip(a.status)}</div>`).join('')
-      : '<div style="color:var(--ts);font-size:12px">Sin tours próximos asignados.</div>');
-
-  // ④ RANKING — tours COMPLETADOS (aceptados con fecha ya pasada), contados
-  // sobre las asignaciones de TODOS. No inventa empates: posición = 1 + cuántos
-  // llevan MÁS que tú, que es la regla de cualquier tabla deportiva.
-  const compPor = {};
-  (aceptadas || []).forEach((a) => { const ds = fechaDe(a.evento_id); if (ds && ds < hoy) compPor[a.coordi_id] = (compPor[a.coordi_id] || 0) + 1; });
-  const mios = compPor[currentUser.id] || 0;
-  const todos = Object.values(compPor);
-  const pos = 1 + todos.filter((n) => n > mios).length;
-  const rankHtml = _iniCard('🏆 Ranking de Guerreros Z',
-    `<div style="font-size:26px;font-family:'Zen Dots',sans-serif;margin-bottom:4px">#${pos} <i style="font-size:12px;color:var(--ts)">de ${Math.max(todos.length, 1)}</i></div>
-     <div style="font-size:12px;color:var(--ts)">${mios} tour${mios === 1 ? '' : 's'} completado${mios === 1 ? '' : 's'} (aceptados y ya ocurridos)</div>`);
-
-  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${ctrHtml}${datosHtml}${toursHtml}${rankHtml}</div>`;
-}
+// ── La cara de GUERREROS Z ──────────────────────────────────────────────────
+// [GZ-INICIO-2 · 14-oct] El render se mudó a kamehouse-gz.js (reloj del
+// contrato, foto, tours próximos/pasados, ranking con puntos, alertas). Aquí
+// queda el nombre que loadInicio llama.
+async function _inicioGZ(cont) { return gzInicioPintar(cont); }

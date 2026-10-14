@@ -101,7 +101,9 @@ exports.handler = async (event) => {
     guardar_mio: ['coordinador'],
     enviar_mio: ['coordinador'],
     aprobar_popo: ROLES_MOD,
-    aprobar_final: ROLES_ADMIN_MILK,
+    // [KARIN-GZ-1 · 14-oct] Palabra de Memo: «el reporte final lo reviso yo
+    // roshi y yo soy quien acepta». Antes lo podían cerrar Bulma y Milk.
+    aprobar_final: ['maestro_roshi'],
     rechazar: ROLES_MOD,
     marcar_kits_recibidos: ROLES_MOD,
     eliminar: ROLES_ADMIN,          // eliminar reporte = destructivo → milk NO
@@ -380,7 +382,21 @@ exports.handler = async (event) => {
           }
         }
       } catch (e) { salida_v2 = salida_v2 || false; }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salida_v2, ...(faltantes_vence ? { faltantes_vence } : {}) }) };
+      // [KARIN-GZ-1] Si Popo YA confirmó que recibió la devolución, la
+      // aprobación final recarga la bodega en este mismo acto: palomea el
+      // regreso del reporte y suma por el ÚNICO camino que suma
+      // (sumarRegresoYCerrar, con su cierre condicionado — jamás dos veces).
+      let regreso = null;
+      try {
+        const rep2 = await leerReporte(id);
+        const sals2 = rep2 ? await salidasAutorizadasDe(rep2.evento_id, rep2.coordi_id) : [];
+        if (sals2.length && sals2.some((s) => s.devolucion_recibida_at)) {
+          const kd = parseKitsDetalle(rep2.kits_detalle).map((k) => ({ ...k, recibido: true }));
+          const pk = await patchStatus(id, { kits_detalle: kd, updated_at: new Date().toISOString() });
+          if (pk.statusCode === 200) regreso = await sumarRegresoYCerrar(id, kd);
+        }
+      } catch (e) { regreso = { error: 'No se pudo recargar la devolución: ' + e.message }; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salida_v2, ...(faltantes_vence ? { faltantes_vence } : {}), ...(regreso ? { regreso } : {}) }) };
     }
 
     // ── rechazar (mister_popo / admin) ────────────────────────────────────────
@@ -474,7 +490,7 @@ exports.handler = async (event) => {
     const r = await fetch(
       `${env.KH_SB_URL}/rest/v1/salidas_bodega?evento_id=eq.${encodeURIComponent(String(eventoId))}` +
       `&solicitante_id=eq.${encodeURIComponent(String(coordiId))}&estado=eq.autorizada` +
-      `&select=id,detalle,estado,faltantes_monto,faltantes_vence&limit=100`,
+      `&select=id,detalle,estado,faltantes_monto,faltantes_vence,devolucion_recibida_at&limit=100`,
       { headers: sbHeaders }
     );
     if (!r.ok) throw new Error('salidas_bodega no respondió');

@@ -33,7 +33,8 @@ function aplicarPermisosUI() {
     .filter(id => document.getElementById('nav-' + id));
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
-    if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
+    const sinBoton = (typeof NAV_SIN_BOTON !== 'undefined' && (NAV_SIN_BOTON[rol] || []).includes(tab));
+    if (btn) btn.style.display = (tabsPermitidos.includes(tab) && !sinBoton) ? '' : 'none';
   });
   // El desplegable de Herramientas obedece la MISMA fuente: se ve si al rol le
   // queda al menos una herramienta. Antes llevaba su propia lista de roles a

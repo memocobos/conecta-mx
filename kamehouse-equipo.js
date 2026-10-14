@@ -1496,27 +1496,35 @@ async function subirFoto(userId) {
   input.click();
 }
 // ─── RANKING ───
+// [GZ-INICIO-2] LA CUENTA DEL RANKING TIENE UN SOLO DUEÑO. La usaban el modal
+// (aquí) y el Inicio del Guerrero Z con OTRA regla —«tours completados»—, así
+// que la misma persona podía ser #2 en el modal y #5 en su Inicio. Hoy los dos
+// le preguntan a esta función: puntos del año (manuales + auto), mismo orden.
+async function _rankingCalcular() {
+  const tours = await khTours.listar({ desde: '2026-01-01' }); // [sec-tours]
+  const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
+  // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
+  const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
+  const evArr = await _fetchEVFromIndex();
+  const evMap = {};
+  evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
+  const anioActual = new Date().getFullYear();
+  const rankingData = usuarios.map(u => {
+    const misToures = tours.filter(t => t.usuario_id === u.id);
+    const misAsign = asignaciones.filter(a => a.coordi_id === u.id);
+    const comb = calcularPuntosCombinados(misToures, misAsign, evMap, anioActual);
+    const ptsAnio = comb.total;
+    const numTours = misToures.length + comb.detalleAuto.length;
+    const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    return { ...u, tours: misToures, ptsAnio, numTours, iniciales };
+  });
+  rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
+  return { rankingData, anioActual };
+}
 async function abrirRanking() {
   crearModal('ranking', '', '<div class="loading-state"><div class="spinner"></div>Calculando ranking…</div>');
   try {
-    const tours = await khTours.listar({ desde: '2026-01-01' }); // [sec-tours]
-    const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
-    // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
-    const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
-    const evArr = await _fetchEVFromIndex();
-    const evMap = {};
-    evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
-    const anioActual = new Date().getFullYear();
-    const rankingData = usuarios.map(u => {
-      const misToures = tours.filter(t => t.usuario_id === u.id);
-      const misAsign = asignaciones.filter(a => a.coordi_id === u.id);
-      const comb = calcularPuntosCombinados(misToures, misAsign, evMap, anioActual);
-      const ptsAnio = comb.total;
-      const numTours = misToures.length + comb.detalleAuto.length;
-      const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-      return { ...u, tours: misToures, ptsAnio, numTours, iniciales };
-    });
-    rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
+    const { rankingData, anioActual } = await _rankingCalcular();
     const medallaEmoji = ['1°','2°','3°'];
     const tieneTours = rankingData.some(u => u.ptsAnio > 0);
 

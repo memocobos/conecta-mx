@@ -528,6 +528,13 @@ async function eliminarIngreso(id) {
 async function loadInventario() {
  const tbody = document.getElementById('tabla-inventario');
  const verCostos = !['mister_popo','coordinador','cc'].includes(currentUser?.rol);
+ // [KARIN-GZ-1 · 14-oct] El coordinador ve SOLO artículo y cuántos hay (y si es
+ // préstamo o se regala). El servidor ya no le manda lo demás; aquí se apagan
+ // las columnas y el alta.
+ const vistaSimple = ['coordinador','cc'].includes(currentUser?.rol);
+ const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo','milk'].includes(currentUser?.rol);
+ const btnAgregar = document.getElementById('inv-btn-agregar');
+ if (btnAgregar) btnAgregar.style.display = puedeEditarKarin ? '' : 'none';
  try {
  const items = await khKits.listar(); // [sec-kits]
  const valorTotal = items.reduce((s, i) => s + (i.cantidad * i.costo_unitario), 0);
@@ -545,19 +552,27 @@ async function loadInventario() {
    // th[2]=costo_unitario, th[3]=valor_total
    if (ths[2]) ths[2].style.display = verCostos ? '' : 'none';
    if (ths[3]) ths[3].style.display = verCostos ? '' : 'none';
+   [4, 5, 6].forEach(k => { if (ths[k]) ths[k].style.display = vistaSimple ? 'none' : ''; });
  }
 
  if (!items.length) {
  // [FLUJO-UX-5] Sin acción: el alta de bodega no cuelga de esta tabla.
- khVacio(tbody, 'items en la bodega', { colspan: verCostos ? 7 : 5 });
+ khVacio(tbody, 'items en la bodega', { colspan: vistaSimple ? 2 : (verCostos ? 7 : 5) });
+ loadSalidasZona(); // [KARIN-GZ-1] el reporte de salida vive aquí
  return;
  }
- const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo','milk'].includes(currentUser?.rol);
  tbody.innerHTML = items.map(i => {
  const valor = i.cantidad * i.costo_unitario;
- const alerta = i.cantidad <= i.stock_minimo;
+ const alerta = !vistaSimple && i.cantidad <= i.stock_minimo;
+ const nombre = vistaSimple
+   ? _esfEsc(i.pieza)
+   : `<button type="button" class="kdx-link" onclick="abrirKardex('${_salEsc(i.id)}')" title="Ver el expediente de esta pieza: cada salida, quién se la llevó y si regresó">${_esfEsc(i.pieza)}</button>`;
+ if (vistaSimple) return `<tr>
+ <td style="font-weight:600">${nombre} ${_karinTipoChip(i.retornable)}</td>
+ <td style="font-weight:600">${i.cantidad}</td>
+ </tr>`;
  return `<tr>
- <td style="font-weight:600"><button type="button" class="kdx-link" onclick="abrirKardex('${_salEsc(i.id)}')" title="Ver el expediente de esta pieza: cada salida, quién se la llevó y si regresó">${_esfEsc(i.pieza)}</button>${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
+ <td style="font-weight:600">${nombre} ${_karinTipoChip(i.retornable)}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
  <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
  ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
  <td style="color:var(--ts)">${i.stock_minimo}</td>
@@ -572,6 +587,13 @@ async function loadInventario() {
  tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
  }
  loadTorreSalidas(); // [TORRE v2 F3] bandeja + prestado (fails-soft, solo cuidador/admins)
+ loadSalidasZona();  // [KARIN-GZ-1] el reporte de salida + mis salidas, aquí en la Torre
+}
+// [KARIN-GZ-1] Préstamo o regalo: la pieza lo dice con palabras, no con un ↻.
+function _karinTipoChip(retornable) {
+  return retornable
+    ? '<span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Se presta y se regresa a la bodega: 5 días después del tour">🔁 préstamo</span>'
+    : '<span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#ffb703;background:rgba(255,183,3,.10);border:1px solid rgba(255,183,3,.3)" title="Se regala o se queda en el tour">🎁 se regala</span>';
 }
 async function editarKit(id) {
   // Limpiar form y abrir modal primero
@@ -609,7 +631,9 @@ function _salResumenDetalle(detalle) {
 async function loadTorreSalidas() {
   const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma', 'milk'].includes(currentUser?.rol);
   const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card'), fc = document.getElementById('torre-faltantes-card');
-  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; if (fc) fc.style.display = 'none'; return; }
+  const dc = document.getElementById('torre-devol-card');
+  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; if (fc) fc.style.display = 'none'; if (dc) dc.style.display = 'none'; return; }
+  if (dc) dc.style.display = '';
   if (bc) bc.style.display = '';
   if (pc) pc.style.display = '';
   if (fc) fc.style.display = '';
@@ -664,6 +688,30 @@ async function loadTorreSalidas() {
             <td style="font-size:12px;color:var(--ts)">${_salEsc(f.evento)}</td>
             <td style="font-size:12px;color:var(--ts)">${_salEsc(f.desde)}</td>
           </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    // [KARIN-GZ-1] Devoluciones por confirmar: salidas autorizadas con préstamo.
+    // Primero las que el coordi ya avisó; luego las que ya debieron volver.
+    const dd = document.getElementById('torre-devol');
+    if (dd) {
+      const conPrestamo = autorizadas.filter(s => (Array.isArray(s.detalle) ? s.detalle : []).some(d => d.retornable));
+      const orden = conPrestamo.slice().sort((a, b) => (b.devolucion_avisada_at ? 1 : 0) - (a.devolucion_avisada_at ? 1 : 0));
+      dd.innerHTML = !orden.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada por regresar</div>'
+        : orden.map(s => {
+            const presta = (s.detalle || []).filter(d => d.retornable).map(d => `${Number(d.cantidad) || 0}× ${_salEsc(d.pieza)}`).join(' · ');
+            const estado = s.devolucion_recibida_at
+              ? `<span style="color:var(--green);font-weight:700">✓ Recibido el ${_salEsc(String(s.devolucion_recibida_at).slice(0, 10))}</span> <span style="color:var(--ts)">· se recarga con la aprobación final de Memo</span>`
+              : s.devolucion_avisada_at
+                ? `<span style="color:#7cc4ff;font-weight:700">El coordi dice que YA lo regresó (${_salEsc(String(s.devolucion_avisada_at).slice(0, 10))})</span>`
+                : '<span style="color:var(--ts)">Todavía no avisa que lo regresó</span>';
+            return `<div style="border:1px solid ${s.devolucion_avisada_at && !s.devolucion_recibida_at ? 'rgba(124,196,255,.45)' : 'var(--border)'};border-radius:var(--r-sm,8px);padding:10px 14px;margin-bottom:8px">
+              <div style="font-size:13px"><b>${_salEsc(quien(s))}</b> · ${_salEsc(s.evento_id)}</div>
+              <div style="font-size:12px;color:var(--ts);margin-top:4px">🔁 ${presta}</div>
+              <div style="font-size:11px;margin-top:4px">${estado}</div>
+              ${s.devolucion_recibida_at ? '' : `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="torreDevolucionRecibir('${_salEsc(s.id)}')">Lo recibí en la bodega</button></div>`}
+            </div>`;
+          }).join('');
     }
 
     // [TORRE v2 F4b] Faltantes por cobrar: monto, quién, vence, estado, y el

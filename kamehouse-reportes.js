@@ -31,7 +31,8 @@ function repVista(v) {
   const f = document.getElementById('rep-filtros'); if (f) f.style.display = rep ? 'flex' : 'none';
   const l = document.getElementById('reportes-list'); if (l) l.style.display = rep ? '' : 'none';
   const hb = document.getElementById('reportes-header-btns'); if (hb) hb.style.display = rep ? 'flex' : 'none';
-  const z = document.getElementById('salidas-zona'); if (z) z.style.display = rep ? 'none' : '';
+  // [KARIN-GZ-1] `#salidas-zona` se mudó a la Torre: esta función ya no la
+  // esconde ni la muestra (si lo hiciera, abrir Reportes apagaría la Torre).
   const tr = document.getElementById('rep-tab-reportes'), ts = document.getElementById('rep-tab-salidas');
   [[tr, rep], [ts, !rep]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
   if (!rep) loadSalidasZona();
@@ -63,7 +64,7 @@ async function loadSalPiezas() {
     box.innerHTML = _salPiezas.map((p, i) => `
       <div style="display:flex;align-items:center;gap:10px">
         <input type="number" id="sal-cant-${i}" min="0" value="0" class="cot-input" style="width:80px">
-        <div style="flex:1;font-size:13px">${_salEsc(p.pieza)}${p.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)">↻ siempre vuelve</span>' : ''}</div>
+        <div style="flex:1;font-size:13px">${_salEsc(p.pieza)} ${typeof _karinTipoChip === 'function' ? _karinTipoChip(p.retornable) : ''}</div>
         <div style="font-size:11px;color:var(--ts)">${Number(p.cantidad) || 0} disp.</div>
       </div>`).join('');
   } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
@@ -112,9 +113,50 @@ async function loadMisSalidas() {
         <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
         ${Number(s.faltantes_monto) > 0 ? _salFaltantesHtml(s) : ''}
         ${s.estado === 'rechazada' ? '<div style="font-size:11px;color:#ff6666;margin-top:4px">Rechazada — el motivo te llegó por correo</div>' : ''}
+        ${_salDevolucionHtml(s)}
         ${s.estado === 'solicitada' ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="cancelarSalidaBodega('${_salEsc(s.id)}')">Cancelar</button></div>` : ''}
       </div>`).join('');
   } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+// [KARIN-GZ-1] La devolución de los PRÉSTAMOS, vista por quien los trae:
+// «ya lo regresé» (avisa a Popo por correo) → Popo confirma que lo recibió.
+function _salDevolucionHtml(s) {
+  if (s.estado !== 'autorizada') return '';
+  const presta = (Array.isArray(s.detalle) ? s.detalle : []).filter(d => d.retornable);
+  if (!presta.length) return '';
+  if (s.devolucion_recibida_at) return `<div style="font-size:11px;color:var(--green);margin-top:6px;font-weight:700">✓ Popo confirmó que recibió tu préstamo (${_salEsc(String(s.devolucion_recibida_at).slice(0, 10))})</div>`;
+  if (s.devolucion_avisada_at) return `<div style="font-size:11px;color:#7cc4ff;margin-top:6px;font-weight:700">Avisaste que ya lo regresaste — Popo lo confirma</div>`;
+  const yo = currentUser && String(s.solicitante_id) === String(currentUser.id);
+  return `<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--ts)">🔁 Préstamo: ${presta.map(d => `${Number(d.cantidad) || 0}× ${_salEsc(d.pieza)}`).join(', ')}</span>
+    ${yo ? `<button class="btn btn-primary btn-sm" onclick="salDevolucionAvisar('${_salEsc(s.id)}')">Ya lo regresé a la bodega</button>` : ''}
+  </div>`;
+}
+async function salDevolucionAvisar(id) {
+  if (!confirm('¿Ya dejaste el préstamo en la bodega? Le avisamos a Popo para que lo confirme.')) return;
+  try { await khSalidas.devolucionAvisar(id); showToast('Listo — Popo ya sabe que lo regresaste', 'success'); loadMisSalidas(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+// Popo confirma. Si el reporte de esa persona YA trae la aprobación final de
+// Memo, se palomea el regreso en ese momento (suma stock y cierra la salida
+// por el único camino que suma). Si no, la aprobación final lo hace sola.
+async function torreDevolucionRecibir(id) {
+  if (!confirm('¿Confirmas que el préstamo ya está en la bodega?')) return;
+  try {
+    const j = await khSalidas.devolucionRecibir(id);
+    if (j.recargar_ahora && j.reporte_id) {
+      const reps = await khReportes.listar({ limit: 300 });
+      const r = (reps || []).find(x => x.id === j.reporte_id);
+      if (r) {
+        const kits = typeof r.kits_detalle === 'string' ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+        await khReportes.marcarKitsRecibidos(r.id, JSON.stringify(kits.map(k => ({ ...k, recibido: true }))));
+        showToast('Recibido — la bodega ya se recargó', 'success');
+      } else showToast('Recibido. La bodega se recarga con la aprobación final del reporte.', 'success');
+    } else {
+      showToast(j.reporte_id ? 'Recibido. La bodega se recarga cuando Memo apruebe el reporte final.' : 'Recibido. Falta que el coordi mande su reporte post-evento; con la aprobación final de Memo se recarga la bodega.', 'success');
+    }
+    loadInventario();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 // [TORRE v2 F4b] Faltantes cobrados del viajero: monto, vence y la cuenta de
 // LA EMPRESA para liquidar (viene del backend; sin cuenta → pide el dato).
@@ -231,9 +273,13 @@ function renderReportes(lista, filtro) {
       btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
-    if (['maestro_roshi','bulma'].includes(rol) && ['aprobado_popo','enviado'].includes(r.status)) {
+    // [KARIN-GZ-1 · 14-oct] «El reporte final lo reviso yo roshi y yo soy quien
+    // acepta» (Memo): el botón de aprobar es SOLO suyo (el servidor también).
+    if (rol === 'maestro_roshi' && ['aprobado_popo','enviado'].includes(r.status)) {
       btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar${r.status==='enviado'?' directo':' Definitivo'}</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
+    } else if (rol === 'bulma' && ['aprobado_popo','enviado'].includes(r.status)) {
+      btns = `<button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
     // Popo: marcar kits recibidos cuando aprobado_memo
     if (rol === 'mister_popo' && r.status === 'aprobado_memo' && kits.some(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {

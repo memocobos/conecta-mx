@@ -739,7 +739,11 @@ exports.handler = async (event) => {
           num_emergencia: v.num_emergencia || null,
           boletos: v.boletos || 1, grupo_viaje: v.grupo_viaje || null,
         });
-        const viajeros = filas.filter((v) => esCliente(v.tipo_viajero) && duerme(v.tipo_paquete)).map(limpia);
+        // [COORDI-LISTA-1b] Una BAJA no viaja: el careo la deja con `boletos=0`
+        // y la zona en NULL (fila roja = cancelación, CAREO-ZONA-1). Cazado por
+        // Memo careando su lista de Soy Luna: Fabiola (cancelada el 8-oct) salía.
+        const esBaja = (v) => Number(v.boletos) === 0 && !v.zona_boleto;
+        const viajeros = filas.filter((v) => esCliente(v.tipo_viajero) && duerme(v.tipo_paquete) && !esBaja(v)).map(limpia);
 
         // El equipo: filas de staff/creadoras del evento + asignaciones del
         // evento base (quien está asignado aunque todavía no tenga fila).

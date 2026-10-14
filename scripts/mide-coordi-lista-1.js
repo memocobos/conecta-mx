@@ -46,6 +46,7 @@ const DB = {
     vj({ id: 'v5', nombre: 'Coordi Uno', tipo_paquete: 'PLUS', tipo_viajero: 'coordinador', usuario_id: COORDI, zona_boleto: 'General' }),
     vj({ id: 'v6', nombre: 'Marietta', tipo_paquete: 'CHEAP', tipo_viajero: 'creadora', zona_boleto: 'VIP', total_contrato: 0, abonado_previo: 0 }),
     vj({ id: 'v7', evento_id: 'omar#1', nombre: 'Omar Plus', tipo_paquete: 'PLUS', zona_boleto: 'Pista' }),
+    vj({ id: 'v8', nombre: 'Fabi Baja', tipo_paquete: 'PLUS', zona_boleto: null, boletos: 0 }),
   ],
 };
 const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b) });
@@ -84,6 +85,7 @@ const pedir = (id, rol, evento_id) => H({ httpMethod: 'POST', headers: { origin:
   af(r.statusCode === 200 && j.vista === 'coordi', `[A0] coordi asignado → 200 vista coordi (${r.statusCode}) ${r.statusCode !== 200 ? r.body : ''}`);
   af(nombres.length === 3 && ['Ana Plus', 'Caro Stay', 'Dani Ride'].every((n) => nombres.includes(n)), `[A1] solo PLUS/STAY/RIDE de clientes: ${JSON.stringify(nombres)}`);
   af(!nombres.includes('Beto Cheap') && !nombres.includes('Marietta'), '[A2] ningún CHEAP en la lista de viajeros');
+  af(!nombres.includes('Fabi Baja'), '[A7] una BAJA (boletos 0, sin zona) no sale en la lista');
   const PROHIBIDAS = ['celular', 'correo', 'notas', 'total_contrato', 'abonado_previo', 'usuario_id', 'tipo_viajero'];
   const llaves = new Set((j.viajeros || []).flatMap((v) => Object.keys(v)));
   af(PROHIBIDAS.every((k) => !llaves.has(k)), `[A3] sin celular/correo/notas/dinero en la respuesta: ${[...llaves].join(',')}`);

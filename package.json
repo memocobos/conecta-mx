@@ -81,6 +81,7 @@
     "mide:staff-boleto-1": "node scripts/mide-staff-boleto-1.js",
     "mide:alarmas-1": "node scripts/mide-alarmas-1.js",
     "mide:cc-cards-1": "node scripts/mide-cc-cards-1.js",
-    "mide:crea-baja-1": "node scripts/mide-crea-baja-1.js"
+    "mide:crea-baja-1": "node scripts/mide-crea-baja-1.js",
+    "mide:crea-seg-1": "node scripts/mide-crea-seg-1.js"
   }
 }

@@ -2670,9 +2670,30 @@
       <button class="gz-filter active" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)">Pendientes</button>
       <button class="gz-filter" id="ctrf-firmados" onclick="filtrarContratos('firmado',this)">// firmados</button>
       <button class="gz-filter" id="ctrf-vencidos" onclick="filtrarContratos('vencido',this)" title="Vigencia terminada. Se calcula de vigencia_fin — hoy solo la llena la plantilla coordinador.">// vencidos</button>
+      <button class="gz-filter" id="ctrf-cancelados" onclick="filtrarContratos('cancelado',this)" title="Colaboraciones dadas de baja">// cancelados</button>
       <button class="gz-filter" id="ctrf-todos" onclick="filtrarContratos('todos',this)">// todos</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" onclick="ctrRankingAbrir()" title="Quién cumple y quién no">🏆 Ranking de creadoras</button>
      </div>
-     <input type="search" id="ctr-buscar" class="cot-input" placeholder="Buscar por nombre, correo o evento…"
+     <!-- [CREA-SEG-2] Filtros que se SUMAN al chip y al buscador. -->
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="ctr-f-plantilla" class="cot-input" style="flex:1;min-width:160px;font-size:12px" onchange="_ctrPlantilla=this.value;_ctrPintarLista()">
+       <option value="">Todos los tipos</option>
+       <option value="creadora">Creadoras de evento</option>
+       <option value="creadora_team">Creadoras team</option>
+       <option value="coordinador">Coordinadores</option>
+       <option value="auxiliar_admin">Auxiliar admin</option>
+       <option value="giveaway">Giveaway</option>
+      </select>
+      <select id="ctr-f-cuando" class="cot-input" style="flex:1;min-width:160px;font-size:12px" onchange="_ctrCuando=this.value;_ctrPintarLista()">
+       <option value="">Cualquier fecha</option>
+       <option value="proximos">Eventos próximos</option>
+       <option value="30">Próximos 30 días</option>
+       <option value="pasados">Eventos pasados</option>
+      </select>
+     </div>
+     <div id="ctr-ranking" style="display:none;margin-bottom:14px"></div>
+     <input type="search" id="ctr-buscar" class="cot-input" placeholder="Buscar por nombre, correo, evento, Instagram o celular…"
             autocomplete="off" oninput="_ctrBuscarEnLista()" aria-label="Buscar contrato"
             style="width:100%;font-size:13px;margin-bottom:12px">
      <div class="table-wrap">

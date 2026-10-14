@@ -232,7 +232,16 @@ exports.handler = async function (event) {
     const acTalla = String(ac.talla || "").trim().toUpperCase();
     if (acNom && !TALLAS.includes(acTalla)) return bad(400, "Falta la talla de tu acompañante");
     if (acTalla && !acNom) return bad(400, "Falta el nombre de tu acompañante");
+    // [CREA-SEG-1] Redes y celular (palabra de Memo): para encontrar su
+    // contenido y organizar las entregas. Instagram y celular obligatorios,
+    // TikTok opcional. Se normalizan con la MISMA función de admin-creadoras.
+    const { normRedes } = require("./admin-creadoras");
+    const rd = normRedes({ instagram: df.instagram, tiktok: df.tiktok, celular: df.celular });
+    if (rd.error) return bad(400, rd.error);
+    if (!rd.redes.celular) return bad(400, "Falta tu celular (10 dígitos)");
+    if (!rd.redes.instagram) return bad(400, "Falta tu usuario de Instagram");
     datosFirma = {
+      instagram: rd.redes.instagram, tiktok: rd.redes.tiktok || null, celular: rd.redes.celular,
       fecha_nacimiento: fnac,
       emergencia: { nombre: emNom, telefono: emTel },
       talla,
@@ -476,11 +485,25 @@ exports.handler = async function (event) {
   // Emails best-effort (no rompen el endpoint si fallan).
   const link = `${SITE}/contrato?t=${token}`;
   try {
-    await sendEmail(
-      contrato.creador_email,
-      `Tu contrato firmado · ${contrato.evento_nombre}`,
-      confirmacionEmail({ creador_nombre: contrato.creador_nombre, evento_nombre: contrato.evento_nombre, link })
-    );
+    if (esCreadora) {
+      // [CREA-SEG-4] La creadora de evento recibe la BIENVENIDA: su link «Mi
+      // colaboración» (cuenta regresiva + entregables), lo acordado en la 2.2 y
+      // sus fechas si Memo ya las puso. Reemplaza al correo genérico.
+      const L = require("./_lib/creadoras");
+      let items = [];
+      try {
+        const re = await fetch(`${SB_URL}/rest/v1/entregables_creadora?contrato_id=eq.${contrato.id}&estado=neq.descartado&select=*&order=orden.asc`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+        if (re.ok) items = await re.json();
+      } catch (_) {}
+      const m = L.correoCreadora("bienvenida", { ...contrato, token }, items);
+      await sendEmail(contrato.creador_email, m.asunto, m.html);
+    } else {
+      await sendEmail(
+        contrato.creador_email,
+        `Tu contrato firmado · ${contrato.evento_nombre}`,
+        confirmacionEmail({ creador_nombre: contrato.creador_nombre, evento_nombre: contrato.evento_nombre, link })
+      );
+    }
   } catch (e) { console.error("[contrato-firmar] Email creadora:", e.message); }
   try {
     await sendEmail(

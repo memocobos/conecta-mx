@@ -68,6 +68,8 @@ const COLS = [
   'cortesia_zona:datos->cortesia->>zona',
   'cortesia_boletos:datos->cortesia->>boletos',
   'cortesia_acomp_viaja:datos->cortesia->>acompanante_viaja',
+  // [CREA-SEG-1] Sus redes y celular (los da al firmar) — para encontrarla.
+  'instagram:datos->>instagram', 'tiktok:datos->>tiktok', 'celular_ctr:datos->>celular',
 ].join(',');
 // Detalle (accion 'obtener'): whitelist + datos jsonb. Solo admins llegan aquí.
 const COLS_DETALLE = COLS + ',datos';

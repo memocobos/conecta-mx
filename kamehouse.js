@@ -10315,12 +10315,34 @@ function _ctrAlertaPintar() {
 // qué juzgarse. Firmado por Memo sabiéndolo.
 let _ctrFiltro = 'pendiente';
 
+// [CREA-SEG-1] Instagram / TikTok / celular a un clic.
+function _ctrRedesChip(c) {
+  const out = [];
+  if (c.instagram) out.push(`<a href="https://instagram.com/${encodeURIComponent(c.instagram)}" target="_blank" rel="noopener" style="color:#ff4bd1;text-decoration:none">IG @${_escCtr(c.instagram)}</a>`);
+  if (c.tiktok) out.push(`<a href="https://www.tiktok.com/@${encodeURIComponent(c.tiktok)}" target="_blank" rel="noopener" style="color:#88ddff;text-decoration:none">TT @${_escCtr(c.tiktok)}</a>`);
+  if (c.celular_ctr) out.push(`<a href="https://wa.me/52${encodeURIComponent(c.celular_ctr)}" target="_blank" rel="noopener" style="color:#3ddc84;text-decoration:none">WA ${_escCtr(c.celular_ctr)}</a>`);
+  return out.length ? `<br><span style="font-size:11px;display:inline-flex;gap:10px;flex-wrap:wrap">${out.join('')}</span>` : '';
+}
 function _ctrPasaFiltro(c, filtro) {
   const vencido = _ctrVencido(c);
   if (filtro === 'vencido') return vencido;
   if (filtro === 'todos') return true;
   if (vencido) return false;                 // fuera de la vista principal
   return String(c.estado || '') === filtro;
+}
+// [CREA-SEG-2] Tipo de contrato y cuándo es el evento: se SUMAN al chip.
+let _ctrPlantilla = '', _ctrCuando = '';
+function _ctrPasaExtra(c) {
+  if (_ctrPlantilla && (c.plantilla || 'creadora') !== _ctrPlantilla) return false;
+  if (_ctrCuando) {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+    const f = String(c.evento_fecha || '').slice(0, 10);
+    if (!f) return false;
+    if (_ctrCuando === 'pasados') return f < hoy;
+    if (f < hoy) return false;
+    if (_ctrCuando === '30') return (Date.parse(f) - Date.parse(hoy)) / 864e5 <= 30;
+  }
+  return true;
 }
 
 
@@ -10330,7 +10352,8 @@ function _ctrPasaFiltro(c, filtro) {
 function _ctrCoincide(c, q) {
   if (!q) return true;
   const t = (String(c.creador_nombre || '') + ' ' + String(c.creador_email || '') + ' ' +
-             String(c.evento_nombre || '')).toLowerCase();
+             String(c.evento_nombre || '') + ' ' + String(c.instagram || '') + ' ' + String(c.tiktok || '') + ' ' + String(c.celular_ctr || ''))
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return t.includes(q);
 }
 
@@ -10364,19 +10387,22 @@ function _ctrPintarLista() {
     // [HER-1c] Dos cortes que se COMBINAN: primero el chip, luego el texto.
     const visibles = _contratosCache
       .filter(c => _ctrPasaFiltro(c, _ctrFiltro))
+      .filter(c => _ctrPasaExtra(c))
       .filter(c => _ctrCoincide(c, _ctrBusca));
     // Los conteos se cuentan SIN el buscador: el chip dice cuántos hay de cada
     // clase, no cuántos sobreviven al texto.
-    const cuenta = { pendiente: 0, firmado: 0, vencido: 0 };
+    const cuenta = { pendiente: 0, firmado: 0, vencido: 0, cancelado: 0 };
     _contratosCache.forEach((c) => {
       if (_ctrPasaFiltro(c, 'vencido')) { cuenta.vencido++; return; }
       if (_ctrPasaFiltro(c, 'pendiente')) cuenta.pendiente++;
       else if (_ctrPasaFiltro(c, 'firmado')) cuenta.firmado++;
+      else if (_ctrPasaFiltro(c, 'cancelado')) cuenta.cancelado++;
     });
     const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
     rot('ctrf-pendientes', '// pendientes', cuenta.pendiente);
     rot('ctrf-firmados', '// firmados', cuenta.firmado);
     rot('ctrf-vencidos', '// vencidos', cuenta.vencido);
+    rot('ctrf-cancelados', '// cancelados', cuenta.cancelado);
     rot('ctrf-todos', '// todos', _contratosCache.length);
     _ctrAlertaPintar();
     if (!visibles.length) {
@@ -10414,15 +10440,17 @@ function _ctrPintarLista() {
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
           ${CORT_PAQUETE[c.plantilla] ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#3ddc84;border-color:rgba(61,220,132,.35)" onclick="cortAbrir('${_escCtr(c.id)}')">${c.cortesia_evento ? '🎟 ✓' : '🎟 Cortesía'}</button>` : ''}
           ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
+          ${esCreadora ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" title="Lo que tiene que entregar y sus fechas" onclick="ctrEntAbrir('${_escCtr(c.id)}')">📋 Entregables</button>` : ''}
           ${bajaBtn}
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`
         : `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ffb020;border-color:rgba(255,176,32,.4)" onclick="reenviarContratoEmail('${tokenSafe}')">✉ Reenviar…</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
+          ${esCreadora ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" title="Pon sus fechas antes de que firme y le llegan en la bienvenida" onclick="ctrEntAbrir('${_escCtr(c.id)}')">📋 Entregables</button>` : ''}
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`;
       return `<tr>
-        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span>${_ctrKitChip(c)}</td>
+        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span>${_ctrRedesChip(c)}${_ctrKitChip(c)}</td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
         <td>${fechaEnviado}${_ctrAntiguedadFila(c)}</td>
         <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>

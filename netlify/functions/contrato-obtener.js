@@ -148,12 +148,24 @@ exports.handler = async function (event) {
     ine_urls = { frente: frenteUrl, reverso: reversoUrl, expiresIn: SIGNED_TTL };
   }
 
+  // [CREA-SEG-3] «Mi colaboración»: los entregables de la creadora (con su
+  // fecha límite y si ya se recibieron) viajan para que la página los pinte.
+  // Solo firmados; los descartados no se enseñan. Best-effort.
+  let entregables;
+  if ((row.plantilla === "creadora" || row.plantilla === "creadora_team" || !row.plantilla) && row.estado === "firmado") {
+    try {
+      const re = await fetch(`${SB_URL}/rest/v1/entregables_creadora?contrato_id=eq.${row.id}&estado=neq.descartado&select=descripcion,fase,fecha_limite,estado,entregado_at&order=orden.asc`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+      entregables = re.ok ? await re.json() : [];
+    } catch (_) { entregables = []; }
+  }
+
   return {
     statusCode: 200,
     headers: HEADERS,
     body: JSON.stringify({
       ok: true,
       contrato: {
+        entregables,
         id: row.id,
         token: row.token,
         creador_nombre: row.creador_nombre,

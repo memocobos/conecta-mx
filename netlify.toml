@@ -91,6 +91,11 @@
   # 8:30 PM de Reynosa del día del sorteo, 30 min dentro de la ventana.
   schedule = "30 1 * * *"
 
+# [CREA-SEG-4] Recordatorios a creadoras: 3 días y 1 día antes de cada fecha
+# límite, y aviso de vencido. 15:00 UTC = 9:00 AM Reynosa (10 en verano).
+[functions."creadoras-entregables-diario"]
+  schedule = "0 15 * * *"
+
 [functions."check-strikes-diario"]
   schedule = "0 0 * * *"
 

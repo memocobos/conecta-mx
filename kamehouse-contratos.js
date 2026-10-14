@@ -360,3 +360,159 @@ async function ctrBajaConfirmar() {
     if (btn) { btn.disabled = false; btn.textContent = 'Cancelar la colaboración y enviar el correo'; }
   }
 }
+
+// ═══ [CREA-SEG-2] ENTREGABLES DE UNA CREADORA (los marca Memo) ════════════
+let _entCtr = null, _entItems = [];
+async function _crCall(body) {
+  const r = await khAdminFetch('/.netlify/functions/admin-creadoras', { method: 'POST', body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function _entModal(html) {
+  let bg = document.getElementById('ent-bg');
+  if (!bg) {
+    bg = document.createElement('div'); bg.id = 'ent-bg';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    bg.addEventListener('click', (e) => { if (e.target === bg) bg.style.display = 'none'; });
+    document.body.appendChild(bg);
+  }
+  bg.style.display = 'flex';
+  bg.innerHTML = `<div style="background:var(--bg2,#121214);border:1px solid var(--border,#333);border-radius:14px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:20px">${html}</div>`;
+}
+function _entHoy() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }); }
+function _entDias(f) { return f ? Math.round((Date.parse(f + 'T12:00:00Z') - Date.parse(_entHoy() + 'T12:00:00Z')) / 864e5) : null; }
+async function ctrEntAbrir(contratoId) {
+  _entModal('<div style="color:var(--ts)">Cargando…</div>');
+  try {
+    const j = await _crCall({ accion: 'entregables_listar', contrato_id: contratoId });
+    _entCtr = j.contrato;
+    _entItems = (j.entregables || []).filter((e) => e.estado !== 'descartado');
+    _entPintar(j.sugeridos || null);
+  } catch (e) { _entModal(`<div style="color:#ff5f56">No se pudo: ${_escCtr(e.message)}</div>`); }
+}
+function _entPintar(sugeridos) {
+  const c = _entCtr || {};
+  const r = c.redes || {};
+  const dEv = _entDias(c.fecha);
+  const esRoshi = typeof currentUser !== 'undefined' && currentUser && currentUser.rol === 'maestro_roshi';
+  const filas = _entItems.map((e, i) => {
+    const d = _entDias(e.fecha_limite);
+    const ok = e.estado === 'entregado';
+    const col = ok ? '#3ddc84' : d == null ? 'var(--ts)' : d < 0 ? '#ff5f56' : d <= 3 ? '#ffb020' : 'var(--text)';
+    const est = ok ? '✓ Recibido' : d == null ? 'sin fecha' : d < 0 ? `venció hace ${-d} d` : d === 0 ? 'vence hoy' : `faltan ${d} d`;
+    return `<div style="display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--border,#333);border-radius:10px;margin-bottom:8px;${ok ? 'opacity:.8' : ''}">
+      ${e.id && esRoshi ? `<input type="checkbox" ${ok ? 'checked' : ''} onchange="ctrEntMarcar('${e.id}',this.checked,this)" style="width:20px;height:20px;cursor:pointer" title="Marcar como recibido (le llega un correo)">` : `<span style="width:20px"></span>`}
+      <div style="flex:1;min-width:0">
+        <input class="cot-input ent-desc" data-i="${i}" value="${_escCtr(e.descripcion)}" style="width:100%;font-size:12px;margin-bottom:6px" ${ok ? 'disabled' : ''}>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select class="cot-input ent-fase" data-i="${i}" style="font-size:11px" ${ok ? 'disabled' : ''}>
+            <option value="previo" ${e.fase === 'previo' ? 'selected' : ''}>Antes del evento</option>
+            <option value="evento" ${e.fase === 'evento' ? 'selected' : ''}>Durante el evento</option>
+            <option value="posterior" ${e.fase === 'posterior' ? 'selected' : ''}>Después del evento</option>
+          </select>
+          <input type="date" class="cot-input ent-fecha" data-i="${i}" value="${_escCtr(e.fecha_limite || '')}" style="font-size:11px" ${ok ? 'disabled' : ''}>
+          <span style="font-size:11px;font-weight:700;color:${col}">${est}</span>
+          ${!ok ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px" onclick="ctrEntQuitar(${i})">Quitar</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  const listos = _entItems.filter((e) => e.estado === 'entregado').length;
+  _entModal(`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div><b style="font-size:16px">📋 ${_escCtr(c.nombre || '')}</b><div style="font-size:12px;color:var(--ts)">${_escCtr(c.evento || '')} · ${_escCtr(c.fecha || '')}${dEv != null ? (dEv >= 0 ? ` · faltan <b>${dEv}</b> días` : ' · ya pasó') : ''}${c.estado === 'cancelado' ? ' · <span style="color:#ff6666">CANCELADO</span>' : ''}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ent-bg').style.display='none'">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0">
+      <label style="font-size:11px;color:var(--ts)">Instagram<input id="ent-ig" class="cot-input" value="${_escCtr(r.instagram || '')}" placeholder="@usuario" style="width:100%;font-size:12px;margin-top:4px"></label>
+      <label style="font-size:11px;color:var(--ts)">TikTok<input id="ent-tt" class="cot-input" value="${_escCtr(r.tiktok || '')}" placeholder="@usuario" style="width:100%;font-size:12px;margin-top:4px"></label>
+      <label style="font-size:11px;color:var(--ts)">Celular<input id="ent-cel" class="cot-input" value="${_escCtr(r.celular || '')}" placeholder="10 dígitos" style="width:100%;font-size:12px;margin-top:4px"></label>
+    </div>
+    ${esRoshi ? '<button class="btn btn-ghost btn-sm" onclick="ctrEntRedes()" style="margin-bottom:12px">Guardar redes</button>' : ''}
+    <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin:6px 0 8px">Entregables ${_entItems.length ? `· ${listos} de ${_entItems.length} recibidos` : ''}</div>
+    ${sugeridos ? `<div style="font-size:12px;color:#ffb020;margin-bottom:8px">Aún no tiene entregables. Los prellené desde su contrato (cláusula 2.2): revisa fases y pon las fechas límite.</div>` : ''}
+    ${filas || '<div style="color:var(--ts);font-size:12px;margin-bottom:8px">Sin entregables.</div>'}
+    ${esRoshi && c.estado !== 'cancelado' ? `
+      <button class="btn btn-ghost btn-sm" onclick="ctrEntAgregar()">+ Agregar entregable</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <button class="btn btn-primary" onclick="ctrEntGuardar(false)">Guardar</button>
+        <button class="btn" onclick="ctrEntGuardar(true)" title="Guarda y le manda sus fechas de entrega por correo">Guardar y mandarle sus fechas ✉</button>
+      </div>` : ''}
+    <div id="ent-msg" style="font-size:12px;margin-top:10px"></div>
+    <div style="font-size:11px;color:var(--ts);margin-top:10px">Al marcar ✓ un entregable le llega «Recibimos tu contenido». Los recordatorios salen solos 3 días y 1 día antes de cada fecha, y un aviso si vence.</div>`);
+  if (sugeridos && !_entItems.length) { _entItems = sugeridos.map((s) => ({ ...s, estado: 'pendiente' })); _entPintar(null); const m = document.getElementById('ent-msg'); if (m) { m.style.color = '#ffb020'; m.textContent = 'Prellenado desde la cláusula 2.2 — todavía no se guarda.'; } }
+}
+function _entLeer() {
+  document.querySelectorAll('.ent-desc').forEach((x) => { const i = +x.dataset.i; if (_entItems[i]) _entItems[i].descripcion = x.value; });
+  document.querySelectorAll('.ent-fase').forEach((x) => { const i = +x.dataset.i; if (_entItems[i]) _entItems[i].fase = x.value; });
+  document.querySelectorAll('.ent-fecha').forEach((x) => { const i = +x.dataset.i; if (_entItems[i]) _entItems[i].fecha_limite = x.value || null; });
+}
+function ctrEntAgregar() { _entLeer(); _entItems.push({ descripcion: '', fase: 'previo', fecha_limite: null, estado: 'pendiente' }); _entPintar(null); }
+function ctrEntQuitar(i) { _entLeer(); _entItems.splice(i, 1); _entPintar(null); }
+async function ctrEntGuardar(avisar) {
+  _entLeer();
+  const m = document.getElementById('ent-msg');
+  if (avisar && _entItems.some((e) => e.estado !== 'entregado' && !e.fecha_limite)) { m.style.color = '#ff5f56'; m.textContent = 'Pon la fecha límite de todos antes de mandarle sus fechas.'; return; }
+  if (avisar && !confirm('¿Guardar y mandarle el correo con sus fechas de entrega?')) return;
+  m.style.color = 'var(--ts)'; m.textContent = 'Guardando…';
+  try {
+    const j = await _crCall({ accion: 'entregables_guardar', contrato_id: _entCtr.id, avisar: avisar === true,
+      items: _entItems.map((e) => ({ id: e.id, descripcion: e.descripcion, fase: e.fase, fecha_limite: e.fecha_limite })) });
+    _entItems = (j.entregables || []).filter((e) => e.estado !== 'descartado');
+    _entPintar(null);
+    const m2 = document.getElementById('ent-msg');
+    m2.style.color = '#3ddc84';
+    m2.textContent = '✓ Guardado' + (j.correo ? (j.correo.enviado ? ' · correo con sus fechas enviado ✓' : ' · ⚠️ el correo no salió: ' + (j.correo.error || '')) : '');
+  } catch (e) { m.style.color = '#ff5f56'; m.textContent = 'No se pudo: ' + e.message; }
+}
+async function ctrEntMarcar(id, entregado, chk) {
+  const aviso = entregado ? confirm('¿Marcar como RECIBIDO? Le llega un correo «Recibimos tu contenido».') : true;
+  if (!aviso) { chk.checked = !entregado; return; }
+  try {
+    const j = await _crCall({ accion: 'entregable_marcar', id, estado: entregado ? 'entregado' : 'pendiente' });
+    const i = _entItems.findIndex((e) => e.id === id); if (i >= 0) _entItems[i] = j.entregable;
+    _entPintar(null);
+    const m = document.getElementById('ent-msg');
+    if (m && j.correo) { m.style.color = j.correo.enviado ? '#3ddc84' : '#ff5f56'; m.textContent = j.correo.enviado ? '✓ Le llegó el correo de «recibido»' : '⚠️ Se marcó, pero el correo no salió: ' + (j.correo.error || ''); }
+  } catch (e) { chk.checked = !entregado; alert('No se pudo: ' + e.message); }
+}
+async function ctrEntRedes() {
+  const m = document.getElementById('ent-msg');
+  try {
+    await _crCall({ accion: 'redes_guardar', contrato_id: _entCtr.id, instagram: document.getElementById('ent-ig').value, tiktok: document.getElementById('ent-tt').value, celular: document.getElementById('ent-cel').value });
+    m.style.color = '#3ddc84'; m.textContent = '✓ Redes guardadas';
+    if (typeof cargarContratos === 'function') cargarContratos(); else if (typeof loadContratosList === 'function') loadContratosList();
+  } catch (e) { m.style.color = '#ff5f56'; m.textContent = 'No se pudo: ' + e.message; }
+}
+
+// ═══ [CREA-SEG-2] RANKING DE CREADORAS (puntos automáticos) ═══════════════
+async function ctrRankingAbrir() {
+  const box = document.getElementById('ctr-ranking');
+  if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="color:var(--ts);font-size:12px">Calculando…</div>';
+  try {
+    const j = await _crCall({ accion: 'ranking' });
+    const P = j.puntos || {};
+    const filas = (j.creadoras || []).map((c, i) => {
+      const col = c.puntos > 0 ? '#3ddc84' : c.puntos < 0 ? '#ff5f56' : 'var(--ts)';
+      const r = c.redes || {};
+      return `<tr>
+        <td style="font-weight:800;color:var(--ts)">${i + 1}</td>
+        <td><b>${_escCtr(c.nombre)}</b>${c.bajas ? ' <span style="color:#ff6666;font-size:10px;font-weight:800">⛔ ' + c.bajas + ' baja' + (c.bajas > 1 ? 's' : '') + '</span>' : ''}<br><span style="font-size:11px;color:var(--ts)">${r.instagram ? 'IG @' + _escCtr(r.instagram) + ' · ' : ''}${_escCtr(c.correo || '')}</span></td>
+        <td style="text-align:center">${c.colaboraciones}</td>
+        <td style="text-align:center">${c.cumplidas}</td>
+        <td style="text-align:center;font-size:11px"><span style="color:#3ddc84">${c.a_tiempo}</span> / <span style="color:#ffb020">${c.tarde}</span> / <span style="color:#ff5f56">${c.vencidos}</span></td>
+        <td style="text-align:center;font-weight:900;color:${col}">${c.puntos > 0 ? '+' : ''}${c.puntos}</td>
+        <td style="font-size:11px;color:var(--ts)">${_escCtr(c.ultima || '—')}</td>
+      </tr>`;
+    }).join('');
+    box.innerHTML = `<div class="card" style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>🏆 Ranking de creadoras</b><button class="btn btn-ghost btn-sm" onclick="document.getElementById('ctr-ranking').style.display='none'">Cerrar</button></div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Puntos: +${P.cumplida} colaboración cumplida · +${P.a_tiempo} por entrega a tiempo · ${P.tarde} tarde · ${P.vencido} vencida sin entregar · ${P.baja} dada de baja.</div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>Creadora</th><th>Veces</th><th>Cumplidas</th><th>A tiempo / tarde / vencidas</th><th>Puntos</th><th>Último evento</th></tr></thead><tbody>${filas || '<tr><td colspan="7" style="color:var(--ts)">Sin creadoras todavía.</td></tr>'}</tbody></table></div>
+    </div>`;
+  } catch (e) { box.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`; }
+}

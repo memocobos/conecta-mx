@@ -1302,6 +1302,15 @@ function renderDoc(c, opts) {
             <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Fecha de nacimiento
               <input type="date" id="fnacInput" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;color-scheme:dark">
             </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Tu celular (WhatsApp) <span style="color:#e8ff4c">· para coordinar tus entregas</span>
+              <input type="tel" id="celInput" maxlength="14" placeholder="10 dígitos" inputmode="numeric" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+            </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Tu Instagram
+              <input type="text" id="igInput" maxlength="80" placeholder="@tuusuario" autocapitalize="off" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+            </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Tu TikTok <span style="color:rgba(255,255,255,.45)">· opcional</span>
+              <input type="text" id="ttInput" maxlength="80" placeholder="@tuusuario" autocapitalize="off" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+            </label>
             <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Contacto de emergencia — nombre
               <input type="text" id="emNomInput" maxlength="120" placeholder="Nombre de tu contacto" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
             </label>
@@ -1778,6 +1787,10 @@ function _datosFirmaOk() {
   const ta = document.getElementById("tallaInput");
   if (!(f.value && n && n.value.trim() && t && t.value.trim())) return false;
   if (ta && !String(ta.value || "").trim()) return false;
+  // [CREA-SEG-1] celular (10 dígitos) e Instagram obligatorios; TikTok opcional.
+  const cel = document.getElementById("celInput"), ig = document.getElementById("igInput");
+  if (cel && String(cel.value || "").replace(/\D/g, "").length !== 10) return false;
+  if (ig && !String(ig.value || "").trim()) return false;
   // El acompañante es opcional pero VA EN PAREJA: medio acompañante deja un kit
   // a medias o una talla huérfana. O los dos campos, o ninguno.
   const an = document.getElementById("acompNombreInput");
@@ -1834,6 +1847,9 @@ function _datosFirmaPayload() {
       // validar: esto es comodidad, no el candado.
       talla: ((ta && ta.value) || "").trim(),
       acompanante: (acompN && acompT) ? { nombre: acompN, talla: acompT } : null,
+      celular: ((document.getElementById("celInput") || {}).value || "").trim(),
+      instagram: ((document.getElementById("igInput") || {}).value || "").trim(),
+      tiktok: ((document.getElementById("ttInput") || {}).value || "").trim(),
     };
   }
   // CREADORA_TEAM: proemio (solo inputs presentes) + Anexo C.
@@ -1895,6 +1911,58 @@ const COMPRESS_STEPS = [
   { maxDim: 1200, quality: 0.65 },
   { maxDim: 1000, quality: 0.60 },
 ];
+
+// ═══ [CREA-SEG-3] MI COLABORACIÓN ═══════════════════════════════════════
+function _mcHoy() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Matamoros" }); }
+function _mcDias(a, b) { return Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000); }
+function _mcFecha(ymd) { return new Date(ymd + "T12:00:00Z").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); }
+function _miColabPanel(c) {
+  const hoy = _mcHoy();
+  const FASE = { previo: "Antes del evento", evento: "Durante el evento", posterior: "Después del evento" };
+  const items = Array.isArray(c.entregables) ? c.entregables : [];
+  const listos = items.filter((e) => e.estado === "entregado").length;
+  const filas = items.map((e) => {
+    const d = e.fecha_limite ? _mcDias(hoy, e.fecha_limite) : null;
+    const ok = e.estado === "entregado";
+    const col = ok ? "#88ea4e" : d == null ? "rgba(255,255,255,.6)" : d < 0 ? "#ff5a4d" : d <= 3 ? "#ffb020" : "#e8ff4c";
+    const txt = ok ? "✓ Recibido" : d == null ? "Fecha por confirmar" : d < 0 ? "Venció " + _mcFecha(e.fecha_limite) : d === 0 ? "Vence HOY" : d === 1 ? "Vence mañana" : "Faltan " + d + " días · " + _mcFecha(e.fecha_limite);
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)">' +
+      '<div style="width:22px;height:22px;flex:0 0 22px;border-radius:50%;border:2px solid ' + col + ';display:flex;align-items:center;justify-content:center;color:' + col + ';font-size:12px;font-weight:900">' + (ok ? "✓" : "") + '</div>' +
+      '<div style="flex:1"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">' + escapeHtml(FASE[e.fase] || "") + '</div>' +
+      '<div style="font-size:13px;color:#fff;line-height:1.4">' + escapeHtml(e.descripcion) + '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:' + col + ';margin-top:2px">' + txt + '</div></div></div>';
+  }).join("");
+  const el = document.createElement("div");
+  el.id = "mi-colab";
+  el.style.cssText = "background:#0b0b10;border:1.5px solid rgba(232,255,76,.35);border-radius:14px;padding:18px;margin:0 0 22px;color:#fff;font-family:Montserrat,Arial,sans-serif";
+  el.innerHTML =
+    '<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e8ff4c;font-weight:800">Mi colaboración</div>' +
+    '<div style="font-size:20px;font-weight:900;margin:4px 0 2px">' + escapeHtml(c.evento_nombre || "") + '</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:12px">' + (c.evento_fecha ? escapeHtml(_mcFecha(c.evento_fecha)) : "") + '</div>' +
+    '<div id="mc-cuenta" style="display:flex;gap:8px;margin-bottom:14px"></div>' +
+    (items.length
+      ? '<div style="font-size:12px;font-weight:800;margin:4px 0 2px">Tus entregas · ' + listos + ' de ' + items.length + ' recibidas</div>' +
+        '<div style="height:6px;background:rgba(255,255,255,.1);border-radius:6px;overflow:hidden;margin:6px 0 4px"><div style="height:100%;width:' + Math.round(100 * listos / items.length) + '%;background:#88ea4e"></div></div>' + filas
+      : '<div style="font-size:12px;color:rgba(255,255,255,.7)">Pronto verás aquí tus fechas de entrega. Lo acordado está en la cláusula 2.2 de tu contrato.</div>') +
+    '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:12px">Conecta marca cada entrega cuando la recibe. Si ya mandaste algo y no aparece, escríbenos.</div>';
+  return el;
+}
+function _miColabTick(c) {
+  const box = document.getElementById("mc-cuenta");
+  if (!box || !c.evento_fecha) return;
+  const objetivo = Date.parse(c.evento_fecha + "T20:00:00-06:00");
+  const celda = (n, l) => '<div style="flex:1;background:rgba(255,255,255,.06);border-radius:10px;padding:10px 0;text-align:center"><div style="font-size:24px;font-weight:900;color:#e8ff4c;font-variant-numeric:tabular-nums">' + n + '</div><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)">' + l + '</div></div>';
+  const pinta = () => {
+    let ms = objetivo - Date.now();
+    if (ms <= 0) { box.innerHTML = '<div style="font-size:14px;font-weight:800;color:#88ea4e">¡Es el día! Disfruta y comparte la experiencia 🎉</div>'; return false; }
+    const d = Math.floor(ms / 864e5); ms -= d * 864e5;
+    const h = Math.floor(ms / 36e5); ms -= h * 36e5;
+    const m = Math.floor(ms / 6e4);
+    box.innerHTML = celda(d, "días") + celda(h, "horas") + celda(m, "min");
+    return true;
+  };
+  if (pinta()) setInterval(pinta, 30000);
+}
 
 async function enviarFirma(token, btn, errBox) {
   if (btn.disabled) return;
@@ -2070,6 +2138,13 @@ async function loadContrato() {
   renderItemList(root.querySelector(".item-list-expectativas"), c.expectativas);
   // [CREA-BAJA-1] Colaboración cancelada: el documento se puede leer, pero se
   // dice arriba que ya no tiene efecto y no se ofrece firma.
+  // [CREA-SEG-3] «MI COLABORACIÓN»: con el contrato firmado, arriba de todo la
+  // creadora ve la cuenta regresiva a su evento y cada entregable con su fecha
+  // límite y si ya lo recibimos (lo marca Conecta). Siempre actualizado: se lee
+  // de la base cada vez que abre el link.
+  if (c.estado === "firmado" && (c.plantilla === "creadora" || c.plantilla === "creadora_team")) {
+    try { root.insertBefore(_miColabPanel(c), root.firstChild); _miColabTick(c); } catch (e) { console.error("[mi-colab]", e); }
+  }
   if (c.estado === "cancelado") {
     const aviso = document.createElement("div");
     aviso.style.cssText = "background:#ff283b;color:#fff;padding:14px 16px;margin:0 0 18px;font-weight:700;font-size:14px;border-radius:8px;text-align:center";
@@ -2091,7 +2166,7 @@ async function loadContrato() {
     document.getElementById("firmaCanvas").addEventListener("touchend", checkSubmit);
     document.getElementById("acepto").addEventListener("change", checkSubmit);
     // Captura al firmar (creadora: fnac/emergencia · team: proemio + Anexo C).
-    ["fnacInput", "emNomInput", "emTelInput",
+    ["fnacInput", "emNomInput", "emTelInput", "celInput", "igInput", "ttInput",
      "teamOrigen", "teamDomicilio", "teamCiudad",
      "axCuentas", "axPlataformas", "axEstado", "axMaterial", "axMaterialDesc", "axIntencion", "axIntencionDet"].forEach((id) => {
       const el = document.getElementById(id);

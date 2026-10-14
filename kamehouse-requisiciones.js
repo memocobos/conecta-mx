@@ -139,7 +139,7 @@ function _reqBdjCard(r) {
       ${r.num_emergencia ? `<span>Emergencia: <b style="color:var(--text)">${_reqBdjEsc(r.num_emergencia)}</b></span>` : ''}
     </div>
     ${Array.isArray(r.acompanantes) && r.acompanantes.length ? `<div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6">
-      <div style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Acompañantes (al aprobar nace un viajero por persona, el pago repartido)</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Acompañantes (al aprobar nace un viajero por persona${Array.isArray(r.desglose) ? ', con el pago que declaró cada quien' : ', el pago repartido'})</div>
       ${r.acompanantes.map((a, i) => `<div>${i + 1}. <b style="color:var(--text)">${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}${a.celular ? ' · WA ' + _reqBdjEsc(a.celular) : ''}${a.talla_playera ? ' · talla ' + _reqBdjEsc(a.talla_playera) : ''}${a.num_emergencia ? ' · emerg. ' + _reqBdjEsc(a.num_emergencia) : ''}</div>`).join('')}
     </div>` : ''}
     ${r.cotizacion_texto ? `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:11px;color:var(--ts)">Ver la cotización que el cliente vio</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--ts);background:rgba(255,255,255,.04);padding:10px;border-radius:8px;margin:6px 0 0">${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
@@ -173,10 +173,11 @@ function _reqBdjAprobarUI(id) {
   box.innerHTML = `
     <div style="font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">Al aprobar NACE el viajero con su abono</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px">
-      <label style="font-size:11px;color:var(--ts)">Abono verificado (lo que dice el comprobante) *<input type="number" id="req-apr-monto-${id}" value="${r.separo_sistema != null ? Math.round(Number(r.separo_sistema)) : ''}" min="1" step="1" style="width:100%;margin-top:4px"></label>
+      <label style="font-size:11px;color:var(--ts)">Abono verificado (lo que dice el comprobante) *<input type="number" id="req-apr-monto-${id}" value="${_reqBdjMontoInicial(r)}" min="1" step="1" oninput="_reqBdjDesgloseSuma('${id}')" style="width:100%;margin-top:4px"></label>
       <label style="font-size:11px;color:var(--ts)">Total del contrato *<input type="number" id="req-apr-total-${id}" value="${r.total_sistema != null ? Math.round(Number(r.total_sistema)) : ''}" min="1" step="1" style="width:100%;margin-top:4px"></label>
       ${esRide ? '' : `<label style="font-size:11px;color:var(--ts)">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}" style="width:100%;margin-top:4px"></label>`}
     </div>
+    ${_reqBdjDesgloseHtml(r, id)}
     <label style="font-size:11px;color:var(--ts)">Nota (opcional)<input type="text" id="req-apr-nota-${id}" maxlength="500" style="width:100%;margin-top:4px"></label>
     ${(r.transporte && r.total_sistema != null) ? '<div style="font-size:11px;color:var(--orange,#ffb020);margin-top:6px">⚠️ El total del sistema NO incluye el transporte a CDMX — ajústalo si aplica (la cotización del cliente lo trae).</div>' : ''}
     <div style="display:flex;gap:8px;margin-top:10px">
@@ -185,6 +186,61 @@ function _reqBdjAprobarUI(id) {
     </div>
     <div id="req-apr-msg-${id}" style="font-size:12px;margin-top:8px"></div>`;
   box.style.display = 'block';
+  _reqBdjDesgloseSuma(id);
+}
+
+// [DESGLOSE-1] Cuánto pagó cada quien: prellenado con lo que DECLARÓ el
+// cliente (o parejo si no lo mandó), EDITABLE. Tiene que sumar el abono
+// verificado; si no cuadra, se corrige aquí (después de hablar por WhatsApp)
+// en vez de rechazar. Solo con acompañantes: es lo que hace nacer un viajero
+// por persona.
+// El abono se prellena con lo que el cliente DECLARÓ pagar (suma de su
+// desglose) y, sin desglose, con el separo del sistema. Bulma lo carea contra
+// el comprobante: el prellenado es ayuda, no verdad.
+function _reqBdjMontoInicial(r) {
+  const ps = _reqBdjPersonas(r);
+  if (ps && Array.isArray(r.desglose) && r.desglose.length === ps.length) {
+    const s = r.desglose.reduce((a, b) => a + (Math.round(Number(b)) || 0), 0);
+    if (s > 0) return s;
+  }
+  return r.separo_sistema != null ? Math.round(Number(r.separo_sistema)) : '';
+}
+function _reqBdjPersonas(r) {
+  const a = Array.isArray(r.acompanantes) ? r.acompanantes : [];
+  if (!a.length || a.length !== Math.max(0, (r.num_personas || 1) - 1)) return null;
+  return [r.nombre].concat(a.map((x) => x.nombre));
+}
+function _reqBdjDesgloseHtml(r, id) {
+  const ps = _reqBdjPersonas(r);
+  if (!ps) return '';
+  const n = ps.length;
+  const dec = Array.isArray(r.desglose) && r.desglose.length === n ? r.desglose.map((x) => Math.round(Number(x) || 0)) : null;
+  const base = Math.round(Number(r.separo_sistema || 0));
+  const parejo = Array.from({ length: n }, (_, i) => Math.floor(base / n) + (i === 0 ? base - Math.floor(base / n) * n : 0));
+  const vals = dec || parejo;
+  const sumaDec = dec ? dec.reduce((a, b) => a + b, 0) : null;
+  return `<div style="margin:4px 0 10px;padding:10px;border:1px dashed var(--border);border-radius:8px">
+    <div style="font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px">¿Cuánto pagó cada quien?</div>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:8px">${dec ? 'Lo que declaró el cliente (suma ' + _reqBdjMxn(sumaDec) + ').' : 'El cliente no mandó desglose: viene parejo.'} Corrígelo si no cuadra con el comprobante — tiene que sumar el abono verificado.</div>
+    ${ps.map((nom, i) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span style="flex:1;font-size:12px">${i === 0 ? '👤 ' : ''}${_reqBdjEsc(nom)}</span>
+      <input type="number" class="req-apr-pago-${id}" value="${vals[i]}" min="0" step="1" oninput="_reqBdjDesgloseSuma('${id}')" style="width:110px">
+    </div>`).join('')}
+    <div id="req-apr-suma-${id}" style="font-size:12px;text-align:right;margin-top:4px"></div>
+  </div>`;
+}
+function _reqBdjDesgloseLeer(id) {
+  const els = document.querySelectorAll('.req-apr-pago-' + id);
+  if (!els.length) return null;
+  return Array.prototype.map.call(els, (x) => Math.round(Number(x.value)));
+}
+function _reqBdjDesgloseSuma(id) {
+  const d = _reqBdjDesgloseLeer(id); const el = document.getElementById('req-apr-suma-' + id);
+  if (!d || !el) return;
+  const s = d.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
+  const monto = Math.round(Number((document.getElementById('req-apr-monto-' + id) || {}).value));
+  const ok = s === monto;
+  el.innerHTML = 'Suma ' + _reqBdjMxn(s) + (ok ? ' <span style="color:var(--green)">✓ cuadra</span>' : ' <span style="color:var(--red)">≠ abono ' + _reqBdjMxn(monto || 0) + '</span>');
 }
 
 async function _reqBdjAprobar(id) {
@@ -199,6 +255,18 @@ async function _reqBdjAprobar(id) {
   const btn = $('go');
   if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
   const body = { accion: 'aprobar', id, monto, total_contrato: total, nota };
+  const desglose = _reqBdjDesgloseLeer(id);
+  if (desglose) {
+    if (desglose.some((x) => !Number.isFinite(x) || x < 0)) { if (msg) { msg.textContent = 'Revisa el desglose: cada monto en pesos, sin negativos (puede ser 0).'; msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    const s = desglose.reduce((a, b) => a + b, 0);
+    if (s !== monto) { if (msg) { msg.textContent = 'El desglose suma ' + _reqBdjMxn(s) + ' y el abono verificado es ' + _reqBdjMxn(monto) + ': ajusta hasta que cuadren.'; msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    body.desglose = desglose;
+  }
+  // [DESGLOSE-1] Pagó de más: se confirma con palabras, el excedente queda a favor.
+  if (monto > total) {
+    if (!confirm('El abono (' + _reqBdjMxn(monto) + ') es mayor que el total (' + _reqBdjMxn(total) + '). ¿El cliente sí pagó de más? Los ' + _reqBdjMxn(monto - total) + ' quedan como saldo a favor.')) { if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    body.saldo_favor = true;
+  }
   if (zonaEl) body.zona = zonaEl.value;
   const j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
   if (j && j.ok) {

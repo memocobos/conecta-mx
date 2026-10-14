@@ -389,6 +389,41 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   af(red.viajeros.length === 1 && red.viajeros[0].talla_playera === 'S' && red.viajeros[0].num_emergencia === '8991119999', '[E11] camino viejo (un viajero) también lleva talla y emergencia');
   af(/function _reqPideViaje\(/.test(INDEX_HTML) && /datos_viaje:viaje\|\|undefined/.test(INDEX_HTML), '[E12] el index decide cuándo pedir datos de viaje y lo marca en el envío');
 
+  // ── [F] DESGLOSE-1 · cuánto pagó cada quien ──────────────────────────────
+  console.log('\n[F] DESGLOSE-1 — cuánto pagó cada quien (declara el cliente, confirma Bulma)');
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk, desglose: [500, 300, 300] })));
+  af(r.statusCode === 200 && JSON.stringify(red.requisiciones[0].desglose) === '[500,300,300]', '[F1] el desglose declarado se guarda con la requisición');
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk, desglose: [500, 300] })));
+  af(r.statusCode === 400 && red.requisiciones.length === 0, '[F2] desglose de largo distinto a las personas → 400, nada nace');
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk, desglose: [500, -1, 300] })));
+  af(r.statusCode === 400 && red.requisiciones.length === 0, '[F3] monto negativo → 400');
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk })));
+  af(r.statusCode === 200 && red.requisiciones[0].desglose == null, '[F4] página vieja sin desglose → nace igual (desglose NULL)');
+  // aprobar con el desglose CONFIRMADO por Bulma (corrigió uno)
+  red = redNueva({ requisiciones: [pend({ desglose: [500, 300, 300] })] }); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 1100, total_contrato: 10001, desglose: [500, 300, 300] }, tokenBulma)); j = JSON.parse(r.body);
+  af(r.statusCode === 200 && red.abonos.map((x) => x.monto).join(',') === '500,300,300', `[F5] cada quien nace con SU pago: 500/300/300 (${red.abonos.map((x) => x.monto).join(',')})`);
+  af(red.abonos.every((x) => /desglose confirmado por Bulma/.test(x.nota || '')), '[F6] la nota dice que el reparto lo confirmó Bulma');
+  af(red.viajeros.reduce((a, v) => a + v.total_contrato, 0) === 10001, '[F7] el contrato sigue repartido al peso (el desglose solo mueve el dinero)');
+  red = redNueva({ requisiciones: [pend()] }); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 1100, total_contrato: 10001, desglose: [500, 300, 200] }, tokenBulma));
+  af(r.statusCode === 400 && red.viajeros.length === 0 && red.requisiciones[0].estado === 'pendiente', '[F8] desglose que NO suma el abono → 400 y la requisición sigue PENDIENTE (se valida antes de reclamar)');
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 1100, total_contrato: 10001, desglose: [1100, 0] }, tokenBulma));
+  af(r.statusCode === 400 && red.viajeros.length === 0 && red.requisiciones[0].estado === 'pendiente', '[F9] desglose con menos personas → 400, sigue pendiente');
+  // pagó de más: sin la palabra → 400; con saldo_favor → pasa
+  red = redNueva({ requisiciones: [pend({ total_sistema: 900 })] }); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 1100, total_contrato: 900, desglose: [500, 300, 300] }, tokenBulma));
+  af(r.statusCode === 400 && red.viajeros.length === 0, '[F10] abono mayor que el total SIN confirmar → 400 (el candado contra el dedazo sigue)');
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 1100, total_contrato: 900, desglose: [500, 300, 300], saldo_favor: true }, tokenBulma));
+  af(r.statusCode === 200 && red.abonos.reduce((a, x) => a + x.monto, 0) === 1100 && red.abonos[0].monto === 500, '[F11] confirmado «pagó de más» → pasa; la de $500 queda con $200 a favor en SU ficha');
+  // un acompañante que no pagó nada: sin abono, sin error
+  red = redNueva({ requisiciones: [pend()] }); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900, total_contrato: 10001, desglose: [600, 300, 0] }, tokenBulma));
+  af(r.statusCode === 200 && red.viajeros.length === 3 && red.abonos.length === 2, '[F12] quien puso $0 nace sin abono (debe su parte), sin error');
+  af(/function _reqDesgloseHtml\(/.test(INDEX_HTML) && /desglose:\(acomp\.length&&desglose\.length\)/.test(INDEX_HTML), '[F13] el index pide el desglose y lo manda en el envío');
+
   console.log(`\n${R === 0 ? (V ? '✅ VERDE' : '⚠️ NADA MEDIDO · esto NO es un verde') : '🔴 ROJO'} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.log('✗ EL ARNÉS SE CAYÓ: ' + e.stack); process.exit(1); });

@@ -409,6 +409,21 @@ está caduco antes de escribirse.
       invitación SOLO a los correos distintos del titular (la lib decide el
       evento). Caso de uso #1: **Karina R-RMZ5P** al aprobarla.
       `npm run mide:acomp-2` **43**.
+  - **DESGLOSE-1 (13-oct) · CUÁNTO PAGÓ CADA QUIEN.** Palabra de Memo: el
+    cliente desglosa al pagar y Bulma revisa — si no cuadra, habla por WhatsApp
+    y ajusta. Columna `requisiciones.desglose jsonb` (acta `migraciones/
+    DESGLOSE-1.sql`, YA CORRIÓ). **Index:** con 2+ personas, «¿Cuánto pagó cada
+    quien?» prellenado parejo con el separo por persona, renglones con el
+    nombre en vivo y el total del comprobante (verificado en navegador con el
+    CSP real: 300/300/300 → editar a 500 → total $1,100 → payload [300,500,300]).
+    **Bandeja:** tabla editable prellenada con lo declarado; el abono se
+    prellena con la suma declarada; tiene que cuadrar o no deja aprobar.
+    **Servidor:** el desglose se valida ANTES de reclamar (un 400 después dejaría
+    «aprobada» sin viajeros); con desglose cada viajero nace con SU pago y la
+    nota dice que lo confirmó quien aprobó; el contrato sigue repartido al
+    peso; $0 = nace sin abono. **Pagar de más** pasa solo con `saldo_favor:true`
+    (confirm en la bandeja): el excedente queda a favor en la ficha de quien
+    pagó. Lo declarado por el cliente NO se sobrescribe. `mide:acomp-1` **67** ([F]).
   - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
     escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
     blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede

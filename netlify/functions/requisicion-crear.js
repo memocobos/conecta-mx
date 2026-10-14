@@ -192,6 +192,26 @@ exports.handler = async (event) => {
     }
   }
 
+  // [DESGLOSE-1] Cuánto pagó cada quien (titular primero). Lo DECLARA el
+  // cliente: es informativo hasta que Bulma/Milk lo confirman al aprobar. Solo
+  // tiene sentido con acompañantes (un viajero por persona). Opcional: una
+  // página vieja que no lo manda nace igual.
+  let desglose = null;
+  if (acompanantes && Array.isArray(body.desglose)) {
+    if (body.desglose.length !== num_personas) {
+      return json(400, headers, { ok: false, error: 'El desglose de pagos no coincide con el número de personas — recarga la página' });
+    }
+    desglose = [];
+    for (let i = 0; i < body.desglose.length; i++) {
+      const m = Number(body.desglose[i]);
+      if (!Number.isFinite(m) || m < 0 || m > 1000000) {
+        return json(400, headers, { ok: false, error: `Revisa cuánto pagó ${i === 0 ? 'tú' : 'el acompañante ' + i}: va en pesos, sin letras` });
+      }
+      desglose.push(Math.round(m));
+    }
+    if (!desglose.some((m) => m > 0)) return json(400, headers, { ok: false, error: 'Escribe cuánto pagó cada quien' });
+  }
+
   const zona = body.zona == null ? null : String(body.zona).trim().slice(0, 80) || null;
   const hotel = body.hotel == null ? null : String(body.hotel).trim().slice(0, 60) || null;
   const transporte = body.transporte == null ? null : String(body.transporte).trim().slice(0, 120) || null;
@@ -279,7 +299,7 @@ exports.handler = async (event) => {
     num_personas,
     hotel, transporte,
     nombre, celular, correo, forma_pago,
-    acompanantes, talla_playera, num_emergencia,
+    acompanantes, talla_playera, num_emergencia, desglose,
     total_sistema: precio.total,
     separo_sistema: precio.separo,
     cotizacion_texto,

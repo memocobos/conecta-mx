@@ -200,7 +200,10 @@ exports.handler = async (event) => {
       ? Math.round(Number(body.total_contrato))
       : (req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null);
     if (!(total_contrato > 0)) return j(400, headers, { error: 'Falta el total del contrato (el sistema no lo tiene para este caso — por ejemplo CDMX con transporte): captúralo' });
-    if (monto > total_contrato) return j(400, headers, { error: `El abono ($${monto}) no puede ser mayor que el total del contrato ($${total_contrato}). Si el cliente pagó de más, ajusta el total o revisa el comprobante.` });
+    // [DESGLOSE-1] Pagar DE MÁS se permite solo si quien aprueba lo dice
+    // (`saldo_favor:true`): el excedente queda como saldo a favor del cliente.
+    // Sin esa palabra sigue siendo el candado de siempre contra un dedazo.
+    if (monto > total_contrato && body.saldo_favor !== true) return j(400, headers, { error: `El abono ($${monto}) es mayor que el total del contrato ($${total_contrato}). Si el cliente sí pagó de más, confírmalo para dejar $${monto - total_contrato} como saldo a favor; si no, revisa el comprobante.` });
     const notaStaff = String(body.nota || '').trim().slice(0, 500);
 
     // 3 · La zona, por la PUERTA. El staff puede corregirla al aprobar.
@@ -218,6 +221,23 @@ exports.handler = async (event) => {
       zonaFinal = p.zona;
       var zonaConfesion = (p.estado === 'canonizada') ? ` · zona escrita «${p.capturada}», guardada como la ficha la escribe` :
                           (p.estado === 'sin-catalogo') ? ' · ⚠️ catálogo ilegible al aprobar: la zona pasó sin validar' : '';
+    }
+
+    // 3b · [DESGLOSE-1] El desglose se valida ANTES de reclamar: un 400 después
+    // del reclamo dejaría la requisición «aprobada» sin viajeros.
+    let desglosePre = null;
+    {
+      const nPre = (Array.isArray(req.acompanantes) && req.acompanantes.length === Math.max(0, (req.num_personas || 1) - 1) && req.acompanantes.length)
+        ? req.acompanantes.length + 1 : 1;
+      if (nPre > 1 && body.desglose != null) {
+        const d = Array.isArray(body.desglose) ? body.desglose.map((x) => Math.round(Number(x))) : null;
+        if (!d || d.length !== nPre || d.some((x) => !Number.isFinite(x) || x < 0)) {
+          return j(400, headers, { error: `El desglose tiene que traer ${nPre} montos (uno por persona), en pesos y sin negativos` });
+        }
+        const suma = d.reduce((a, b) => a + b, 0);
+        if (suma !== monto) return j(400, headers, { error: `El desglose suma $${suma} y el abono verificado es $${monto}: tienen que ser iguales` });
+        desglosePre = d;
+      }
     }
 
     // 4 · RECLAMAR la requisición (cierra la carrera del doble clic).
@@ -255,7 +275,12 @@ exports.handler = async (event) => {
     const N = personas ? personas.length : 1;
     const repartir = (x) => { const base = Math.floor(x / N); return Array.from({ length: N }, (_, i) => base + (i === 0 ? x - base * N : 0)); };
     const contratos = repartir(total_contrato);
-    const montos = repartir(monto);
+    // [DESGLOSE-1] Cuánto pagó cada quien: lo CONFIRMA quien aprueba (viene
+    // prellenado con lo que declaró el cliente y lo puede corregir). Tiene que
+    // sumar EXACTO el abono verificado. Sin desglose: repartido al peso.
+    let montos = repartir(monto);
+    const desgloseUsado = !!(personas && desglosePre);
+    if (desgloseUsado) montos = desglosePre;
     // [GRUPO-VIAJE-1] Los que nacen de UNA requisición viajan juntos: misma
     // llave de grupo para que Bulma/Milk los vean como un solo grupo.
     const grupoViaje = personas ? require('crypto').randomUUID() : null;
@@ -300,7 +325,9 @@ exports.handler = async (event) => {
       viajero_id: v.id,
       monto: montos[i],
       nota: `Requisición ${req.folio} · comprobante verificado al aprobar`
-        + (N > 1 ? ` · pagado por ${req.nombre} (${i + 1} de ${N}, total $${monto})` : ''),
+        + (N > 1 ? (desgloseUsado
+          ? ` · su parte del pago del grupo según el desglose confirmado por ${quien} (${i + 1} de ${N}, total $${monto}, comprobante enviado por ${req.nombre})`
+          : ` · pagado por ${req.nombre} (${i + 1} de ${N}, total $${monto})`) : ''),
       foto_path: req.comprobante_path || null,
       capturado_por: quien,
     })).filter((a) => a.monto > 0);

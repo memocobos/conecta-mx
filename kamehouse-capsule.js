@@ -428,13 +428,27 @@ function filtrarCapsule() {
 // ── Crear / Editar evento ────────────────────────────────────
 function abrirModalCrearEvento() { abrirModalEvento(null); }
 async function abrirModalAsignarCoordi() {
-  const rolesAsignables = ['coordinador','cc','mister_popo','maestro_roshi','bulma'];
+  // [CC-ASIG-TODOS 13-oct] «No me salen todos los Guerreros Z» (Memo). La lista
+  // filtraba EN SILENCIO por tres razones: faltaba el rol `milk` (Ximena nunca
+  // salía), se escondía a quien estaba inactivo y a quien ya estaba asignado
+  // (aunque hubiera declinado). Hoy salen TODOS los de Guerreros Z: los
+  // asignables arriba y los demás abajo, apagados y diciendo POR QUÉ — una
+  // persona que no aparece no dice nada; una apagada con su razón, sí.
+  const rolesAsignables = ['coordinador','cc','mister_popo','maestro_roshi','bulma','milk'];
   let usuarios = [];
-  try { usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); } // [sec-usuarios]
-  catch(e) {}
-  // Excluir ya asignados
-  const asignadosIds = _ccAsignados.map(a=>a.coordi_id);
-  usuarios = usuarios.filter(u => rolesAsignables.includes(u.rol) && !asignadosIds.includes(u.id));
+  let falloLista = null;
+  try { usuarios = await khUsuarios.listar({ orden: 'nombre' }); } // [sec-usuarios]
+  catch(e) { falloLista = e.message || 'error'; }
+  const asigPorId = {};
+  (_ccAsignados || []).forEach(a => { asigPorId[a.coordi_id] = a.status || 'pendiente'; });
+  const _motivo = (u) => {
+    if (!rolesAsignables.includes(u.rol)) return `rol ${u.rol}`;
+    if (u.activo === false) return 'inactivo — reactívalo en Guerreros Z';
+    if (asigPorId[u.id]) return `ya asignado (${asigPorId[u.id]})`;
+    return null;
+  };
+  const noAsignables = usuarios.filter(u => _motivo(u));
+  usuarios = usuarios.filter(u => !_motivo(u));
   // Cargar deudas pendientes de cada usuario para advertir
   const deudasPend = await khCoordi.deudasListar({ pagado: false }).catch(()=>[]); // [sec-sensibles]
   const deudasPorUser = {};
@@ -448,7 +462,10 @@ async function abrirModalAsignarCoordi() {
     const warn = deuda > 0 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> debe ${formatMXN(deuda)}` : '';
     const strike = u.strikes >= 2 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strikes` : '';
     return `<option value="${u.id}">${_esfEsc(u.nombre)} · ${u.rol}${warn}${strike}</option>`;
-  }).join('');
+  }).join('') + (noAsignables.length
+    ? `<optgroup label="No se pueden asignar ahora">${noAsignables.map(u =>
+        `<option value="" disabled>${_esfEsc(u.nombre)} · ${_esfEsc(_motivo(u))}</option>`).join('')}</optgroup>`
+    : '');
   document.getElementById('modal-asignar-coordi').innerHTML = `
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
@@ -461,6 +478,7 @@ async function abrirModalAsignarCoordi() {
           <select class="cot-input" id="ac-coordi-sel" style="width:100%">
             <option value="">— Selecciona —</option>${opts}
           </select>
+          ${falloLista ? `<div class="alert alert-error" style="margin-top:6px">No se pudo cargar el equipo (${_esfEsc(falloLista)}). Cierra y vuelve a abrir.</div>` : ''}
         </div>
         <div class="form-group">
           <label>Indicaciones especiales</label>

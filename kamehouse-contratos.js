@@ -516,3 +516,37 @@ async function ctrRankingAbrir() {
     </div>`;
   } catch (e) { box.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`; }
 }
+
+// ═══ [CREA-SEG-6] AVISO A TODAS LAS CREADORAS VIGENTES ═════════════════════
+async function ctrAvisoVigentes() {
+  _entModal('<div style="color:var(--ts)">Revisando a quién se le manda…</div>');
+  try {
+    const j = await _crCall({ accion: 'aviso_vigentes' });
+    const filas = (j.vigentes || []).map((v) => `<tr>
+      <td><b>${_escCtr(v.nombre)}</b><br><span style="font-size:11px;color:var(--ts)">${_escCtr(v.correo || '')}</span></td>
+      <td style="font-size:12px">${_escCtr(v.evento)}<br><span style="color:var(--ts)">${_escCtr(v.fecha)}</span></td>
+      <td style="font-size:11px">${v.estado === 'firmado' ? '✓ firmado' : '⏳ por firmar'}${v.falta_redes ? '<br><span style="color:#ffb020">sin redes</span>' : ''}</td>
+      <td style="text-align:center;font-size:12px">${v.entregables || '<span style="color:#ff5f56">0</span>'}</td>
+      <td style="font-size:11px">${v.ya_enviado ? 'ya lo recibió' : (v.entregables ? '<span style="color:#3ddc84">se le manda</span>' : '<span style="color:var(--ts)">sin fechas, no</span>')}</td></tr>`).join('');
+    const esRoshi = typeof currentUser !== 'undefined' && currentUser && currentUser.rol === 'maestro_roshi';
+    _entModal(`
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">✉ Avisar a creadoras vigentes</b><button class="btn btn-ghost btn-sm" onclick="document.getElementById('ent-bg').style.display='none'">✕</button></div>
+      <div style="font-size:12px;color:var(--ts);margin:6px 0 12px">A cada una le llega su calendario de entregas y el link a su página de colaboración (cuenta regresiva + lo que le falta). A las que no han firmado se les pide firmar; a las firmadas sin redes, que las completen.</div>
+      <div class="table-wrap"><table><thead><tr><th>Creadora</th><th>Evento</th><th>Estado</th><th>Entregables</th><th>Correo</th></tr></thead><tbody>${filas}</tbody></table></div>
+      ${j.muestra ? `<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin:14px 0 6px">Así se ve (muestra de la primera): «${_escCtr(j.muestra.asunto)}»</div><div style="background:#fff;border-radius:8px;overflow:hidden">${j.muestra.html}</div>` : ''}
+      ${esRoshi && j.a_mandar ? `<button class="btn" id="aviso-go" style="margin-top:14px;background:#e8ff4c;color:#000;border-color:#e8ff4c" onclick="ctrAvisoVigentesGo()">Mandar a ${j.a_mandar} creadora${j.a_mandar > 1 ? 's' : ''}</button>` : `<div style="margin-top:12px;font-size:12px;color:var(--ts)">${j.a_mandar ? '' : 'No hay a quién mandarle (o ya todas lo recibieron).'}</div>`}
+      <div id="aviso-res" style="margin-top:10px;font-size:12px"></div>`);
+  } catch (e) { _entModal(`<div style="color:#ff5f56">No se pudo: ${_escCtr(e.message)}</div>`); }
+}
+async function ctrAvisoVigentesGo() {
+  if (!confirm('¿Mandar el correo a todas las creadoras de la lista?')) return;
+  const btn = document.getElementById('aviso-go'), res = document.getElementById('aviso-res');
+  btn.disabled = true; btn.textContent = 'Mandando…';
+  try {
+    const j = await _crCall({ accion: 'aviso_vigentes', confirmar: true });
+    const ok = (j.hechos || []).filter((h) => h.enviado).length;
+    res.innerHTML = `<b style="color:#3ddc84">✓ ${ok} correo${ok === 1 ? '' : 's'} enviado${ok === 1 ? '' : 's'}.</b>` +
+      (j.hechos || []).filter((h) => !h.enviado).map((h) => `<div style="color:#ff5f56">⚠️ ${_escCtr(h.nombre)}: ${_escCtr(h.error || '')}</div>`).join('');
+    btn.style.display = 'none';
+  } catch (e) { res.innerHTML = `<span style="color:#ff5f56">No se pudo: ${_escCtr(e.message)}</span>`; btn.disabled = false; btn.textContent = 'Reintentar'; }
+}

@@ -36,6 +36,7 @@ const casa = (row, k, v) => {
   if (v.startsWith('eq.')) return val === decodeURIComponent(v.slice(3));
   if (v.startsWith('neq.')) return val !== null && val !== decodeURIComponent(v.slice(4));
   if (v.startsWith('in.(')) return v.slice(4, -1).split(',').includes(val);
+  if (v.startsWith('gte.')) return val !== null && val >= v.slice(4);
   throw new Error('filtro no modelado ' + k + '=' + v);
 };
 global.fetch = async (url, init) => {
@@ -112,6 +113,28 @@ const ents = (cid) => DB.entregables_creadora.filter((e) => e.contrato_id === ci
   af(r.j.creadoras[0].correo === 'ana@x.mx', '[F3] ordenado por puntos');
   const evC = L.evaluarContrato({ estado: 'firmado', evento_fecha: dia(-5) }, [{ estado: 'entregado', fecha_limite: dia(-8), entregado_at: dia(-6) + 'T18:00:00Z' }], hoy);
   af(evC.tarde === 1 && evC.puntos === L.PUNTOS.tarde + L.PUNTOS.cumplida, '[F4] entregado después de su fecha cuenta TARDE');
+  // [CREA-SEG-6] aviso a vigentes: seco por default, una vez por contrato
+  DB.contratos_creadores.push({ id: 'cccccccc-0000-4000-8000-000000000004', token: 'tok4', creador_nombre: 'Pendiente P', creador_email: 'p@x.mx', plantilla: 'creadora', estado: 'pendiente', evento_nombre: 'Futuro', evento_fecha: dia(30), datos: {} });
+  DB.entregables_creadora.push({ id: 'eeeeeeee-0000-4000-8000-000000000009', contrato_id: 'cccccccc-0000-4000-8000-000000000004', orden: 0, descripcion: 'Reel previo', fase: 'previo', fecha_limite: dia(23), estado: 'pendiente', avisos: {} });
+  MAILS = [];
+  r = await pedir({ accion: 'aviso_vigentes' });
+  af(r.s === 200 && r.j.seco && MAILS.length === 0 && r.j.a_mandar === 1 && r.j.vigentes.length === 2 && r.j.vigentes.find((v) => v.estado === 'firmado').ya_enviado && r.j.muestra, `[G1] aviso seco: la firmada que ya recibió su calendario se salta, solo la pendiente; la cancelada fuera, 0 correos (${r.j.a_mandar})`);
+  r = await pedir({ accion: 'aviso_vigentes', confirmar: true });
+  af(MAILS.length === 1 && /Firma tu contrato/.test(MAILS[0].subject), `[G2] confirmado: 1 correo y a la pendiente le pide firmar (${MAILS.length})`);
+  r = await pedir({ accion: 'aviso_vigentes', confirmar: true });
+  af(MAILS.length === 1, '[G4] 2ª vez no repite');
+  r = await pedir({ accion: 'aviso_vigentes', confirmar: true, forzar: true });
+  af(MAILS.length === 3 && !MAILS.slice(1).some((m) => /Completa tu Instagram/.test(m.html)), '[G5] con forzar le llega otra vez a las dos; la firmada YA tiene redes: no se le piden');
+  // contrato-redes (público por token)
+  const RED = require(path.join(RAIZ, 'netlify/functions/contrato-redes.js')).handler;
+  DB.contratos_creadores[0].token = 'a'.repeat(40);
+  let rr = await RED({ httpMethod: 'POST', body: JSON.stringify({ token: 'a'.repeat(40), instagram: '@ana.ig', celular: '8991112233' }) });
+  af(rr.statusCode === 200 && DB.contratos_creadores[0].datos.instagram === 'ana.ig' && DB.contratos_creadores[0].datos.talla === 'M', `[H1] la creadora guarda sus redes por su link (${rr.statusCode})`);
+  DB.contratos_creadores[3].token = 'b'.repeat(40);
+  rr = await RED({ httpMethod: 'POST', body: JSON.stringify({ token: 'b'.repeat(40), instagram: 'x', celular: '8991112233' }) });
+  af(rr.statusCode === 409, `[H2] una pendiente no (sus datos van al firmar) (${rr.statusCode})`);
+  rr = await RED({ httpMethod: 'POST', body: JSON.stringify({ token: 'a'.repeat(40), instagram: 'x', celular: '12' }) });
+  af(rr.statusCode === 400, '[H3] WhatsApp inválido → 400');
   console.log(`\n${R ? '🔴' : '🟢'} ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.error('💥', e); process.exit(2); });

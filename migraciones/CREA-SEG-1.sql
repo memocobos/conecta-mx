@@ -30,3 +30,12 @@ create table if not exists public.entregables_creadora (
 create index if not exists entregables_creadora_contrato_idx on public.entregables_creadora(contrato_id);
 alter table public.entregables_creadora enable row level security;
 -- (sin políticas = deny-all para anon/authenticated)
+
+-- =============================================================================
+-- CREA-SEG-6 (14-oct-2026) · SEMBRADO DE LAS 16 CREADORAS VIGENTES (YA CORRIÓ)
+-- Regla de Memo: reel previo = evento − 7 · 2 historias previas = evento − 3 ·
+-- historias durante = día del evento · reel(es) posterior(es) y carrusel =
+-- evento + 3 (cláusula 4.4). Las que ya no alcanzaban lo previo (Day/Alfredito
+-- 15-oct y Marietta/Soy Luna 21-oct) van SOLO con durante y después.
+-- Resultado: 16 contratos · 76 entregables · 28 previos. creado_por='jane-crea-seg-6'.
+-- =============================================================================

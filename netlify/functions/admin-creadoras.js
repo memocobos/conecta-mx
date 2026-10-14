@@ -27,6 +27,7 @@ const ESCRIBE = ['maestro_roshi'];
 const ACCIONES = {
   entregables_listar: LEEN, ranking: LEEN,
   entregables_guardar: ESCRIBE, entregable_marcar: ESCRIBE, redes_guardar: ESCRIBE,
+  aviso_vigentes: ESCRIBE,
 };
 const PLANTILLAS = ['creadora', 'creadora_team'];
 
@@ -150,6 +151,40 @@ exports.handler = async (event) => {
       if (r.error) return res(400, { error: r.error });
       await anotarDatos(T_C, sb, c, r.redes);
       return res(200, { ok: true, redes: r.redes });
+    }
+
+    // ── [CREA-SEG-6] AVISO A TODAS LAS CREADORAS VIGENTES ──────────────────
+    // Les manda su calendario (el mismo correo «calendario»: a las pendientes
+    // les pide firmar, a las firmadas sin redes que las completen). Solo a
+    // contratos de creadora firmados/pendientes con evento por venir y con
+    // entregables. 🔒 Seco por DEFAULT (enseña la lista y un correo de
+    // muestra); con confirmar:true manda. Una vez por contrato: quien ya lo
+    // recibió se salta salvo `forzar:true`.
+    if (accion === 'aviso_vigentes') {
+      const hoy = L.hoyMx();
+      const cs = await get(`${T_C}?plantilla=in.(creadora,creadora_team)&estado=in.(firmado,pendiente)&evento_fecha=gte.${hoy}&select=id,token,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,expectativas,datos&order=evento_fecha.asc&limit=500`);
+      const ids = cs.map((c) => c.id);
+      const es = ids.length ? await get(`${T_E}?contrato_id=in.(${ids.join(',')})&estado=neq.descartado&select=*&order=orden.asc&limit=5000`) : [];
+      const lista = cs.map((c) => {
+        const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+        const items = es.filter((e) => e.contrato_id === c.id);
+        return { c, items, fila: { id: c.id, nombre: c.creador_nombre, correo: c.creador_email, evento: c.evento_nombre, fecha: c.evento_fecha, estado: c.estado,
+          entregables: items.length, falta_redes: c.estado === 'firmado' && (!d.instagram || !d.celular), ya_enviado: !!d.calendario_email_at } };
+      });
+      const forzar = body.forzar === true;
+      const aMandar = lista.filter((x) => x.items.length && x.c.creador_email && (forzar || !x.fila.ya_enviado));
+      if (body.confirmar !== true) {
+        const muestra = aMandar[0] ? L.correoCreadora('calendario', aMandar[0].c, aMandar[0].items) : null;
+        return res(200, { ok: true, seco: true, vigentes: lista.map((x) => x.fila), a_mandar: aMandar.length, muestra });
+      }
+      const hechos = [];
+      for (const x of aMandar) {
+        const m = L.correoCreadora('calendario', x.c, x.items);
+        const r = await L.enviarCorreo(x.c.creador_email, m.asunto, m.html);
+        if (r.enviado) await anotarDatos(T_C, sb, x.c, { calendario_email_at: new Date().toISOString(), calendario_email_id: r.email_id });
+        hechos.push({ nombre: x.c.creador_nombre, evento: x.c.evento_nombre, enviado: r.enviado, error: r.error || null });
+      }
+      return res(200, { ok: true, hechos });
     }
 
     if (accion === 'ranking') {

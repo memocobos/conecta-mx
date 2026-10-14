@@ -75,8 +75,15 @@ ${items && items.length ? tablaEntregables(items, hoy) : '<p style="margin:0 0 1
 <p style="margin:12px 0 0">En tu página de colaboración ves la cuenta regresiva y lo que te falta entregar, siempre actualizado.</p>`, c.token) };
   }
   if (tipo === 'calendario') {
-    return { asunto: `Tus fechas de entrega para ${c.evento_nombre || 'tu colaboración'}`, html: marco('Calendario de entregas', `
-<p style="margin:0 0 12px">¡Hola ${n1}! Estas son tus fechas de entrega para <b>${ev}</b>:</p>${cuenta}${tablaEntregables(items, hoy)}
+    // [CREA-SEG-6] Para una creadora que todavía no firma, el mismo correo le
+    // pide firmar primero; a una firmada sin redes, que las complete en su página.
+    const pend = c.estado === 'pendiente';
+    const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+    const faltaRedes = !pend && (!d.instagram || !d.celular);
+    return { asunto: pend ? `Firma tu contrato y conoce tus fechas — ${c.evento_nombre || 'tu colaboración'}` : `Tus fechas de entrega para ${c.evento_nombre || 'tu colaboración'}`, html: marco('Calendario de entregas', `
+<p style="margin:0 0 12px">¡Hola ${n1}! Estrenamos tu página de colaboración: ahí ves la <b>cuenta regresiva</b> a tu evento, lo que te toca entregar y <b>cuándo</b>. Estas son tus fechas para <b>${ev}</b>:</p>${cuenta}${tablaEntregables(items, hoy)}
+${pend ? '<p style="margin:12px 0 0;padding:10px 12px;background:#fff7d6;border-radius:8px"><b>Tu contrato todavía está pendiente de firma.</b> Fírmalo en el mismo link de abajo para confirmar tu colaboración.</p>' : ''}
+${faltaRedes ? '<p style="margin:12px 0 0;padding:10px 12px;background:#eef6ff;border-radius:8px"><b>Completa tu Instagram, TikTok y WhatsApp</b> en tu página de colaboración: así encontramos tu contenido y coordinamos las entregas.</p>' : ''}
 <p style="margin:12px 0 0">Recuerda que el contenido previo es parte de tu contrato: si no llega a tiempo, la colaboración se puede cancelar (cláusula 5).</p>`, c.token) };
   }
   if (tipo === 'recibido') {

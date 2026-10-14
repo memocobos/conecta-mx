@@ -23,8 +23,13 @@
 // de Ver como, se le pide al servidor que conteste COMO esa persona (gz-panel
 // solo lo acepta de maestro_roshi).
 function _gzVerComoId() {
-  try { return sessionStorage.getItem('_roshi_session_backup') && currentUser ? currentUser.id : null; }
-  catch (e) { return null; }
+  // [SES-CRUCE-1] Solo cuenta si el respaldo es de quien firma el JWT (Memo):
+  // un respaldo viejo colgado en la pestaña no vuelve «Ver como» a nadie.
+  try {
+    const b = JSON.parse(sessionStorage.getItem('_roshi_session_backup') || 'null');
+    const uid = (typeof _khJwtUid === 'function') ? _khJwtUid(khGetJwt()) : null;
+    return (b && b.user && uid && b.user.id === uid && currentUser && currentUser.id !== uid) ? currentUser.id : null;
+  } catch (e) { return null; }
 }
 async function _gzCall(payload) {
   const r = await khAdminFetch('/.netlify/functions/gz-panel', {

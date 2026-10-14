@@ -265,8 +265,40 @@ let _khSessionExpired = false;
 // Usar para endpoints admin (contrato-*, send-invite, github-publish, etc.)
 // que ahora requieren JWT. Si el JWT expiró/es inválido, el endpoint devolverá
 // 401 y el caller debe manejar el re-login.
+// [SES-CRUCE-1 · 14-oct] LA SESIÓN DE LA PANTALLA Y LA DEL SERVIDOR SON LA
+// MISMA PERSONA, O NO SE PIDE NADA. El JWT vive en localStorage (lo comparten
+// TODAS las pestañas del navegador) y la persona de la pantalla en
+// sessionStorage (una por pestaña). Medido con Memo el 14-oct: registró una
+// cuenta de prueba en el navegador donde ya era maestro_roshi, la pantalla
+// decía «Ladrón de Fama» y el servidor contestaba como MEMO — su contrato, sus
+// datos. Única excepción legítima: «Ver como» (el JWT es el de Memo, guardado
+// en el respaldo de la pestaña).
+function _khJwtUid(t) {
+  try {
+    const p = String(t || '').split('.')[1];
+    if (!p) return null;
+    const j = JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/')));
+    return j.id || j.sub || null;
+  } catch (e) { return null; }
+}
+function _khSesionCoherente() {
+  const t = khGetJwt();
+  if (!t || typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return true;
+  const uid = _khJwtUid(t);
+  if (!uid || uid === currentUser.id) return true;
+  try {
+    const b = JSON.parse(sessionStorage.getItem('_roshi_session_backup') || 'null');
+    if (b && b.user && b.user.id === uid) return true;   // «Ver como»
+  } catch (e) { /* respaldo ilegible: no cuenta */ }
+  return false;
+}
 async function khAdminFetch(url, options) {
   options = options || {};
+  if (!_khSesionCoherente()) {
+    try { showToast('Se entró con otra cuenta en este navegador. Vuelve a iniciar sesión.', 'error'); } catch (e) {}
+    try { doLogout(); } catch (e) {}
+    throw new Error('La sesión cambió en este navegador — vuelve a entrar');
+  }
   const jwt = khGetJwt();
   const baseHeaders = { 'Content-Type': 'application/json' };
   options.headers = Object.assign(
@@ -592,6 +624,7 @@ async function doLogin() {
     }
     currentUser = data.user;
     khSetJwt(data.token);
+    sessionStorage.removeItem('_roshi_session_backup'); // [SES-CRUCE-1] entrada fresca: sin «Ver como» colgado
     _khSessionExpired = false; // [sec-401] sesión fresca, rearma el manejador
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
       user: data.user,
@@ -610,6 +643,7 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem('_roshi_session_backup'); // [SES-CRUCE-1] un «Ver como» no sobrevive a la salida
   khSetJwt(null);
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
@@ -4590,9 +4624,26 @@ async function completarRegistro(userId, token) {
       btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
       return;
     }
-    currentUser = res.user;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, expires: Date.now() + SESSION_HOURS * 3600000 }));
+    // [SES-CRUCE-1] El registro NO trae JWT: sin esto la pestaña se quedaba
+    // con el JWT de quien estuviera logueado antes en el navegador (Memo) y el
+    // servidor contestaba como él. Se entra de verdad con lo recién creado.
+    khSetJwt(null);
+    const lr = await fetch('/.netlify/functions/auth-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credentials: username, password: pass }),
+    });
+    const ld = await lr.json().catch(() => ({}));
     window.history.replaceState({}, '', window.location.pathname);
+    if (!lr.ok || !ld.ok || !ld.token) {
+      sessionStorage.removeItem(SESSION_KEY);
+      alert('Tu cuenta quedó creada. Entra con tu usuario «' + username + '» y tu contraseña.');
+      window.location.reload();
+      return;
+    }
+    khSetJwt(ld.token);
+    _khSessionExpired = false;
+    currentUser = ld.user || res.user;
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, expires: Date.now() + (ld.ttl ? ld.ttl * 1000 : SESSION_HOURS * 3600000) }));
     enterApp();
   } catch(e) {
     _regFalla(e.message || 'Error al crear la cuenta', null);

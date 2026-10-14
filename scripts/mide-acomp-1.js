@@ -148,7 +148,20 @@ function redNueva(opts) {
     if (String(url).includes('/rest/v1/invitaciones_portal')) {
       if (st.bitacoraCaida) return resp(500, 'bitácora caída (sembrado)');
       if (met === 'GET') { const f = filtros(url); return resp(200, st.invitaciones.filter((x) => !f.evento_id || x.evento_id === f.evento_id)); }
-      if (met === 'POST') { const fila = JSON.parse(init.body); st.invitaciones.push(fila); return resp(201, [fila]); }
+      if (met === 'POST') {
+        // [BITACORA-1] La base de mentira RESPETA la forma de la tabla REAL
+        // (MIG-1D-invitaciones.sql): nombre + viajero_ids uuid[] + enviada_por NOT
+        // NULL, y una columna que no existe se RECHAZA como lo haría PostgREST.
+        // Sin esto, el asiento con la forma del acta que nunca corrió pasó verde
+        // y en producción fallaba SIEMPRE.
+        const fila = JSON.parse(init.body);
+        const COLS = ['evento_id', 'correo', 'nombre', 'viajero_ids', 'email_id', 'enviada_por', 'enviada_en'];
+        const extra = Object.keys(fila).filter((k) => !COLS.includes(k));
+        if (extra.length) return resp(400, { code: 'PGRST204', message: 'columna inexistente: ' + extra.join(',') });
+        if (!fila.nombre || !Array.isArray(fila.viajero_ids) || !fila.enviada_por || !fila.correo || fila.correo !== String(fila.correo).toLowerCase()) return resp(400, { code: '23502', message: 'not null / check' });
+        if (st.invitaciones.some((x) => x.evento_id === fila.evento_id && x.correo === fila.correo)) return resp(409, { code: '23505' });
+        st.invitaciones.push(fila); return resp(201, [fila]);
+      }
     }
     if (String(url).startsWith('https://pt.falso.test/rest/v1/clientes')) {
       if (met === 'GET') {

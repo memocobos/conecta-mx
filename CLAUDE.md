@@ -424,6 +424,27 @@ está caduco antes de escribirse.
     peso; $0 = nace sin abono. **Pagar de más** pasa solo con `saldo_favor:true`
     (confirm en la bandeja): el excedente queda a favor en la ficha de quien
     pagó. Lo declarado por el cliente NO se sobrescribe. `mide:acomp-1` **67** ([F]).
+  - 🔴 **BITACORA-1 (13-oct, cazado por Memo al aprobar a Lizeth: «marcó un
+    error justo al final»): la bitácora `invitaciones_portal` NUNCA había
+    asentado nada.** La tabla REAL nació de `MIG-1D-invitaciones.sql` (nombre,
+    viajero_ids uuid[], `enviada_por` NOT NULL); `ACTA-MIG-1D-II.sql` traía OTRA
+    forma con `create if not exists` y nunca corrió — y el código (botón Y
+    correo único) escribía con la forma del acta: el correo SALÍA (Resend
+    delivered) y el asiento fallaba siempre. Hoy `filaBitacora` en
+    `_lib/invitacion-portal` es el dueño de la forma; UNIQUE (evento,correo) +
+    CHECK minúsculas puestos (acta `migraciones/BITACORA-1.sql`); Juventino y
+    Lizeth asentados a mano con su email_id. 🔒 **La base de mentira inventaba
+    nombres OTRA VEZ**: el fake de `mide:acomp-1` aceptaba cualquier fila — hoy
+    rechaza columnas inexistentes y NOT NULL como PostgREST, con control
+    positivo (el código viejo da 2 rojos: C3 y C9).
+  - **PRUEBA-ARCHIVO-1 (13-oct) · «🗑 Era prueba».** Botón en cada solicitud de
+    la bandeja, SOLO maestro_roshi (`archivar_prueba`, pide confirmar + motivo).
+    COPIA a `pruebas_archivo_requisiciones/_viajeros/_abonos` (con quién, cuándo
+    y por qué) y SOLO entonces quita de las tablas vivas; si estaba aprobada se
+    van también los viajeros que nacieron de ella (nota «Requisición FOLIO») y
+    sus abonos. 🔒 Si la persona tiene un pago capturado APARTE → 409, nada se
+    mueve (eso ya es dinero real). Archivadas a mano el 13-oct: las 3 de Memo/
+    Milk y la de Ximena (con sus viajeros y $300 c/u). `mide:prueba-archivo-1` **9**.
   - **GENKIDAMA-2 (13-oct) · EL MENSAJE LIBRE.** Quinto tipo `libre`: Memo
     escribe asunto (5-120) y mensaje (10-2,000, texto plano escapado, línea en
     blanco = párrafo); el slogan es el título. Con código, NINGÚN texto puede

@@ -65,6 +65,7 @@ function aQuienInvitar(viajeros, yaInvitados) {
   const invitar = [], yaEstaban = [];
   for (const g of grupos.values()) {
     const fila = { correo: g.correo, nombre: g.nombre, filas: g.filas.length, portal_cliente_id: g.portal_cliente_id,
+                   viajero_ids: g.filas.map((f) => f.id), // [BITACORA-1] la bitácora real lo exige (uuid[] NOT NULL)
                    // ⚰️ [PLAN-CASE-1, 1-oct] **ESTE AVISO SE RETIRA, NO SE SILENCIA.**
                    // Lo que seguía era cierto cuando se escribió y dejó de serlo el mismo
                    // día: `portal-mi-plan-migrado` ya NO casa con `eq` sensible — estrecha
@@ -168,6 +169,18 @@ function renderInvitacion({ nombre, correo, ev }) {
 // lista: [{ correo, nombre, portal_cliente_id }] (salida de aQuienInvitar).
 // ─────────────────────────────────────────────────────────────────────────────
 const FROM_INVITACION = 'Conecta Reynosa <admin@conectareynosa.mx>';
+// [BITACORA-1] La forma de UNA fila de `invitaciones_portal`, con UN dueño (la
+// usan el botón «Invitar al Portal» y el correo único de CONFIRMA-1). Rellena lo
+// NOT NULL con algo verdadero en vez de dejar que la base rechace el asiento.
+function filaBitacora({ evento_id, correo, nombre, viajero_ids, enviada_por, email_id }) {
+  return {
+    evento_id, correo: String(correo || '').toLowerCase(),
+    nombre: String(nombre || '').trim() || String(correo || ''),
+    viajero_ids: Array.isArray(viajero_ids) ? viajero_ids.filter(Boolean) : [],
+    enviada_por: String(enviada_por || '').trim() || 'sistema',
+    email_id: email_id || null,
+  };
+}
 async function enviarInvitaciones({ lista, ev, evento_id, KH_URL, KH_KEY, RESEND_KEY, enviado_por }) {
   const FROM = FROM_INVITACION;
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY, 'Content-Type': 'application/json' };
@@ -199,8 +212,12 @@ async function enviarInvitaciones({ lista, ev, evento_id, KH_URL, KH_KEY, RESEND
     // corta o el próximo clic se lo manda otra vez.
     const aR = await fetch(`${KH_URL}/rest/v1/invitaciones_portal`, {
       method: 'POST', headers: { ...hKH, Prefer: 'return=representation' },
-      body: JSON.stringify({ evento_id, correo: p.correo, portal_cliente_id: p.portal_cliente_id,
-                             enviado_por: (auth.user || {}).correo || null, email_id: data.id || null }),
+      // [BITACORA-1] Las columnas de la tabla REAL (migraciones/MIG-1D-invitaciones.sql):
+      // nombre y viajero_ids NOT NULL, `enviada_por` (no «enviado_por») NOT NULL, y
+      // SIN portal_cliente_id. Antes se mandaban los nombres del acta que nunca corrió
+      // y el asiento fallaba SIEMPRE: el correo salía y la bitácora quedaba vacía.
+      body: JSON.stringify(filaBitacora({ evento_id, correo: p.correo, nombre: p.nombre, viajero_ids: p.viajero_ids,
+                             enviada_por: (auth.user || {}).correo, email_id: data.id || null })),
     });
     const asentado = aR.ok;
     if (!asentado) errores.push({ correo: p.correo, paso: 'bitacora', detail: (await aR.text()).slice(0, 200),
@@ -211,4 +228,5 @@ async function enviarInvitaciones({ lista, ev, evento_id, KH_URL, KH_KEY, RESEND
   return { enviados, errores };
 }
 
-module.exports = { aQuienInvitar, renderInvitacion, escapeHtml, PORTAL_URL, enviarInvitaciones };
+module.exports = {
+  filaBitacora, aQuienInvitar, renderInvitacion, escapeHtml, PORTAL_URL, enviarInvitaciones };

@@ -151,6 +151,7 @@ function _reqBdjCard(r) {
       ${esPend ? `<button class="btn btn-primary btn-sm" onclick="_reqBdjAprobarUI('${r.id}')">✓ Aprobar…</button>` : ''}
       ${esPend ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="_reqBdjRechazar('${r.id}')">✕ Rechazar</button>` : ''}
       ${r.estado === 'aprobada' && r.viajero_id ? '<span style="font-size:11px;color:var(--green);align-self:center">Viajero creado ✓</span>' : ''}
+      ${(typeof currentUser !== 'undefined' && currentUser && currentUser.rol === 'maestro_roshi') ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px;color:var(--ts)" title="Quitar esta solicitud de la bandeja (era de prueba). Se guarda una copia en el archivo." onclick="_reqBdjArchivarPrueba('${r.id}','${_reqBdjEsc(r.folio)}','${r.estado}')">🗑 Era prueba</button>` : ''}
     </div>
     <div id="req-apr-${r.id}" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px"></div>
   </div>`;
@@ -285,6 +286,21 @@ async function _reqBdjAprobar(id) {
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; }
     if (j && j._status === 207) setTimeout(() => loadRequisiciones(), 4000);
   }
+}
+
+// [PRUEBA-ARCHIVO-1] Quitar una solicitud de PRUEBA (solo Memo). Si estaba
+// aprobada, se van también su viajero y su pago de prueba. Todo se copia antes
+// a un archivo aparte; si la persona ya tiene pagos capturados a mano, el
+// servidor se rehúsa (eso ya es dinero real).
+async function _reqBdjArchivarPrueba(id, folio, estado) {
+  const extra = estado === 'aprobada' ? '\n\nEstaba APROBADA: también se quita el viajero y el pago que nacieron de ella.' : '';
+  const motivo = prompt('¿Quitar la solicitud ' + folio + ' por ser de PRUEBA?' + extra + '\n\nEscribe un motivo corto (ej. «prueba de Ximena»):', 'prueba');
+  if (motivo == null) return;
+  const j = await _reqBdjCall({ accion: 'archivar_prueba', id, motivo: String(motivo).trim() || 'prueba', confirmar: true }).catch((e) => ({ error: e.message }));
+  if (j && j.ok) {
+    showToast('Solicitud ' + folio + ' quitada' + (j.viajeros ? ' (con ' + j.viajeros + ' viajero' + (j.viajeros === 1 ? '' : 's') + ' y ' + j.abonos + ' pago' + (j.abonos === 1 ? '' : 's') + ' de prueba)' : ''), 'success');
+    loadRequisiciones();
+  } else alert('No se pudo quitar: ' + ((j && j.error) || 'sin respuesta'));
 }
 
 async function _reqBdjRechazar(id) {

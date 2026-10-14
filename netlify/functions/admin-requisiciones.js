@@ -43,6 +43,9 @@ const ACCIONES = {
   // [PORTAL-EDIT-1] las solicitudes de cambio que el cliente manda desde el Portal.
   cambios_listar: ROLES_BANDEJA,
   cambio_cerrar: ROLES_BANDEJA,
+  // [PRUEBA-ARCHIVO-1] Quitar una solicitud de PRUEBA (y lo que nació de ella).
+  // Solo Memo: es la única acción que saca filas de dinero de la vista.
+  archivar_prueba: ['maestro_roshi'],
 };
 // [CONFIRMA-1] Al aprobar sale UN correo: confirmación + invitación al Portal
 // (palabra de Memo: «correo único»). El dueño es _lib/correo-confirmacion; sus
@@ -181,6 +184,66 @@ exports.handler = async (event) => {
     const rows = await r.json();
     if (!rows.length) return j(409, headers, { error: 'Esa requisición ya no está pendiente — alguien más la revisó' });
     return j(200, headers, { ok: true, requisicion: rows[0] });
+  }
+
+  // ── [PRUEBA-ARCHIVO-1] archivar_prueba: «quítala, fue de prueba» ─────────
+  // Palabra de Memo (13-oct): «dame opción de eliminar manualmente las
+  // solicitudes de prueba». No se borra a ciegas: TODO lo que se quita se COPIA
+  // antes a `pruebas_archivo_*` (con quién, cuándo y por qué) y solo entonces se
+  // saca de las tablas vivas. Si la requisición estaba APROBADA, se van también
+  // los viajeros que nacieron de ELLA (nota «Requisición FOLIO») y SUS abonos.
+  // 🔒 Candado: si alguno de esos viajeros tiene un pago que NO vino de la
+  // requisición (capturado a mano después), se REHÚSA — eso ya es dinero real y
+  // no se archiva como prueba.
+  if (accion === 'archivar_prueba') {
+    if (body.confirmar !== true) return j(400, headers, { error: 'Archivar pide confirmar:true' });
+    const motivo = String(body.motivo || 'prueba').trim().slice(0, 300) || 'prueba';
+    const H = Object.assign({}, sbH, { 'Content-Type': 'application/json' });
+    const leer = async (u) => { const r = await fetch(u, { headers: sbH }); if (!r.ok) throw new Error((await r.text()).slice(0, 200)); return r.json(); };
+    let req, viajeros = [], abonos = [];
+    try {
+      req = (await leer(`${base}?id=eq.${id}&select=*`))[0];
+      if (!req) return j(404, headers, { error: 'Esa solicitud ya no existe' });
+      if (req.estado === 'aprobada') {
+        const porNota = await leer(`${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${encodeURIComponent(req.evento_id)}&notas=like.${encodeURIComponent('Requisición ' + req.folio + '*')}&select=*`);
+        const ids = new Set(porNota.map((v) => v.id));
+        if (req.viajero_id && !ids.has(req.viajero_id)) {
+          const t = await leer(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${req.viajero_id}&select=*`);
+          t.forEach((v) => { ids.add(v.id); porNota.push(v); });
+        }
+        viajeros = porNota;
+        if (ids.size) {
+          abonos = await leer(`${SB_URL}/rest/v1/abonos_viajero?viajero_id=in.(${Array.from(ids).join(',')})&select=*`);
+          const ajenos = abonos.filter((a) => !String(a.nota || '').includes(req.folio));
+          if (ajenos.length) {
+            return j(409, headers, { error: `No se archiva: ${ajenos.length} pago(s) de esa persona se capturaron aparte de la solicitud (dinero real). Revísalo a mano.` });
+          }
+        }
+      }
+    } catch (e) { return j(502, headers, { error: 'No pude leer lo que hay que archivar', detail: e.message }); }
+    const sello = { archivado_por: quien, motivo_archivo: motivo };
+    // 1 · COPIAR al archivo (si falla, no se borra nada).
+    const copiar = async (tabla, filas) => {
+      if (!filas.length) return true;
+      const r = await fetch(`${SB_URL}/rest/v1/${tabla}`, { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify(filas.map((f) => Object.assign({}, f, sello))) });
+      if (!r.ok) throw new Error(tabla + ': ' + (await r.text()).slice(0, 200));
+      return true;
+    };
+    try {
+      await copiar('pruebas_archivo_requisiciones', [req]);
+      await copiar('pruebas_archivo_viajeros', viajeros);
+      await copiar('pruebas_archivo_abonos', abonos);
+    } catch (e) { return j(502, headers, { error: 'No se pudo copiar al archivo — no se quitó nada', detail: e.message }); }
+    // 2 · QUITAR de las tablas vivas, en orden de llaves (abonos → requisición → viajeros).
+    const quitar = async (u) => { const r = await fetch(u, { method: 'DELETE', headers: Object.assign({}, sbH, { Prefer: 'return=representation' }) }); if (!r.ok) throw new Error((await r.text()).slice(0, 200)); return (await r.json()).length; };
+    try {
+      if (abonos.length) await quitar(`${SB_URL}/rest/v1/abonos_viajero?id=in.(${abonos.map((a) => a.id).join(',')})`);
+      await quitar(`${base}?id=eq.${id}&folio=eq.${encodeURIComponent(req.folio)}`);
+      if (viajeros.length) await quitar(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${viajeros.map((v) => v.id).join(',')})`);
+    } catch (e) {
+      return j(207, headers, { ok: false, error: 'Se copió al archivo pero no se terminó de quitar — avísale a Jane', detail: e.message });
+    }
+    return j(200, headers, { ok: true, folio: req.folio, viajeros: viajeros.length, abonos: abonos.length });
   }
 
   // ── aprobar: NACE el viajero ──────────────────────────────────────────────

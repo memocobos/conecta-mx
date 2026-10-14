@@ -156,8 +156,9 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
     for (const v of vs) {
       const k = llaveCorreo(v.correo);
       if (!k || !esCorreoUsable(v.correo)) { saltados.push(v.nombre || v.id); continue; }
-      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null, grupo: null });
+      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], ids: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null, grupo: null });
       const g = grupos.get(k);
+      g.ids.push(v.id);
       if (!g.grupo) g.grupo = linksWA[v.evento_id] || linksWA[evento_id] || null;
       g.nombres.push(v.nombre);
       const s = saldoMigrado(v, porV[v.id] || []);
@@ -189,7 +190,8 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
       if (portal === 'nuevo') {
         const iR = await fetch(`${KH_URL}/rest/v1/invitaciones_portal`, {
           method: 'POST', headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-          body: JSON.stringify({ evento_id: evBase, correo: g.correo, portal_cliente_id: g.portal_cliente_id, enviado_por: enviado_por || null, email_id: data.id || null }),
+          // [BITACORA-1] columnas de la tabla REAL, por el dueño de la forma.
+          body: JSON.stringify(require('./invitacion-portal').filaBitacora({ evento_id: evBase, correo: g.correo, nombre: g.nombres[0], viajero_ids: g.ids, enviada_por: enviado_por, email_id: data.id || null })),
         });
         asentado = iR.ok;
         if (!iR.ok) errores.push({ correo: g.correo, paso: 'bitacora', aviso: 'EL CORREO YA SALIÓ pero la invitación no quedó asentada: el botón «Invitar al Portal» se la mandaría otra vez' });

@@ -10692,7 +10692,15 @@ function cortEventoElegido() {
   const cfg = _cortCtr ? CORT_PAQUETE[_cortCtr.plantilla] : null;
   if (!id || !cfg) { sel.innerHTML = '<option value="">— elige evento primero —</option>'; hint.textContent = ''; return; }
   const ev = (_cortEV || []).find(e => e && e.id === id);
-  const fuente = (ev && ev[cfg.zonasDe]) || [];
+  let fuente = (ev && ev[cfg.zonasDe]) || [];
+  // [CORT-SINCHEAP-1 · 14-oct] Un evento que NO vende CHEAP (Rodeo Saltillo:
+  // solo paquete, sin `cheapZonas`) dejaba a la creadora sin ninguna zona y
+  // la cortesía no se podía asignar. El boleto físico es el mismo: se usan las
+  // zonas del boleto del evento, y se DICE.
+  let prestada = false;
+  if (!fuente.length && cfg.zonasDe === 'cheapZonas' && ev && Array.isArray(ev.zonas) && ev.zonas.length) {
+    fuente = ev.zonas; prestada = true;
+  }
   if (!fuente.length) {
     sel.innerHTML = '<option value="">— sin zonas en el catálogo —</option>';
     hint.textContent = `Este evento no tiene lista ${cfg.zonasDe} — revisa el catálogo antes de asignar.`;
@@ -10700,7 +10708,9 @@ function cortEventoElegido() {
   }
   sel.innerHTML = '<option value="">— elegir —</option>' + fuente.map(z =>
     `<option value="${_escCtr(z.n)}">${_escCtr(z.n)}${z.ag ? ' (agotada)' : ''}</option>`).join('');
-  hint.textContent = `Zonas del paquete ${cfg.paquete}.`;
+  hint.textContent = prestada
+    ? 'Este evento no vende solo-boleto: se usan las zonas de su boleto (el mismo boleto físico).'
+    : `Zonas del paquete ${cfg.paquete}.`;
 }
 
 

@@ -59,7 +59,15 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: `pestana demasiado larga (máx ${MAX_NOMBRE_PESTANA})` }) };
   }
 
-  const r = await cosechar({ pestana });
+  // [EFECTIVO-2 · 14-oct] `fuente:'numerologia'` lee una pestaña del libro de
+  // Numerología (p. ej. «Efectivo», el libro de Banamex) por el MISMO cosechador
+  // con sus llaves en Netlify — antes había que exportarla a PDF. Solo Memo:
+  // ese libro trae el dinero de todo el negocio.
+  const fuente = body.fuente === 'numerologia' ? 'numerologia' : undefined;
+  if (fuente && auth.user.rol !== 'maestro_roshi') {
+    return { statusCode: 403, headers, body: JSON.stringify({ error: 'El libro de Numerología solo lo lee maestro_roshi' }) };
+  }
+  const r = await cosechar({ pestana, fuente });
 
   // Un fallo de la cosecha NO es un 500 genérico: cada uno sale con su código y
   // su mensaje, porque los tres se arreglan distinto y confundirlos manda al

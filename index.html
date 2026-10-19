@@ -438,6 +438,11 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .pkg-tag-ride{background:rgba(136,234,78,.15);color:#88ea4e;border:1px solid rgba(136,234,78,.3)}
 .pkg-tag-stay{background:rgba(0,0,205,.25);color:#8888ff;border:1px solid rgba(0,0,205,.4)}
 .pkg-tag-cheap{background:rgba(255,40,59,.15);color:#ff6677;border:1px solid rgba(255,40,59,.3)}
+/* [SIN-SOLO-BOLETO-1] Palabra de Memo (19-oct-2026): la etiqueta roja del CHEAP no
+   vuelve JAMÁS al index. Queda vacía y se esconde; la preventa la sigue usando
+   («Aparta tu lugar»). El candado vive en _lib/sin-solo-boleto (publish de Esferas
+   lo rehúsa) y en npm run mide:sin-solo-boleto */
+.pkg-tag:empty{display:none}
 .pkg-prox-badge{display:inline-block;background:rgba(255,107,0,.18);color:#FF6B00;font-size:10px;font-weight:900;letter-spacing:.12em;padding:4px 9px;border-radius:var(--r-chip,999px);border:1px solid rgba(255,107,0,.4);text-transform:uppercase}
 .pkg-inc{font-size:10px;color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase;letter-spacing:.04em;line-height:1.8;margin-bottom:8px}
 .wiz-btn.active .pkg-inc{color:rgba(255,255,255,.6)}
@@ -1366,7 +1371,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
         <div class="pkg-desde">Desde <span class="pkg-precio" id="pp-stay">—</span></div>
       </button>
       <button class="wiz-btn wiz-pkg-btn" id="btn-cheap" onclick="selPaquete(this,'cheap')">
-        <div class="pkg-top"><span class="pkg-name">CHEAP</span><span class="pkg-tag pkg-tag-cheap">Solo boleto</span></div>
+        <div class="pkg-top"><span class="pkg-name">CHEAP</span><span class="pkg-tag pkg-tag-cheap"></span></div>
         <div class="pkg-inc" id="pi-cheap"></div>
         <div class="pkg-desde">Desde <span class="pkg-precio" id="pp-cheap">—</span></div>
       </button>
@@ -5566,7 +5571,7 @@ function updatePkgCards(){
   // botón sigue deshabilitado. Pensado para eventos cuyos precios CHEAP todavía
   // no se publican (todos los cheapZonas con p:0,prox:1).
   if(cur.cheapSoon&&!cur.rideOnly){
-    $$('pi-cheap').textContent='Solo boleto · Kit Conecta';
+    $$('pi-cheap').textContent='Boleto · Kit Conecta';
     $$('pp-cheap').innerHTML='<span class="pkg-prox-badge">PRÓXIMAMENTE</span>';
     if(cheapBtn){cheapBtn.classList.add('disabled');cheapBtn.disabled=true;}
     return;
@@ -7393,7 +7398,7 @@ var _lastQuincenas=[],_lastPagoQ=0;
 function generarImagenCotizacion(){
   if(!cur)return;
   var W=420,sc=Math.max(window.devicePixelRatio||1,2);
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'};
 
   // Collect rows
   var rows=[];
@@ -7829,7 +7834,7 @@ function calcular(){
   // [AIT-1] Con la promo de pareja las dos personas pagan distinto: el rótulo
   // dice PROMEDIO para no vender como "por viajero" una cifra que nadie paga.
   $$('r-np').textContent=_promoSegundoPax?'promedio por viajero':'por viajero';
-  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'}[selPkg];
+  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'}[selPkg];
   actualizarBankInfo();
   actualizarIncluye();
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
@@ -7964,7 +7969,7 @@ function calcular(){
 
 var _lastCotizacion='';
 function buildCotizacionMsg(quincenas,pagoQ){
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'};
   var hoy=new Date();
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;
@@ -8090,7 +8095,7 @@ function getQuincenas(from, until, max, diasAntes){
         <div class="onboard-step-num">2</div>
         <div class="onboard-step-body">
           <div class="onboard-step-title">Selecciona tu paquete</div>
-          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto + kit).</div>
+          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (boleto + kit).</div>
         </div>
       </div>
       <div class="onboard-step">

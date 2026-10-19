@@ -26,6 +26,7 @@ const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vige
 const { simetrizarLote, avisosDelLote, soltarFichas, disponiblesPorEvento } = require('./_lib/agotado-derivado');
 const { ocupaLugar } = require('./_lib/paquete-viaje');
 const { derivarLetreros, derivarChips } = require('./_lib/letrero-derivado');
+const { apariciones: sinSoloBoleto } = require('./_lib/sin-solo-boleto');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
 // correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
 const { notificarEvento, upsertSnapshot, esALaVenta, PRESUPUESTO_PUBLICAR_MS } = require('./_lib/waitlist-core');
@@ -260,6 +261,24 @@ exports.handler = async (event) => {
           medios_en_riesgo,
         }),
       };
+    }
+
+    // 5-ter. [SIN-SOLO-BOLETO-1] Palabra de Memo (19-oct-2026): la leyenda
+    //        «solo boleto» JAMÁS vuelve al index. Si el index compilado la trae
+    //        (p. ej. en el «incluye» de una ficha), se REHÚSA y no se escribe nada.
+    {
+      const malas = sinSoloBoleto(contenidoNuevo);
+      if (malas.length) {
+        return {
+          statusCode: 409,
+          headers,
+          body: JSON.stringify({
+            ok: false,
+            error: 'El index diría «solo boleto», y esa leyenda no va en el sitio (palabra de Memo). No se escribió nada. Quítala de la ficha (incluye / textos) y vuelve a publicar.',
+            apariciones: malas.slice(0, 10),
+          }),
+        };
+      }
     }
 
     // Nada cambió (ni insertar ni actualizar con diferencia real): no hace PUT

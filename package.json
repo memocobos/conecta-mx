@@ -83,6 +83,7 @@
     "mide:cc-cards-1": "node scripts/mide-cc-cards-1.js",
     "mide:crea-baja-1": "node scripts/mide-crea-baja-1.js",
     "mide:crea-seg-1": "node scripts/mide-crea-seg-1.js",
-    "mide:gz-plataforma-1": "node scripts/mide-gz-plataforma-1.js"
+    "mide:gz-plataforma-1": "node scripts/mide-gz-plataforma-1.js",
+    "mide:sin-solo-boleto": "node scripts/mide-sin-solo-boleto.js"
   }
 }

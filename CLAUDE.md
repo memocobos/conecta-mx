@@ -3927,6 +3927,20 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **TODA TABLA NUEVA EN `public` LLEVA SU `GRANT` EN LA MISMA ACTA (desde el
+  30-oct-2026, en las DOS bases: KH y Portal).** Aviso de Supabase: a partir de
+  esa fecha las tablas nuevas ya NO reciben permisos automáticos para la Data API
+  (PostgREST / supabase-js); sin GRANT, el endpoint contesta «permission denied»
+  y la pantalla nueva truena. Las tablas que ya existen NO cambian. Nuestras
+  tablas las tocan solo las Netlify Functions con la llave del servidor, así que
+  el permiso es para **`service_role`**, y NADA para `anon`/`authenticated`
+  salvo que la tabla lo necesite de verdad (RLS deny-all sigue siendo la casa):
+
+      grant select, insert, update, delete on public.<tabla> to service_role;
+
+  Si una tabla sí se lee desde el navegador con la llave pública (raro aquí), se
+  decide y se dice en el acta, con su RLS. Una acta de `create table` sin su
+  `grant` está incompleta.
 - 🔒 **FILA ROJA = CANCELACIÓN, EN LOS DOS EXCELES** (palabra de Memo, 1-oct):
   en las pestañas de Conecta 2026 Y en el libro de Numerología. El careo ya lo
   aplica en pestañas (barrido del 1-oct: 116 bajas, 0 errores; umbral 3 celdas

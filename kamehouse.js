@@ -10549,6 +10549,7 @@ function _ctrPintarLista() {
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ffb020;border-color:rgba(255,176,32,.4)" onclick="reenviarContratoEmail('${tokenSafe}')">✉ Reenviar…</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
           ${esCreadora ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" title="Pon sus fechas antes de que firme y le llegan en la bienvenida" onclick="ctrEntAbrir('${_escCtr(c.id)}')">📋 Entregables</button>` : ''}
+          ${bajaBtn /* [CREA-BAJA-2] también sin firmar: el servidor ya lo aceptaba y el correo cambia a «la invitación queda sin efecto» */}
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`;
       return `<tr>
         <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span>${_ctrRedesChip(c)}${_ctrKitChip(c)}</td>

@@ -282,6 +282,8 @@ async function cortGuardar(opcion) {
 // queda sin efecto. Primero se ENSEÑA el correo exacto (seco) y solo con
 // «Cancelar y enviar» se escribe y se manda. Solo maestro_roshi.
 const _BAJA_MOTIVOS = [
+  // [CREA-BAJA-2] para quien nunca firmó (el botón ya sale también en «sin firmar»)
+  'El contrato no se firmó a tiempo y no se realizó el contenido previo al evento.',
   'No entregaste el contenido previo al evento acordado en el contrato (reel previo e historias de promoción).',
   'No respondiste a nuestros mensajes para coordinar el contenido previo al evento.',
   'El contenido entregado no cumple los requisitos acordados en el contrato.',

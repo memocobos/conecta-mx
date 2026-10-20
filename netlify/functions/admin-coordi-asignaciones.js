@@ -652,7 +652,23 @@ exports.handler = async (event) => {
       const asunto = `Cancelación de tu colaboración con Conecta Reynosa — ${c.evento_nombre || 'evento'}`;
       const entregables = Array.isArray(c.expectativas) && c.expectativas.length
         ? `<p style="margin:0 0 8px">Lo acordado en la cláusula 2.2 de tu contrato era:</p><ul style="margin:0 0 14px;padding-left:18px">${c.expectativas.map((e) => `<li style="margin:0 0 4px">${esc(e)}</li>`).join('')}</ul>` : '';
-      const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
+      // [CREA-BAJA-2 · 20-oct-2026] Un contrato que NUNCA se firmó también se da
+      // de baja (caso Melissa Salas, Bad Gyal: no firmó ni entregó el contenido
+      // previo). El correo no puede citarle cláusulas de un contrato que no
+      // aceptó: dice que la invitación queda sin efecto.
+      const sinFirma = !yaCancelado ? c.estado === 'pendiente' : !c.firmado_at;
+      const html = sinFirma
+        ? `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
+<div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
+<div style="padding:20px">
+<p style="margin:0 0 12px">Hola ${esc(nombre1)}:</p>
+<p style="margin:0 0 12px">Te escribimos para informarte que <b>la invitación a colaborar con Conecta Reynosa para ${esc(c.evento_nombre || 'el evento')}${fechaEv ? ` (${esc(fechaEv)})` : ''} queda cancelada</b>. El contrato de colaboración que te enviamos no se firmó, así que queda <b>sin efecto</b> a partir de hoy.</p>
+<p style="margin:0 0 8px"><b>Motivo:</b> ${esc(motivo)}</p>
+<p style="margin:0 0 12px">No recibirás los beneficios del intercambio (${esc((Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join(', ') || 'boletos y kit')}) y <b>no tienes ningún pago ni reembolso pendiente</b> con nosotros.</p>
+<p style="margin:0 0 12px">Si crees que hay un error, respóndenos a este correo.</p>
+<p style="margin:0">Gracias por tu tiempo,<br><b>Conecta Reynosa</b></p>
+</div></div>`
+        : `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
 <div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
 <div style="padding:20px">
 <p style="margin:0 0 12px">Hola ${esc(nombre1)}:</p>

@@ -99,7 +99,7 @@ async function emVistaPrevia() {
         ${j.total > (j.audiencia || []).length ? `<div>… y ${j.total - j.audiencia.length} más</div>` : ''}
       </div>
       <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">Así se ve el correo</div>
-      <iframe sandbox="" style="width:100%;height:300px;border:1px solid var(--border);border-radius:6px;background:#fff" srcdoc="${_emEsc(j.html_muestra)}"></iframe>
+      <iframe id="em-prev" sandbox="" style="width:100%;height:300px;border:1px solid var(--border);border-radius:6px;background:#fff"></iframe>
       <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn-primary" id="em-enviar" onclick="emEnviar()">Enviar a ${j.total}</button>
         <button class="btn btn-ghost btn-sm" onclick="_emFreno=true" title="Detiene las tandas que falten">Detener</button>
@@ -107,6 +107,12 @@ async function emVistaPrevia() {
       </div>
       <div id="em-errores" style="margin-top:8px;font-size:11px;color:var(--red)"></div>
     </div>`;
+  // 🔴 [EMMA-1b] El HTML del correo entra por PROPIEDAD, jamás interpolado en
+  // el atributo srcdoc: _emEsc escapa <>& pero NO comillas, y el correo está
+  // lleno de style="…" — la primera comilla rompía el atributo y Memo veía la
+  // vista previa VACÍA. Asignar la propiedad no pasa por el parser de atributos.
+  const prev = _emEl('em-prev');
+  if (prev) prev.srcdoc = j.html_muestra;
 }
 
 // ── CONCEDER: las tandas (30 por llamada, el patrón del blast) ──────────────

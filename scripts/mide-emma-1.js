@@ -131,6 +131,10 @@ const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo
   af(/'emma'\]/.test(kj) && /name === 'emma'/.test(kj), 'PERMISOS_TABS (solo roshi) + carga en showHerramienta (una puerta)');
   af(/emVistaPrevia/.test(ui) && /confirm\(/.test(ui) && /seco: false, confirmar: true/.test(ui), 'la pantalla enseña la vista previa primero y manda solo tras confirm con los dos gestos');
   af(/_emFreno/.test(ui) && /j\.siguiente/.test(ui), 'tandas con botón de detener, avanzando por el siguiente del servidor');
+  // [EMMA-1b] La vista previa VACÍA que cazó Memo: _emEsc no escapa comillas y
+  // el correo trae style="…" — interpolarlo en srcdoc="…" rompía el atributo.
+  af(/prev\.srcdoc = j\.html_muestra/.test(ui), 'el HTML de la vista previa entra por PROPIEDAD (srcdoc asignado, no interpolado)');
+  af(!/srcdoc="\$\{/.test(ui), 'y NINGÚN srcdoc se interpola en un atributo (la trampa de las comillas)');
   af(/GENKIDAMA/i.test(ui) || /Genkidama/.test(html.slice(html.indexOf('page-emma'))), 'y la pantalla manda las campañas masivas a Genkidama (Emma no la reemplaza)');
   af(!fs.existsSync(path.join(RAIZ, 'netlify/functions/admin-correo-equipo.js')), 'admin-correo-equipo murió sin estrenarse: UN solo dueño del correo interno');
   af(!fs.existsSync(path.join(RAIZ, 'kamehouse-shenron.js')) && !fs.existsSync(path.join(RAIZ, 'netlify/functions/admin-shenron.js')), 'Shenron murió sin estrenarse (renombrado a Emma el mismo día)');

@@ -2391,7 +2391,7 @@ function showPage(name) {
  document.getElementById(`page-${name}`).classList.add('active');
  // [NAV-MIN-1] Páginas hermanas sin botón propio: su luz del menú es la de su
  // entrada compartida (Dinero = nav-gastos · Torre de Karin = nav-inventario).
- const NAV_ALIAS = { ingresos: 'gastos', saldos: 'gastos', reportes: 'inventario' };
+ const NAV_ALIAS = { ingresos: 'gastos', saldos: 'gastos', reportes: 'inventario', montana: 'equipo' };
  const navBtn = document.getElementById(`nav-${name}`) || document.getElementById(`nav-${NAV_ALIAS[name] || name}`);
  if (navBtn) {
    navBtn.classList.add('active');
@@ -2432,7 +2432,9 @@ function loadPage(name) {
  if (name === 'nube') loadNube();
  if (name === 'baba') babaCargar();
  if (name === 'yamcha') loadYamcha();
- if (name === 'radio') loadRadio();
+ // [NAV-MIN-2] ⚰️ Aquí colgaba `if (name === 'radio') loadRadio();`. Kaio-sama
+ // volvió a ser herramienta (orden de Memo): su carga vive en showHerramienta.
+ // Una carga en los DOS sitios sería la segunda puerta que todavía no diverge.
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4815,6 +4817,10 @@ function showHerramienta(name) {
   // [GENKIDAMA-1] poner el botón no es poner la pantalla.
   if (name === 'genkidama') {
     loadGenkidama();
+  }
+  // [NAV-MIN-2] Kaio-sama volvió a ser herramienta: su carga se mudó de loadPage.
+  if (name === 'radio') {
+    loadRadio();
   }
   // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
   // Si el admin sale de cualquier herramienta, paramos los timers del Radar.
@@ -11432,7 +11438,7 @@ async function loadInicio() {
       // Roshi / Popo: atajos simples (su cabina de verdad es el Resumen / la Torre).
       if (sub) sub.textContent = '';
       cont.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${_puedeVerTab('resumen') ? `<button class="btn btn-primary" onclick="showPage('resumen')">Ir al Resumen</button>` : ''}
+        ${_puedeVerTab('resumen') ? `<button class="btn btn-primary" onclick="showPage('resumen')">Ir a Montaña Pai</button>` : ''}
         ${_puedeVerTab('inventario') ? `<button class="btn btn-ghost" onclick="showPage('inventario')">Torre de Karin</button>` : ''}
         ${_puedeVerTab('equipo') ? `<button class="btn btn-ghost" onclick="showPage('equipo')">Guerreros Z</button>` : ''}
       </div>`;

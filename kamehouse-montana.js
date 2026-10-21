@@ -50,6 +50,11 @@ function aplicarPermisosUI() {
     ? [...dropdownHerr.querySelectorAll('.nav-dropdown-item[id^="nav-"]')].map(b => b.id.slice(4))
     : [];
   if (dropdownHerr) dropdownHerr.style.display = HERRAMIENTAS.some(h => tabsPermitidos.includes(h)) ? '' : 'none';
+  // [NAV-MIN-2] La sub-barra de Guerreros Z solo ofrece el Panel de control
+  // (página 'montana') a quien lleva el permiso — hoy, solo maestro_roshi.
+  // Pintarle el botón a los demás sería un botón que rebota en showPage.
+  const equipoSubnav = document.getElementById('equipo-subnav');
+  if (equipoSubnav) equipoSubnav.style.display = _puedeVerTab('montana') ? '' : 'none';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 

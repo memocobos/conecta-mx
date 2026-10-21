@@ -132,7 +132,7 @@
    <button class="nav-btn" onclick="showPage('inicio')" id="nav-inicio"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Inicio</span></button>
    <!-- [GZ-TOURS-1 · 14-oct] Los tours del Guerrero Z: viajeros, equipo, rooming. -->
    <button class="nav-btn" onclick="showPage('tours')" id="nav-tours"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Mis Tours</span></button>
-   <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
+   <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-montana"/></svg><span>Montaña Pai</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
    <!-- [REQ-B1] La bandeja de FASE B: las reservaciones que levanta el index. -->
    <button class="nav-btn" onclick="showPage('requisiciones')" id="nav-requisiciones"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Requisiciones</span></button>
@@ -158,18 +158,22 @@
         propio de Saldos murió, su puerta es la sub-barra de Dinero. -->
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Dinero</span></button>
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
-  </div>
-
-  <div class="nav-group">
-   <div class="nav-group-title" onclick="toggleNavGroup(this)">Equipo</div>
+   <!-- [NAV-MIN-2 · 20-oct] El grupo «Equipo» se disuelve (palabra de Memo):
+        Guerreros Z sube a Operación y el panel maestro (antes «Montaña Pai»,
+        hoy «Panel de control» — el nombre se lo llevó el Resumen) vive como
+        sub-pestaña de Guerreros Z. Su botón del menú murió; su permiso
+        ('montana', roshi-only) no — la sub-barra lo esconde a quien no lo
+        lleva (aplicarPermisosUI toggla #subnav-montana). -->
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo"><svg class="nav-ic"><use href="#ic-equipo"/></svg><span>Guerreros Z</span></button>
-   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana"><svg class="nav-ic"><use href="#ic-montana"/></svg><span>Montaña Pai</span></button>
   </div>
 
   <div class="nav-group">
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Eventos</div>
-   <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
+   <!-- [NAV-MIN-2] Orden de Memo: Esferas · Palacio · Baba · Radar · Nube ·
+        Yamcha. Kaio-sama se mudó a Herramientas (cero llamadores de
+        showPage('radio') fuera del botón, medido). -->
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <!-- [NUBE-4] LA NUBE SE MUDA AL LISTADO PRINCIPAL, junto a Esferas (orden de
         Memo, 24-sep-2026). Era `nav-dropdown-item` + `showHerramienta`; hoy es
         `nav-btn` + `showPage`, la MISMA forma que Esferas.
@@ -181,11 +185,10 @@
         visibilidad también se deriva («se ve si al rol le queda al menos una
         herramienta») y la Nube era la única que tenían. Es correcto —ya no es
         una herramienta— y va dicho aquí para que no se lea como una pérdida. -->
-   <button class="nav-btn" onclick="showPage('nube')" id="nav-nube"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Nube voladora</span></button>
    <button class="nav-btn" onclick="showPage('baba')" id="nav-baba"><svg class="nav-ic"><use href="#ic-baba"/></svg><span>La Casa de Uranai Baba</span></button>
-   <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
-   <button class="nav-btn" onclick="showPage('radio')" id="nav-radio"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Kaio-sama</span></button>
+   <button class="nav-btn" onclick="showPage('nube')" id="nav-nube"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Nube voladora</span></button>
+   <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
   </div>
 
   <div class="nav-group" id="nav-dropdown-herramientas">
@@ -206,6 +209,9 @@
    <!-- [GENKIDAMA-1] El concentrado de correos y las campañas. Solo maestro_roshi:
         manda correo REAL. Nace cerrada para los demás (PERMISOS_TABS). -->
    <button class="nav-dropdown-item" id="nav-genkidama" onclick="showHerramienta('genkidama')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Genkidama</span></button>
+   <!-- [NAV-MIN-2] Kaio-sama (la radio) baja a Herramientas, orden de Memo.
+        Su carga se mudó de loadPage a showHerramienta — UNA puerta, no dos. -->
+   <button class="nav-dropdown-item" id="nav-radio" onclick="showHerramienta('radio')"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Kaio-sama</span></button>
   </div>
  </nav>
 
@@ -260,8 +266,10 @@
  <div class="page" id="page-resumen">
   <div class="page-hero">
    <div>
-    <div class="page-title">RESUMEN</div>
-    <div class="page-sub">// vista general · tiempo real</div>
+    <!-- [NAV-MIN-2] Renombrada por Memo: «Montaña Pai, que es donde todo
+         empieza». El id interno sigue siendo 'resumen'. -->
+    <div class="page-title">MONTAÑA PAI</div>
+    <div class="page-sub">// donde todo empieza · vista general · tiempo real</div>
    </div>
    <!-- [CUADRE-4] El «Actualizar» del uso diario, A LA VISTA SIN SCROLL.
         Vivía dentro de Eventos → Comparar con Excel, donde nadie lo buscaba. -->
@@ -938,6 +946,10 @@
 
  <!-- ─── GUERREROS Z ─── -->
      <div class="page" id="page-equipo">
+      <!-- [NAV-MIN-2] El Panel de control (antes «Montaña Pai») vive aquí como
+           sub-pestaña. La sub-barra SOLO se pinta a quien lleva el permiso
+           'montana' (aplicarPermisosUI) — a los demás un botón que rebota. -->
+      <div class="kh-subnav" id="equipo-subnav" style="display:none"><button class="kh-subnav-btn active">🐉 Guerreros Z</button><button class="kh-subnav-btn" onclick="showPage('montana')">🛡 Panel de control</button></div>
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px">
@@ -1440,10 +1452,14 @@
  <!-- ─── COTIZADOR ─── -->
      <!-- ─── MONTAÑA PAI ─── -->
      <div class="page" id="page-montana">
+      <div class="kh-subnav"><button class="kh-subnav-btn" onclick="showPage('equipo')">🐉 Guerreros Z</button><button class="kh-subnav-btn active">🛡 Panel de control</button></div>
       <div class="page-hero">
        <div>
-        <div class="page-title">MONTAÑA PAI</div>
-        <div class="page-sub">// panel maestro roshi · control total</div>
+        <!-- [NAV-MIN-2] El nombre «Montaña Pai» se lo llevó el Resumen (palabra
+             de Memo: «es donde todo empieza»). Esta pantalla queda como el
+             panel de control del equipo; su id interno ('montana') no cambia. -->
+        <div class="page-title">PANEL DE CONTROL</div>
+        <div class="page-sub">// maestro roshi · pendientes · reportes · deudas</div>
        </div>
        <button class="btn btn-ghost btn-sm k-mono" onclick="loadMontana()">ACTUALIZAR</button>
       </div>
@@ -4215,7 +4231,7 @@
 <!-- D2: barra inferior (móvil) + scrim del drawer. A nivel raíz para no verse
      afectados por el transform del sidebar. Usan showPage() (mismo ruteo). -->
 <nav class="kh-bottombar" id="kh-bottombar" aria-label="Navegación rápida">
- <button class="kh-bb-item active" data-tab="resumen" onclick="showPage('resumen')"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
+ <button class="kh-bb-item active" data-tab="resumen" onclick="showPage('resumen')"><svg class="nav-ic"><use href="#ic-montana"/></svg><span>Montaña Pai</span></button>
  <button class="kh-bb-item" data-tab="pagos" onclick="showPage('pagos')"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
  <button class="kh-bb-item" data-tab="capsule" onclick="showPage('capsule')"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule</span></button>
  <button class="kh-bb-item" data-tab="solicitudes_portal" onclick="showPage('solicitudes_portal')"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Portal</span></button>

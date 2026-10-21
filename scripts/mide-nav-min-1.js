@@ -34,7 +34,7 @@ af(activa('reportes', 'Reportes') && pagina('reportes').includes("showPage('inve
 af((css.match(/\.kh-subnav-btn\{/g) || []).length === 1, 'el estilo .kh-subnav-btn existe UNA vez en kamehouse.css');
 
 console.log('[C] el resaltado del menú para páginas sin botón');
-af(/NAV_ALIAS = \{ ingresos: 'gastos', saldos: 'gastos', reportes: 'inventario' \}/.test(js), 'NAV_ALIAS vive en showPage');
+af(/NAV_ALIAS = \{ ingresos: 'gastos', saldos: 'gastos', reportes: 'inventario', montana: 'equipo' \}/.test(js), 'NAV_ALIAS vive en showPage con sus cuatro alias');
 
 console.log('[D] EL INVARIANTE: quien ve una hermana ve a TODAS (evaluado, no leído con regex)');
 let PERMISOS_TABS = null;
@@ -56,6 +56,29 @@ if (PERMISOS_TABS) {
   const malos3 = Object.entries(PERMISOS_TABS).filter(([, t]) => t.includes('reportes') && !t.includes('inventario')).map(([r]) => r);
   af(malos3.length === 0, 'y reportes sin inventario tampoco existe' + (malos3.length ? ' — VIOLAN: ' + malos3.join(',') : ''));
 }
+
+console.log('[F] NAV-MIN-2: el orden de Eventos, Kaio-sama en Herramientas, Equipo disuelto, el renombre');
+const nav = html.slice(html.indexOf('id="kh-sidebar"'), html.indexOf('</nav>'));
+const ordenEv = ['nav-esferas', 'nav-kamisama', 'nav-baba', 'nav-radar', 'nav-nube', 'nav-yamcha'].map((id) => nav.indexOf(`id="${id}"`));
+af(ordenEv.every((x) => x > -1) && ordenEv.every((x, i) => i === 0 || x > ordenEv[i - 1]), 'Eventos en el orden de Memo: Esferas · Palacio · Baba · Radar · Nube · Yamcha');
+const dd = nav.slice(nav.indexOf('nav-dropdown-herramientas'));
+af(dd.includes(`id="nav-radio" onclick="showHerramienta('radio')"`), 'Kaio-sama vive en Herramientas (showHerramienta)');
+af(!/nav-btn" onclick="showPage\('radio'\)/.test(nav), 'y ya no tiene botón de página');
+// Comentarios fuera ANTES de la aserción de ausencia: el ⚰️ de loadPage
+// NOMBRA la línea que se fue (la ley de «un arnés que lee comentarios»).
+const jsVivo = js.replace(/\/\/[^\n]*/g, '');
+af(/if \(name === 'radio'\) \{\s*loadRadio\(\);/.test(jsVivo) && !/if \(name === 'radio'\) loadRadio/.test(jsVivo), 'la carga de la radio vive en showHerramienta y NO en loadPage (una puerta)');
+af(!/nav-group-title[^>]*>Equipo</.test(nav), 'el grupo «Equipo» murió');
+af(!/id="nav-montana"/.test(nav), 'Montaña Pai (permisos del equipo) ya no tiene botón propio');
+af(nav.indexOf('id="nav-equipo"') > -1 && nav.indexOf('id="nav-equipo"') < nav.indexOf('nav-group-title" onclick="toggleNavGroup(this)">Eventos'), 'Guerreros Z vive en Operación (antes del grupo Eventos)');
+af(/id="nav-resumen"><svg[^>]*><use href="#ic-montana"[^>]*><\/svg><span>Montaña Pai<\/span>/.test(nav.replace(/\n/g, '')), 'el Resumen se llama «Montaña Pai» en el menú');
+af(pagina('resumen').includes('MONTAÑA PAI'), 'y en su título de página');
+af(pagina('montana').includes('PANEL DE CONTROL'), 'la pantalla vieja de Montaña Pai ahora es «PANEL DE CONTROL» (sin nombres duplicados)');
+af(activa('equipo', 'Guerreros Z') && pagina('equipo').includes("showPage('montana')") && pagina('equipo').includes('id="equipo-subnav"') && pagina('equipo').includes('display:none'), 'Guerreros Z trae su sub-barra, NACE oculta (la enciende el permiso)');
+const apu = fs.readFileSync(path.join(RAIZ, 'kamehouse-montana.js'), 'utf8');
+af(/equipo-subnav'\)/.test(apu) && /_puedeVerTab\('montana'\)/.test(apu), 'aplicarPermisosUI la enciende solo con el permiso montana');
+af(activa('montana', 'Panel de control') && pagina('montana').includes("showPage('equipo')"), 'el Panel de control trae su sub-barra de regreso');
+af(/montana: 'equipo'/.test(js), 'NAV_ALIAS resalta Guerreros Z al abrir el Panel');
 
 console.log('[E] control positivo del instrumento');
 af(!activa('gastos', 'Ingresos'), 'el detector de activo distingue (Gastos no marca Ingresos)');

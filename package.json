@@ -90,6 +90,7 @@
     "mide:req-dup-1": "node scripts/mide-req-dup-1.js",
     "mide:ctr-tabs-1": "node scripts/mide-ctr-tabs-1.js",
     "mide:rep-popo-1": "node scripts/mide-rep-popo-1.js",
-    "mide:emma-1": "node scripts/mide-emma-1.js"
+    "mide:emma-1": "node scripts/mide-emma-1.js",
+    "mide:total-baja-1": "node scripts/mide-total-baja-1.js"
   }
 }

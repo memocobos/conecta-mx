@@ -610,11 +610,28 @@ function carear(personasExcel, viajerosBase, opciones) {
   // —no en un log— porque el encargo es que Memo VEA el tamaño de cada montón.
   const ceroRegla = [];
   const ceroFuera = {};
+  // 🔒 [TOTAL-BAJA-1 · 21-oct-2026] El total que una BAJA tenía y el careo
+  // quiso pisar: se NOMBRA, jamás se aplica.
+  const totalesBaja = [];
   for (const p of enExcel.values()) {
     if (p.total == null) continue;
     const mismos = enBase.get(p.clave) || [];
     if (mismos.length !== 1) continue;
     const v = mismos[0];
+    // 🔒 [TOTAL-BAJA-1] EL TOTAL DE UNA BAJA ES DE LA BAJA, NO DE LA PESTAÑA.
+    // La regla de Memo (CAREO-ZONA-1c): al cancelar, total = LO COBRADO
+    // (saldo 0, el dinero del cancelado es ganancia). La celda «Total» de un
+    // cancelado en la pestaña dice otra cosa, y pisarla DESHACÍA esa
+    // corrección firmada — mordió el 21-oct: 4 bajas (soyluna×2,
+    // julionrodep×2) amanecieron con «saldo a favor» falso de hasta $1,500.
+    // Era el hoyo nombrado el 3-oct en PREVENTA-DESCUENTO-1 («el careo puede
+    // deshacer una corrección firmada… totalesContrato no tiene guarda»).
+    // Baja = boletos_crudo 0 Y sin zona (la MISMA forma que escribe la baja;
+    // el crudo existe justo porque el respaldo de `boletos` sube el 0 a 1).
+    if (v.boletos_crudo === 0 && v.zona == null) {
+      totalesBaja.push({ nombre: p.nombre, viajero_id: v.id, excel_total: p.total, sistema_total: v.total_contrato == null ? null : Number(v.total_contrato) });
+      continue;
+    }
     // Un `total_contrato` NULL en la base no es cero: es «todavía no se sabe».
     // Se dice como null y se resta como cero, que es lo que la pantalla ya hace
     // con esas filas (cuenta-evento solo suma las que traen total). Así la fila
@@ -683,6 +700,9 @@ function carear(personasExcel, viajerosBase, opciones) {
            bajas: bajas.sort(porNombre), iguales: iguales.sort(porNombre),
            apartados: apartados.sort(porNombre), ambiguos: ambiguos.sort(porNombre),
            totales_contrato: totalesContrato.sort(porNombre),
+           // [TOTAL-BAJA-1] Los totales que NO se tocaron por ser de una baja
+           // — nombrados para que un hueco no se lea como «todo cuadra».
+           totales_baja: totalesBaja.sort(porNombre),
            // [CUADRE-5]
            totales_cero_regla: ceroRegla.sort(porNombre),
            cuadre5: {

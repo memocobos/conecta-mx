@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* =============================================================================
- * mide-shenron-1 — 🐉 EL MENSAJERO DE MEMO (21-oct-2026).
+ * mide-emma-1 — EMMA KAIOSAMA · el correo del sistema (21-oct-2026).
  * Supersede a mide-correo-equipo-1 (CORREO-EQUIPO-1 murió sin estrenarse: la
  * misma tuerca creció a las tres audiencias y se renombró Shenron).
  * Handler REAL + red falsa que CUENTA los envíos a Resend (control positivo:
@@ -68,13 +68,13 @@ function redNueva() {
 }
 function H() {
   Object.keys(require.cache).forEach((k) => { if (k.includes('netlify/functions') || k.includes('netlify\\functions')) delete require.cache[k]; });
-  return { h: require(path.join(RAIZ, 'netlify/functions/admin-shenron.js')).handler, jwtSign: require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js')).jwtSign };
+  return { h: require(path.join(RAIZ, 'netlify/functions/admin-emma.js')).handler, jwtSign: require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js')).jwtSign };
 }
 const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + tok }, body: JSON.stringify(body) });
 const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo.\n\nMetan sus tours en su perfil.' };
 
 (async function main() {
-  console.log('══ mide:shenron-1 · el mensajero de Memo ══\n');
+  console.log('══ mide:emma-1 · Emma Kaiosama ══\n');
   let red = redNueva(); global.fetch = red.fetch;
   let { h, jwtSign } = H();
   const roshi = jwtSign({ id: 'u-memo', rol: 'maestro_roshi', nombre: 'Memo' }, process.env.JWT_SECRET, 3600);
@@ -111,7 +111,7 @@ const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo
   console.log('\n[D] las puertas');
   red = redNueva(); global.fetch = red.fetch; ({ h } = H());
   r = await h(ev({ ...CUERPO, audiencia: 'equipo' }, bulma));
-  af(r.statusCode === 403, 'bulma no puede: Shenron obedece a maestro_roshi');
+  af(r.statusCode === 403, 'bulma no puede: la pluma es de Memo (solo maestro_roshi)');
   r = await h(ev({ ...CUERPO, audiencia: 'equipo', roles: ['cliente'] }, roshi));
   af(r.statusCode === 400 && /Roles desconocidos/.test(JSON.parse(r.body).error), 'rol fuera de la lista cerrada → 400 que lo nombra');
   r = await h(ev({ ...CUERPO, audiencia: 'evento', evento_id: 'x; drop' }, roshi));
@@ -124,15 +124,22 @@ const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo
 
   console.log('\n[E] la pantalla (estática) y el cableado');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
-  const ui = fs.readFileSync(path.join(RAIZ, 'kamehouse-shenron.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  const ui = fs.readFileSync(path.join(RAIZ, 'kamehouse-emma.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
   const kj = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
-  af(/id="nav-shenron"/.test(html) && /id="page-shenron"/.test(html) && /kamehouse-shenron\.js/.test(html), 'nav + página + script en el HTML');
+  af(/id="nav-emma"/.test(html) && /id="page-emma"/.test(html) && /kamehouse-emma\.js/.test(html), 'nav + página + script en el HTML');
   af(/<option value="">— elige la audiencia —<\/option>/.test(html), 'el selector de audiencia NACE VACÍO (DEFAULTS-1)');
-  af(/'shenron'\]/.test(kj) && /name === 'shenron'/.test(kj), 'PERMISOS_TABS (solo roshi) + carga en showHerramienta (una puerta)');
-  af(/shInvocar/.test(ui) && /confirm\(/.test(ui) && /seco: false, confirmar: true/.test(ui), 'la pantalla invoca primero y manda solo tras confirm con los dos gestos');
-  af(/_shFreno/.test(ui) && /j\.siguiente/.test(ui), 'tandas con freno, avanzando por el siguiente del servidor');
-  af(/GENKIDAMA/i.test(ui) || /Genkidama/.test(html.slice(html.indexOf('page-shenron'))), 'y la pantalla manda las campañas masivas a Genkidama (Shenron no la reemplaza)');
+  af(/'emma'\]/.test(kj) && /name === 'emma'/.test(kj), 'PERMISOS_TABS (solo roshi) + carga en showHerramienta (una puerta)');
+  af(/emVistaPrevia/.test(ui) && /confirm\(/.test(ui) && /seco: false, confirmar: true/.test(ui), 'la pantalla enseña la vista previa primero y manda solo tras confirm con los dos gestos');
+  af(/_emFreno/.test(ui) && /j\.siguiente/.test(ui), 'tandas con botón de detener, avanzando por el siguiente del servidor');
+  af(/GENKIDAMA/i.test(ui) || /Genkidama/.test(html.slice(html.indexOf('page-emma'))), 'y la pantalla manda las campañas masivas a Genkidama (Emma no la reemplaza)');
   af(!fs.existsSync(path.join(RAIZ, 'netlify/functions/admin-correo-equipo.js')), 'admin-correo-equipo murió sin estrenarse: UN solo dueño del correo interno');
+  af(!fs.existsSync(path.join(RAIZ, 'kamehouse-shenron.js')) && !fs.existsSync(path.join(RAIZ, 'netlify/functions/admin-shenron.js')), 'Shenron murió sin estrenarse (renombrado a Emma el mismo día)');
+  // Botones SIN nombres temáticos (palabra de Memo): se mide el TEXTO que el
+  // botón pinta, con los comentarios fuera (la ley del arnés que lee comentarios).
+  const pagEmma = html.slice(html.indexOf('id="page-emma"'), html.indexOf('LISTA DE ESPERA'));
+  af(/>Vista previa<\/button>/.test(pagEmma), 'el botón dice «Vista previa», sin tema');
+  af(!/[Ii]nvocar|[Dd]eseo|Shenron/.test(pagEmma), 'y la página no trae nombres temáticos en sus textos');
+  af(/Enviar a \$\{j\.total\}/.test(ui) && !/Conceder|Invocar|deseo/.test(ui.replace(/\/\*[^]*?\*\//g, '')), 'los botones de la pantalla dicen Enviar/Detener, sin tema');
 
   console.log('\n' + (R ? '🔴 ROJO' : (V ? '✅ VERDE' : 'NADA MEDIDO')) + ' · ' + V + ' en verde · ' + R + ' en rojo');
   process.exit(R ? 1 : 0);

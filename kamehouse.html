@@ -209,10 +209,10 @@
    <!-- [GENKIDAMA-1] El concentrado de correos y las campañas. Solo maestro_roshi:
         manda correo REAL. Nace cerrada para los demás (PERMISOS_TABS). -->
    <button class="nav-dropdown-item" id="nav-genkidama" onclick="showHerramienta('genkidama')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Genkidama</span></button>
-   <!-- [SHENRON-1] El mensajero de Memo: correo puntual a equipo, creadoras o
+   <!-- [EMMA-1] Emma Kaiosama: correo puntual del sistema a equipo, creadoras o
         viajeros de un evento. Solo maestro_roshi (manda correo REAL). Para
         campañas masivas con bitácora/energía sigue siendo Genkidama. -->
-   <button class="nav-dropdown-item" id="nav-shenron" onclick="showHerramienta('shenron')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Shenron</span></button>
+   <button class="nav-dropdown-item" id="nav-emma" onclick="showHerramienta('emma')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Emma Kaiosama</span></button>
    <!-- [NAV-MIN-2] Kaio-sama (la radio) baja a Herramientas, orden de Memo.
         Su carga se mudó de loadPage a showHerramienta — UNA puerta, no dos. -->
    <button class="nav-dropdown-item" id="nav-radio" onclick="showHerramienta('radio')"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Kaio-sama</span></button>
@@ -2970,50 +2970,50 @@
    <div id="blast-cont"><div class="loading-state">Cargando…</div></div>
  </div>
 
- <!-- [SHENRON-1] 🐉 SHENRON · el mensajero de Memo (correo del sistema) -->
- <div class="page" id="page-shenron">
+ <!-- [EMMA-1] EMMA KAIOSAMA · el correo del sistema -->
+ <div class="page" id="page-emma">
    <div class="page-hero">
     <div>
-     <div class="page-title">🐉 SHENRON</div>
-     <div class="page-sub">// pide tu deseo: el mensaje llega a quien tú elijas — equipo, creadoras o los viajeros de un evento</div>
+     <div class="page-title">EMMA KAIOSAMA</div>
+     <div class="page-sub">// correo del sistema: equipo, creadoras o los viajeros de un evento</div>
     </div>
    </div>
    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:18px;max-width:720px">
      <div class="form-group">
-       <label>¿A quién va tu deseo?</label>
+       <label>¿A quién va el correo?</label>
        <!-- Nace VACÍO (DEFAULTS-1): a quién le llega es una ATRIBUCIÓN. -->
-       <select id="sh-aud" class="cot-input" onchange="shAudienciaCambia()">
+       <select id="em-aud" class="cot-input" onchange="emAudienciaCambia()">
          <option value="">— elige la audiencia —</option>
          <option value="equipo">Equipo (coordis y más)</option>
          <option value="creadoras">Creadoras vigentes</option>
          <option value="evento">Viajeros de un evento</option>
        </select>
      </div>
-     <div class="form-group" id="sh-roles-wrap" style="display:none">
+     <div class="form-group" id="em-roles-wrap" style="display:none">
        <label>Roles del equipo</label>
        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px">
-         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="sh-rol" value="coordinador" checked> Coordinadores</label>
-         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="sh-rol" value="mister_popo" checked> Mister Popo</label>
-         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="sh-rol" value="bulma"> Bulma</label>
-         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="sh-rol" value="milk"> Milk</label>
-         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="sh-rol" value="cc"> Creadores de contenido</label>
+         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="em-rol" value="coordinador" checked> Coordinadores</label>
+         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="em-rol" value="mister_popo" checked> Mister Popo</label>
+         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="em-rol" value="bulma"> Bulma</label>
+         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="em-rol" value="milk"> Milk</label>
+         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="em-rol" value="cc"> Creadores de contenido</label>
        </div>
      </div>
-     <div class="form-group" id="sh-evento-wrap" style="display:none">
+     <div class="form-group" id="em-evento-wrap" style="display:none">
        <label>Evento</label>
-       <select id="sh-evento" class="cot-input"><option value="">— elige el evento —</option></select>
-       <div style="font-size:11px;color:var(--ts);margin-top:4px">Les llega a los viajeros del evento (clientes con lugar; bajas y staff quedan fuera). ⚠️ Shenron no lleva bitácora: si repites un envío, llega doble. Para campañas con dedup y energía usa <b>Genkidama</b>.</div>
+       <select id="em-evento" class="cot-input"><option value="">— elige el evento —</option></select>
+       <div style="font-size:11px;color:var(--ts);margin-top:4px">Les llega a los viajeros del evento (clientes con lugar; bajas y staff quedan fuera). ⚠️ Emma no lleva bitácora: si repites un envío, llega doble. Para campañas con dedup y energía usa <b>Genkidama</b>.</div>
      </div>
      <div class="form-group">
        <label>Asunto</label>
-       <input id="sh-asunto" class="cot-input" maxlength="120" placeholder="ej. Registra tus tours del ranking">
+       <input id="em-asunto" class="cot-input" maxlength="120" placeholder="ej. Registra tus tours del ranking">
      </div>
      <div class="form-group">
        <label>Mensaje (texto plano; línea en blanco = párrafo)</label>
-       <textarea id="sh-mensaje" class="cot-input" rows="8" maxlength="4000" placeholder="Escribe tu deseo…"></textarea>
+       <textarea id="em-mensaje" class="cot-input" rows="8" maxlength="4000" placeholder="Escribe el mensaje…"></textarea>
      </div>
-     <button class="btn" onclick="shInvocar()">🐉 Invocar a Shenron (vista previa)</button>
-     <div id="sh-resultado"></div>
+     <button class="btn" onclick="emVistaPrevia()">Vista previa</button>
+     <div id="em-resultado"></div>
    </div>
  </div>
 
@@ -4370,8 +4370,8 @@
 <script src="kamehouse-nube.js"></script>
 <!-- [PN27] El blast de preventa — antes del tronco, misma regla. -->
 <script src="kamehouse-blast.js"></script>
-<!-- [SHENRON-1] El mensajero de Memo — antes del tronco, misma regla. -->
-<script src="kamehouse-shenron.js"></script>
+<!-- [EMMA-1] Emma Kaiosama — antes del tronco, misma regla. -->
+<script src="kamehouse-emma.js"></script>
 <!-- [GENKIDAMA-1] El concentrado y las campañas — antes del tronco, misma regla. -->
 <script src="kamehouse-genkidama.js"></script>
 <script src="kamehouse-requisiciones.js"></script>

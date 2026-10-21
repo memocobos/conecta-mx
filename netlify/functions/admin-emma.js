@@ -1,10 +1,11 @@
 // =============================================================================
-// admin-shenron  [SHENRON-1 · 21-oct-2026] 🐉
+// admin-emma  [EMMA-1 · 21-oct-2026]
 //
-// «Shenron, el dragón que concede deseos»: Memo escribe el mensaje y Shenron se
-// lo lleva a quien él elija. Nació como admin-correo-equipo (CORREO-EQUIPO-1,
-// solo equipo) y se SUPERSEDIÓ el mismo día, antes de estrenarse, con las tres
-// audiencias que pidió Memo: «creadores, coordis, clientes, lo que yo quiera».
+// EMMA KAIOSAMA, el juez que decide a dónde va cada alma: Memo escribe el
+// mensaje y Emma lo despacha a quien él elija. Nació como admin-correo-equipo
+// (solo equipo), creció a las tres audiencias como «Shenron» y Memo lo
+// renombró el mismo día, antes de estrenarse: «Shenron no me gusta… mejor
+// déjalo en Emma Kaiosama» — y los botones SIN nombres temáticos.
 //
 // POST { audiencia, asunto, mensaje, seco?, confirmar?, desde?, ...según audiencia }
 //   · audiencia (LISTA CERRADA, sin default — elegir a quién es una ATRIBUCIÓN,
@@ -27,11 +28,11 @@
 //     `desde` (índice) → contesta { enviados, errores, siguiente|null, total }.
 //     La pantalla orquesta las tandas (el patrón de khExcelRecorrer/blast).
 //
-// 🔒 SOLO maestro_roshi: Shenron obedece a quien reunió las esferas.
+// 🔒 SOLO maestro_roshi: la pluma es de Memo.
 // 🔒 SIN bitácora A PROPÓSITO (el precedente de contratos-alerta-cron): esto es
 //    mensajería puntual, no campaña. Si la respuesta de una tanda se pierde y
 //    se repite, esa tanda llega doble — dicho aquí y en la pantalla. Para
-//    campañas masivas con dedup, energía y bajas existe GENKIDAMA: Shenron no
+//    campañas masivas con dedup, energía y bajas existe GENKIDAMA: Emma no
 //    la reemplaza y la pantalla lo dice.
 // 🔒 El envío va por L.enviarCorreo (_lib/creadoras): MISMO FROM y correo-guard.
 // =============================================================================

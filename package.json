@@ -89,6 +89,7 @@
     "mide:capsule-comp-1": "node scripts/mide-capsule-comp-1.js",
     "mide:req-dup-1": "node scripts/mide-req-dup-1.js",
     "mide:ctr-tabs-1": "node scripts/mide-ctr-tabs-1.js",
-    "mide:rep-popo-1": "node scripts/mide-rep-popo-1.js"
+    "mide:rep-popo-1": "node scripts/mide-rep-popo-1.js",
+    "mide:correo-equipo-1": "node scripts/mide-correo-equipo-1.js"
   }
 }

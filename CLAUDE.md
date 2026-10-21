@@ -271,6 +271,24 @@ está caduco antes de escribirse.
     con su palabra tanda por tanda · los emojis/acentos del copy viven en el
     CORREO (el `inc` del sitio va sobrio a propósito).
 
+- 📜⏳ **CONTRATO-CLIENTE-1 · EL CONTRATO DEL CLIENTE VA CON LAS FASES REALES
+  (decisión de Memo, 20-oct-2026: opción B, firmada en chat «Si b esta bien
+  empecemos asi»).** Los clientes del Portal HOY no firman nada y no es un
+  hueco: el módulo de contratos de cliente (F3a, `contratos_viajeros` por
+  lugar) cuelga del flujo VIEJO del Portal (`solicitudes_tour`/`lugares`), que
+  está en CERO; los de la preventa entran por requisición → `viajeros_evento`
+  y ese camino no genera contrato. **La regla que esto fija: el contrato del
+  cliente nace cuando Pa'l Norte publique FASES REALES y el cliente elija
+  paquete** — ahí el monto es verdadero y el contrato dice algo verdadero; un
+  contrato de la preventa a ciegas diría $300 y habría que re-firmarlo.
+  🔒 **NO construir la opción A** (contrato al aprobar la requisición): se
+  propuso y Memo la descartó. Cuando toque la tuerca: generar el contrato por
+  viajero al elegir paquete (ajuste de `total_contrato` del rumbo PN27),
+  firma por link en el Portal (patrón F3a), chips en el Portal y columna
+  «contrato» en Capsule. El TEXTO vive en `CONTRATO-CLIENTE-BORRADOR.md`
+  (raíz privada, sin commitear) esperando el visto de Memo — deriva de las
+  POLITICAS firmadas del index + las reglas de pago de la casa, no se
+  inventó cláusula nueva.
 - 👥⏳ **ACOMP-1 · ACOMPAÑANTES EN LA REQUISICIÓN + PORTAL AL APROBAR
   (13-oct-2026). ⏳ EN EL ÁRBOL LOCAL, PENDIENTE PUSH DE MEMO; el SQL
   (`migraciones/ACOMP-1.sql`, columna `requisiciones.acompanantes jsonb` +

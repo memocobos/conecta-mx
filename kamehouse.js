@@ -86,7 +86,7 @@ const PERMISOS_TABS = {
   // [OPS-MIN-1 13-oct] Palabra de Memo: «minimizar pantallas». Fuera para los
   // admins: Inicio (su resumen es Resumen), Pagos y Por Evento (leían el Portal
   // vacío; la cobranza vive en Resumen y los números en Capsule → Números).
-  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama'],
+  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama','shenron'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
@@ -4822,6 +4822,10 @@ function showHerramienta(name) {
   // [GENKIDAMA-1] poner el botón no es poner la pantalla.
   if (name === 'genkidama') {
     loadGenkidama();
+  }
+  // [SHENRON-1] poner el botón no es poner la pantalla.
+  if (name === 'shenron') {
+    loadShenron();
   }
   // [NAV-MIN-2] Kaio-sama volvió a ser herramienta: su carga se mudó de loadPage.
   if (name === 'radio') {

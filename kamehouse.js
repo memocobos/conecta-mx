@@ -81,12 +81,10 @@ let disenoLoaded = false;
 const PERMISOS_TABS = {
   // [HOME-ROL-1] `inicio` es la pantalla de ENTRADA por rol (RUMBO 12-oct):
   // todos la pueden ver; a quién ATERRIZA ahí lo decide HOME_PREFERIDO.
-  // [PN27] `blast` manda correo REAL por tandas: SOLO maestro_roshi. Bulma y
-  // Milk NO lo llevan a propósito — la pluma del blast es de Memo.
   // [OPS-MIN-1 13-oct] Palabra de Memo: «minimizar pantallas». Fuera para los
   // admins: Inicio (su resumen es Resumen), Pagos y Por Evento (leían el Portal
   // vacío; la cobranza vive en Resumen y los números en Capsule → Números).
-  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','blast','genkidama','emma'],
+  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','genkidama','emma'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
@@ -4815,10 +4813,6 @@ function showHerramienta(name) {
   // en `loadPage`. Medido: cero llamadores de `showHerramienta('nube')` en el
   // árbol. Dejar la carga en los DOS sitios habría sido la segunda puerta que
   // todavía no ha divergido.
-  // [PN27] El blast de preventa: poner el botón no es poner la pantalla.
-  if (name === 'blast') {
-    loadBlast();
-  }
   // [GENKIDAMA-1] poner el botón no es poner la pantalla.
   if (name === 'genkidama') {
     loadGenkidama();

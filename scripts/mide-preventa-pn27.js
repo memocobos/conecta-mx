@@ -5,6 +5,8 @@
  * Palabra de Memo: preventa a ciegas, separo $300, fecha 26-28 mar 2027 SOLO
  * para el sistema (el público ve «Por confirmar»), bandeja de requisiciones
  * encendida POR EVENTO (solo palnorte), blast por tandas después.
+ * ⚰️ El blast se RETIRÓ el 21-oct (BLAST-RETIRO-1): su bloque [F] quedó como
+ * guardia de la poda; la bitácora preventa_blast vive y Genkidama la lee.
  *
  * ⚠️ SIN ANCLA a propósito (árbol de trabajo, como mide:req-b1 y
  * mide:cuadre-aplicar): mide lo que acabas de escribir y no sufre la trampa
@@ -275,102 +277,26 @@ function extraerObj(contenido, id) {
   af(iCatch > -1, 'el catchall sigue existiendo (cardinalidad del control)');
   af(iRegla > -1 && iCatch > -1 && iRegla < iCatch, 'y la regla va ANTES del catchall (first match wins)');
 
-  // ═══ [F] EL BLAST: seco no manda, enviar exige confirmar, el sitio manda ══
-  console.log('\n[F] admin-preventa-blast · las cuatro puertas del correo real');
-  process.env.JWT_SECRET = 'secreto-del-arnes';
-  process.env.PORTAL_SUPABASE_URL = 'https://portal.fake';
-  process.env.PORTAL_SUPABASE_SERVICE_KEY = 'llave-portal-falsa';
-  process.env.RESEND_API_KEY = 're_fake_key';
-  const { jwtSign } = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js'));
-  const tokenRoshi = jwtSign({ id: 'u-memo', rol: 'maestro_roshi', nombre: 'Memo' }, process.env.JWT_SECRET, 3600);
-  const tokenBulma = jwtSign({ id: 'u-bulma', rol: 'bulma', nombre: 'Bulma' }, process.env.JWT_SECRET, 3600);
-
-  async function correrBlast(catalogo, body, token, filasBitacora) {
-    limpiarCache();
-    const n = { resend: 0, patch: 0, postBitacora: 0, index: 0 };
-    const filas = (filasBitacora || []).map((f, i) => Object.assign({ id: 'b' + i, campana: 'pn27', caliente: false, enviado_at: null, error: null }, f));
-    const patches = [];
-    global.fetch = async (url, init) => {
-      const u = String(url); const metodo = (init && init.method) || 'GET';
-      if (u.includes('api.resend.com')) { n.resend++; return { ok: true, status: 200, json: async () => ({ id: 'em' }) }; }
-      if (u.includes('/index.html')) { n.index++; return { ok: true, status: 200, text: async () => catalogo }; }
-      // ⚠️ /rest/v1/usuarios sirve a DOS preguntas: la SESIÓN del verify (debe
-      // tronar → fail-open documentado, el rol del JWT manda) y el STAFF de la
-      // siembra (select=correo — debe contestar). Dos caminos, una ruta.
-      if (u.includes('/rest/v1/usuarios') && u.includes('select=correo')) { return { ok: true, status: 200, json: async () => [] }; }
-      if (u.includes('/rest/v1/usuarios') || u.includes('sesion')) { throw new Error('sesion-viva truena a propósito (fail-open documentado: el rol del JWT manda)'); }
-      // [GENKIDAMA-1] El blast gasta la ENERGÍA del día (una sola para todo el
-      // correo masivo): la red falsa contesta el límite y lo enviado HOY.
-      if (u.includes('/rest/v1/genkidama_config')) return { ok: true, status: 200, json: async () => [{ limite_diario: 300 }] };
-      if (u.includes('/rest/v1/genkidama_envios')) return { ok: true, status: 200, json: async () => [], headers: { get: (h) => h === 'content-range' ? '0-0/0' : null }, text: async () => '' };
-      if (u.includes('/rest/v1/preventa_blast') && u.includes('enviado_at=gte.')) {
-        const hoy = filas.filter((f) => f.enviado_at).length;
-        return { ok: true, status: 200, json: async () => [], headers: { get: (h) => h === 'content-range' ? `0-0/${hoy}` : null }, text: async () => '' };
-      }
-      if (u.includes('/rest/v1/preventa_blast')) {
-        if (metodo === 'GET') {
-          const pend = filas.filter((f) => !f.enviado_at && !f.error);
-          const lim = (u.match(/limit=(\d+)/) || [])[1];
-          const quiere = u.includes('select=id&limit=1') && !u.includes('enviado_at') ? filas.slice(0, 1) : pend.slice(0, lim ? Number(lim) : 100);
-          return { ok: true, status: 200, json: async () => quiere, headers: { get: (h) => h === 'content-range' ? `0-0/${pend.length}` : null }, text: async () => '' };
-        }
-        if (metodo === 'PATCH') {
-          n.patch++; const id = (u.match(/id=eq\.([^&]+)/) || [])[1];
-          const f = filas.find((x) => x.id === id); if (f) Object.assign(f, JSON.parse(init.body));
-          patches.push({ id, body: JSON.parse(init.body) });
-          return { ok: true, status: 204, text: async () => '' };
-        }
-        if (metodo === 'POST') { n.postBitacora += JSON.parse(init.body).length; return { ok: true, status: 201, text: async () => '' }; }
-      }
-      if (u.includes('portal.fake')) {
-        if (u.includes('giveaway_registros')) return { ok: true, status: 200, json: async () => [{ correo: 'Nuevo@Correo.MX ', nombre: 'Nuevo' }, { correo: 'ya@estaba.mx', nombre: 'Dup' }] };
-        if (u.includes('bkp_mel')) return { ok: true, status: 200, json: async () => [] };
-      }
-      if (u.includes('/rest/v1/eventos_waitlist')) return { ok: true, status: 200, json: async () => [] };
-      throw new Error('red no prevista en [F]: ' + metodo + ' ' + u);
-    };
-    const { handler } = require(path.join(RAIZ, 'netlify/functions/admin-preventa-blast.js'));
-    const headers2 = { origin: 'https://conectareynosa.mx' };
-    if (token) headers2.authorization = 'Bearer ' + token;
-    const res = await handler({ httpMethod: 'POST', headers: headers2, body: JSON.stringify(body) });
-    return { res, json: JSON.parse(res.body || '{}'), n, filas, patches };
-  }
-
-  // F1 · la pluma: bulma rebota, sin token rebota.
-  const f1 = await correrBlast(outNuevo.contenidoNuevo, { accion: 'estado' }, tokenBulma, []);
-  af(f1.res.statusCode === 403, 'bulma NO puede entrar al blast (403) — la pluma es de Memo (salió ' + f1.res.statusCode + ')');
-  const f1b = await correrBlast(outNuevo.contenidoNuevo, { accion: 'estado' }, null, []);
-  af(f1b.res.statusCode === 401 || f1b.res.statusCode === 403, 'sin token rebota (' + f1b.res.statusCode + ')');
-
-  // F2 · seco: enseña el correo y NO manda (con su control positivo en F4).
-  const f2 = await correrBlast(outNuevo.contenidoNuevo, { accion: 'seco' }, tokenRoshi, [{ correo: 'uno@x.mx', nombre: 'Ana' }]);
-  af(f2.res.statusCode === 200 && f2.json.seco === true, 'el seco contesta 200 (salió ' + f2.res.statusCode + (f2.json.error ? ' · ' + f2.json.error : '') + ')');
-  af(f2.n.resend === 0, 'el seco NO mandó un solo correo (Resend = 0)');
-  if (f2.json.html) {
-    af(f2.json.html.includes('$300') && f2.json.html.includes('Gorra conmemorativa'), 'el html trae el copy de Memo ($300 + beneficios)');
-    af(f2.json.html.includes('palnorte27'), 'el CTA apunta a /palnorte27');
-    af(f2.json.html.includes('BAJA'), 'la línea de baja existe (higiene del dominio que manda la cobranza)');
-    af(!/2[678]\s*(de\s*)?mar|\bmar(zo)?\s*(de\s*)?2027|2027-03/i.test(f2.json.html), 'la FECHA no viaja en el correo');
-  }
-
-  // F3 · el candado del sitio: contra el catálogo ACTUAL (preventa sin publicar), ni seco ni enviar.
-  const f3 = await correrBlast(INDEX_SIN_PUB, { accion: 'seco' }, tokenRoshi, []);
-  af(f3.res.statusCode === 409, 'control: con el sitio SIN publicar, el seco se rehúsa (409 — CONSUELO-VERDAD) (salió ' + f3.res.statusCode + ')');
-  const f3b = await correrBlast(INDEX_SIN_PUB, { accion: 'enviar', confirmar: true, tope: 5 }, tokenRoshi, [{ correo: 'uno@x.mx' }]);
-  af(f3b.res.statusCode === 409 && f3b.n.resend === 0, 'control: enviar contra el sitio sin publicar tampoco manda NADA');
-
-  // F4 · enviar: confirmar obligatorio · tope respetado · bitácora tras el envío.
-  const f4a = await correrBlast(outNuevo.contenidoNuevo, { accion: 'enviar', tope: 5 }, tokenRoshi, [{ correo: 'uno@x.mx' }]);
-  af(f4a.res.statusCode === 400 && f4a.n.resend === 0, 'enviar SIN confirmar:true rebota con cero envíos (dos gestos)');
-  const f4 = await correrBlast(outNuevo.contenidoNuevo, { accion: 'enviar', confirmar: true, tope: 2 }, tokenRoshi,
-    [{ correo: 'uno@x.mx', nombre: 'Ana', caliente: true }, { correo: 'dos@x.mx' }, { correo: 'tres@x.mx' }]);
-  af(f4.json.ok === true && f4.json.enviados === 2, 'con confirmar manda EXACTO el tope (2 de 3 pendientes) — control positivo del contador (envió ' + f4.json.enviados + ')');
-  af(f4.n.resend === 2, 'Resend vio 2 envíos (el contador no es ciego)');
-  af(f4.n.patch === 2 && f4.patches.every((p) => p.body.enviado_at), 'la bitácora se asentó fila por fila DESPUÉS de cada envío');
-
-  // F5 · sembrar: dedup + idempotencia (el duplicado no re-entra).
-  const f5 = await correrBlast(outNuevo.contenidoNuevo, { accion: 'sembrar_giveaway', confirmar: true }, tokenRoshi, [{ correo: 'ya@estaba.mx' }]);
-  af(f5.json.ok === true && f5.n.postBitacora === 1, 'la siembra insertó SOLO el correo nuevo (el duplicado del Portal no re-entra) — insertó ' + f5.n.postBitacora);
+  // ═══ [F] EL BLAST: RETIRADO (BLAST-RETIRO-1, 21-oct-2026) ═════════════════
+  // Palabra de Memo: «ya terminé con el blast del Pa'l Norte, podemos
+  // eliminarlo para trabajar solo con Genkidama». El endpoint, la pantalla y
+  // su careo se van JUNTOS — este bloque no se silencia: se actualiza a la
+  // verdad nueva (la ley de los arneses podridos). Lo que QUEDA de guardia:
+  console.log('\n[F] el blast RETIRADO · lo que queda de guardia');
+  af(!fs.existsSync(path.join(RAIZ, 'netlify/functions/admin-preventa-blast.js')), 'el endpoint del blast ya no existe');
+  af(!fs.existsSync(path.join(RAIZ, 'kamehouse-blast.js')), 'la pantalla del blast ya no existe');
+  const _kjs = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  const _khtml = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
+  af(!/'blast'/.test(_kjs) && !/loadBlast/.test(_kjs), 'kamehouse.js sin permiso ni cargador del blast');
+  af(!/nav-blast|page-blast|kamehouse-blast\.js/.test(_khtml), 'kamehouse.html sin botón, página ni script del blast');
+  // 🔒 La TABLA preventa_blast NO se toca: es la bitácora (acta) de los ~240
+  // correos ya mandados, y GENKIDAMA la sigue leyendo para tres cosas que no
+  // pueden morir con el botón: la ENERGÍA del día, la SIEMBRA de contactos y
+  // la exclusión `excluir_blast` de GENKIDAMA-2.
+  const _gklib = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/genkidama.js'), 'utf8');
+  const _gk = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-genkidama.js'), 'utf8');
+  af(/preventa_blast/.test(_gklib), 'la energía de Genkidama sigue contando la bitácora del blast');
+  af((_gk.match(/preventa_blast/g) || []).length >= 2, 'y Genkidama sigue leyendo la bitácora (siembra + excluir_blast)');
 
   // ═══ RESULTADO ════════════════════════════════════════════════════════════
   console.log('\n══ RESULTADO ══');

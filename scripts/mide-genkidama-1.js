@@ -100,7 +100,9 @@ function red(o) {
 }
 function fresco() {
   Object.keys(require.cache).forEach((k) => { if (k.includes('netlify/functions')) delete require.cache[k]; });
-  return { gk: require(path.join(RAIZ, 'netlify/functions/admin-genkidama.js')).handler, blast: require(path.join(RAIZ, 'netlify/functions/admin-preventa-blast.js')).handler,
+  // ⚰️ [BLAST-RETIRO-1 · 21-oct] el handler del blast se podó (palabra de Memo);
+  // su bitácora preventa_blast sigue viva y la energía que gasta se mide en [E2]/[E4].
+  return { gk: require(path.join(RAIZ, 'netlify/functions/admin-genkidama.js')).handler,
     jwtSign: require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js')).jwtSign, G: require(path.join(RAIZ, 'netlify/functions/_lib/genkidama.js')) };
 }
 const ev = (b, t) => ({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + t }, body: JSON.stringify(b) });
@@ -183,13 +185,14 @@ const P = (r) => JSON.parse(r.body);
   r = await H.gk(ev({ accion: 'enviar', campana_id: cid, tope: 25, confirmar: true }, tok)); j = P(r);
   af(r.statusCode === 409 && st.correos.length === antes && /ya no honra/i.test(j.error), '[E10] si el código vence a media campaña, la siguiente tanda se rehúsa (409, cero correos)');
 
-  console.log('[F] la energía es una sola para todo el dominio');
-  st = red({ limite: 1, indexOpts: { conPreventa: true }, blast: [{ id: 'pb9', campana: 'pn27', correo: 'w@w.com', nombre: 'W', caliente: true, enviado_at: null, error: null }], envios: [{ id: 'x1', campana_id: 'c', correo: 'z@z.com', enviado_at: new Date(Date.now() - 600e3).toISOString() }] }); global.fetch = st.fetch; H = fresco();
-  r = await H.blast(ev({ accion: 'enviar', confirmar: true, tope: 5 }, tok)); j = P(r);
-  af(r.statusCode === 429 && st.correos.length === 0, `[F1] el blast de PN27 también se detiene cuando Genkidama ya gastó la energía (${r.statusCode} ${(j.error || '').slice(0, 60)})`);
-  st.kh.genkidama_config[0].limite_diario = 5;
-  r = await H.blast(ev({ accion: 'enviar', confirmar: true, tope: 5 }, tok)); j = P(r);
-  af(r.statusCode === 200 && st.correos.length === 1, `[F2] control positivo: con energía, el mismo blast SÍ manda (${r.statusCode} · ${st.correos.length}) — el 429 de F1 fue la energía, no otra cosa`);
+  // ⚰️ [F] RETIRADO con su razón (BLAST-RETIRO-1, 21-oct-2026): [F1]/[F2]
+  // probaban que el ENDPOINT del blast respetaba la energía compartida, y ese
+  // endpoint murió por palabra de Memo («trabajar solo con Genkidama»). No se
+  // silenció: lo que sigue vivo de aquel hecho —que la bitácora preventa_blast
+  // GASTA energía del día— lo miden [E2]/[E4] sembrando filas en la tabla. Y
+  // queda la guardia de la poda:
+  console.log('[F] el blast retirado · la guardia de la poda');
+  af(!require('fs').existsSync(path.join(RAIZ, 'netlify/functions/admin-preventa-blast.js')), '[F1] el endpoint del blast ya no existe (quien lo reviva, que lea BLAST-RETIRO-1)');
 
   console.log('[L] GENKIDAMA-2 · el mensaje libre');
   {

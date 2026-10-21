@@ -202,10 +202,6 @@
         ven «herramientas», así que no se estrena permiso ni se toca el menú
         principal. `aplicarPermisosUI` deriva la lista del DOM, así que nace
         CERRADA hasta que PERMISOS_TABS la nombre — el lado correcto para fallar. -->
-   <!-- [PN27] El blast de preventa: SOLO maestro_roshi lo nombra en
-        PERMISOS_TABS — manda correo REAL (CORREOS_MODO 'real'), la pluma es
-        de Memo. Nace cerrada para todos los demás, igual que la Nube. -->
-   <button class="nav-dropdown-item" id="nav-blast" onclick="showHerramienta('blast')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Blast preventa</span></button>
    <!-- [GENKIDAMA-1] El concentrado de correos y las campañas. Solo maestro_roshi:
         manda correo REAL. Nace cerrada para los demás (PERMISOS_TABS). -->
    <button class="nav-dropdown-item" id="nav-genkidama" onclick="showHerramienta('genkidama')"><svg class="nav-ic"><use href="#ic-correo"/></svg><span>Genkidama</span></button>
@@ -2956,20 +2952,6 @@
    <div id="gk-cont"><div class="loading-state">Cargando…</div></div>
  </div>
 
- <!-- [PN27] EL BLAST DE PREVENTA · tandas de correo con bitácora, solo Memo -->
- <div class="page" id="page-blast">
-   <div class="page-hero">
-    <div>
-     <div class="page-title">BLAST PREVENTA PN27</div>
-     <div class="page-sub">// el ataque por tandas — ensayo primero, bitácora siempre</div>
-    </div>
-     <div style="display:flex;gap:8px;flex-wrap:wrap">
-       <button class="btn btn-ghost btn-sm" onclick="loadBlast()">↻ Refrescar</button>
-     </div>
-   </div>
-   <div id="blast-cont"><div class="loading-state">Cargando…</div></div>
- </div>
-
  <!-- [EMMA-1] EMMA KAIOSAMA · el correo del sistema -->
  <div class="page" id="page-emma">
    <div class="page-hero">
@@ -4368,8 +4350,6 @@
 <script src="kamehouse-operacion.js"></script>
 <!-- [MONO-17] Antes del tronco, regla del sentido único (ver MONO-2). -->
 <script src="kamehouse-nube.js"></script>
-<!-- [PN27] El blast de preventa — antes del tronco, misma regla. -->
-<script src="kamehouse-blast.js"></script>
 <!-- [EMMA-1] Emma Kaiosama — antes del tronco, misma regla. -->
 <script src="kamehouse-emma.js"></script>
 <!-- [GENKIDAMA-1] El concentrado y las campañas — antes del tronco, misma regla. -->

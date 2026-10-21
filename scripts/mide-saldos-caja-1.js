@@ -48,6 +48,8 @@ process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'service-kh-falsa';
 
 // El ancla se LEE de la lib (un literal tecleado aquí serían dos copias).
 const { CAJA_ANCLA_DIA, CAJA_ANCLA_INSTANTE } = require(path.join(RAIZ, 'netlify/functions/_lib/cuentas-dinero.js'));
+// [CAJA-REANCLA-2] la fecha del rótulo se DERIVA del ancla de la lib (re-anclar no debe tumbar el careo).
+const _fechaAnclaTxt = (() => { const [y, m, d] = CAJA_ANCLA_DIA.split('-').map(Number); return d + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m - 1] + '-' + y; })();
 
 // ── LA RED FALSA: filtros respetados, cero escrituras ────────────────────────
 // Comparaciones gte: lexicográficas. Es válido PORQUE los fixtures usan el
@@ -241,10 +243,10 @@ function fixtures() {
     vm.runInContext(fuente, ctx, { filename: 'kamehouse-saldos.js' });
     af(typeof ctx._renderSaldos === 'function' && typeof ctx._renderSaldoDetalle === 'function' && typeof ctx._saldosFechaAncla === 'function',
       'el módulo entero evaluó en el vm (funciones presentes)');
-    af(ctx._saldosFechaAncla('2026-10-13') === '13-oct-2026', '_saldosFechaAncla pinta 13-oct-2026 sin pasar por Date (la mordida UTC en espejo)');
+    af(ctx._saldosFechaAncla('2026-10-13') === '13-oct-2026' && ctx._saldosFechaAncla(CAJA_ANCLA_DIA) === _fechaAnclaTxt, '_saldosFechaAncla pinta 13-oct-2026 sin pasar por Date (la mordida UTC en espejo)');
     ctx._renderSaldos(d);
     const html = nodos['saldos-content'].innerHTML;
-    af(html.includes('13-oct-2026') && html.includes('Caja anclada al banco real'), 'el rótulo del ancla sale, con su fecha');
+    af(html.includes(ctx._saldosFechaAncla(CAJA_ANCLA_DIA)) && html.includes('Caja anclada al banco real'), 'el rótulo del ancla sale, con su fecha');
     af(html.includes('no</b> entran solas'), 'y dice que las entradas de clientes post-ancla no entran solas');
     af(!/migrado/i.test(html) && !html.includes('incompletos'), 'el HTML impreso ya no habla de migrados ni de «incompletos»');
     const detalle = ctx._renderSaldoDetalle(d.cuentas.BBVA);
@@ -270,7 +272,7 @@ function fixtures() {
     vm.runInContext(fuenteResumen, ctx, { filename: 'kamehouse-resumen.js' });
     await ctx._renderResumenDinero(0);
     af(nodoHero.innerHTML.includes('Caja total de la empresa'), 'el hero del Resumen pinta (premisa)');
-    af(nodoHero.innerHTML.includes('Anclada al banco real') && nodoHero.innerHTML.includes('13-oct-2026'),
+    af(nodoHero.innerHTML.includes('Anclada al banco real') && nodoHero.innerHTML.includes(_fechaAnclaTxt),
       'el sub del hero dice el ancla con su fecha');
     af(() => {
       const mxn = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

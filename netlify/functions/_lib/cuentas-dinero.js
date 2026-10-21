@@ -70,8 +70,12 @@ const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
 //     UTC pelado habría metido la noche del 12 de Reynosa — la ley de
 //     «toISOString() nunca es hoy en México».
 // ─────────────────────────────────────────────────────────────────────────────
-const CAJA_ANCLA_DIA = '2026-10-13';
-const CAJA_ANCLA_INSTANTE = '2026-10-13T05:00:00Z';
+// [CAJA-REANCLA-2 · 20-oct-2026] Re-anclado con los saldos que pasó Memo la
+// noche del 20-oct (Banamex y BBVA); el ancla nueva es el arranque del 21-oct en
+// Reynosa. Los asientos «Saldo inicial» del 13-oct quedan en la tabla como acta
+// (pre-ancla: ya no cuentan). Efectivo se arrastra con lo que el sistema llevaba.
+const CAJA_ANCLA_DIA = '2026-10-21';
+const CAJA_ANCLA_INSTANTE = '2026-10-21T05:00:00Z';
 
 function esValidaCuenta(cuenta) {
   return CUENTAS.includes(cuenta);

@@ -6075,6 +6075,9 @@ async function _vj2Cargar() {
         })()}
         <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
         ${_vjPuedeEliminar() ? `<td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" style="font-size:10px"
+            title="Ver los pagos de ${_esfEsc(v.nombre || '')} con sus comprobantes"
+            onclick="_vjPagosVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📎 Pagos</button>
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
             onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
@@ -6117,15 +6120,60 @@ async function vjGrupoSeparar(id, nombre) {
 // nuevos. La fecha nace en HOY (es FORMA, no atribución — DEFAULTS-1) y el
 // monto nace VACÍO. El comprobante con foto vive en la caja de Cobranza; aquí
 // va lo diario: monto, fecha y nota.
+// ═══ [CAPSULE-COMP-1 · 20-oct-2026] VER LOS PAGOS CON SU COMPROBANTE ════════
+// Pedido de Memo: «cuando entro a Capsule y veo el evento no puedo ver los
+// tickets que han subido». El servidor YA firma la foto cuando se piden los
+// abonos de UN viajero (`abonos_listar` con viajero_id → foto_url firmada,
+// 1 hora); lo que faltaba era la pantalla. Reusa el renglón plegable `vj-ab-`
+// del abono manual — un solo renglón abierto a la vez, misma regla.
+async function _vjPagosVer(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'pagos';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'pagos';
+  const celda = tr.firstElementChild;
+  celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--ts)">Cargando los pagos de ${_esfEsc(nombre)}…</div>`;
+  try {
+    // La URL firmada caduca (1 h): se pide FRESCA cada vez que se abre, igual
+    // que el comprobante del separo. No se cachea a propósito.
+    const abonos = await khViajeros.abonosDe(id);   // [sec-coordi]
+    if (!abonos.length) {
+      celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--ts)">${_esfEsc(nombre)} no tiene abonos capturados aquí. (Lo migrado del Excel vive en «abonado previo», sin comprobante.)</div>`;
+      return;
+    }
+    celda.innerHTML = `<div style="padding:10px;border:1px dashed var(--ts);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:6px"><b style="color:var(--text)">${_esfEsc(nombre)}</b> · ${abonos.length} abono${abonos.length === 1 ? '' : 's'}</div>
+      ${abonos.map((a) => `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid rgba(255,255,255,.06);font-size:12px">
+          <span style="min-width:84px;color:var(--ts)">${_esfEsc(String(a.fecha || '').slice(0, 10))}</span>
+          <b style="min-width:90px">${_spFmtMxn(Number(a.monto) || 0)}</b>
+          ${a.foto_url
+            ? `<a href="${_esfEsc(a.foto_url)}" target="_blank" rel="noopener" style="color:var(--green)">📎 ver comprobante</a>`
+            : '<span style="color:var(--ts)">sin comprobante</span>'}
+          <span style="flex:1;color:var(--ts)">${a.nota ? _esfEsc(a.nota) : ''}${a.capturado_por ? ` · ${_esfEsc(a.capturado_por)}` : ''}</span>
+        </div>`).join('')}
+    </div>`;
+  } catch (e) {
+    celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudieron leer los pagos: ${_esfEsc(e.message)}</div>`;
+  }
+}
+
 function _vjAbonoAbrir(id, nombre) {
   const tr = document.getElementById(`vj-ab-${id}`);
   if (!tr) return;
-  const abierto = tr.style.display !== 'none';
+  // [CAPSULE-COMP-1] El renglón ahora tiene dos caras (pagos / abono): solo
+  // cuenta como "ya abierto" si estaba en ESTA cara — si estaba enseñando los
+  // pagos, el clic en ➕ Abono lo cambia de cara en vez de cerrarlo.
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo !== 'pagos';
   // Un solo renglón abierto a la vez: dos formularios de dinero a la vista son
   // dos oportunidades de capturarle el pago a la persona equivocada.
-  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; });
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
   if (abierto) return;
   tr.style.display = '';
+  tr.dataset.modo = 'abono';
   tr.firstElementChild.innerHTML = `
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--green);border-radius:8px;background:rgba(136,234,78,.04)">
       <div style="font-size:11px;color:var(--ts);min-width:140px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>nuevo abono</div>

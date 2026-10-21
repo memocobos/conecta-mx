@@ -4243,11 +4243,16 @@ const PUNTOS_TOUR = {
   festival_3d: 10
 };
 
-// Festivales (multi-día) por SLUG del EV → nº de días. Todo lo demás (incl. multifecha)
-// cuenta como concierto. Usado para derivar puntos AUTO de los tours asignados (DC2d).
+// Festivales por SLUG del EV → nº de días (los de 1 día TAMBIÉN van aquí:
+// valen festival_1d = 5 pts, no concierto). Todo lo demás (incl. multifecha)
+// cuenta como concierto. Usado para derivar puntos AUTO de los tours asignados
+// (DC2d). [21-oct-2026, palabra de Memo] entran vaiven, pulsoquetaro (Pulso
+// GNP) y tecatecomuna como festivales de 1 día — Vaivén le sube 3→5 pts a
+// Luis Padilla retroactivo solo (la cuenta se deriva al leer, no se escribe).
 const FESTIVALES = {
   palnorte: 3, edc2026: 3, coronacapital: 3,
-  emblema: 2, arre: 2, ultramexico: 2, flowfest: 2
+  emblema: 2, arre: 2, ultramexico: 2, flowfest: 2,
+  vaiven: 1, pulsoquetaro: 1, tecatecomuna: 1
 };
 
 const TIPO_TOUR_LABEL = {

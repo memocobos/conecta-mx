@@ -142,7 +142,32 @@ async function emEnviar() {
     } else if (btn) { btn.disabled = false; btn.textContent = `Enviar a ${total}`; }
   } finally {
     if (errBox && errores.length) {
-      errBox.innerHTML = '<b>' + errores.length + ' con error:</b> ' + errores.map((e) => _emEsc(e.correo) + ' (' + _emEsc(e.error) + ')').join(' · ');
+      // [EMMA-1c] Los fallidos se pueden REINTENTAR solos (param `solo` del
+      // servidor: estrecha la audiencia derivada, jamás mete a nadie nuevo).
+      // Nació del primer envío real: 6 de 20 rebotaron por el límite de Resend.
+      const correosFallidos = errores.map((e) => e.correo).filter((c) => /@/.test(String(c)));
+      _emFallidos = correosFallidos;
+      errBox.innerHTML = '<b>' + errores.length + ' con error:</b> ' + errores.map((e) => _emEsc(e.correo) + ' (' + _emEsc(e.error) + ')').join(' · ') +
+        (correosFallidos.length ? ' <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="emReintentarFallidos()">↻ Reintentar los ' + correosFallidos.length + '</button>' : '');
     }
   }
+}
+
+// [EMMA-1c] Reenvía SOLO a los que fallaron (los demás ya lo recibieron y Emma
+// no lleva bitácora: reenviar a todos los duplicaría).
+let _emFallidos = [];
+async function emReintentarFallidos() {
+  if (!_emSeco || !_emFallidos.length) { showToast('No hay fallidos que reintentar', 'error'); return; }
+  if (!confirm(`¿Reintentar el envío SOLO a los ${_emFallidos.length} que fallaron?`)) return;
+  const prog = _emEl('em-progreso'), errBox = _emEl('em-errores');
+  if (prog) prog.textContent = 'Reintentando a los fallidos…';
+  const { st, j } = await _emApi({ ..._emSeco.payload, seco: false, confirmar: true, desde: 0, solo: _emFallidos });
+  if (st !== 200 || !j.ok) { if (errBox) errBox.innerHTML = '<b>No se pudo:</b> ' + _emEsc(j.error || ('HTTP ' + st)); return; }
+  const quedan = (j.errores || []).map((e) => e.correo);
+  _emFallidos = quedan;
+  if (prog) prog.textContent = `↻ Reintento: ${j.enviados} enviados${quedan.length ? ', ' + quedan.length + ' siguen fallando' : ' — todos entregados ✅'}.`;
+  if (errBox) errBox.innerHTML = quedan.length
+    ? '<b>' + quedan.length + ' siguen con error:</b> ' + (j.errores || []).map((e) => _emEsc(e.correo) + ' (' + _emEsc(e.error) + ')').join(' · ') +
+      ' <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="emReintentarFallidos()">↻ Reintentar</button>'
+    : '';
 }

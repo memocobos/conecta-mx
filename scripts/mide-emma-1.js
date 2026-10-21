@@ -94,19 +94,41 @@ const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo
   af(b.total === 2 && b.audiencia.every((x) => x.correo !== 'pasada@x.test'), 'creadoras: las vigentes (la pasada hace 20 días queda fuera; la team sin fecha entra)');
   r = await h(ev({ ...CUERPO, audiencia: 'evento', evento_id: 'bruno' }, roshi)); b = JSON.parse(r.body);
   af(b.total === 35, 'evento: 35 viajeros — dedup por correo (36→35), sin staff, sin bajas, y brunomars2 NO entra (un prefijo no es un ancla)');
-  af(b.tanda === 30, 'y avisa que el envío va por tandas de 30');
+  af(b.tanda === 20, 'y avisa que el envío va por tandas de 20 (con el freno de 150 ms, 30 rozaba los 10 s de Netlify)');
 
-  console.log('\n[C] conceder el deseo: tandas de 30 con desde/siguiente');
+  console.log('\n[C] enviar: tandas de 20 con desde/siguiente');
   red = redNueva(); global.fetch = red.fetch; ({ h } = H());
   r = await h(ev({ ...CUERPO, audiencia: 'evento', evento_id: 'bruno', seco: false, confirmar: true, desde: 0 }, roshi)); b = JSON.parse(r.body);
-  af(b.enviados === 30 && b.siguiente === 30 && b.total === 35, 'tanda 1: manda 30 y dice siguiente=30');
-  r = await h(ev({ ...CUERPO, audiencia: 'evento', evento_id: 'bruno', seco: false, confirmar: true, desde: 30 }, roshi)); b = JSON.parse(r.body);
-  af(b.enviados === 5 && b.siguiente === null, 'tanda 2: manda los 5 que faltan y cierra (siguiente null)');
+  af(b.enviados === 20 && b.siguiente === 20 && b.total === 35, 'tanda 1: manda 20 y dice siguiente=20');
+  r = await h(ev({ ...CUERPO, audiencia: 'evento', evento_id: 'bruno', seco: false, confirmar: true, desde: 20 }, roshi)); b = JSON.parse(r.body);
+  af(b.enviados === 15 && b.siguiente === null, 'tanda 2: manda los 15 que faltan y cierra (siguiente null)');
   af(red.resend.length === 35, 'Resend recibió EXACTAMENTE 35 (el contador no es ciego)');
   const correos = red.resend.map((x) => String(x.to));
   af(new Set(correos).size === 35 && !correos.includes('ajeno@x.test') && !correos.includes('staff@x.test') && !correos.includes('baja@x.test'), 'sin repetidos y sin colados (ajeno/staff/baja)');
   af(red.resend.every((x) => /Conecta/.test(String(x.from))) && /color:#111111/.test(red.resend[0].html), 'FROM del sistema y color por bloque (ley CONFIRMA-1)');
   af(red.escrituras === 0, 'cero escrituras a la base: sin bitácora A PROPÓSITO (dicho en el encabezado)');
+
+  console.log('\n[C2] el freno de Resend (EMMA-1c, cobrado en el primer envío real: 6 de 20 en 429)');
+  red = redNueva(); global.fetch = red.fetch; ({ h } = H());
+  // El Resend falso rebota la PRIMERA llamada de cada correo con el error real
+  // y acepta el reintento: sin el retry, los 2 saldrían como errores.
+  const vistos = new Set();
+  const fetchBase = red.fetch;
+  global.fetch = async (url, init) => {
+    if (String(url).includes('api.resend.com')) {
+      const to = JSON.parse(init.body).to;
+      if (!vistos.has(to)) { vistos.add(to); return { ok: false, status: 429, json: async () => ({ message: 'Too many requests. You can only make 10 requests per second.' }), text: async () => 'rate' }; }
+    }
+    return fetchBase(url, init);
+  };
+  ({ h } = H());
+  r = await h(ev({ ...CUERPO, audiencia: 'equipo', seco: false, confirmar: true, desde: 0 }, roshi)); b = JSON.parse(r.body);
+  af(b.enviados === 2 && !(b.errores || []).length, 'el 429 se reintenta UNA vez y los 2 salen (antes eran errores)');
+  af(red.resend.length === 2, 'y el contador ve los 2 entregados');
+  // `solo` estrecha la audiencia derivada (el botón «reintentar fallidos»)
+  red = redNueva(); global.fetch = red.fetch; ({ h } = H());
+  r = await h(ev({ ...CUERPO, audiencia: 'equipo', solo: ['popo@x.test', 'colado@x.test'] }, roshi)); b = JSON.parse(r.body);
+  af(b.total === 1 && b.audiencia[0].correo === 'popo@x.test', 'solo ESTRECHA: queda popo, y el colado que la derivación no trajo NO entra');
 
   console.log('\n[D] las puertas');
   red = redNueva(); global.fetch = red.fetch; ({ h } = H());
@@ -131,6 +153,7 @@ const CUERPO = { asunto: 'Registra tus tours del ranking', mensaje: 'Hola equipo
   af(/'emma'\]/.test(kj) && /name === 'emma'/.test(kj), 'PERMISOS_TABS (solo roshi) + carga en showHerramienta (una puerta)');
   af(/emVistaPrevia/.test(ui) && /confirm\(/.test(ui) && /seco: false, confirmar: true/.test(ui), 'la pantalla enseña la vista previa primero y manda solo tras confirm con los dos gestos');
   af(/_emFreno/.test(ui) && /j\.siguiente/.test(ui), 'tandas con botón de detener, avanzando por el siguiente del servidor');
+  af(/emReintentarFallidos/.test(ui) && /solo: _emFallidos/.test(ui), 'y el botón «reintentar fallidos» manda con `solo` (jamás re-manda a los que ya recibieron)');
   // [EMMA-1b] La vista previa VACÍA que cazó Memo: _emEsc no escapa comillas y
   // el correo trae style="…" — interpolarlo en srcdoc="…" rompía el atributo.
   af(/prev\.srcdoc = j\.html_muestra/.test(ui), 'el HTML de la vista previa entra por PROPIEDAD (srcdoc asignado, no interpolado)');

@@ -41,7 +41,8 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const L = require('./_lib/creadoras');
 
 const ROLES_EQUIPO = ['coordinador', 'mister_popo', 'bulma', 'milk', 'cc'];
-const TANDA = 30;
+// [EMMA-1c] 20 por llamada: con el freno de 150 ms, 30 rozaba los 10 s de Netlify.
+const TANDA = 20;
 const SLUG_RE = /^[a-z0-9-]+(#\d+)?$/;
 
 function render(asunto, mensaje) {
@@ -122,7 +123,14 @@ exports.handler = async (event) => {
     if (!c || !/@/.test(c)) continue;
     if (!porCorreo.has(c)) porCorreo.set(c, { nombre: p.nombre || '', correo: c });
   }
-  const audiencia = [...porCorreo.values()].sort((a, b) => a.correo.localeCompare(b.correo));
+  let audiencia = [...porCorreo.values()].sort((a, b) => a.correo.localeCompare(b.correo));
+  // [EMMA-1c] `solo`: ESTRECHA la audiencia derivada a correos concretos (el
+  // botón «reintentar los fallidos»). Solo puede quitar, nunca meter a nadie
+  // que la derivación no trajo — la audiencia sigue saliendo de la base.
+  if (Array.isArray(body.solo) && body.solo.length) {
+    const quiero = new Set(body.solo.map((c) => String(c).trim().toLowerCase()));
+    audiencia = audiencia.filter((u) => quiero.has(u.correo));
+  }
   if (!audiencia.length) return res(409, { error: 'La audiencia salió VACÍA — nada que mandar' });
 
   const html = render(asunto, mensaje);
@@ -138,9 +146,20 @@ exports.handler = async (event) => {
   const desde = Math.max(0, Math.round(Number(body.desde)) || 0);
   const tanda = audiencia.slice(desde, desde + TANDA);
   if (!tanda.length) return res(400, { error: `desde=${desde} está fuera de la lista (total ${audiencia.length})` });
+  // [EMMA-1c] EL FRENO DE RESEND, cobrado en el primer envío real: su límite
+  // es 10/s y la tanda salía a ráfaga — 6 de 20 rebotaron con «Too many
+  // requests». Pausa de 150 ms entre envíos (~6/s, deja aire al resto del
+  // correo del sistema) y ante un rate limit UN reintento tras 1.2 s.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const enviados = [], errores = [];
-  for (const u of tanda) {
-    const out = await L.enviarCorreo(u.correo, asunto, html);
+  for (let i = 0; i < tanda.length; i++) {
+    const u = tanda[i];
+    if (i > 0) await sleep(150);
+    let out = await L.enviarCorreo(u.correo, asunto, html);
+    if (!out.enviado && /too many requests|rate limit/i.test(String(out.error || ''))) {
+      await sleep(1200);
+      out = await L.enviarCorreo(u.correo, asunto, html);
+    }
     if (out.enviado) enviados.push(u.correo);
     else errores.push({ correo: u.correo, error: out.error });
   }

@@ -84,6 +84,7 @@
     "mide:crea-baja-1": "node scripts/mide-crea-baja-1.js",
     "mide:crea-seg-1": "node scripts/mide-crea-seg-1.js",
     "mide:gz-plataforma-1": "node scripts/mide-gz-plataforma-1.js",
-    "mide:sin-solo-boleto": "node scripts/mide-sin-solo-boleto.js"
+    "mide:sin-solo-boleto": "node scripts/mide-sin-solo-boleto.js",
+    "mide:nav-min-1": "node scripts/mide-nav-min-1.js"
   }
 }

@@ -143,21 +143,21 @@
         diseño de ETAPA 5 lo dejó anotado como el riesgo reversible. -->
    <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos"><svg class="nav-ic"><use href="#ic-eventos"/></svg><span>Por Evento</span></button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule Corp</span></button>
-  </div>
-
-  <div class="nav-group">
-   <div class="nav-group-title" onclick="toggleNavGroup(this)">Inventario &amp; Ventas</div>
+   <!-- [NAV-MIN-1 · 20-oct-2026] Palabra de Memo: «tenerlo más minimalista». El
+        grupo «Inventario & Ventas» se DISUELVE: sus pantallas eran operación.
+        · «Dinero» (id nav-gastos, permiso 'gastos') es UNA entrada: Gastos,
+          Ingresos y Saldos siguen siendo tres páginas con sus permisos, pero se
+          navegan por la sub-barra .kh-subnav de cada una. Quien ve una ve las
+          tres (medido: roshi/bulma/milk llevan las tres en PERMISOS_TABS).
+        · Reportes perdió su botón: vive como sub-pestaña de la Torre de Karin
+          (quien tiene 'inventario' tiene 'reportes', medido en los 5 roles).
+        · El resaltado del menú usa NAV_ALIAS en showPage (ingresos/saldos →
+          nav-gastos, reportes → nav-inventario).
+        Cero permisos nuevos: PERMISOS_TABS no se tocó; showPage sigue siendo
+        el candado (E5-4). SALDOS-NAV-1 queda superada por esta forma: el botón
+        propio de Saldos murió, su puerta es la sub-barra de Dinero. -->
+   <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Dinero</span></button>
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
-   <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
-   <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
-   <!-- [SALDOS-NAV-1 · 12-oct-2026] La pantalla de Saldos existía (page-saldos)
-        y su permiso también ('saldos' en PERMISOS_TABS para roshi/bulma/milk),
-        pero el botón del menú NUNCA existió: solo se entraba por el click-through
-        del Resumen («Caja total de la empresa»). Un permiso concedido sin botón
-        es una pantalla huérfana — Memo la buscó y no estaba. El icono reusa
-        #ic-ingresos a propósito: no se estrena arte en una tuerca de un renglón. -->
-   <button class="nav-btn" onclick="showPage('saldos')" id="nav-saldos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Saldos</span></button>
-   <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
 
   <div class="nav-group">
@@ -671,6 +671,8 @@
 
  <!-- ─── GASTOS ─── -->
  <div class="page" id="page-gastos">
+ <!-- [NAV-MIN-1] Dinero = Gastos · Ingresos · Saldos en una sola entrada del menú. -->
+ <div class="kh-subnav"><button class="kh-subnav-btn active">💸 Gastos</button><button class="kh-subnav-btn" onclick="showPage('ingresos')">💰 Ingresos</button><button class="kh-subnav-btn" onclick="showPage('saldos')">🏦 Saldos</button></div>
  <div class="page-hero">
    <div>
     <div class="page-title">GASTOS</div>
@@ -729,6 +731,7 @@
 
  <!-- ─── INGRESOS ─── -->
  <div class="page" id="page-ingresos">
+ <div class="kh-subnav"><button class="kh-subnav-btn" onclick="showPage('gastos')">💸 Gastos</button><button class="kh-subnav-btn active">💰 Ingresos</button><button class="kh-subnav-btn" onclick="showPage('saldos')">🏦 Saldos</button></div>
  <div class="page-hero">
    <div>
     <div class="page-title">INGRESOS</div>
@@ -787,6 +790,7 @@
 
  <!-- ─── SALDOS ─── -->
  <div class="page" id="page-saldos">
+ <div class="kh-subnav"><button class="kh-subnav-btn" onclick="showPage('gastos')">💸 Gastos</button><button class="kh-subnav-btn" onclick="showPage('ingresos')">💰 Ingresos</button><button class="kh-subnav-btn active">🏦 Saldos</button></div>
  <div class="page-hero">
    <div>
     <div class="page-title">SALDOS</div>
@@ -802,6 +806,8 @@
 
  <!-- ─── INVENTARIO ─── -->
  <div class="page" id="page-inventario">
+ <!-- [NAV-MIN-1] Reportes vive dentro de la Torre (quien tiene 'inventario' tiene 'reportes'). -->
+ <div class="kh-subnav"><button class="kh-subnav-btn active">📦 Bodega</button><button class="kh-subnav-btn" onclick="showPage('reportes')">📝 Reportes</button></div>
  <div class="page-hero">
    <div>
     <div class="page-title">TORRE DE KARIN</div>
@@ -900,6 +906,7 @@
 
  <!-- ─── REPORTES POST-EVENTO ─── -->
  <div class="page" id="page-reportes">
+  <div class="kh-subnav"><button class="kh-subnav-btn" onclick="showPage('inventario')">📦 Bodega</button><button class="kh-subnav-btn active">📝 Reportes</button></div>
   <div class="page-hero">
    <div>
     <div class="page-title">REPORTES</div>

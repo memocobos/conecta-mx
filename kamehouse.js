@@ -2389,7 +2389,10 @@ function showPage(name) {
  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
  document.getElementById(`page-${name}`).classList.add('active');
- const navBtn = document.getElementById(`nav-${name}`);
+ // [NAV-MIN-1] Páginas hermanas sin botón propio: su luz del menú es la de su
+ // entrada compartida (Dinero = nav-gastos · Torre de Karin = nav-inventario).
+ const NAV_ALIAS = { ingresos: 'gastos', saldos: 'gastos', reportes: 'inventario' };
+ const navBtn = document.getElementById(`nav-${name}`) || document.getElementById(`nav-${NAV_ALIAS[name] || name}`);
  if (navBtn) {
    navBtn.classList.add('active');
    // No esconder dónde estás: si la vista activa cae en un grupo colapsado, ábrelo.

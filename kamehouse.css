@@ -71,6 +71,17 @@
    SISTEMA DE DISEÑO UNIFICADO — KAMEHOUSE v2
 ═══════════════════════════════════════════════ */
 
+/* [NAV-MIN-1] Sub-barra de páginas hermanas (Dinero: Gastos·Ingresos·Saldos ·
+   Torre: Bodega·Reportes). Páginas separadas, UNA entrada en el menú. */
+.kh-subnav{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.kh-subnav-btn{
+ font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;letter-spacing:.04em;
+ padding:7px 14px;border-radius:999px;border:1px solid var(--border);
+ background:var(--bg2);color:var(--ts);cursor:pointer;transition:border-color .15s,color .15s;
+}
+.kh-subnav-btn:hover{color:var(--text);border-color:var(--ts)}
+.kh-subnav-btn.active{color:var(--text);border-color:var(--orange);background:var(--bg3);cursor:default}
+
 /* Headers de página potentes — estilo manga editorial */
 .page-hero{
  display:flex;align-items:center;justify-content:space-between;

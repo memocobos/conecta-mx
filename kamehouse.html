@@ -2626,11 +2626,23 @@
 
    <!-- ── Vista B: Listado ── -->
    <div id="ctr-view-listado" class="contratos-view">
+     <!-- [CTR-TABS-1] Palabra de Memo (21-oct): «los contratos de los coordis en
+          otra pestaña y los clientes en otra, creadoras en otra y cada pestaña
+          con sus propias alertas». El reparto vive en _ctrTabDe: creadora y
+          creadora_team → Creadoras · coordinador y auxiliar_admin → Coordis ·
+          giveaway (la ganadora es clienta) y el futuro CONTRATO-CLIENTE-1 →
+          Clientes. Misma sub-barra que NAV-MIN-1. -->
+     <div class="kh-subnav" style="margin-bottom:12px">
+       <button class="kh-subnav-btn active" id="ctrt-creadoras" onclick="ctrTabSet('creadoras',this)">Creadoras</button>
+       <button class="kh-subnav-btn" id="ctrt-coordis" onclick="ctrTabSet('coordis',this)">Coordis</button>
+       <button class="kh-subnav-btn" id="ctrt-clientes" onclick="ctrTabSet('clientes',this)">Clientes</button>
+     </div>
      <!-- [HER-1b] El buscador, mismo patrón que el de Esferas: filtra EN VIVO lo
           que ya está pintado, no le pide nada al servidor. Con 25 contratos y
           cero filtros, encontrar uno era leerse la tabla. -->
      <!-- [HER-1d] La alerta de pendientes atorados. Nace VACÍA y se esconde sola
-          cuando no hay nada que apurar: una alerta permanente es decoración. -->
+          cuando no hay nada que apurar: una alerta permanente es decoración.
+          [CTR-TABS-1] Desde hoy pinta SOLO lo de la pestaña abierta. -->
      <div id="ctr-alerta" style="display:none;background:rgba(255,176,32,.10);border:1px solid rgba(255,176,32,.38);border-left:4px solid #ffb020;border-radius:var(--r-sm,8px);padding:14px 18px;margin-bottom:14px"></div>
 
      <!-- [CREA-1b] Asignar cortesía. Panel EN LÍNEA a propósito, no

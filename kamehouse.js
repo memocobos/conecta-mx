@@ -10427,9 +10427,71 @@ function _ctrDiasTexto(d) {
 function _ctrAlertaPintar() {
   const el = document.getElementById('ctr-alerta');
   if (!el) return;
-  const alertados = (_contratosCache || []).filter(_ctrAlerta)
+  // [CTR-TABS-1] Cada pestaña con SUS alertas: la tarjeta solo habla de los
+  // contratos de la pestaña abierta.
+  const delTab = (_contratosCache || []).filter((c) => _ctrTabDe(c) === _ctrTab);
+  const secciones = [];
+
+  // 1 · Sin firmar N+ días (aplica a toda pestaña).
+  const alertados = delTab.filter(_ctrAlerta)
     .sort((a, b) => (_ctrDiasEnviado(b) || 0) - (_ctrDiasEnviado(a) || 0));
-  if (!alertados.length) {
+  if (alertados.length) {
+    const n = alertados.length;
+    secciones.push(
+      '<div style="font-size:13px;font-weight:800;color:#ffb020;margin-bottom:8px">' +
+        '<svg class="ic"><use href="#ic-alerta"/></svg> ' + n +
+        (n === 1 ? ' contrato lleva ' : ' contratos llevan ') + _CTR_DIAS_ALERTA + '+ días sin firmar</div>' +
+      '<div style="font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.7">' +
+        alertados.map((c) =>
+          '<div data-ctr-alerta="' + _escCtr(c.token) + '"><b style="color:var(--text)">' + _escCtr(c.creador_nombre) +
+          '</b> · ' + _escCtr(c.evento_nombre) + ' — enviado <b style="color:#ffb020">' +
+          _escCtr(_ctrDiasTexto(_ctrDiasEnviado(c))) + '</b></div>').join('') +
+      '</div>');
+  }
+
+  // 2 · [CTR-TABS-1] Coordis: vigencias vencidas o por vencer (≤30 días), el
+  // mismo umbral del chip de la fila (_ctrVigenciaAviso) — aquí juntas.
+  if (_ctrTab === 'coordis') {
+    const vig = delTab
+      .filter((c) => c.estado === 'firmado' && c.vigencia_fin)
+      .map((c) => ({ c, d: _ctrDiasVigencia(c) }))
+      .filter((x) => x.d !== null && x.d <= 30)
+      .sort((a, b) => a.d - b.d);
+    if (vig.length) {
+      secciones.push(
+        '<div style="font-size:13px;font-weight:800;color:#ffb020;margin-bottom:8px">⏳ ' + vig.length +
+          (vig.length === 1 ? ' vigencia vencida o por vencer' : ' vigencias vencidas o por vencer') + '</div>' +
+        '<div style="font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.7">' +
+          vig.map((x) =>
+            '<div data-ctr-vigencia="' + _escCtr(x.c.token) + '"><b style="color:var(--text)">' + _escCtr(x.c.creador_nombre) +
+            '</b> — ' + (x.d < 0 ? '<b style="color:#ff6666">vigencia vencida</b>' : 'vence en <b style="color:#ffb020">' + x.d + (x.d === 1 ? ' día' : ' días') + '</b>') +
+            '</div>').join('') +
+        '</div>');
+    }
+  }
+
+  // 3 · [CTR-TABS-1] Creadoras: MATERIAL vencido (entregables pendientes con
+  // fecha ya pasada). Tres estados sin aplastar: contestó con lista · no se
+  // pudo leer (se DICE) · todavía no contesta (no se afirma nada).
+  if (_ctrTab === 'creadoras' && _ctrMaterial) {
+    if (_ctrMaterial.error) {
+      secciones.push('<div style="font-size:12px;color:var(--ts);margin-bottom:12px">📋 El material no se pudo revisar: ' + _escCtr(_ctrMaterial.error) + '</div>');
+    } else if ((_ctrMaterial.lista || []).length) {
+      const m = _ctrMaterial.lista;
+      secciones.push(
+        '<div style="font-size:13px;font-weight:800;color:#ffb020;margin-bottom:8px">📋 ' + m.length +
+          (m.length === 1 ? ' creadora con material vencido' : ' creadoras con material vencido') + '</div>' +
+        '<div style="font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.7">' +
+          m.map((x) =>
+            '<div data-ctr-material="' + _escCtr(x.contrato_id) + '"><b style="color:var(--text)">' + _escCtr(x.nombre) +
+            '</b> · ' + _escCtr(x.evento) + ' — <b style="color:#ffb020">' + x.vencidos + (x.vencidos === 1 ? ' entregable vencido' : ' entregables vencidos') + '</b>' +
+            (x.primero ? ' <span style="color:var(--ts2)">(desde ' + _escCtr(String(x.primero.fecha_limite || '').slice(0, 10)) + ')</span>' : '') +
+            ' · <a href="#" onclick="ctrEntAbrir(\'' + _escCtr(x.contrato_id) + '\');return false" style="color:#e8ff4c">ver entregables</a></div>').join('') +
+        '</div>');
+    }
+  }
+
+  if (!secciones.length) {
     // Sin nada que apurar la tarjeta DESAPARECE. Una alerta permanente deja de
     // ser una alerta y se vuelve decoración.
     el.style.display = 'none';
@@ -10437,18 +10499,8 @@ function _ctrAlertaPintar() {
     return;
   }
   el.style.display = '';
-  const n = alertados.length;
-  el.innerHTML =
-    '<div style="font-size:13px;font-weight:800;color:#ffb020;margin-bottom:8px">' +
-      '<svg class="ic"><use href="#ic-alerta"/></svg> ' + n +
-      (n === 1 ? ' contrato lleva ' : ' contratos llevan ') + _CTR_DIAS_ALERTA + '+ días sin firmar</div>' +
-    '<div style="font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.7">' +
-      alertados.map((c) =>
-        '<div data-ctr-alerta="' + _escCtr(c.token) + '"><b style="color:var(--text)">' + _escCtr(c.creador_nombre) +
-        '</b> · ' + _escCtr(c.evento_nombre) + ' — enviado <b style="color:#ffb020">' +
-        _escCtr(_ctrDiasTexto(_ctrDiasEnviado(c))) + '</b></div>').join('') +
-    '</div>' +
-    '<span style="font-size:11px;color:var(--ts2)">La alerta sugiere; el reenvío lo decides tú, desde el botón de su fila.</span>';
+  el.innerHTML = secciones.join('') +
+    '<span style="font-size:11px;color:var(--ts2)">La alerta sugiere; el reenvío o el recordatorio lo decides tú, desde el botón de su fila.</span>';
 }
 
 // ═══ [HER-1c] LOS CHIPS ═══════════════════════════════════════════════════
@@ -10464,6 +10516,61 @@ function _ctrAlertaPintar() {
 // ago-2027. No es que la regla falle: es que 12 de 25 contratos no tienen con
 // qué juzgarse. Firmado por Memo sabiéndolo.
 let _ctrFiltro = 'vigente';
+
+// ═══ [CTR-TABS-1 · 21-oct-2026] LAS TRES PESTAÑAS DE CONTRATOS ══════════════
+// Palabra de Memo: «los contratos de los coordis en otra pestaña y los clientes
+// en otra, creadoras en otra y cada pestaña con sus propias alertas … acomodar
+// los contratos por orden de fecha a usar (hoy es Soy Luna → hasta arriba)».
+// El reparto es por PLANTILLA y tiene UN dueño (esta función): creadora y
+// creadora_team son Creadoras; coordinador y auxiliar_admin son Coordis (los
+// dos son equipo); giveaway cae en Clientes (la ganadora es una clienta), donde
+// también vivirán los contratos de CONTRATO-CLIENTE-1 cuando nazcan con las
+// fases reales. Una plantilla NUEVA cae a Clientes a propósito: mejor visible
+// en la pestaña equivocada que invisible en ninguna.
+let _ctrTab = 'creadoras';
+function _ctrTabDe(c) {
+  const p = (c && c.plantilla) || 'creadora';
+  if (p === 'creadora' || p === 'creadora_team') return 'creadoras';
+  if (p === 'coordinador' || p === 'auxiliar_admin') return 'coordis';
+  return 'clientes';
+}
+function ctrTabSet(t, btn) {
+  _ctrTab = t;
+  document.querySelectorAll('[id^="ctrt-"]').forEach((b) => b.classList.remove('active'));
+  const el = btn || document.getElementById('ctrt-' + t);
+  if (el) el.classList.add('active');
+  _ctrPintarLista();
+}
+// El ORDEN DE USO: primero los eventos por venir, el más cercano arriba (el de
+// HOY cuenta como por venir — es justo el que se está usando); luego los sin
+// fecha (por enviado más reciente); al final los que ya pasaron, el más
+// reciente primero. El reloj es el de Reynosa (la ley de toISOString).
+function _ctrOrdenUso(a, b) {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+  const rango = (c) => {
+    const f = String(c.evento_fecha || '').slice(0, 10);
+    if (!f) return { r: 1, k: 0 };
+    return f >= hoy ? { r: 0, k: Date.parse(f) } : { r: 2, k: -Date.parse(f) };
+  };
+  const ra = rango(a), rb = rango(b);
+  if (ra.r !== rb.r) return ra.r - rb.r;
+  if (ra.r === 1) return (Date.parse(b.enviado_at || '') || 0) - (Date.parse(a.enviado_at || '') || 0);
+  return ra.k - rb.k;
+}
+// El material vencido de las creadoras (lo sirve admin-creadoras). Tres
+// estados que NO se aplastan: null = aún no se pidió · {lista} = contestó ·
+// {error} = no se pudo leer, y se DICE (callarlo se vería igual que «todo
+// entregado» — la ley del cero falso).
+let _ctrMaterial = null;
+async function _ctrMaterialCargar() {
+  try {
+    const j = await _crCall({ accion: 'material_vencido' });
+    _ctrMaterial = { lista: j.lista || [] };
+  } catch (e) {
+    _ctrMaterial = { error: e.message };
+  }
+  if (_ctrTab === 'creadoras') _ctrAlertaPintar();
+}
 
 // [CREA-SEG-1] Instagram / TikTok / celular a un clic.
 function _ctrRedesChip(c) {
@@ -10536,6 +10643,10 @@ async function loadContratosList() {
     const rows = await khContratos.listar({ limit: 200 });
     _contratosCache = rows || [];
     _ctrPintarLista();
+    // [CTR-TABS-1] El material vencido se pide UNA vez por carga, aparte y sin
+    // frenar la lista: cuando conteste, la alerta de Creadoras se repinta sola.
+    _ctrMaterial = null;
+    _ctrMaterialCargar();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:30px;font-size:12px">Error: ${_escCtr(e.message)}</td></tr>`;
   }
@@ -10550,16 +10661,28 @@ function _ctrPintarLista() {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
       return;
     }
-    // [HER-1c] Dos cortes que se COMBINAN: primero el chip, luego el texto.
-    const visibles = _contratosCache
+    // [CTR-TABS-1] La pestaña corta PRIMERO; el chip, los extras y el buscador
+    // cortan DENTRO de ella. Y el resultado va en ORDEN DE USO: el evento de
+    // hoy hasta arriba («hoy es Soy Luna → el contrato de la creadora, coordi y
+    // clientes hasta arriba», palabra de Memo).
+    const delTab = _contratosCache.filter((c) => _ctrTabDe(c) === _ctrTab);
+    const visibles = delTab
       .filter(c => _ctrPasaFiltro(c, _ctrFiltro))
       .filter(c => _ctrPasaExtra(c))
-      .filter(c => _ctrCoincide(c, _ctrBusca));
-    // Los conteos se cuentan SIN el buscador: el chip dice cuántos hay de cada
-    // clase, no cuántos sobreviven al texto.
-    const cuenta = { vigente: 0, pendiente: 0, pasado: 0, cancelado: 0 };
-    _contratosCache.forEach((c) => { cuenta[_ctrClase(c)]++; });
+      .filter(c => _ctrCoincide(c, _ctrBusca))
+      .sort(_ctrOrdenUso);
+    // Cada pestaña dice cuántos tiene (sobre el cache entero)…
+    const porTab = { creadoras: 0, coordis: 0, clientes: 0 };
+    _contratosCache.forEach((c) => { porTab[_ctrTabDe(c)]++; });
     const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
+    rot('ctrt-creadoras', 'Creadoras', porTab.creadoras);
+    rot('ctrt-coordis', 'Coordis', porTab.coordis);
+    rot('ctrt-clientes', 'Clientes', porTab.clientes);
+    // …y los conteos de los chips se cuentan DENTRO de la pestaña y SIN el
+    // buscador: el chip dice cuántos hay de cada clase aquí, no cuántos
+    // sobreviven al texto.
+    const cuenta = { vigente: 0, pendiente: 0, pasado: 0, cancelado: 0 };
+    delTab.forEach((c) => { cuenta[_ctrClase(c)]++; });
     rot('ctrf-vigentes', 'Vigentes', cuenta.vigente);
     rot('ctrf-pendientes', 'Sin firmar', cuenta.pendiente);
     rot('ctrf-pasados', 'Pasados', cuenta.pasado);
@@ -10567,13 +10690,19 @@ function _ctrPintarLista() {
     _ctrAlertaPintar();
     if (!visibles.length) {
       // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
-      // porque si no, no se sabe si no existe o si el texto lo tapó.
+      // porque si no, no se sabe si no existe o si el texto lo tapó. Y la
+      // pestaña Clientes VACÍA dice POR QUÉ está vacía: los contratos de
+      // cliente nacen con las fases reales (CONTRATO-CLIENTE-1, decisión B).
+      if (_ctrTab === 'clientes' && !delTab.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;line-height:1.8">Todavía no hay contratos de clientes — nacen cuando se publiquen las <b>fases reales</b> y cada cliente elija su paquete (CONTRATO-CLIENTE-1).<br>Aquí van a vivir, con su firma y sus alertas.</td></tr>`;
+        return;
+      }
       const etq = { vigente: 'vigente', pendiente: 'sin firmar', pasado: 'pasado', cancelado: 'dado de baja', todos: '' };
       const q = etq[_ctrFiltro] ? etq[_ctrFiltro] + ' ' : '';
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px">` +
         (_ctrBusca
-          ? `Ningún contrato ${q}dice "${_escCtr(_ctrBusca)}" — hay ${_contratosCache.length} en total.`
-          : `Ningún contrato ${q || 'registrado'} — hay ${_contratosCache.length} en total.`) +
+          ? `Ningún contrato ${q}dice "${_escCtr(_ctrBusca)}" — hay ${delTab.length} en esta pestaña.`
+          : `Ningún contrato ${q || 'registrado'} en esta pestaña — hay ${delTab.length} en total aquí.`) +
         `</td></tr>`;
       return;
     }

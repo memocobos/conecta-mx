@@ -26,6 +26,7 @@ const LEEN = ['maestro_roshi', 'bulma', 'milk'];
 const ESCRIBE = ['maestro_roshi'];
 const ACCIONES = {
   entregables_listar: LEEN, ranking: LEEN,
+  material_vencido: LEEN,   // [CTR-TABS-1] la alerta de material de la pestaña Creadoras
   entregables_guardar: ESCRIBE, entregable_marcar: ESCRIBE, redes_guardar: ESCRIBE,
   aviso_vigentes: ESCRIBE,
 };
@@ -59,6 +60,34 @@ exports.handler = async (event) => {
   const entregables = async (cid) => get(`${T_E}?contrato_id=eq.${cid}&select=*&order=orden.asc,created_at.asc`);
 
   try {
+    // ── [CTR-TABS-1] MATERIAL VENCIDO, para la alerta de la pestaña Creadoras ──
+    // Solo LECTURA: entregables PENDIENTES con fecha_limite ya pasada, de
+    // contratos de creadora FIRMADOS cuyo plazo sigue vivo (el evento no pasó
+    // hace más de 3 días — la MISMA regla del cajón «pasado» de CTR-FILTROS-1:
+    // el reel posterior vence al 3er día). Un entregable sin fecha_limite no
+    // puede estar vencido y no sale aquí.
+    if (accion === 'material_vencido') {
+      const hoy = L.hoyMx();
+      const cs = await get(`${T_C}?plantilla=in.(creadora,creadora_team)&estado=eq.firmado&select=id,creador_nombre,evento_nombre,evento_fecha&limit=500`);
+      const vivos = cs.filter((c) => {
+        const f = String(c.evento_fecha || '').slice(0, 10);
+        if (!f) return true; // sin fecha no se puede declarar pasado
+        return (Date.parse(hoy) - Date.parse(f)) / 864e5 <= 3;
+      });
+      const ids = vivos.map((c) => c.id);
+      const es = ids.length
+        ? await get(`${T_E}?contrato_id=in.(${ids.join(',')})&estado=eq.pendiente&fecha_limite=lt.${hoy}&select=contrato_id,descripcion,fecha_limite&order=fecha_limite.asc&limit=1000`)
+        : [];
+      const por = {};
+      es.forEach((e) => { (por[e.contrato_id] = por[e.contrato_id] || []).push(e); });
+      const lista = vivos.filter((c) => por[c.id]).map((c) => ({
+        contrato_id: c.id, nombre: c.creador_nombre, evento: c.evento_nombre, evento_fecha: c.evento_fecha,
+        vencidos: por[c.id].length,
+        primero: { descripcion: por[c.id][0].descripcion, fecha_limite: por[c.id][0].fecha_limite },
+      }));
+      return res(200, { ok: true, hoy, lista });
+    }
+
     if (accion === 'entregables_listar') {
       const cid = String(body.contrato_id || ''); if (!UUID_RE.test(cid)) return res(400, { error: 'contrato_id inválido' });
       const c = await contrato(cid); if (!c) return res(404, { error: 'Ese contrato no existe' });

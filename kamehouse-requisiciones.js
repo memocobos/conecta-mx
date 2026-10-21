@@ -142,8 +142,15 @@ function _reqBdjCard(r) {
       <div class="rq-sub">Acompañantes · al aprobar nace un viajero por persona${Array.isArray(r.desglose) ? ', con lo que declaró cada quien' : ', el pago repartido'}</div>
       <div class="rq-acomp">${r.acompanantes.map((a, i) => `<div>${i + 2}. <b>${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}${a.celular ? ' · WA ' + _reqBdjEsc(a.celular) : ''}${a.talla_playera ? ' · talla ' + _reqBdjEsc(a.talla_playera) : ''}${a.num_emergencia ? ' · emerg. ' + _reqBdjEsc(a.num_emergencia) : ''}</div>`).join('')}</div>
     </div>` : '';
+  // [REQ-DUP-1] El aviso de gemelas que el servidor derivó (mismo evento +
+  // mismo celular o correo). Nació del caso Virginia Moguel: la misma solicitud
+  // aprobada dos veces. El candado real vive en el servidor; esto es la señal.
+  const dup = Array.isArray(r.dup_de) && r.dup_de.length
+    ? `<div style="margin:6px 0;padding:6px 10px;border:1px solid var(--red);border-radius:8px;font-size:11px;color:var(--red)">⚠️ Posible duplicado: este celular/correo ya tiene ${r.dup_de.map((d) => `<b>${_reqBdjEsc(d.folio)}</b> (${_reqBdjEsc(d.estado)})`).join(', ')} en este mismo evento. Compara los comprobantes antes de aprobar.</div>`
+    : '';
   return `
   <div class="rq-card is-${cls}" id="req-card-${r.id}">
+    ${dup}
     <div class="rq-head">
       <div class="rq-av">${_reqBdjEsc(ini)}</div>
       <div class="rq-who">
@@ -299,7 +306,15 @@ async function _reqBdjAprobar(id) {
     body.saldo_favor = true;
   }
   if (zonaEl) body.zona = zonaEl.value;
-  const j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
+  let j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
+  // [REQ-DUP-1] El servidor rebotó por duplicado: se confirma CON PALABRAS y se
+  // reintenta con la marca. Solo quien comparó los comprobantes puede decirlo.
+  if (j && !j.ok && Array.isArray(j.duplicado) && j.duplicado.length) {
+    if (confirm('⚠️ ' + (j.error || 'Posible duplicado') + '\n\n¿Es una compra NUEVA (otro pago, otro comprobante)? Acepta para aprobarla de todos modos.')) {
+      body.duplicado_ok = true;
+      j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
+    }
+  }
   if (j && j.ok) {
     // [ACOMP-1] Cuántos viajeros nacieron y qué pasó con el Portal — dicho, no supuesto.
     const nv = Array.isArray(j.viajeros) ? j.viajeros.length : 1;

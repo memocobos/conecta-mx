@@ -1,0 +1,40 @@
+-- =============================================================================
+-- REQ-DUP-1 · ACTA (20-oct-2026) — YA CORRIDA contra la base viva de KH.
+--
+-- EL CASO: Virginia Moguel mandó la MISMA solicitud de preventa (palnorte) dos
+-- veces — R-9HGTE (16-oct 02:55) y R-RJ4JP (16-oct 11:15) — con el MISMO
+-- comprobante (los dos archivos pesan exactamente 118,081 bytes), y la bandeja
+-- aprobó las dos el 19-oct: 4 lugares y $1,200 en el sistema donde la realidad
+-- son 2 lugares (ella + Olivia Salas) y $600 pagados UNA vez.
+--
+-- PALABRA DE MEMO (20-oct): eliminar el duplicado conservando el mejor par.
+-- Se conservó el par de R-9HGTE (trae correo y celular PROPIOS de Olivia) y se
+-- ANULÓ el par de R-RJ4JP. Forma CORR-DOBLE-1: monto/boletos a 0 con nota
+-- ANEXADA, valor esperado en cada WHERE, CERO DELETEs.
+--
+-- LO CORRIDO (7 updates, 1 fila cada uno, verificado con careo de salida):
+--   · abonos 690fc0c1… y 2222e3d1… (par R-RJ4JP): monto 300 → 0, nota anexada.
+--   · viajeros 21725aa9… (Virginia) y 5bc25fd3… (Olivia de R-RJ4JP):
+--     boletos 1 → 0, zona_boleto → NULL, total_contrato 300 → 0, nota anexada.
+--   · requisiciones R-RJ4JP: nota_staff anexada «DUPLICADA de R-9HGTE…».
+--   · viajero 90b57b59… (Olivia que SE QUEDA): correo
+--     brenda24_salas@hotmail.con → brenda24_salas@hotmail.com (dedazo .con).
+--   · requisiciones R-9HGTE: el mismo correo corregido dentro del jsonb
+--     acompanantes (jsonb_set en {0,correo}).
+--
+-- CAREO DE SALIDA (query fresca): par anulado 0/$0/NULL · par vivo intacto
+-- (2 × boletos 1 · $300 · «Preventa a ciegas») · correo corregido en los dos
+-- lados · nota_staff sellada. La invitación al Portal de Virginia (una sola,
+-- UNIQUE evento+correo la protegió) sigue válida; Olivia queda SIN invitar
+-- porque su correo tenía el dedazo — se invita desde KameHouse cuando Memo
+-- quiera, ya con el correo bueno.
+--
+-- LA TUERCA QUE ESTO PARIÓ (mismo día, mide:req-dup-1 · 15 verdes):
+--   · `listar` adjunta `dup_de` (gemelas por evento + celular/correo).
+--   · `aprobar` RECHAZA (409, nombrando folios) si ya hay una APROBADA gemela,
+--     salvo `duplicado_ok:true` — la palabra de quien comparó comprobantes.
+--   · Si la consulta de duplicados no se puede leer → 502, no aprobación muda.
+-- =============================================================================
+-- (Sin SQL ejecutable a propósito: los updates llevaban valores esperados de
+-- una base que ya cambió; re-correrlos escribiría cero filas. El acta es el
+-- registro, la corrección ya vive en las notas de las filas.)

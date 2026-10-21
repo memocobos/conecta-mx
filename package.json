@@ -86,6 +86,7 @@
     "mide:gz-plataforma-1": "node scripts/mide-gz-plataforma-1.js",
     "mide:sin-solo-boleto": "node scripts/mide-sin-solo-boleto.js",
     "mide:nav-min-1": "node scripts/mide-nav-min-1.js",
-    "mide:capsule-comp-1": "node scripts/mide-capsule-comp-1.js"
+    "mide:capsule-comp-1": "node scripts/mide-capsule-comp-1.js",
+    "mide:req-dup-1": "node scripts/mide-req-dup-1.js"
   }
 }

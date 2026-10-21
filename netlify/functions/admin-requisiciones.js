@@ -99,7 +99,28 @@ exports.handler = async (event) => {
     if (!r.ok) return j(502, headers, { error: 'No se pudo leer la bandeja', detail: (await r.text()).slice(0, 300) });
     const rows = await r.json();
     const pend = rc.ok ? (await rc.json()).length : null; // null = no se pudo contar (no es 0)
-    return j(200, headers, { ok: true, requisiciones: rows, pendientes: pend });
+    // [REQ-DUP-1 · 20-oct-2026] El aviso de duplicados, nacido del caso real:
+    // Virginia Moguel mandó la MISMA solicitud dos veces (mismo comprobante) y
+    // la bandeja aprobó las dos — 4 lugares y $1,200 donde eran 2 y $600. Cada
+    // fila lista a sus GEMELAS (mismo evento + mismo celular O correo, otra
+    // solicitud, pendiente o aprobada). Este aviso es cortesía de pantalla; el
+    // candado de verdad vive en `aprobar` (esconder un botón no es la regla).
+    let dups = {};
+    try {
+      const rd = await fetch(`${base}?select=id,folio,evento_id,celular,correo,estado&estado=in.(pendiente,aprobada)&limit=1000`, { headers: sbH });
+      if (rd.ok) {
+        const todas = await rd.json();
+        const nCel = (s) => String(s || '').replace(/\D/g, '');
+        const nMail = (s) => String(s || '').trim().toLowerCase();
+        for (const row of rows) {
+          const c = nCel(row.celular), m = nMail(row.correo);
+          const gem = todas.filter((o) => o.id !== row.id && o.evento_id === row.evento_id &&
+            ((c && nCel(o.celular) === c) || (m && nMail(o.correo) === m)));
+          if (gem.length) dups[row.id] = gem.map((o) => ({ folio: o.folio, estado: o.estado }));
+        }
+      }
+    } catch (_) { /* el aviso no tumba la bandeja; la autoridad es el candado de aprobar */ }
+    return j(200, headers, { ok: true, requisiciones: rows.map((x) => dups[x.id] ? Object.assign({}, x, { dup_de: dups[x.id] }) : x), pendientes: pend });
   }
 
   // ── [PORTAL-EDIT-1] solicitudes de cambio del Portal ─────────────────────
@@ -255,6 +276,28 @@ exports.handler = async (event) => {
     if (!rows0.length) return j(404, headers, { error: 'Esa requisición no existe' });
     const req = rows0[0];
     if (req.estado !== 'pendiente') return j(409, headers, { error: `Ya está ${req.estado}` });
+
+    // [REQ-DUP-1] EL CANDADO DEL DUPLICADO, en el servidor (la regla, no la UI).
+    // Si este celular/correo YA tiene una requisición APROBADA en este evento,
+    // aprobar otra duplica lugares y dinero (caso Virginia Moguel, 19-oct: el
+    // mismo comprobante se aprobó dos veces). Solo pasa con `duplicado_ok:true`
+    // — la palabra de quien COMPARÓ los comprobantes y vio dos pagos distintos.
+    // La verificación es parte de la aprobación: si no se puede leer, no se
+    // aprueba a ciegas (un candado que falla en silencio no es un candado).
+    {
+      const cN = String(req.celular || '').replace(/\D/g, '');
+      const mN = String(req.correo || '').trim().toLowerCase();
+      const rd = await fetch(`${base}?select=id,folio,celular,correo&evento_id=eq.${encodeURIComponent(req.evento_id)}&estado=eq.aprobada&limit=500`, { headers: sbH });
+      if (!rd.ok) return j(502, headers, { error: 'No se pudo verificar si hay duplicados — reintenta en un momento' });
+      const gem = (await rd.json()).filter((o) => o.id !== id &&
+        ((cN && String(o.celular || '').replace(/\D/g, '') === cN) || (mN && String(o.correo || '').trim().toLowerCase() === mN)));
+      if (gem.length && body.duplicado_ok !== true) {
+        return j(409, headers, {
+          error: `Este celular/correo ya tiene aprobada ${gem.map((g) => g.folio).join(', ')} en este mismo evento. Compara los comprobantes: si es la MISMA transferencia, recházala como duplicada; si es una compra nueva de verdad (otro pago), confírmalo.`,
+          duplicado: gem.map((g) => g.folio),
+        });
+      }
+    }
 
     // 2 · El dinero, tecleado por el humano que vio el comprobante.
     const monto = Math.round(Number(body.monto));

@@ -190,6 +190,12 @@ async function loadReportes() {
   if (headerBtns) {
     if (rol === 'coordinador') {
       headerBtns.innerHTML = `<button class="btn btn-primary" onclick="abrirModalReporte(null)">+ Nuevo Reporte</button>`;
+    } else if (rol === 'mister_popo') {
+      // [REP-POPO-1] Popo también coordina tours (Allan en Sanz): puede crear
+      // SU reporte además de revisar los de los demás. El suyo lo aprueban
+      // Memo/Bulma/Milk — el candado vive en el servidor.
+      headerBtns.innerHTML = `<button class="btn btn-primary" onclick="abrirModalReporte(null)">+ Nuevo Reporte</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadReportes()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>`;
     } else if (['maestro_roshi','bulma'].includes(rol)) {
       headerBtns.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="loadReportes()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>`;
     } else {
@@ -276,13 +282,20 @@ function renderReportes(lista, filtro) {
 
     // Botones según rol y status
     const rol = currentUser?.rol;
+    // [REP-POPO-1] Popo también coordina: SUS filas se editan y se mandan como
+    // las de un coordi, y las AJENAS se revisan como siempre. Su propia fila
+    // enviada no trae el botón de aprobar (el servidor también lo niega): la
+    // aprueban Memo/Bulma/Milk con «Aprobar directo».
+    const esMio = String(r.coordi_id) === String(currentUser?.id);
     let btns = '';
-    if (rol === 'coordinador' && (r.status === 'borrador' || r.status === 'rechazado')) {
+    if ((rol === 'coordinador' || (rol === 'mister_popo' && esMio)) && (r.status === 'borrador' || r.status === 'rechazado')) {
       btns = `<button class="btn btn-primary btn-sm" onclick="abrirModalReporte('${r.id}')">Editar</button>
               <button class="btn btn-ghost btn-sm" onclick="enviarReporte('${r.id}')">Enviar →</button>`;
     }
     if (rol === 'mister_popo' && r.status === 'enviado') {
-      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
+      btns = esMio
+        ? `<span style="font-size:11px;color:var(--ts)">Tu reporte lo aprueban Memo, Bulma o Milk</span>`
+        : `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
     // [KARIN-GZ-1 · 14-oct] «El reporte final lo reviso yo roshi y yo soy quien

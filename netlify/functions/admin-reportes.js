@@ -98,8 +98,13 @@ exports.handler = async (event) => {
   // Roles permitidos por acción.
   const rolesPorAccion = {
     listar: ROLES_READ,
-    guardar_mio: ['coordinador'],
-    enviar_mio: ['coordinador'],
+    // [REP-POPO-1 · 21-oct-2026] Mister Popo también COORDINA tours (caso real:
+    // Allan en Alejandro Sanz — la alerta de GZ le pedía el reporte y la puerta
+    // de crear no existía para su rol). Su reporte nace por el MISMO camino:
+    // coordi_id SIEMPRE del JWT, así que no puede reportar a nombre de nadie.
+    // Lo que NO puede es aprobarse a sí mismo — ese candado vive en aprobar_popo.
+    guardar_mio: ['coordinador', 'mister_popo'],
+    enviar_mio: ['coordinador', 'mister_popo'],
     aprobar_popo: ROLES_MOD,
     // [KARIN-GZ-1 → GZ-INICIO-3 · 14-oct] Memo primero pidió que fuera solo
     // suyo y el mismo día corrigió: «bulma y milk también deben de poder
@@ -289,6 +294,12 @@ exports.handler = async (event) => {
       // faltantes cobrados llega en F4b — aquí un faltante simplemente no cuadra.
       const rep = await leerReporte(id);
       if (!rep) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Reporte no encontrado' }) };
+      // [REP-POPO-1] NADIE aprueba su propio reporte, y el candado vive AQUÍ
+      // (esconder el botón es UI, negarlo es la regla). La cadena no se rompe:
+      // Memo/Bulma/Milk aprueban el suyo con «Aprobar directo» desde 'enviado'.
+      if (jwtRol === 'mister_popo' && String(rep.coordi_id) === String(jwtUserId)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Tu propio reporte no lo apruebas tú: lo revisan Memo, Bulma o Milk (Aprobar directo).' }) };
+      }
       const salidas = await salidasAutorizadasDe(rep.evento_id, rep.coordi_id);
       if (salidas.length) {
         const diferencias = compararSalidaVsReporte(salidas, rep.kits_detalle);

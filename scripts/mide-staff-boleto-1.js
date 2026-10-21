@@ -100,6 +100,19 @@ const filaDe = (c, ev = 'soyluna') => DB.viajeros_evento.find((v) => v.usuario_i
   af(r.s === 409 && ESC === 0 && filaDe(C2).zona_boleto === 'VIP', `[F2] fila de CLIENTE → 409 sin tocarla (${r.s})`);
   r = await pedir({ evento_id: 'omar#0', coordi_id: C3, zona: 'VIP' });
   af(r.s === 200 && filaDe(C3, 'omar#0') && filaDe(C3, 'omar#0').zona_boleto === 'VIP', `[G] asignación base abre la fecha omar#0 (${r.s}) ${r.j.error || ''}`);
+  // [S] STAFF-SINBOLETO-1 (20-oct): «va sin boleto» = zona NULL + marca; no mide inventario.
+  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'VIP' });
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: '__sin_boleto__' });
+  af(r.s === 200 && r.j.sin_boleto === true && filaDe(C1).zona_boleto === null && filaDe(C1).sin_boleto === true && ESC === 1,
+    `[S1] VIP → «va sin boleto»: zona NULL, sin_boleto=true, 1 escritura (${r.s}, ${ESC})`);
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: '__sin_boleto__' });
+  af(r.j.ya === true && ESC === 0, `[S2] 2º clic «sin boleto» → 0 escrituras (${ESC})`);
+  r = await pedir({ evento_id: 'soyluna', coordi_id: C1, zona: 'Platino' });
+  af(r.s === 200 && filaDe(C1).zona_boleto === 'Platino' && filaDe(C1).sin_boleto === false, `[S3] volver a asignar zona apaga la marca (${r.s})`);
+  DB.eventos_coordi.push({ id: 'a4', evento_id: 'soyluna', coordi_id: C3, status: 'aceptado' });
+  ESC = 0; r = await pedir({ evento_id: 'soyluna', coordi_id: C3, zona: '__sin_boleto__' });
+  af(r.s === 200 && filaDe(C3) && filaDe(C3).zona_boleto === null && filaDe(C3).sin_boleto === true && ESC === 1,
+    `[S4] sin fila previa: nace su fila de staff marcada «sin boleto», sin medir inventario (${r.s}, ${ESC})`);
   // [I] la fila de staff con zona OCUPA lugar en la disponibilidad (la regla de su dueño)
   const { ocupaLugar, consumeBoleto } = require(path.join(RAIZ, 'netlify/functions/_lib/paquete-viaje.js'));
   af(ocupaLugar('PLUS', 'coordinador') === true && ocupaLugar('CHEAP', 'creadora') === true && ocupaLugar('RIDE', 'cliente') === false && ocupaLugar('PLUS', null) === true && consumeBoleto('PLUS', 'coordinador') === false,

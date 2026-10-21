@@ -174,7 +174,7 @@ const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 // Whitelist ESTRICTA de `viajeros_evento` (PII) — solo lo que la descarga usa.
 // [GRUPO-VIAJE-1] + boletos (un titular de 3 lugares se lee distinto que uno
 // de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje';
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -389,7 +389,7 @@ exports.handler = async (event) => {
       let ve, asigs, usus, ctrs;
       try {
         [ve, asigs, usus, ctrs] = await Promise.all([
-          leer(`${baseVE}?select=evento_id,tipo_viajero,tipo_paquete,zona_boleto,boletos,usuario_id,nombre,talla_playera&limit=20000`),
+          leer(`${baseVE}?select=evento_id,tipo_viajero,tipo_paquete,zona_boleto,boletos,usuario_id,nombre,talla_playera,sin_boleto&limit=20000`),
           leer(`${baseEC}?select=evento_id,coordi_id,status&limit=5000`),
           leer(`${baseUsuarios}?select=id,nombre,rol&limit=1000`),
           leer(`${baseContratos}?plantilla=eq.creadora&select=id,creador_nombre,creador_email,estado,evento_nombre,evento_fecha,datos&limit=2000`),
@@ -411,7 +411,7 @@ exports.handler = async (event) => {
         if (a.status === 'declinado') return;
         const u = uDe[a.coordi_id] || {};
         const fila = staffDe(a.evento_id, a.coordi_id);
-        de(a.evento_id).equipo.push({ nombre: u.nombre || '—', rol: u.rol || null, status: a.status || 'pendiente', boleto: fila ? (fila.zona_boleto || null) : null, base: !String(a.evento_id).includes('#') });
+        de(a.evento_id).equipo.push({ nombre: u.nombre || '—', rol: u.rol || null, status: a.status || 'pendiente', boleto: fila ? (fila.zona_boleto || null) : null, sin_boleto: !!(fila && fila.sin_boleto), base: !String(a.evento_id).includes('#') });
       });
       // Creadoras: la cortesía ya dice su tour; las que no, se cuelgan por FECHA
       // del contrato (la tarjeta casa fecha + nombre en el navegador).
@@ -448,7 +448,7 @@ exports.handler = async (event) => {
           leer(`${baseEC}?select=id,evento_id,coordi_id,status,asignado_en&limit=5000`),
           leer(`${baseUsuarios}?select=id,nombre,rol,correo,talla_playera,activo&limit=1000`),
           leer(`${baseContratos}?select=id,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,datos&limit=2000`),
-          leer(`${baseVE}?tipo_viajero=not.is.null&tipo_viajero=neq.cliente&select=id,evento_id,usuario_id,nombre,zona_boleto,talla_playera,tipo_viajero&limit=5000`),
+          leer(`${baseVE}?tipo_viajero=not.is.null&tipo_viajero=neq.cliente&select=id,evento_id,usuario_id,nombre,zona_boleto,talla_playera,tipo_viajero,sin_boleto&limit=5000`),
           leer(`${env.KH_SB_URL}/rest/v1/requisiciones?estado=eq.pendiente&select=id&limit=1000`),
           leer(`${env.KH_SB_URL}/rest/v1/cambios_viajero?estado=eq.pendiente&select=id&limit=1000`),
           leer(`${env.KH_SB_URL}/rest/v1/salidas_bodega?estado=eq.solicitada&select=id,evento_id,solicitante_id&limit=500`),
@@ -478,7 +478,8 @@ exports.handler = async (event) => {
         if (a.status !== 'aceptado') push({ ...base, tipo: 'por_aceptar', texto: `${quien} no ha aceptado el tour` });
         if (u.rol === 'coordinador' && !firmado.has(String(u.correo || '').toLowerCase())) push({ ...base, tipo: 'sin_contrato', nivel: 'rojo', texto: `${quien} va asignada(o) y NO ha firmado contrato` });
         const fila = (staff || []).find((v) => v.usuario_id === a.coordi_id && (v.evento_id === a.evento_id || String(v.evento_id).split('#')[0] === a.evento_id));
-        if (!fila || !fila.zona_boleto) push({ ...base, tipo: 'sin_boleto', texto: `${quien} no tiene boleto asignado` });
+        // [STAFF-SINBOLETO-1] «va sin boleto» es una DECISIÓN, no un faltante: no alarma.
+        if (!fila || (!fila.zona_boleto && !fila.sin_boleto)) push({ ...base, tipo: 'sin_boleto', texto: `${quien} no tiene boleto asignado` });
         if (!((fila && fila.talla_playera) || u.talla_playera)) push({ ...base, tipo: 'sin_talla', nivel: 'amarillo', texto: `${quien} no tiene talla de playera` });
       });
       // 2) Creadoras: contrato del tour (por fecha del contrato).
@@ -523,7 +524,11 @@ exports.handler = async (event) => {
       if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
       const coordi_id = String(body.coordi_id || '').trim();
       if (!UUID_RE.test(coordi_id)) return bad(headers, 'coordi_id inválido');
-      const zonaPedida = cleanText(body.zona, 120) || '';
+      let zonaPedida = cleanText(body.zona, 120) || '';
+      // [STAFF-SINBOLETO-1] '__sin_boleto__' = va al tour pero NO usa boleto en
+      // este evento: zona en NULL (no descuenta) + marca que apaga la alarma.
+      const sinBoleto = zonaPedida === '__sin_boleto__';
+      if (sinBoleto) zonaPedida = '';
       const eventoBase = evento_id.split('#')[0];
       // Tiene que estar asignado a esa fecha o al evento base.
       const ra = await fetch(`${baseEC}?coordi_id=eq.${coordi_id}&evento_id=in.(${[...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',')})&select=id,status&limit=1`, { headers: sbHeaders });
@@ -538,11 +543,12 @@ exports.handler = async (event) => {
       }
 
       // Su lugar de viajero en ESTA fecha.
-      const rv = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&usuario_id=eq.${coordi_id}&select=id,zona_boleto,tipo_viajero,notas&limit=1`, { headers: sbHeaders });
+      const rv = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&usuario_id=eq.${coordi_id}&select=id,zona_boleto,tipo_viajero,notas,sin_boleto&limit=1`, { headers: sbHeaders });
       if (!rv.ok) return upstream(headers, await rv.text(), 'consulta');
       let fila = (await rv.json())[0] || null;
       const zonaVieja = fila ? (fila.zona_boleto || null) : null;
-      if (zonaVieja === zona) return ok(headers, { ya: true, zona });
+      const sinVieja = !!(fila && fila.sin_boleto);
+      if (zonaVieja === zona && sinVieja === sinBoleto) return ok(headers, { ya: true, zona, sin_boleto: sinBoleto });
 
       // 🔒 [STAFF-BOLETO-2] NO SE SOBREVENDE (palabra de Memo): la zona nueva
       // tiene que tener lugar EN KAMISAMA. La fila del staff ES el boleto
@@ -558,7 +564,7 @@ exports.handler = async (event) => {
       }
 
       if (!fila) {
-        if (!zona) return ok(headers, { ya: true, zona: null });
+        if (!zona && !sinBoleto) return ok(headers, { ya: true, zona: null });
         const ur = await fetch(`${baseUsuarios}?id=eq.${coordi_id}&select=id,nombre,celular,correo,talla_playera,num_emergencia,nombre_emergencia,rol&limit=1`, { headers: sbHeaders });
         if (!ur.ok) return upstream(headers, await ur.text(), 'consulta');
         const u = (await ur.json())[0];
@@ -569,8 +575,8 @@ exports.handler = async (event) => {
             evento_id, nombre: u.nombre, celular: u.celular || null, correo: u.correo || null,
             talla_playera: u.talla_playera || null, num_emergencia: u.num_emergencia || null,
             emergencia_nombre: u.nombre_emergencia || null, tipo_paquete: 'PLUS',
-            tipo_viajero: u.rol || 'staff', usuario_id: u.id, zona_boleto: zona,
-            notas: `[STAFF:${u.rol || 'staff'}] Boleto de staff asignado en Capsule (${zona})`,
+            tipo_viajero: u.rol || 'staff', usuario_id: u.id, zona_boleto: zona, sin_boleto: sinBoleto,
+            notas: sinBoleto ? `[STAFF:${u.rol || 'staff'}] Va al tour SIN boleto en este evento (marcado en Capsule)` : `[STAFF:${u.rol || 'staff'}] Boleto de staff asignado en Capsule (${zona})`,
           }),
         });
         if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
@@ -579,13 +585,13 @@ exports.handler = async (event) => {
         if (esCliente(fila.tipo_viajero)) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esa fila es de un cliente, no de staff: el boleto de un cliente se maneja en su compra' }) };
         const up = await fetch(`${baseVE}?id=eq.${fila.id}&${zonaVieja ? `zona_boleto=eq.${encodeURIComponent(zonaVieja)}` : 'zona_boleto=is.null'}`, {
           method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
-          body: JSON.stringify({ zona_boleto: zona, notas: `${fila.notas || ''} · boleto de staff: ${zonaVieja || '—'} → ${zona || '—'}`.slice(0, 4000) }),
+          body: JSON.stringify({ zona_boleto: zona, sin_boleto: sinBoleto, notas: `${fila.notas || ''} · boleto de staff: ${zonaVieja || (sinVieja ? 'sin boleto' : '—')} → ${zona || (sinBoleto ? 'sin boleto (no lo usa)' : '—')}`.slice(0, 4000) }),
         });
         if (!up.ok) return upstream(headers, await up.text(), 'update');
         if (!(await up.json()).length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien la cambió al mismo tiempo: recarga y vuelve a intentar' }) };
       }
 
-      return ok(headers, { zona, antes: zonaVieja });
+      return ok(headers, { zona, antes: zonaVieja, sin_boleto: sinBoleto });
     }
 
     // ── [CREA-1b] cortesía: boleto de cortesía a un evento ────────────────

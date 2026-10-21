@@ -5219,7 +5219,7 @@ function renderCCEventos(lista, filtro) {
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   let filtrada = lista;
   const _fut = (e) => new Date(e.fecha+'T12:00:00') >= hoy;
-  const _sinBoleto = (e) => ((e._res && e._res.equipo) || []).filter(p => !p.boleto).length;
+  const _sinBoleto = (e) => ((e._res && e._res.equipo) || []).filter(p => !p.boleto && !p.sin_boleto).length;   // [STAFF-SINBOLETO-1]
   if (filtro === 'proximo') filtrada = lista.filter(_fut);
   if (filtro === 'pasado')  filtrada = lista.filter(e => !_fut(e));
   // [CC-CARDS-1] Filtros que ayudan a operar, no solo a mirar.
@@ -5271,9 +5271,9 @@ function _ccTarjetaRes(e, pasado) {
   const pq = Object.entries(r.por_paquete || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${_esfEsc(k)}`).join(' · ');
   const eq = (r.equipo || []).map(p => {
     const ok = p.status === 'aceptado';
-    const col = !ok ? '#ffb020' : (p.boleto ? 'var(--green)' : '#ffb020');
-    const tip = !ok ? 'no ha aceptado' : (p.boleto ? p.boleto : 'sin boleto');
-    return `<span title="${_esfEsc(tip)}" style="color:${col}">${ok ? '✓' : '⏳'} ${_esfEsc(String(p.nombre || '').split(' ')[0])}${ok && !p.boleto ? ' 🎟?' : ''}</span>`;
+    const col = !ok ? '#ffb020' : ((p.boleto || p.sin_boleto) ? 'var(--green)' : '#ffb020');
+    const tip = !ok ? 'no ha aceptado' : (p.boleto ? p.boleto : (p.sin_boleto ? 'va sin boleto (no lo usa aquí)' : 'sin boleto'));
+    return `<span title="${_esfEsc(tip)}" style="color:${col}">${ok ? '✓' : '⏳'} ${_esfEsc(String(p.nombre || '').split(' ')[0])}${ok && !p.boleto && !p.sin_boleto ? ' 🎟?' : ''}${ok && p.sin_boleto ? ' 🚫🎟' : ''}</span>`;
   }).join(' · ');
   const cr = (r.creadoras || []).map(c => {
     const col = !c.firmado || !c.cortesia ? '#ffb020' : 'var(--green)';
@@ -5432,7 +5432,7 @@ async function staffBoletoGuardar(coordiId) {
   try {
     const j = await khViajeros._call({ accion: 'staff_boleto', evento_id: _ccEventoActual, coordi_id: coordiId, zona: sel.value });
     if (msg) {
-      msg.textContent = j.aviso ? ('⚠️ ' + j.aviso) : (j.ya ? 'sin cambios' : (j.zona ? `✓ ${j.zona} — descontado del inventario` : '✓ boleto quitado — regresó al inventario'));
+      msg.textContent = j.aviso ? ('⚠️ ' + j.aviso) : (j.ya ? 'sin cambios' : (j.zona ? `✓ ${j.zona} — descontado del inventario` : (j.sin_boleto ? '✓ va sin boleto — no descuenta inventario' : '✓ boleto quitado — regresó al inventario')));
       msg.style.color = j.aviso ? '#ffb020' : 'var(--green)';
     }
     if (typeof loadViajeros === 'function') loadViajeros();
@@ -5553,7 +5553,8 @@ async function loadCCEquipo() {
     let _zonaDe = {}, _zonasEv = [];
     if (_puedeBoleto && asigs.length) {
       try {
-        (await khViajeros.listar(_ccEventoActual) || []).forEach(v => { if (v.usuario_id) _zonaDe[v.usuario_id] = v.zona_boleto || ''; });
+        // [STAFF-SINBOLETO-1] «va sin boleto» se guarda como '__sin_boleto__' en el select.
+        (await khViajeros.listar(_ccEventoActual) || []).forEach(v => { if (v.usuario_id) _zonaDe[v.usuario_id] = v.zona_boleto || (v.sin_boleto ? '__sin_boleto__' : ''); });
       } catch (_) { _zonaDe = null; }
       const _e = ev._ev || {};
       const _idx = String(_ccEventoActual).includes('#') ? Number(String(_ccEventoActual).split('#')[1]) : null;
@@ -5567,11 +5568,12 @@ async function loadCCEquipo() {
       return `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--ts)">🎟 Boleto:</span>
         <select class="cot-input" id="sb-${a.coordi_id}" style="width:auto;min-width:150px;padding:4px 8px;font-size:12px">
-          <option value="">— sin boleto —</option>
+          <option value="">— sin asignar —</option>
+          <option value="__sin_boleto__"${actual === '__sin_boleto__' ? ' selected' : ''}>🚫 Va sin boleto (no lo usa aquí)</option>
           ${_zonasEv.map(z => `<option value="${_esfEsc(z)}"${z === actual ? ' selected' : ''}>${_esfEsc(z)}</option>`).join('')}
         </select>
         <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="staffBoletoGuardar('${a.coordi_id}')">Guardar</button>
-        <span id="sb-msg-${a.coordi_id}" style="font-size:11px;color:var(--ts)">${actual ? '' : 'sin boleto todavía'}</span>
+        <span id="sb-msg-${a.coordi_id}" style="font-size:11px;color:var(--ts)">${actual === '__sin_boleto__' ? 'va sin boleto ✓' : (actual ? '' : 'sin boleto todavía')}</span>
       </div>`;
     };
     const htmlAsigs = asigs.map(a => {

@@ -36,5 +36,15 @@ console.log('[C] la forma de la baja es LAS DOS mitades (boletos_crudo 0 Y zona 
 m = carear([persona], [Object.assign({}, baja, { zona: 'Barrera' })], { cdmx: false });
 af((m.totales_contrato || []).length === 1, 'boletos_crudo 0 con ZONA viva no es baja: se propone como siempre');
 
+console.log('[D] TOTAL-BAJA-1b: el montón VIAJA en el plan (planear lo copia)');
+// El 22-oct el montón existía en carear() y la pantalla no lo veía: planear no
+// lo forwardeaba — un montón que no viaja se lee como «todo cuadra».
+const { planear } = require(path.join(__dirname, '..', 'netlify/functions/_lib/excel-aplicar.js'));
+const careo = { montones: carear([persona], [baja], { cdmx: false }), personas: [], viajeros: [] };
+const plan = planear(careo, {});
+af(Array.isArray(plan.totales_baja) && plan.totales_baja.length === 1 && plan.totales_baja[0].nombre === 'David Sandoval',
+   'plan.totales_baja trae la fila nombrada — el preview y la pantalla la pueden enseñar');
+af((plan.totales || []).length === 0, 'y plan.totales sigue SIN la baja: nombrar no es aplicar');
+
 console.log((ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
 process.exit(ko ? 1 : 0);

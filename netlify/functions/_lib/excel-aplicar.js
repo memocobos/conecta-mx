@@ -689,6 +689,12 @@ function planear(careo, opciones) {
 
   return { abonos, totales, altas, negativas, saltados, boletos, fuera, sellos,
            avisos_boletos: avisosBoletos,
+           // 🔒 [TOTAL-BAJA-1b] EL MONTÓN DE LA GUARDA VIAJA EN EL PLAN. carear()
+           // ya separaba el total de una BAJA en `totales_baja` (nombrado, jamás
+           // aplicado), pero planear no lo copiaba: la pantalla y el preview no lo
+           // veían — un montón que no viaja se lee como «todo cuadra», que es la
+           // ley del cero falso. Solo se NOMBRA: nunca entra a `totales`.
+           totales_baja: M.totales_baja || [],
            // [EXCEL-AG-2] los dos montones, SEPARADOS, más los avisos que no escriben.
            ag_cerrar: agCerrar, ag_abrir: agAbrir,
            // 🔴 [AG-CERO-FALSO-1] LO QUE LA PANTALLA PINTA, y `null` cuando NO se

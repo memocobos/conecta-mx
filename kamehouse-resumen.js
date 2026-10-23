@@ -373,6 +373,8 @@ async function _loadAlertasHome() {
     khCoordi.alertasListar().catch(() => []),
   ]);
   const lista = _rahNormalizar(radar, sistema);
+  // [MONT-MIN-1] El globo de la barra minimizada: cuántas piden atención.
+  el.dataset.mtBadge = String(lista.length);
   if (!lista.length) { el.style.display = 'none'; return; }
   el.style.display = '';
   el.innerHTML = _rahRender(lista);
@@ -1209,6 +1211,8 @@ function _renderResumenAtrasados(activos, cancelados) {
   const atr = (activos || []).filter(_cobEsAtrasado)
     .map(t => ({ t, dias: _cobDiasAtraso(((t.pago || {}).proximo || {}).fecha_esperada) }))
     .sort((a, b) => b.dias - a.dias);  // más atrasado arriba
+  // [MONT-MIN-1] El globo de la barra minimizada: cuántos atrasados.
+  el.dataset.mtBadge = String(atr.length);
   const nCanc = (cancelados || []).length;
   const pie = nCanc ? `<div style="margin-top:12px;font-size:11px;color:var(--ts)">${nCanc} tour${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'} (no cuentan en los totales).</div>` : '';
 
@@ -1265,6 +1269,9 @@ function _renderResumenRiesgoBaja(activos) {
   const enRiesgo = (activos || [])
     .filter(t => Number((t.pago || {}).vencidos || 0) >= 3)
     .sort((a, b) => Number((b.pago||{}).vencidos||0) - Number((a.pago||{}).vencidos||0));
+  // [MONT-MIN-1] El globo de la barra minimizada: siempre ROJO — es la lista de baja.
+  el.dataset.mtBadge = String(enRiesgo.length);
+  el.dataset.mtRojo = enRiesgo.length ? '1' : '0';
   if (!enRiesgo.length) { card.style.display = 'none'; el.innerHTML = ''; return; }
   card.style.display = '';
   const N = enRiesgo.length;
@@ -1536,7 +1543,12 @@ async function _loadLogisticaHome() {
   box.innerHTML = '<div class="card"><div class="loading-state"><div class="spinner"></div>Revisando la logística del equipo…</div></div>';
   let j;
   try { j = await khViajeros._call({ accion: 'alarmas_operacion' }); }
-  catch (e) { box.innerHTML = `<div class="card"><div class="alert alert-error">No se pudo revisar la logística: ${_almEsc(e.message)}</div></div>`; return; }
+  catch (e) {
+    box.innerHTML = `<div class="card"><div class="alert alert-error">No se pudo revisar la logística: ${_almEsc(e.message)}</div></div>`;
+    // [MONT-MIN-1] Minimizada, un error que no se ve es un hueco: el globo lo dice.
+    box.dataset.mtBadge = '1'; box.dataset.mtRojo = '1';
+    return;
+  }
   _almLista = j.alarmas || [];
   const b = j.bandejas || {};
   const chip = (n, txt, onclick) => n ? `<button class="btn btn-sm" style="font-size:11px;background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.4);color:#ffb020" onclick="${onclick}">${n} ${txt} →</button>` : '';
@@ -1546,6 +1558,9 @@ async function _loadLogisticaHome() {
     chip(b.salidas, b.salidas === 1 ? 'salida de bodega por autorizar' : 'salidas de bodega por autorizar', "showPage('inventario')"),
   ].join('');
   const rojas = _almLista.filter(a => a.nivel === 'rojo').length;
+  // [MONT-MIN-1] El globo de la barra minimizada: pendientes, rojo si hay urgentes.
+  box.dataset.mtBadge = String(_almLista.length);
+  box.dataset.mtRojo = rojas ? '1' : '0';
   box.innerHTML = `<div class="card" style="border-left:3px solid ${rojas ? 'var(--red)' : (_almLista.length ? '#ffb020' : 'var(--green)')}">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Logística del equipo</div>
@@ -1592,6 +1607,8 @@ async function _loadCobranzaHome() {
     };
     const nombreDe = (llave) => { const [b, i] = String(llave || '').split('#'); const e = evDe[b]; if (!e) return llave; const mf = (i != null && Array.isArray(e.multifecha)) ? e.multifecha[Number(i)] : null; return (e.a || b) + (mf && mf.lbl ? ' · ' + mf.lbl : ''); };
     const deud = (j.deudores || []).map(d => ({ ...d, _f: fechaDe(d.evento_id) })).filter(d => d._f && d._f >= hoy && d._f <= limite && Number(d.resta || d.saldo || 0) > 0);
+    // [MONT-MIN-1] El globo de la barra minimizada: cuántos deben.
+    el.dataset.mtBadge = String(deud.length);
     if (!deud.length) { el.innerHTML = '<div style="font-size:12px;color:var(--ts);text-align:center;padding:14px">Nadie debe en los tours de los próximos 21 días ✓</div>'; return; }
     const porEv = {};
     deud.forEach(d => { (porEv[d.evento_id] = porEv[d.evento_id] || []).push(d); });
@@ -1613,3 +1630,111 @@ async function _loadCobranzaHome() {
     el.innerHTML = `<div class="alert alert-error">No se pudo leer la cobranza: ${_almEsc(e.message)}</div>`;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [MONT-MIN-1 · 22-oct-2026] MINIMIZAR LAS SECCIONES DE MONTAÑA PAI
+// ═══════════════════════════════════════════════════════════════════════════
+// Palabra de Memo: «opción de minimizar las casillas de cada desplegado por si
+// no quiero ver tanta información… que se quede la configuración… y al tenerlo
+// minimizado una alerta en la esquina de cosas por revisar».
+//
+// · Cada sección gana un botón «—» en su esquina. Minimizada queda una BARRA
+//   delgada con el título y, cuando hay algo, el globo «N por revisar».
+// · La elección vive en localStorage (kh_mtmin_v1): sobrevive sesiones y
+//   aplica desde la PRIMERA pintada, antes de que carguen los datos.
+// · 🔒 EL MECANISMO NO TOCA A LOS RENDERERS. El colapso es una CLASE en un
+//   envoltorio creado aquí: `display:none !important` le gana al `style` en
+//   línea que los renderers escriben al recargar, así que pueden re-pintar
+//   mil veces sin «destapar» lo minimizado. Y la visibilidad del envoltorio
+//   SIGUE al target por MutationObserver: una sección que el renderer esconde
+//   (permiso, sin datos) no deja ni barra ni botón flotando — la ley del
+//   hueco de milk (un bloque que anuncia un dato que no va a llegar).
+// · El globo sale de `data-mt-badge`, que cada renderer declara al pintar
+//   (logística: pendientes · alertas: la lista · riesgo: personas · cobranza:
+//   deudores). Sin dato declarado, la barra va SIN globo: un cero no se
+//   inventa y una sección informativa (métricas, atajos) no grita.
+
+const _MTMIN_LS = 'kh_mtmin_v1';
+// `sel` es el elemento que los renderers tocan (estilo + data-mt-badge);
+// `cerca` sube al card que lo envuelve cuando el título vive en el card;
+// `badgeSel` apunta al elemento del dato cuando no es el mismo que se envuelve.
+const _MTMIN_SECS = [
+  { id: 'logistica',  sel: '#resumen-logistica',       titulo: 'Logística del equipo' },
+  { id: 'alertas',    sel: '#resumen-alertas',         titulo: 'Lo que pide atención' },
+  { id: 'conexiones', sel: '#resumen-conexiones',      titulo: 'Conexiones de hoy' },
+  { id: 'tres',       sel: '#page-resumen .res-tres',  titulo: 'Caja · Deuda · Utilidad' },
+  { id: 'dinero',     sel: '#resumen-dinero',          titulo: 'Cuentas y por cobrar' },
+  { id: 'atajos',     sel: '#resumen-atajos',          titulo: 'Atajos' },
+  { id: 'metricas',   sel: '#metrics-grid',            titulo: 'Métricas generales' },
+  { id: 'ganancia',   sel: '#resumen-utilidad-card',   titulo: 'Ganancia por evento' },
+  { id: 'radar',      sel: '#resumen-radar',           titulo: 'Radar del sitio' },
+  { id: 'riesgo',     sel: '#riesgo-baja-card',        titulo: 'En riesgo de baja', badgeSel: '#riesgo-baja-lista' },
+  { id: 'cobrar21',   sel: '#atrasados-lista',         titulo: 'Por cobrar · próximos 21 días', cerca: '.card' },
+];
+function _mtMinEstado() {
+  try { return new Set(JSON.parse(localStorage.getItem(_MTMIN_LS) || '[]')); }
+  catch (_) { return new Set(); }
+}
+function _mtMinGuardar(set) { try { localStorage.setItem(_MTMIN_LS, JSON.stringify([...set])); } catch (_) {} }
+
+function _mtMinSync() {
+  const min = _mtMinEstado();
+  for (const s of _MTMIN_SECS) {
+    const w = s._w;
+    if (!w) continue;
+    // El envoltorio SIGUE al target: si el renderer lo escondió (permiso,
+    // fails-soft, sin datos), aquí no queda ni barra ni botón.
+    w.classList.toggle('mt-oculta', s._t.style.display === 'none');
+    w.classList.toggle('min', min.has(s.id));
+    const src = s._b || s._t;
+    const n = Math.max(0, Math.round(Number((src.dataset || {}).mtBadge || 0)) || 0);
+    const g = w.querySelector('.mt-bar-badge');
+    if (g) {
+      if (n > 0) {
+        g.style.display = '';
+        g.textContent = n + ' por revisar';
+        g.classList.toggle('rojo', (src.dataset || {}).mtRojo === '1');
+      } else { g.style.display = 'none'; }
+    }
+  }
+}
+function mtMinToggle(id) {
+  const min = _mtMinEstado();
+  if (min.has(id)) min.delete(id); else min.add(id);
+  _mtMinGuardar(min);
+  _mtMinSync();
+}
+function _mtMinInit() {
+  if (window.__mtMinListo) return;
+  if (!document.getElementById('page-resumen')) return;
+  window.__mtMinListo = true;
+  const esc = (s2) => String(s2).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  for (const s of _MTMIN_SECS) {
+    const el = document.querySelector(s.sel);
+    if (!el) continue;
+    const objetivo = s.cerca ? (el.closest(s.cerca) || el) : el;
+    const w = document.createElement('div');
+    w.className = 'mt-sec';
+    w.dataset.mt = s.id;
+    objetivo.parentNode.insertBefore(w, objetivo);
+    w.appendChild(objetivo);
+    w.insertAdjacentHTML('afterbegin',
+      `<button class="mt-btn" type="button" title="Minimizar «${esc(s.titulo)}»" onclick="mtMinToggle('${s.id}')">—</button>` +
+      `<div class="mt-bar" onclick="mtMinToggle('${s.id}')" title="Expandir">` +
+        `<span class="mt-bar-chev">▸</span><span class="mt-bar-t">${esc(s.titulo)}</span>` +
+        `<span class="mt-bar-badge" style="display:none">0</span></div>`);
+    s._w = w; s._t = objetivo;
+    s._b = s.badgeSel ? document.querySelector(s.badgeSel) : el;
+    // Un observer por sección: estilo del target (mostrar/esconder del
+    // renderer) + el dato del globo. 🔒 El sync jamás escribe en lo observado
+    // (solo en el envoltorio y la barra), así que no puede ciclarse.
+    const obs = new MutationObserver(_mtMinSync);
+    obs.observe(objetivo, { attributes: true, attributeFilter: ['style', 'data-mt-badge', 'data-mt-rojo'] });
+    if (s._b && s._b !== objetivo) obs.observe(s._b, { attributes: true, attributeFilter: ['data-mt-badge', 'data-mt-rojo'] });
+  }
+  _mtMinSync();
+}
+// El script carga al final del body: el DOM del Resumen ya existe. Aplicar la
+// configuración AQUÍ (y no al primer loadResumen) es lo que hace que lo
+// minimizado nazca minimizado, sin parpadeo de contenido.
+try { _mtMinInit(); } catch (_) { /* sin Resumen (otra página) no hay nada que envolver */ }

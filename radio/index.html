@@ -983,6 +983,7 @@ setInterval(cargarNoticias, 1800000);
 /* ===== Now Playing ===== */
 function actualizar(){
   fetch(API).then(function(r){ return r.json(); }).then(function(data){
+    ultimoLive = data.live || null;
     var np = data.now_playing;
     if(np && np.song){
       var s = np.song;
@@ -990,9 +991,12 @@ function actualizar(){
       actual = { id: s.id, title: s.title || '', artist: s.artist || '', art: s.art || '', genre: s.genre || '' };
       document.getElementById('titulo').textContent = actual.title || 'Radio Conecta';
       document.getElementById('artista').textContent = actual.artist;
-      if(actual.art){
-        document.getElementById('art').src = actual.art;
-        document.getElementById('ambiente').style.backgroundImage = 'url("' + actual.art.replace(/"/g,'%22') + '")';
+      // [RADIO-V2a2] La carátula la decide caratulaSrc: en vivo con programa
+      // con foto, la foto del programa; si no, el arte del álbum como siempre.
+      var art = caratulaSrc(actual.art, ultimoLive, cart);
+      if(art){
+        document.getElementById('art').src = art;
+        document.getElementById('ambiente').style.backgroundImage = 'url("' + art.replace(/"/g,'%22') + '")';
       }
       var pg = document.getElementById('genero');
       if(actual.genre){ pg.textContent = actual.genre; pg.classList.add('visible'); }
@@ -1297,7 +1301,28 @@ dibujarViz();
    mide:radio-v2b las rebana y las corre en un vm. */
 var cart = null;        // la última respuesta buena de radio-cartelera
 var cartError = false;  // true = el fetch falló (distinto de parrilla vacía)
+var ultimoLive = null;  // el último `live` del nowplaying (decide la carátula del programa)
 var DIAS_CORTOS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+// [RADIO-V2a2] LA CARÁTULA DEL REPRODUCTOR (idea de Memo): con un locutor
+// conectado DE VERDAD (live.is_live) y un programa en la parrilla CON foto,
+// la foto del programa TOMA la carátula del álbum; en cualquier otro caso la
+// carátula sigue siendo el arte de la canción — jamás se inventa un vivo.
+function caratulaSrc(artCancion, live, c){
+  if(live && live.is_live && c && c.al_aire && c.al_aire.foto_url) return c.al_aire.foto_url;
+  return artCancion || '';
+}
+// Repinta la carátula con lo último que se sabe (la llama el latido del
+// nowplaying Y la llegada de la cartelera, para no esperar 15 s al cambio).
+function pintarCaratula(){
+  var src = caratulaSrc(actual && actual.art, ultimoLive, cart);
+  if(!src) return;
+  var img = document.getElementById('art');
+  if(img && img.src !== src){
+    img.src = src;
+    document.getElementById('ambiente').style.backgroundImage = 'url("' + src.replace(/"/g,'%22') + '")';
+  }
+}
 
 function hora12(hhmm){
   var p = String(hhmm || '').split(':');
@@ -1414,6 +1439,7 @@ function cargarCartelera(){
     if(data && data.ok){ cart = data; cartError = false; }
     else { cartError = true; }
     pintarCartelera();
+    pintarCaratula();   // la foto del programa no espera al siguiente latido
   }).catch(function(){ cartError = true; pintarCartelera(); });
 }
 cargarCartelera();

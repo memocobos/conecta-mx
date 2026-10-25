@@ -252,7 +252,14 @@ está caduco antes de escribirse.
     jpg/png/webp en el servidor, y **jamás tumba el programa**: si falla se
     DICE (`foto_error`); eliminar barre su objeto del bucket. Pinta en
     Kaio-sama (thumb) y en /radio (AL AIRE + filas, URL escapada).
-    `mide:radio-v2a` **32** · `mide:radio-v2b` **30** (la red falsa aprendió
+    **Y LA CARÁTULA (idea de Memo, mismo día):** con locutor conectado
+    (`live.is_live`) y programa al aire CON foto, la foto del programa TOMA la
+    carátula del álbum y el fondo ambiente — `caratulaSrc` es la función pura
+    que decide (cualquier pata que falte → el álbum de siempre; 🔒 la parrilla
+    sola NO la toma), la pintan el latido del nowplaying Y la llegada de la
+    cartelera (`pintarCaratula`, para no esperar 15 s). La imagen de COMPARTIR
+    sigue con el arte de la canción a propósito.
+    `mide:radio-v2a` **32** · `mide:radio-v2b` **34** (la red falsa aprendió
     storage y DELETE respetando filtros e id — un GET por id que devolviera la
     tabla entera barrería la foto del programa equivocado).
   - ⏳ **V2c:** gestión de locutores (streamer accounts de AzuraCast vía

@@ -90,5 +90,14 @@ af(/desde las 8 PM/.test(s) && !/null/.test(s), 'la parrilla con fin libre pinta
 af(/cartAhoraFoto/.test(s) && /cartFoto/.test(s), 'la foto del programa sale en el AL AIRE y en su fila de la semana');
 af(!/"><script>/.test(s), 'y la URL de la foto va ESCAPADA (una comilla en el dato no rompe el HTML)');
 
+// LA CARÁTULA DEL REPRODUCTOR (idea de Memo): en vivo con programa con foto,
+// la foto TOMA la portada del álbum; cualquier pata que falte → el álbum.
+af(run("caratulaSrc('album.jpg', { is_live: true }, { al_aire: { foto_url: 'programa.jpg' } })") === 'programa.jpg', 'AL AIRE con foto: la foto del programa toma la carátula');
+af(run("caratulaSrc('album.jpg', { is_live: false }, { al_aire: { foto_url: 'programa.jpg' } })") === 'album.jpg', '🔒 sin locutor conectado la carátula sigue siendo el álbum — la parrilla sola no la toma');
+af(run("caratulaSrc('album.jpg', { is_live: true }, { al_aire: { foto_url: null } })") === 'album.jpg' &&
+   run("caratulaSrc('album.jpg', { is_live: true }, null)") === 'album.jpg' &&
+   run("caratulaSrc('album.jpg', null, null)") === 'album.jpg', 'programa sin foto, sin programa o sin dato → el álbum de siempre');
+af(html.includes('caratulaSrc(actual.art, ultimoLive, cart)') && html.includes('pintarCaratula();'), 'y el reproductor REAL le pregunta a caratulaSrc en el latido Y al llegar la cartelera');
+
 console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
 process.exit(ko ? 1 : 0);

@@ -2477,7 +2477,12 @@
            nombres no existen) y se llena al capturar — elegir otro re-captura en vivo. -->
       <select id="cab-mic-sel" onchange="cabMicCambiar(this)" style="display:none;margin-top:6px;width:100%;font-size:12px"></select>
       <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts)">Mic</label>
-      <input type="range" id="cab-vol-mic" min="0" max="150" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div></div>
+      <input type="range" id="cab-vol-mic" min="0" max="150" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div>
+      <!-- [KAIO-CABINA-4] Monitoreo LOCAL del mic: la radia trae 15-30 s de
+           delay (normal), así que el locutor se oye por aquí, al instante. -->
+      <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
+       <input type="checkbox" id="cab-mic-mon" onchange="cabMicMonitor(this.checked)">
+       🎧 Escuchar mi voz al instante (SOLO con audífonos — con bocinas se acopla)</label></div>
      <div><label style="font-size:11px;color:var(--ts)">Samplers</label>
       <input type="range" id="cab-vol-sam" min="0" max="150" value="100" oninput="cabVol('sam',this.value)" style="width:100%"></div>
      <div><label style="font-size:11px;color:var(--ts)">Música</label>

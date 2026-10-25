@@ -340,6 +340,25 @@ está caduco antes de escribirse.
       audio lo dice — desde la cabina no se oye uno mismo (el monitor no toca
       el mic a propósito), así que sin esto el silencio es invisible para
       quien transmite. `mide:kaio-cabina-1` **46**.
+    - ✅ **KAIO-CABINA-4 (25-oct, tercera prueba de Memo: «funcionó por el
+      Web DJ, en la página no, y el delay es larguísimo»):** dos hechos
+      medidos y un canal nuevo.
+      (1) 🏆 **La cadena de audio de la cabina SERVIDA está SANA** — medido en
+      el navegador real con un tono sintético por el camino de la voz
+      (tono → buses → master → ScriptProcessor): pico 0.300 exacto en el
+      processor, 29 llamadas en 2.5 s. El silencio del 25-oct fue el TRACK del
+      mic (lo que CABINA-3 arregla), no el grafo ni el encoder. ⚠️ **Y
+      producción NO traía CABINA-2/3 en esa prueba** (`cabMicCambiar:
+      undefined` en el sitio servido): Memo probó la versión vieja.
+      (2) 🔒 **El delay de 15-30 s es ESTRUCTURAL de toda radio por internet**
+      (buffer del DJ en liquidsoap + Icecast + buffer del reproductor del
+      oyente) — el público no lo nota; solo muerde al locutor que se monitorea
+      POR LA RADIO. El remedio del oficio es monitorearse LOCAL:
+      **checkbox «🎧 Escuchar mi voz al instante (SOLO con audífonos)»** —
+      `micMonitorGain`, un canal APARTE del monitor general (que sigue sin
+      tocar el mic: esa separación impide el acople del checkbox sam+mus).
+      Arañable: bajar el buffer de DJ en el panel de AzuraCast (Perfil →
+      Transmisores) de 5 a ~2 s. `mide:kaio-cabina-1` **48**.
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
 

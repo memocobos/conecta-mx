@@ -1478,11 +1478,20 @@ function cabCtx() {
   _cb.monitorGain = ctx.createGain(); _cb.monitorGain.gain.value = 0;
   _cb.buses.sam.connect(_cb.monitorGain); _cb.buses.mus.connect(_cb.monitorGain);
   _cb.monitorGain.connect(ctx.destination);
+  // [KAIO-CABINA-4] El mic-monitor es un canal APARTE y opt-in: la radio trae
+  // 15-30 s de delay (buffers de liquidsoap/Icecast/reproductor — normal en
+  // toda radio por internet) y un locutor se monitorea LOCAL, al instante,
+  // CON AUDÍFONOS. Jamás se conecta al monitorGain general: esa separación es
+  // la que impide que el checkbox de sam+mus acople el mic con las bocinas.
+  _cb.micMonitorGain = ctx.createGain(); _cb.micMonitorGain.gain.value = 0;
+  _cb.buses.mic.connect(_cb.micMonitorGain);
+  _cb.micMonitorGain.connect(ctx.destination);
   _cbVuLoop();
   return ctx;
 }
 function cabVol(bus, v) { if (_cb.buses[bus]) _cb.buses[bus].gain.value = Number(v) / 100; }
 function cabMonitor(on) { cabCtx(); _cb.monitorGain.gain.value = on ? 1 : 0; }
+function cabMicMonitor(on) { cabCtx(); _cb.micMonitorGain.gain.value = on ? 1 : 0; }
 function _cbVuLoop() {
   const cv = _cbEl('cab-vu');
   if (!cv || !_cb.analyser) return;

@@ -239,6 +239,10 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(js.includes('audio.deviceId = { exact: _cb.micDevice }'), '[KC-3] el micrófono se puede ELEGIR por deviceId exacto — el caso del track muerto de Chrome');
   af(js.includes("track.label") && js.includes("track.muted"), '[KC-3] el nombre del dispositivo capturado se DICE y un track muted se grita con el camino de macOS');
   af(js.includes('async function cabMicCambiar') && fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('id="cab-mic-sel"'), '[KC-3] el selector vive en la Mezcladora y cambiarlo re-captura en vivo');
+  // [KAIO-CABINA-4] El mic-monitor es un canal APARTE: micMonitorGain, jamás el
+  // monitorGain general (la aserción del monitor sin mic sigue arriba, intacta).
+  af(js.includes('_cb.buses.mic.connect(_cb.micMonitorGain)') && js.includes('function cabMicMonitor'), '[KC-4] el locutor puede oír SU VOZ al instante por un canal propio (el delay de la radio es de 15-30 s y no se monitorea por ahí)');
+  af(fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('SOLO con audífonos'), '[KC-4] el checkbox ADVIERTE lo de los audífonos — con bocinas se acopla');
   const csp = fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8');
   af(/connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja salir el WebSocket del uplink (sin esto la cabina moriría muda en producción)');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');

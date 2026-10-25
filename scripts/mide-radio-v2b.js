@@ -54,6 +54,20 @@ af(/Transmisión en vivo/.test(s) && /con Memo/.test(s), 'vivo SIN programa en l
 s = run("alAireHtml({ is_live: true, streamer_name: 'dj' }, { al_aire: { nombre: 'La Hora Conecta', conductor: 'Memo' } })");
 af(/AL AIRE: La Hora Conecta/.test(s) && /con Memo/.test(s), 'vivo CON programa: nombre de la parrilla y su conductor');
 
+// [KAIO-CABINA-6] El APAGADO del banner, AFIRMADO y no supuesto (Memo reportó
+// el AL AIRE pegado tras salir del aire): pintarAlAire se corre con DOM falso
+// y se exige que encienda con live y APAGUE sin él. La otra mitad del pegado
+// —AzuraCast sosteniendo is_live tras el cierre del socket— la ataca
+// dj_desconectar en la cabina (mide:kaio-cabina-1 [KC-6]).
+vm.runInContext(html.slice(html.indexOf('function pintarAlAire('), html.indexOf('function cargarCartelera(')), ctx, { filename: 'radio-alaire.js' });
+const caja = { _on: false, classList: { add: (c) => { if (c === 'on') caja._on = true; }, remove: (c) => { if (c === 'on') caja._on = false; } } };
+const txt = { innerHTML: '' };
+ctx.document = { getElementById: (id) => (id === 'alAire' ? caja : (id === 'alAireTxt' ? txt : null)) };
+run("pintarAlAire({ is_live: true, streamer_name: 'Memo' })");
+af(caja._on === true && /Memo/.test(txt.innerHTML), '[KC-6] el banner ENCIENDE con locutor conectado');
+run('pintarAlAire({ is_live: false, streamer_name: "" })');
+af(caja._on === false && txt.innerHTML === '', '[KC-6] y se APAGA cuando is_live vuelve a false — nuestra mitad del «banner pegado» está sana (pintarAlAire corre en CADA latido de 15 s y el apagador existe)');
+
 af(run('proximoHtml(null)') === '', 'sin cartelera el renglón del próximo va vacío');
 af(/En la parrilla/.test(run("proximoHtml({ al_aire: { nombre: 'X', hora_fin: '22:00' } })")), 'con programa en horario: «En la parrilla … hasta las»');
 af(/Próximo programa/.test(run("proximoHtml({ al_aire: null, siguiente: { nombre: 'Y', fecha: '2026-10-27', hora_inicio: '20:00', empieza_en_min: 60 } })")), 'sin al-aire: «Próximo programa»');

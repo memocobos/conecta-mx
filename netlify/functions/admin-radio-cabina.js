@@ -222,6 +222,21 @@ exports.handler = async (event) => {
         desde, bytes: rebanada.length, bytes_total: total, completo: desde + rebanada.length >= total });
     }
 
+    // ── TRANSMISIÓN ─────────────────────────────────────────────────────────
+    // [KAIO-CABINA-6] Cortar en la ESTACIÓN, no solo en el navegador. Cerrar
+    // el WS deja que liquidsoap suelte al DJ cuando note el socket muerto —
+    // y mientras lo nota, AzuraCast sigue reportando is_live=true y el banner
+    // AL AIRE de /radio se queda pegado (reporte de Memo, primera transmisión
+    // real). backend/disconnect lo suelta al instante. Idempotente: sin DJ
+    // conectado, AzuraCast contesta OK igual.
+    if (accion === 'dj_desconectar') {
+      const API_KEY = process.env.AZURACAST_API_KEY;
+      if (!API_KEY) return res(500, { error: 'Falta env var AZURACAST_API_KEY' });
+      const r = await azFetch(`${AZ_BASE}/api/station/${STATION}/backend/disconnect`, { method: 'POST', headers: { 'X-API-Key': API_KEY } });
+      if (!r.ok) return res(502, { error: 'AzuraCast no pudo desconectar al DJ (HTTP ' + r.status + ') — el cierre del WS lo suelta solo, nomás tarda unos segundos más' });
+      return res(200, { ok: true });
+    }
+
     // ── LOCUTORES (streamers de AzuraCast) ──────────────────────────────────
     if (accion === 'streamers_listar') {
       const API_KEY = process.env.AZURACAST_API_KEY;

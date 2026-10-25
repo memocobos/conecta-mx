@@ -1451,6 +1451,19 @@ function cabinaHello(usuario, contrasena, sampleRate) {
   return { type: 'hello', data: { mime: 'audio/mpeg', user: String(usuario || ''), password: String(contrasena || ''),
     audio: { channels: 2, samplerate: Number(sampleRate) || 44100, bitrate: 192, encoder: 'lamejs' } } };
 }
+// [KAIO-CABINA-6] La METADATA del show viaja por el MISMO webcast, después del
+// hello. Sin ella AzuraCast sigue reportando la última canción del AutoDJ y la
+// página pública se queda con el álbum y el título viejos mientras el show
+// suena (reporte de Memo, primera transmisión real). El título sale de la
+// PARRILLA cuando hay programa al aire; sin programa, «Transmisión en vivo» —
+// jamás se inventa un show que la cartelera no dice.
+function cabinaMetadata(cartelera, locutor) {
+  const p = cartelera && cartelera.al_aire;
+  return { type: 'metadata', data: {
+    title: (p && p.nombre) ? String(p.nombre) : 'Transmisión en vivo',
+    artist: (p && p.conductor) ? String(p.conductor) : (String(locutor || '') || 'Radio Conecta')
+  } };
+}
 // Float32 [-1,1] → Int16 para lamejs, con clamp (un pico >1.0 sin clamp da wrap).
 function cabF32aI16(f32) {
   const out = new Int16Array(f32.length);
@@ -1621,12 +1634,26 @@ async function cabAire() {
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
     _cbMsg('cab-msg', 'Conectando con la estación…');
+    // [KAIO-CABINA-6] La parrilla se pide ANTES de conectar para que el título
+    // del show viaje como metadata en cuanto abra el WS. Si la parrilla no
+    // contesta, se transmite igual con metadata genérica — la cartelera caída
+    // jamás frena el aire.
+    let cart6 = null;
+    const pCart6 = fetch('/.netlify/functions/radio-cartelera')
+      .then((r) => r.json()).then((j) => { if (j && j.ok) cart6 = j; }).catch(() => {});
     const ws = new WebSocket(cabinaWsUrl(), 'webcast');
     ws.binaryType = 'arraybuffer';
     let abrio = false;
     ws.onopen = () => {
       abrio = true;
       ws.send(JSON.stringify(cabinaHello(usuario, pass, ctx.sampleRate)));
+      // [KAIO-CABINA-6] METADATA tras el hello (el hello SIEMPRE va primero:
+      // registrar el envío aquí adentro garantiza el orden aunque la parrilla
+      // ya hubiera contestado). Con esto la web pública cambia título/artista
+      // al show en vez de quedarse con la última canción del AutoDJ.
+      pCart6.then(() => {
+        try { if (_cb.ws === ws && ws.readyState === 1) ws.send(JSON.stringify(cabinaMetadata(cart6, usuario))); } catch (e) {}
+      });
       _cb.enc = new lamejs.Mp3Encoder(2, ctx.sampleRate, 192);
       // ScriptProcessor: el master entra, se codifica a MP3 y viaja por el WS.
       // Va conectado a un sink en silencio (gain 0) porque un processor suelto
@@ -1681,6 +1708,13 @@ function cabCortar(motivo) {
     const ws = _cb.ws; _cb.ws = null;
     try { if (_cb.enc && ws.readyState === 1) { const fin = _cb.enc.flush(); if (fin.length) ws.send(fin); } } catch (e) {}
     try { ws.onclose = null; ws.close(); } catch (e) {}
+    // [KAIO-CABINA-6] Y se le AVISA a la estación (best-effort): liquidsoap
+    // puede sostener la sesión del DJ unos momentos tras el close del socket,
+    // y mientras tanto AzuraCast reporta is_live=true — el banner AL AIRE de
+    // /radio se queda pegado (reporte de Memo). backend/disconnect lo suelta
+    // al instante. Si falla, el cierre del WS basta solo que más lento — el
+    // corte local JAMÁS se frena por esto.
+    try { _cbApi({ accion: 'dj_desconectar' }).catch(() => {}); } catch (e) {}
   }
   _cb.enc = null; _cb.aireDesde = 0;
   const est = _cbEl('cab-estado');

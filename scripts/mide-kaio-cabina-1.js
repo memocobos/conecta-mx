@@ -35,6 +35,12 @@ af(hello.data.audio.samplerate === 48000 && hello.data.audio.channels === 2 && h
 const i16 = run('cabF32aI16(new Float32Array([0, 0.5, -0.5, 1, -1, 2, -2]))');
 af(i16[0] === 0 && i16[3] === 32767 && i16[4] === -32768 && i16[5] === 32767 && i16[6] === -32768, 'float→int16 con CLAMP: un pico >1.0 satura en vez de dar la vuelta (el wrap suena a estática)');
 af(run('cabMMSS(0)') === '0:00' && run('cabMMSS(65)') === '1:05' && run('cabMMSS(3601)') === '60:01', 'el reloj habla mm:ss');
+// [KAIO-CABINA-6] la metadata del show — sin ella AzuraCast repite la última
+// canción del AutoDJ y la web pública se queda con el álbum viejo (Memo).
+const md1 = run("cabinaMetadata({ ok: true, al_aire: { nombre: 'La Hora del Rock', conductor: 'Memo Cobos' } }, 'memo')");
+af(md1.type === 'metadata' && md1.data.title === 'La Hora del Rock' && md1.data.artist === 'Memo Cobos', '[KC-6] con programa al aire, la metadata dice EL SHOW de la parrilla (nombre + conductor)');
+const md2 = run("cabinaMetadata(null, 'memo')");
+af(md2.type === 'metadata' && md2.data.title === 'Transmisión en vivo' && md2.data.artist === 'memo', '[KC-6] sin parrilla legible, metadata genérica con el locutor — la cartelera caída jamás frena el aire ni inventa un show');
 
 console.log('\n[B] el ENCODER de verdad (vendor/lame.min.js) — control del instrumento');
 const lctx = {}; lctx.window = lctx; vm.createContext(lctx);
@@ -60,7 +66,7 @@ const CANCION_CHICA = Buffer.concat([Buffer.from([0xff, 0xfb]), Buffer.alloc(200
 const CANCION_MEDIANA = (() => { const b = Buffer.alloc(9 * 1024 * 1024); b[0] = 0xff; b[1] = 0xfb; for (let i = 2; i < b.length; i++) b[i] = i % 251; return b; })();
 const CANCION_ENORME = Buffer.alloc(26 * 1024 * 1024, 9);
 function redNueva() {
-  const st = { deletes: 0, djsOn: false, adminOk: true, restarts: 0 };
+  const st = { deletes: 0, djsOn: false, adminOk: true, restarts: 0, disconnects: 0 };
   st.fetch = async (url, init) => {
     const U = String(url); const met = ((init || {}).method || 'GET').toUpperCase();
     const resp = (s, b, bin, hdrs) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b), arrayBuffer: async () => bin,
@@ -102,6 +108,7 @@ function redNueva() {
       return resp(200, {});
     }
     if (U.includes('radio.conectareynosa.mx/api/station/1/restart') && met === 'POST') { st.restarts++; return resp(200, {}); }
+    if (U.includes('radio.conectareynosa.mx/api/station/1/backend/disconnect') && met === 'POST') { st.disconnects++; return resp(200, {}); }
     if (U.includes('radio.conectareynosa.mx/api/station/1/streamer/') && met === 'DELETE') {
       const id = Number(U.split('/streamer/')[1]);
       const i = STREAMERS.findIndex((s) => s.id === id);
@@ -224,6 +231,12 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   r = await h(ev({ accion: 'streamer_eliminar', id: 11, confirmar: true }, roshi));
   af(r.statusCode === 200 && STREAMERS.length === 2, 'y con confirmar la cuenta se va');
 
+  // [KAIO-CABINA-6] el corte avisado: backend/disconnect suelta al DJ al instante
+  r = await h(ev({ accion: 'dj_desconectar' }, roshi));
+  af(r.statusCode === 200 && red.disconnects === 1, '[KC-6] dj_desconectar le pega a backend/disconnect de AzuraCast — el corte suelta al DJ al instante en vez de esperar a que liquidsoap note el socket muerto (el banner pegado de /radio)');
+  r = await h(ev({ accion: 'dj_desconectar' }, bulma));
+  af(r.statusCode === 403 && red.disconnects === 1, '[KC-6] y sigue siendo SOLO de Memo: bulma rebota sin tocar la estación');
+
   // Estructura del front (lo que el vm no corre): la carga perezosa y el CSP.
   console.log('\n[D] los cables del front y el CSP');
   af(js.includes("s.src = '/vendor/lame.min.js'"), 'lamejs carga PEREZOSA desde /vendor/ (156 KB que solo paga quien transmite)');
@@ -242,6 +255,11 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   // [KAIO-CABINA-4] El mic-monitor es un canal APARTE: micMonitorGain, jamás el
   // monitorGain general (la aserción del monitor sin mic sigue arriba, intacta).
   af(js.includes('_cb.buses.mic.connect(_cb.micMonitorGain)') && js.includes('function cabMicMonitor'), '[KC-4] el locutor puede oír SU VOZ al instante por un canal propio (el delay de la radio es de 15-30 s y no se monitorea por ahí)');
+  // [KAIO-CABINA-6] los cables de la metadata y del corte avisado — se miden
+  // las LLAMADAS literales, no palabras que un comentario pueda contener.
+  af(js.includes("fetch('/.netlify/functions/radio-cartelera')") && js.includes('ws.send(JSON.stringify(cabinaMetadata(cart6, usuario)))'), '[KC-6] cabAire pide la parrilla y manda la METADATA del show por el webcast — la web pública deja de quedarse con la última canción del AutoDJ');
+  af((() => { const iH = js.indexOf('ws.send(JSON.stringify(cabinaHello('); const iM = js.indexOf('ws.send(JSON.stringify(cabinaMetadata('); return iH > 0 && iM > iH; })(), '[KC-6] el hello viaja PRIMERO y la metadata después — al revés AzuraCast cierra la conexión');
+  af(js.slice(js.indexOf('function cabCortar(')).includes("_cbApi({ accion: 'dj_desconectar' })"), '[KC-6] cabCortar AVISA a la estación (best-effort): sin esto el banner AL AIRE de /radio se queda pegado tras el corte');
   af(fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('SOLO con audífonos'), '[KC-4] el checkbox ADVIERTE lo de los audífonos — con bocinas se acopla');
   const csp = fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8');
   af(/connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja salir el WebSocket del uplink (sin esto la cabina moriría muda en producción)');

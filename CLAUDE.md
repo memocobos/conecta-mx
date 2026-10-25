@@ -388,6 +388,32 @@ está caduco antes de escribirse.
       del archivo entero se cazó solo, primer rojo de la tanda— y los otros
       tres vetos siguen). ⏳ **Espera push de Memo**; tras el deploy, recargar
       kamehouse.html basta — el permiso de Chrome ya está dado.
+    - ✅ **KAIO-CABINA-6 (25-oct, quinta prueba de Memo — ya AL AIRE de
+      verdad): «al salir del aire el banner no se quita» y «la web no cambia
+      el álbum ni la info».** Los dos síntomas son el mismo vecindario:
+      (1) 🔒 **La cabina mandaba puro AUDIO, cero metadata** — AzuraCast sigue
+      reportando la última canción del AutoDJ y /radio se queda con su título,
+      artista y álbum mientras el show suena. Hoy `cabinaMetadata` (pura) viaja
+      por el MISMO webcast DESPUÉS del hello: el título sale de la PARRILLA
+      cuando hay programa al aire (nombre + conductor) y sin parrilla dice
+      «Transmisión en vivo» + locutor — jamás se inventa un show; la cartelera
+      caída no frena el aire (fail-soft a metadata genérica). La parrilla se
+      pide ANTES de conectar y el envío vive dentro del onopen: el hello
+      SIEMPRE primero (careado por posición de las DOS llamadas literales).
+      (2) **El corte ahora se AVISA a la estación**: acción `dj_desconectar`
+      (solo maestro_roshi) → `POST backend/disconnect` de AzuraCast; cerrar el
+      WS deja que liquidsoap suelte al DJ cuando note el socket muerto, y
+      mientras lo nota is_live sigue true — el banner pegado. `cabCortar` lo
+      llama best-effort: si falla, el cierre del WS basta solo que más lento,
+      el corte local jamás se frena. Medido tras la prueba: el nowplaying YA
+      decía `is_live:false` — AzuraCast sí suelta, tarda.
+      🔒 **Y la mitad nuestra del banner quedó AFIRMADA, no supuesta**:
+      `pintarAlAire` corre en CADA latido (15 s) y su apagador existe —
+      `mide:radio-v2b` lo corre en vm con DOM falso y exige encendido con live
+      y APAGADO sin él. Con todo servido, el banner debe caer ≤ ~20 s tras el
+      corte (latido 15 s + el disconnect); una pestaña en SEGUNDO PLANO tarda
+      más (Chrome frena los timers de fondo) — dicho, no es defecto.
+      `mide:kaio-cabina-1` **59** · `mide:radio-v2b` **36**.
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
 

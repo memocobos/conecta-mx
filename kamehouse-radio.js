@@ -55,10 +55,11 @@ async function loadRadio() {
 function showRadioTab(sub, btn) {
   document.querySelectorAll('#page-radio .ks-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['peticiones', 'muro', 'numeros', 'control', 'biblioteca'].forEach(s => {
+  ['peticiones', 'muro', 'cartelera', 'numeros', 'control', 'biblioteca'].forEach(s => {
     const el = document.getElementById('radio-tab-' + s);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
+  if (sub === 'cartelera') loadRadioCartelera();
   if (sub === 'numeros') loadRadioNumeros();
   if (sub === 'control') loadRadioControl();
   if (sub === 'biblioteca') loadRadioBiblioteca();
@@ -1187,4 +1188,146 @@ async function radioMuroVisible(id, visible) {
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+// ═════════════════════════════════════════════════════════════════════════════
+// [RADIO-V2a · 24-oct-2026] CARTELERA — la parrilla de programas de Kaio-sama
+// ═════════════════════════════════════════════════════════════════════════════
+// Serie RADIO-V2 (palabra de Memo: «transmitir programas en vivo, tener
+// cartelera, entrevistas»): V2a = la parrilla (esta captura + radio-cartelera
+// público) · V2b = el rediseño de /radio · V2c = locutores y cabina.
+// Un programa es SEMANAL (día 0-6) o ESPECIAL (fecha) — exactamente uno; las
+// horas van en tiempo de Reynosa y quién resuelve «qué está al aire» es
+// _lib/radio-cartelera en el servidor, no esta pantalla.
+
+const _RC_DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+let _rcProgramas = [];
+let _rcEditando = null;   // id del programa en edición, o null = crear
+
+function _rcEl(id) { return document.getElementById(id); }
+function _rcEsc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+async function _rcApi(body) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-cartelera', { method: 'POST', body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  return { st: r.status, j };
+}
+
+async function loadRadioCartelera() {
+  const box = _rcEl('rc-lista');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando la cartelera…</div>';
+  const { st, j } = await _rcApi({ accion: 'listar' });
+  if (st !== 200 || !j.ok) { box.innerHTML = `<div class="alert alert-error">${_rcEsc(j.error || ('HTTP ' + st))}</div>`; return; }
+  _rcProgramas = j.programas || [];
+  _rcPintar();
+}
+
+function _rcFilaHtml(p) {
+  const cuando = p.fecha != null
+    ? `📅 ${_rcEsc(String(p.fecha).slice(0, 10))}`
+    : _rcEsc(_RC_DIAS[Number(p.dia_semana)] || '¿?');
+  const horas = `${_rcEsc(String(p.hora_inicio).slice(0, 5))}–${_rcEsc(String(p.hora_fin).slice(0, 5))}`;
+  return `<div style="display:flex;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--border);${p.archivado ? 'opacity:.45' : ''}">
+    <span style="width:8px;height:8px;border-radius:50%;background:${p.color ? _rcEsc(p.color) : 'var(--ts)'};flex-shrink:0"></span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700">${_rcEsc(p.nombre)}${p.archivado ? ' <span style="font-size:10px;color:var(--ts)">(archivado)</span>' : ''}</div>
+      <div style="font-size:11px;color:var(--ts)">${cuando} · ${horas}${p.conductor ? ' · ' + _rcEsc(p.conductor) : ''}</div>
+    </div>
+    ${p.archivado
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioCartArchivar('${_rcEsc(p.id)}', false)">↩ Restaurar</button>`
+      : `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioCartEditar('${_rcEsc(p.id)}')">Editar</button>
+         <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" onclick="radioCartArchivar('${_rcEsc(p.id)}', true)">Archivar</button>`}
+  </div>`;
+}
+
+function _rcPintar() {
+  const box = _rcEl('rc-lista');
+  if (!box) return;
+  const vivos = _rcProgramas.filter((p) => !p.archivado);
+  const semanales = vivos.filter((p) => p.fecha == null)
+    .sort((a, b) => (Number(a.dia_semana) - Number(b.dia_semana)) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const especiales = vivos.filter((p) => p.fecha != null)
+    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const archivados = _rcProgramas.filter((p) => p.archivado);
+  const bloque = (titulo, lista) => lista.length
+    ? `<div class="card" style="margin-bottom:12px"><div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">${titulo}</div>${lista.map(_rcFilaHtml).join('')}</div>`
+    : '';
+  box.innerHTML = (vivos.length || archivados.length)
+    ? bloque('Programas semanales', semanales) + bloque('Especiales (fecha puntual)', especiales) +
+      (archivados.length ? `<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;color:var(--ts)">Archivados (${archivados.length})</summary>${archivados.map(_rcFilaHtml).join('')}</details>` : '')
+    : '<div class="empty-state"><div class="empty-icon">📻</div>La cartelera está vacía — captura el primer programa arriba.</div>';
+}
+
+function radioCartTipoCambia() {
+  const tipo = (_rcEl('rc-tipo') || {}).value || '';
+  const dia = _rcEl('rc-dia'), fecha = _rcEl('rc-fecha');
+  if (dia) dia.style.display = tipo === 'semanal' ? '' : 'none';
+  if (fecha) fecha.style.display = tipo === 'especial' ? '' : 'none';
+}
+
+function _rcMsg(txt, esError) {
+  const m = _rcEl('rc-form-msg');
+  if (m) m.innerHTML = txt ? `<span style="color:${esError ? 'var(--red)' : 'var(--green)'}">${_rcEsc(txt)}</span>` : '';
+}
+
+function radioCartLimpiar() {
+  _rcEditando = null;
+  ['rc-nombre', 'rc-conductor', 'rc-desc', 'rc-inicio', 'rc-fin', 'rc-fecha'].forEach((id) => { const e = _rcEl(id); if (e) e.value = ''; });
+  const t = _rcEl('rc-tipo'); if (t) t.value = '';
+  const d = _rcEl('rc-dia'); if (d) d.value = '';
+  radioCartTipoCambia();
+  const ti = _rcEl('rc-form-titulo'); if (ti) ti.textContent = 'Nuevo programa';
+  const g = _rcEl('rc-guardar'); if (g) g.textContent = 'Guardar programa';
+  const c = _rcEl('rc-cancelar'); if (c) c.style.display = 'none';
+  _rcMsg('');
+}
+
+function radioCartEditar(id) {
+  const p = _rcProgramas.find((x) => String(x.id) === String(id));
+  if (!p) return;
+  _rcEditando = p.id;
+  _rcEl('rc-nombre').value = p.nombre || '';
+  _rcEl('rc-conductor').value = p.conductor || '';
+  _rcEl('rc-desc').value = p.descripcion || '';
+  _rcEl('rc-inicio').value = String(p.hora_inicio).slice(0, 5);
+  _rcEl('rc-fin').value = String(p.hora_fin).slice(0, 5);
+  _rcEl('rc-tipo').value = p.fecha != null ? 'especial' : 'semanal';
+  radioCartTipoCambia();
+  if (p.fecha != null) _rcEl('rc-fecha').value = String(p.fecha).slice(0, 10);
+  else _rcEl('rc-dia').value = String(p.dia_semana);
+  const ti = _rcEl('rc-form-titulo'); if (ti) ti.textContent = 'Editando: ' + p.nombre;
+  const g = _rcEl('rc-guardar'); if (g) g.textContent = 'Guardar cambios';
+  const c = _rcEl('rc-cancelar'); if (c) c.style.display = '';
+  _rcMsg('');
+}
+
+async function radioCartGuardar() {
+  const tipo = (_rcEl('rc-tipo') || {}).value || '';
+  if (!tipo) { _rcMsg('Elige si el programa es semanal o especial', true); return; }
+  const programa = {
+    nombre: (_rcEl('rc-nombre') || {}).value || '',
+    conductor: (_rcEl('rc-conductor') || {}).value || '',
+    descripcion: (_rcEl('rc-desc') || {}).value || '',
+    hora_inicio: (_rcEl('rc-inicio') || {}).value || '',
+    hora_fin: (_rcEl('rc-fin') || {}).value || '',
+  };
+  if (tipo === 'semanal') programa.dia_semana = (_rcEl('rc-dia') || {}).value;
+  else programa.fecha = (_rcEl('rc-fecha') || {}).value;
+  if (tipo === 'semanal' && programa.dia_semana === '') { _rcMsg('Elige el día de la semana', true); return; }
+  const btn = _rcEl('rc-guardar');
+  if (btn) btn.disabled = true;
+  const { st, j } = await _rcApi(_rcEditando ? { accion: 'editar', id: _rcEditando, programa } : { accion: 'crear', programa });
+  if (btn) btn.disabled = false;
+  if (st !== 200 || !j.ok) { _rcMsg(j.error || ('HTTP ' + st), true); return; }
+  _rcMsg(_rcEditando ? 'Programa actualizado ✓' : 'Programa creado ✓');
+  radioCartLimpiar();
+  loadRadioCartelera();
+}
+
+async function radioCartArchivar(id, archivado) {
+  const p = _rcProgramas.find((x) => String(x.id) === String(id));
+  if (archivado && !confirm(`¿Archivar «${(p || {}).nombre || 'este programa'}»? Deja de salir en la cartelera pública (se puede restaurar).`)) return;
+  const { st, j } = await _rcApi({ accion: 'archivar', id, archivado });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  showToast(archivado ? 'Programa archivado' : 'Programa restaurado', 'success');
+  loadRadioCartelera();
 }

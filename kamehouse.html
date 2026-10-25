@@ -2402,6 +2402,8 @@
   <div class="ks-tabs">
    <button class="ks-tab active" id="radio-tab-btn-peticiones" onclick="showRadioTab('peticiones',this)">Peticiones <span class="ks-tab-badge" id="radio-pet-badge"></span></button>
    <button class="ks-tab" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
+   <!-- [RADIO-V2a] La parrilla de programas: semanales + especiales. -->
+   <button class="ks-tab" id="radio-tab-btn-cartelera" onclick="showRadioTab('cartelera',this)">Cartelera</button>
    <button class="ks-tab" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
    <button class="ks-tab" id="radio-tab-btn-control" onclick="showRadioTab('control',this)">Control</button>
    <button class="ks-tab" id="radio-tab-btn-biblioteca" onclick="showRadioTab('biblioteca',this)">Biblioteca</button>
@@ -2432,6 +2434,40 @@
      </tbody>
     </table>
    </div>
+  </div>
+
+  <!-- [RADIO-V2a] TAB Cartelera — la parrilla de programas (semanales + especiales).
+       El formulario nace con «— elige —» en tipo y día (DEFAULTS-1: cuándo sale
+       un programa al aire es una atribución, no se inventa con un default). -->
+  <div id="radio-tab-cartelera" style="display:none">
+   <div class="card" style="margin-bottom:14px">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px" id="rc-form-titulo">Nuevo programa</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+     <input class="form-input" id="rc-nombre" maxlength="80" placeholder="Nombre del programa *">
+     <input class="form-input" id="rc-conductor" maxlength="80" placeholder="Conductor / locutor">
+     <select class="form-input" id="rc-tipo" onchange="radioCartTipoCambia()">
+      <option value="">— ¿semanal o especial? —</option>
+      <option value="semanal">Semanal (cada semana)</option>
+      <option value="especial">Especial (una fecha)</option>
+     </select>
+     <select class="form-input" id="rc-dia" style="display:none">
+      <option value="">— elige el día —</option>
+      <option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option>
+      <option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="0">Domingo</option>
+     </select>
+     <input class="form-input" id="rc-fecha" type="date" style="display:none" title="Fecha del especial">
+     <input class="form-input" id="rc-inicio" type="time" title="Empieza (hora Reynosa)">
+     <input class="form-input" id="rc-fin" type="time" title="Termina (hora Reynosa)">
+    </div>
+    <textarea class="form-input" id="rc-desc" maxlength="300" placeholder="Descripción corta (se ve en /radio)" style="margin-top:10px;min-height:52px"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+     <button class="btn btn-primary btn-sm" id="rc-guardar" onclick="radioCartGuardar()">Guardar programa</button>
+     <button class="btn btn-ghost btn-sm" id="rc-cancelar" onclick="radioCartLimpiar()" style="display:none">Cancelar edición</button>
+     <span style="font-size:11px;color:var(--ts)">Horas en tiempo de Reynosa · un programa que cruza medianoche se captura como dos filas</span>
+    </div>
+    <div id="rc-form-msg" style="margin-top:8px;font-size:12px"></div>
+   </div>
+   <div id="rc-lista"><div class="loading-state"><div class="spinner"></div>Cargando la cartelera…</div></div>
   </div>
 
   <!-- TAB 3: Números -->

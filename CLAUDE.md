@@ -188,6 +188,45 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📻⏳ **SERIE RADIO-V2 · KAIO-SAMA SE VUELVE ESTACIÓN (24-oct-2026).** Palabra
+  de Memo: *«quiero empezar a transmitir programas en vivo, tener cartelera,
+  entrevistas… rediseño de funciones, estética, experiencia»*. Decisiones
+  firmadas (24-oct): en vivo = **Memo + invitados** (cuentas de DJ de
+  AzuraCast, que ya las trae de fábrica) · cartelera = **parrilla semanal en
+  /radio** capturada en Kaio-sama · **sin** sección de grabados por ahora ·
+  orden = **página pública primero**. El plan: **V2a parrilla ✅ · V2b rediseño
+  de /radio (sigue) · V2c locutores y cabina**.
+  - ✅ **V2a (24-oct, en main local):** tabla `radio_programas` en KH (RLS
+    deny-all + GRANT service_role — regla del 30-oct; acta
+    `migraciones/RADIO-V2A.sql`, YA CORRIDA). Un programa es SEMANAL
+    (dia_semana 0-6) o ESPECIAL (fecha) — exactamente uno (CHECK); horas en
+    HORA DE REYNOSA, fin > inicio (cruce de medianoche = dos filas, dicho en
+    el acta). **`_lib/radio-cartelera` es el dueño** de «¿qué está al aire y
+    qué sigue?»: recibe el instante (reloj inyectable) y DERIVA el huso
+    (America/Matamoros, jamás un −5 tecleado — el careo caza el huso de mano
+    con el martes post-cambio de horario); **lo específico gana rotulado**
+    (especial pisa semanal, `tipo` lo dice). `radio-cartelera` público (CDN
+    s-maxage 120; base caída = 502 ok:false no-store — un 200 vacío sería el
+    cero falso «no hay programas») + `admin-radio-cartelera` (solo
+    maestro_roshi; listar/crear/editar/archivar, SIN DELETE — se archiva) +
+    pestaña **Cartelera** en Kaio-sama (tipo y día nacen en «— elige —»,
+    DEFAULTS-1). `npm run mide:radio-v2a` (**21**, sin ancla — árbol) +
+    verificada en navegador real por inyección (tab pinta, valida, crea,
+    prefill de edición, archiva a `<details>`).
+    ⚠️ El `empieza_en_min` del «siguiente» cuenta minutos de PARED: la
+    madrugada del cambio de horario desvía 60 min una vez al año — dicho aquí,
+    la pantalla redondea a horas.
+  - ⏳ **V2b:** rediseño completo de `/radio` (1,309 líneas hoy: vistas vivo ·
+    recién · top · pedir · muro): estética de la casa, vista **Cartelera**, y
+    el hero con **🔴 AL AIRE: [programa] con [locutor]** — AzuraCast ya manda
+    `live.is_live` + `streamer_name` en el nowplaying público que la página ya
+    consume cada latido.
+  - ⏳ **V2c:** gestión de locutores (streamer accounts de AzuraCast vía
+    `admin-radio-control`, whitelist nueva) + AL AIRE en el hero de Kaio-sama +
+    el vigilante avisando si un programa de la parrilla debía empezar y nadie
+    se conectó.
+
+
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y
   careada; ⏳ PENDIENTE: push de Memo → publish desde Esferas → verificación en
   navegador → tandas del blast.** Palabra de Memo: separo $300 · fecha 26-28

@@ -233,6 +233,28 @@ está caduco antes de escribirse.
     funciones que arman HTML son PURAS y `mide:radio-v2b` (**25**, sin ancla)
     las rebana y corre en vm; verificación visual con vistas previas sembradas
     (radio-v2b-vivo/cartelera, fuera del repo).
+  - ✅ **V2a2 (24-oct, tras la prueba de Memo):** tres pedidos suyos, citados:
+    «opción para eliminar programación», «meter foto del programa», «los
+    programas son sin límite de tiempo… inicia a las 8 pero se extiende todo
+    lo que ellos quieran, un programa por día». Acta `migraciones/
+    RADIO-V2A2.sql` (YA CORRIDA): `hora_fin` NULLABLE (CHECK re-creado:
+    null o fin>inicio) · columna `foto_url` · bucket PÚBLICO
+    `radio-programas`. 🔒 **Fin null = CIERRE LIBRE**: la parrilla lo considera
+    al aire desde su inicio hasta el fin de ESE día (medianoche Reynosa) y las
+    pantallas dicen «desde las 8 PM» — jamás inventan un cierre; pasada la
+    medianoche el banner real lo sostiene `live.is_live`, que es quien no
+    miente. 🔒 **ELIMINAR existe y es deliberado**: la cartelera es CONTENIDO,
+    no dinero — candado `confirmar:true` EN EL SERVIDOR (solo maestro_roshi);
+    archivar sigue para pausar; la aserción vieja «CERO DELETEs en el archivo»
+    se RETIRÓ con su razón escrita y quedó vigilado que crear/editar/archivar
+    no borran y que ningún DELETE viaja a otra tabla. 🔒 **La foto** va por
+    FileReader→canvas ≤900px (jamás blob: — REQ-FOTO-1), magia de bytes
+    jpg/png/webp en el servidor, y **jamás tumba el programa**: si falla se
+    DICE (`foto_error`); eliminar barre su objeto del bucket. Pinta en
+    Kaio-sama (thumb) y en /radio (AL AIRE + filas, URL escapada).
+    `mide:radio-v2a` **32** · `mide:radio-v2b` **30** (la red falsa aprendió
+    storage y DELETE respetando filtros e id — un GET por id que devolviera la
+    tabla entera barrería la foto del programa equivocado).
   - ⏳ **V2c:** gestión de locutores (streamer accounts de AzuraCast vía
     `admin-radio-control`, whitelist nueva) + AL AIRE en el hero de Kaio-sama +
     el vigilante avisando si un programa de la parrilla debía empezar y nadie

@@ -56,11 +56,26 @@ af(par.especiales.length === 1 && par.especiales[0].nombre === 'Entrevista Espec
 console.log('\n[B] los handlers REALES, por la puerta');
 const PROGS = [];
 function redNueva() {
-  const st = { escrituras: 0, deletes: 0 };
+  const st = { escrituras: 0, deletes: 0, objetos: {} };
   st.fetch = async (url, init) => {
     const U = String(url); const met = ((init || {}).method || 'GET').toUpperCase();
     const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b) });
-    if (met === 'DELETE') { st.deletes++; return resp(405, {}); }
+    // [RADIO-V2a2] El bucket de fotos: guarda estado (las 4 leyes de la base de mentira).
+    if (U.includes('/storage/v1/object/radio-programas/')) {
+      const p = U.split('/storage/v1/object/radio-programas/')[1];
+      if (met === 'POST') { st.objetos[p] = (init.body && init.body.length) || 0; return resp(200, { Key: p }); }
+      if (met === 'DELETE') { delete st.objetos[p]; return resp(200, {}); }
+    }
+    // [RADIO-V2a2] DELETE existe SOLO sobre radio_programas (eliminar, deliberado);
+    // cualquier otro DELETE sigue siendo un 405 que el careo contaría como ajeno.
+    if (met === 'DELETE' && U.includes('/rest/v1/radio_programas')) {
+      st.deletes++;
+      const m = decodeURIComponent(U).match(/id=eq\.([\w-]+)/);
+      const i = PROGS.findIndex((x) => x.id === (m && m[1]));
+      if (i < 0) return resp(200, []);
+      return resp(200, [PROGS.splice(i, 1)[0]]);
+    }
+    if (met === 'DELETE') { st.deletesAjenos = (st.deletesAjenos || 0) + 1; return resp(405, {}); }
     if (U.includes('/rest/v1/usuarios') && met === 'GET') {
       const m = decodeURIComponent(U).match(/id=eq\.([\w-]+)/);
       const us = { 'u-memo': { id: 'u-memo', rol: 'maestro_roshi', activo: true, nombre: 'Memo' },
@@ -71,8 +86,13 @@ function redNueva() {
     if (U.includes('/rest/v1/radio_programas')) {
       if (st.caida) return resp(500, { message: 'se cayó' });
       if (met === 'GET') {
-        const soloVivos = U.includes('archivado=is.false');
-        return resp(200, PROGS.filter((p) => !soloVivos || !p.archivado));
+        // La base de mentira RESPETA los filtros al leer (la primera ley):
+        // un GET por id que devolviera la tabla entera haría que «eliminar»
+        // barriera la foto del programa equivocado.
+        const m = decodeURIComponent(U).match(/id=eq\.([\w-]+)/);
+        let filas = m ? PROGS.filter((p) => p.id === m[1]) : PROGS;
+        if (U.includes('archivado=is.false')) filas = filas.filter((p) => !p.archivado);
+        return resp(200, filas);
       }
       if (met === 'POST') {
         st.escrituras++;
@@ -124,7 +144,10 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(r.statusCode === 404, 'editar un id que no existe → 404, no un 200 vacío');
   r = await admin(ev({ accion: 'archivar', id: PROGS[0].id, archivado: true }, roshi));
   af(r.statusCode === 200 && PROGS[0].archivado === true, 'archivar marca la fila (la fila es el acta: jamás se borra)');
-  af(red.deletes === 0 && !/method:\s*'DELETE'/.test(fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-radio-cartelera.js'), 'utf8')), 'CERO DELETEs: ni la red los vio ni el archivo los tiene');
+  // ⚰️ [RADIO-V2a2] La aserción «CERO DELETEs en el archivo» se RETIRÓ con razón:
+  // Memo pidió eliminar de verdad (la cartelera es contenido, no dinero). Lo que
+  // queda vigilado: crear/editar/archivar jamás borran, y eliminar va con candado ([C]).
+  af(red.deletes === 0, 'crear/editar/archivar no mandaron ni un DELETE');
 
   // El público: siembra un programa cubriendo AHORA (la pared se la pedimos al DUEÑO).
   PROGS[0].archivado = false;
@@ -142,6 +165,40 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   red.caida = false;
   r = await pub({ httpMethod: 'GET', headers: { origin: 'https://malo.example' } });
   af(r.statusCode === 403, 'un Origin ajeno rebota 403; el GET same-origin de /radio pasa');
+
+  console.log('\n[C] RADIO-V2a2: fin LIBRE · la foto · eliminar');
+  // El fin libre en la LIB: mar 27-oct-2026 a las 23:30 (CDT) un programa de
+  // 20:00 SIN fin sigue al aire — cubre hasta el cierre del día; a las 19:00 no.
+  const LIBRE = { id: 'p3', nombre: 'Programa Libre', dia_semana: 2, hora_inicio: '20:00', hora_fin: null, activo: true, archivado: false };
+  let rl = L.alAireYSiguiente([LIBRE], Date.UTC(2026, 9, 28, 4, 30));
+  af(rl.al_aire && rl.al_aire.nombre === 'Programa Libre' && rl.al_aire.hora_fin === null, 'SIN hora de fin el programa sigue AL AIRE a las 23:30 (se extiende hasta el cierre del día) y el fin viaja como null, no como «00:00»');
+  af(L.alAireYSiguiente([LIBRE], Date.UTC(2026, 9, 28, 0, 0)).al_aire === null, 'pero a las 19:00 todavía no — el inicio sigue mandando');
+
+  r = await admin(ev({ accion: 'crear', programa: { nombre: 'Maratón', dia_semana: 5, hora_inicio: '20:00', hora_fin: '' } }, roshi));
+  af(r.statusCode === 200 && PROGS[PROGS.length - 1].hora_fin === null, 'crear con el fin VACÍO pasa: cierre libre (hora_fin null en la fila)');
+
+  // La foto: JPEG por MAGIA DE BYTES sube y queda en el programa; texto disfrazado no.
+  const JPEG = 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString('base64');
+  r = await admin(ev({ accion: 'crear', programa: { nombre: 'Con Foto', dia_semana: 3, hora_inicio: '10:00', hora_fin: '12:00' }, foto_b64: JPEG }, roshi));
+  let bb = JSON.parse(r.body);
+  af(r.statusCode === 200 && /radio-programas\/programas\//.test((bb.programa || {}).foto_url || ''), 'la foto JPEG sube al bucket público y su URL queda en el programa');
+  af(Object.keys(red.objetos).length === 1, 'y el bucket tiene exactamente UN objeto');
+  r = await admin(ev({ accion: 'crear', programa: { nombre: 'Foto Mala', dia_semana: 4, hora_inicio: '10:00', hora_fin: '12:00' }, foto_b64: Buffer.from('hola, soy texto plano').toString('base64') }, roshi));
+  bb = JSON.parse(r.body);
+  af(r.statusCode === 200 && bb.ok === true && bb.foto_error && bb.programa && !bb.programa.foto_url, '🔒 lo que no es imagen (magia de bytes, no el nombre) se rechaza DICIÉNDOLO — y el programa queda: la foto jamás tumba el programa');
+
+  // Eliminar: el candado vive en el SERVIDOR (confirmar:true o cero escrituras).
+  const antes = PROGS.length;
+  r = await admin(ev({ accion: 'eliminar', id: PROGS[0].id }, roshi));
+  af(r.statusCode === 400 && PROGS.length === antes && red.deletes === 0, '🔒 eliminar SIN confirmar:true → 400 con CERO escrituras (esconder el botón no basta)');
+  r = await admin(ev({ accion: 'eliminar', id: PROGS[0].id, confirmar: true }, roshi));
+  af(r.statusCode === 200 && PROGS.length === antes - 1, 'con confirmar la fila SE VA de verdad — la cartelera es contenido, no dinero');
+  r = await admin(ev({ accion: 'eliminar', id: '00000000-0000-4000-8000-000000000099', confirmar: true }, roshi));
+  af(r.statusCode === 404, 'eliminar un id que no existe → 404, no un 200 vacío');
+  const conFoto = PROGS.find((x) => x.foto_url);
+  r = await admin(ev({ accion: 'eliminar', id: conFoto.id, confirmar: true }, roshi));
+  af(r.statusCode === 200 && Object.keys(red.objetos).length === 0, 'y eliminar al de la foto barre su objeto del bucket (cero huérfanas)');
+  af(!red.deletesAjenos, 'ningún DELETE viajó a una tabla que no fuera radio_programas (ni a dinero, ni a nada)');
 
   console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
   process.exit(ko ? 1 : 0);

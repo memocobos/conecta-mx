@@ -33,6 +33,12 @@ function paredReynosa(ahoraMs) {
 }
 
 const _min = (t) => { const [h, m] = String(t || '').slice(0, 5).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+// [RADIO-V2a2] El FIN es OPCIONAL (palabra de Memo: «se extiende todo lo que
+// ellos quieran, un programa por día»). Sin fin, el programa cubre «al aire»
+// desde su inicio hasta el FIN DE ESE DÍA (1440 = medianoche de Reynosa) — la
+// PARRILLA dice qué debería sonar; si de verdad siguen transmitiendo pasada la
+// medianoche, el banner 🔴 lo sostiene live.is_live, que es quien no miente.
+const _finMin = (p) => (p.hora_fin == null || p.hora_fin === '' ? 1440 : _min(p.hora_fin));
 const _fechaMas = (fechaISO, dias) => new Date(Date.parse(fechaISO + 'T12:00:00Z') + dias * 864e5).toISOString().slice(0, 10);
 const _dowDe = (fechaISO) => new Date(Date.parse(fechaISO + 'T12:00:00Z')).getUTCDay();
 
@@ -47,7 +53,10 @@ function _proyecta(p, fechaISO) {
     color: p.color || null, tipo: p.fecha != null ? 'especial' : 'semanal',
     dia_semana: p.fecha != null ? null : Number(p.dia_semana),
     fecha: fechaISO, dia_nombre: DIAS[_dowDe(fechaISO)],
-    hora_inicio: String(p.hora_inicio).slice(0, 5), hora_fin: String(p.hora_fin).slice(0, 5) };
+    foto_url: p.foto_url || null,
+    hora_inicio: String(p.hora_inicio).slice(0, 5),
+    // [RADIO-V2a2] fin null = CIERRE LIBRE — viaja como null, jamás como '00:00'
+    hora_fin: p.hora_fin == null || p.hora_fin === '' ? null : String(p.hora_fin).slice(0, 5) };
 }
 
 // alAireYSiguiente(programas, ahoraMs) → { al_aire, siguiente }
@@ -57,7 +66,7 @@ function alAireYSiguiente(programas, ahoraMs) {
   const vivos = (programas || []).filter(_vivo);
   const hoy = paredReynosa(ahoraMs);
 
-  const cubriendo = vivos.filter((p) => _aplicaA(p, hoy.fecha, hoy.dow) && _min(p.hora_inicio) <= hoy.min && hoy.min < _min(p.hora_fin));
+  const cubriendo = vivos.filter((p) => _aplicaA(p, hoy.fecha, hoy.dow) && _min(p.hora_inicio) <= hoy.min && hoy.min < _finMin(p));
   // Lo específico gana: especial > semanal; a igualdad, el que empezó más tarde
   // (el más «cercano» al instante) — determinista, no el orden de la tabla.
   cubriendo.sort((a, b) => ((b.fecha != null) - (a.fecha != null)) || (_min(b.hora_inicio) - _min(a.hora_inicio)));

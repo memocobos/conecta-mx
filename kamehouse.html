@@ -2457,9 +2457,14 @@
      </select>
      <input class="form-input" id="rc-fecha" type="date" style="display:none" title="Fecha del especial">
      <input class="form-input" id="rc-inicio" type="time" title="Empieza (hora Reynosa)">
-     <input class="form-input" id="rc-fin" type="time" title="Termina (hora Reynosa)">
+     <input class="form-input" id="rc-fin" type="time" title="Termina (opcional — vacío = cierre libre, el programa se extiende)">
     </div>
     <textarea class="form-input" id="rc-desc" maxlength="300" placeholder="Descripción corta (se ve en /radio)" style="margin-top:10px;min-height:52px"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+     <label style="font-size:12px;color:var(--ts)">Foto del programa (opcional):</label>
+     <input type="file" id="rc-foto" accept="image/*" onchange="radioCartFotoCambia(this)" style="font-size:12px">
+     <div id="rc-foto-prev" style="display:flex;gap:8px;align-items:center"></div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
      <button class="btn btn-primary btn-sm" id="rc-guardar" onclick="radioCartGuardar()">Guardar programa</button>
      <button class="btn btn-ghost btn-sm" id="rc-cancelar" onclick="radioCartLimpiar()" style="display:none">Cancelar edición</button>

@@ -1202,6 +1202,11 @@ async function radioMuroVisible(id, visible) {
 const _RC_DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 let _rcProgramas = [];
 let _rcEditando = null;   // id del programa en edición, o null = crear
+// [RADIO-V2a2] La foto del programa: _rcFotoB64 = data-uri nueva por subir;
+// _rcFotoQuitar = true cuando Memo pide quitar la existente. Reescalada en el
+// navegador a ≤900px (la forma de _reqArchivoB64: FileReader→canvas, jamás blob:).
+let _rcFotoB64 = null;
+let _rcFotoQuitar = false;
 
 function _rcEl(id) { return document.getElementById(id); }
 function _rcEsc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
@@ -1225,9 +1230,15 @@ function _rcFilaHtml(p) {
   const cuando = p.fecha != null
     ? `📅 ${_rcEsc(String(p.fecha).slice(0, 10))}`
     : _rcEsc(_RC_DIAS[Number(p.dia_semana)] || '¿?');
-  const horas = `${_rcEsc(String(p.hora_inicio).slice(0, 5))}–${_rcEsc(String(p.hora_fin).slice(0, 5))}`;
+  // [RADIO-V2a2] fin null = CIERRE LIBRE: se dice «desde las HH:MM», no se inventa un fin.
+  const horas = p.hora_fin == null || p.hora_fin === ''
+    ? `desde ${_rcEsc(String(p.hora_inicio).slice(0, 5))} · cierre libre`
+    : `${_rcEsc(String(p.hora_inicio).slice(0, 5))}–${_rcEsc(String(p.hora_fin).slice(0, 5))}`;
+  const foto = p.foto_url
+    ? `<img src="${_rcEsc(p.foto_url)}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0">`
+    : `<span style="width:8px;height:8px;border-radius:50%;background:${p.color ? _rcEsc(p.color) : 'var(--ts)'};flex-shrink:0"></span>`;
   return `<div style="display:flex;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--border);${p.archivado ? 'opacity:.45' : ''}">
-    <span style="width:8px;height:8px;border-radius:50%;background:${p.color ? _rcEsc(p.color) : 'var(--ts)'};flex-shrink:0"></span>
+    ${foto}
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:700">${_rcEsc(p.nombre)}${p.archivado ? ' <span style="font-size:10px;color:var(--ts)">(archivado)</span>' : ''}</div>
       <div style="font-size:11px;color:var(--ts)">${cuando} · ${horas}${p.conductor ? ' · ' + _rcEsc(p.conductor) : ''}</div>
@@ -1236,6 +1247,7 @@ function _rcFilaHtml(p) {
       ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioCartArchivar('${_rcEsc(p.id)}', false)">↩ Restaurar</button>`
       : `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioCartEditar('${_rcEsc(p.id)}')">Editar</button>
          <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" onclick="radioCartArchivar('${_rcEsc(p.id)}', true)">Archivar</button>`}
+    <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" title="Eliminar para siempre" onclick="radioCartEliminar('${_rcEsc(p.id)}')">🗑</button>
   </div>`;
 }
 
@@ -1269,8 +1281,46 @@ function _rcMsg(txt, esError) {
   if (m) m.innerHTML = txt ? `<span style="color:${esError ? 'var(--red)' : 'var(--green)'}">${_rcEsc(txt)}</span>` : '';
 }
 
+// [RADIO-V2a2] La foto se lee por FileReader (jamás blob: — REQ-FOTO-1: el CSP
+// no lo deja) y se reescala en canvas a ≤900px, JPEG. El payload viaja chico.
+function radioCartFotoCambia(input) {
+  _rcFotoQuitar = false;
+  const f = input && input.files && input.files[0];
+  if (!f) { _rcFotoB64 = null; _rcFotoPrev(null); return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const esc = Math.min(1, 900 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * esc); c.height = Math.round(img.height * esc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      _rcFotoB64 = c.toDataURL('image/jpeg', 0.85);
+      _rcFotoPrev(_rcFotoB64);
+    };
+    img.onerror = () => { _rcFotoB64 = null; _rcMsg('Esa imagen no se pudo abrir', true); };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+function radioCartFotoQuitar() {
+  _rcFotoB64 = null; _rcFotoQuitar = true;
+  const inp = _rcEl('rc-foto'); if (inp) inp.value = '';
+  _rcFotoPrev(null);
+}
+function _rcFotoPrev(url) {
+  const box = _rcEl('rc-foto-prev');
+  if (!box) return;
+  box.innerHTML = url
+    ? `<img src="${_rcEsc(url)}" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioCartFotoQuitar()">Quitar foto</button>`
+    : '';
+}
+
 function radioCartLimpiar() {
   _rcEditando = null;
+  _rcFotoB64 = null; _rcFotoQuitar = false;
+  const inp = _rcEl('rc-foto'); if (inp) inp.value = '';
+  _rcFotoPrev(null);
   ['rc-nombre', 'rc-conductor', 'rc-desc', 'rc-inicio', 'rc-fin', 'rc-fecha'].forEach((id) => { const e = _rcEl(id); if (e) e.value = ''; });
   const t = _rcEl('rc-tipo'); if (t) t.value = '';
   const d = _rcEl('rc-dia'); if (d) d.value = '';
@@ -1289,7 +1339,10 @@ function radioCartEditar(id) {
   _rcEl('rc-conductor').value = p.conductor || '';
   _rcEl('rc-desc').value = p.descripcion || '';
   _rcEl('rc-inicio').value = String(p.hora_inicio).slice(0, 5);
-  _rcEl('rc-fin').value = String(p.hora_fin).slice(0, 5);
+  _rcEl('rc-fin').value = p.hora_fin == null || p.hora_fin === '' ? '' : String(p.hora_fin).slice(0, 5);
+  _rcFotoB64 = null; _rcFotoQuitar = false;
+  const fi = _rcEl('rc-foto'); if (fi) fi.value = '';
+  _rcFotoPrev(p.foto_url || null);
   _rcEl('rc-tipo').value = p.fecha != null ? 'especial' : 'semanal';
   radioCartTipoCambia();
   if (p.fecha != null) _rcEl('rc-fecha').value = String(p.fecha).slice(0, 10);
@@ -1315,11 +1368,28 @@ async function radioCartGuardar() {
   if (tipo === 'semanal' && programa.dia_semana === '') { _rcMsg('Elige el día de la semana', true); return; }
   const btn = _rcEl('rc-guardar');
   if (btn) btn.disabled = true;
-  const { st, j } = await _rcApi(_rcEditando ? { accion: 'editar', id: _rcEditando, programa } : { accion: 'crear', programa });
+  const cuerpo = _rcEditando ? { accion: 'editar', id: _rcEditando, programa } : { accion: 'crear', programa };
+  if (_rcFotoB64) cuerpo.foto_b64 = _rcFotoB64;
+  if (_rcFotoQuitar && _rcEditando) cuerpo.foto_quitar = true;
+  const { st, j } = await _rcApi(cuerpo);
   if (btn) btn.disabled = false;
   if (st !== 200 || !j.ok) { _rcMsg(j.error || ('HTTP ' + st), true); return; }
-  _rcMsg(_rcEditando ? 'Programa actualizado ✓' : 'Programa creado ✓');
+  // La foto jamás tumba el programa — pero si falló, SE DICE (no un verde a medias).
+  _rcMsg(j.foto_error
+    ? `Programa guardado, pero la foto no entró: ${j.foto_error}`
+    : (_rcEditando ? 'Programa actualizado ✓' : 'Programa creado ✓'), !!j.foto_error);
   radioCartLimpiar();
+  loadRadioCartelera();
+}
+
+// [RADIO-V2a2] Eliminar DE VERDAD (palabra de Memo). El confirm() es cortesía:
+// el candado real es el confirmar:true que exige el servidor.
+async function radioCartEliminar(id) {
+  const p = _rcProgramas.find((x) => String(x.id) === String(id));
+  if (!confirm(`¿ELIMINAR «${(p || {}).nombre || 'este programa'}» para siempre?\n\nEsto no se puede deshacer (si solo quieres pausarlo, usa Archivar).`)) return;
+  const { st, j } = await _rcApi({ accion: 'eliminar', id, confirmar: true });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  showToast('Programa eliminado', 'success');
   loadRadioCartelera();
 }
 

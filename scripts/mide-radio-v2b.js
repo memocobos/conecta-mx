@@ -76,5 +76,19 @@ af(s.indexOf('martes<span class="hoyChip">HOY</span>') >= 0, 'la semana ARRANCA 
 af(s.indexOf('martes') < s.indexOf('domingo'), 'y el domingo va después del martes — el orden es desde hoy, no de calendario');
 af(/Especial/.test(s) && !/<script>/.test(s), 'los especiales llevan su chip azul y el texto va ESCAPADO (el <script> del fixture no sale crudo)');
 
+console.log('\n[C] RADIO-V2a2: fin LIBRE y la foto, en la página');
+af(run("rangoHoras({ hora_inicio: '20:00', hora_fin: '22:00' })") === '8 PM–10 PM' &&
+   run("rangoHoras({ hora_inicio: '20:00', hora_fin: null })") === 'desde las 8 PM', 'rangoHoras: con fin dice el rango; SIN fin dice «desde las 8 PM» — jamás inventa un cierre');
+af(/desde las 8 PM/.test(run("proximoHtml({ al_aire: { nombre: 'X', hora_inicio: '20:00', hora_fin: null } })")), 'el renglón del escenario con programa SIN fin dice «desde las», no «hasta las null»');
+const LIBRE = `{
+  al_aire: { id: 'a', nombre: 'Maratón', hora_inicio: '20:00', hora_fin: null, tipo: 'semanal', foto_url: 'https://kh.supabase.co/storage/v1/object/public/radio-programas/programas/a.jpg' },
+  siguiente: null, especiales: [],
+  semanales: [{ id: 'a', nombre: 'Maratón', dia_semana: 2, tipo: 'semanal', hora_inicio: '20:00', hora_fin: null, foto_url: 'https://kh.supabase.co/x.jpg"><script>' }]
+}`;
+s = run('cartHtml(' + LIBRE + ', false, 2)');
+af(/desde las 8 PM/.test(s) && !/null/.test(s), 'la parrilla con fin libre pinta «desde las 8 PM» y ningún «null» se asoma');
+af(/cartAhoraFoto/.test(s) && /cartFoto/.test(s), 'la foto del programa sale en el AL AIRE y en su fila de la semana');
+af(!/"><script>/.test(s), 'y la URL de la foto va ESCAPADA (una comilla en el dato no rompe el HTML)');
+
 console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
 process.exit(ko ? 1 : 0);

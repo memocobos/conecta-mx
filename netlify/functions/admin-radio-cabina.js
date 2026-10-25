@@ -174,6 +174,22 @@ exports.handler = async (event) => {
       return res(200, { ok: true, sampler: filas[0] });
     }
 
+    // [KAIO-CABINA-7] El volumen del sampler vive EN SU FILA (columna
+    // `volumen`, 0–2, acta migraciones/KAIO-CABINA-7.sql): se ajusta una vez
+    // y vale en cualquier computadora. El CHECK de la base también muerde;
+    // aquí se valida ANTES para contestar con palabras y no con un 23514.
+    if (accion === 'sampler_volumen') {
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/.test(id)) return res(400, { error: 'id inválido' });
+      const vol = Number(body.volumen);
+      if (!isFinite(vol) || vol < 0 || vol > 2) return res(400, { error: 'El volumen va de 0 a 2 (0–200 %)' });
+      const r = await fetch(`${T}?id=eq.${id}`, { method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' }, body: JSON.stringify({ volumen: vol }) });
+      if (!r.ok) return res(502, { error: 'No se pudo guardar el volumen: ' + (await r.text()).slice(0, 200) });
+      const filas = await r.json().catch(() => []);
+      if (!filas.length) return res(404, { error: 'Ese sampler no existe' });
+      return res(200, { ok: true, sampler: filas[0] });
+    }
+
     if (accion === 'sampler_eliminar') {
       const id = String(body.id || '');
       if (!/^[0-9a-f-]{36}$/.test(id)) return res(400, { error: 'id inválido' });

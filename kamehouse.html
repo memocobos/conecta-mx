@@ -2482,7 +2482,22 @@
            delay (normal), así que el locutor se oye por aquí, al instante. -->
       <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
        <input type="checkbox" id="cab-mic-mon" onchange="cabMicMonitor(this.checked)">
-       🎧 Escuchar mi voz al instante (SOLO con audífonos — con bocinas se acopla)</label></div>
+       🎧 Escuchar mi voz al instante (SOLO con audífonos — con bocinas se acopla)</label>
+      <!-- [KAIO-CABINA-7] Efectos de voz: nacen APAGADOS (el default es «sin
+           efecto» — es forma, no atribución, DEFAULTS-1). Si el micrófono
+           elegido es un MIXER por USB, los efectos aplican a TODO ese canal. -->
+      <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
+       <input type="checkbox" id="cab-fx-locutor" onchange="cabFxAplicar()">
+       🎚 Voz de locutor (compresor — voz pareja y con presencia)</label>
+      <label style="display:block;margin-top:4px;font-size:11px;color:var(--ts)">
+       <input type="checkbox" id="cab-fx-radio" onchange="cabFxAplicar()">
+       📻 Efecto radio viejita / teléfono</label>
+      <label style="display:block;margin-top:4px;font-size:11px;color:var(--ts)">🏟 Eco
+       <input type="range" id="cab-fx-eco" min="0" max="50" value="0" oninput="cabFxAplicar()" style="width:110px;vertical-align:middle">
+       <span style="opacity:.7">(0 = sin eco)</span></label>
+      <label style="display:block;margin-top:4px;font-size:11px;color:var(--ts)">
+       <input type="checkbox" id="cab-duck" onchange="cabDuck(this.checked)">
+       🎵 La música baja sola cuando hablas (ducking)</label></div>
      <div><label style="font-size:11px;color:var(--ts)">Samplers</label>
       <input type="range" id="cab-vol-sam" min="0" max="150" value="100" oninput="cabVol('sam',this.value)" style="width:100%"></div>
      <div><label style="font-size:11px;color:var(--ts)">Música</label>

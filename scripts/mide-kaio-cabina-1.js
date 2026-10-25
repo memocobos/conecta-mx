@@ -41,6 +41,13 @@ const md1 = run("cabinaMetadata({ ok: true, al_aire: { nombre: 'La Hora del Rock
 af(md1.type === 'metadata' && md1.data.title === 'La Hora del Rock' && md1.data.artist === 'Memo Cobos', '[KC-6] con programa al aire, la metadata dice EL SHOW de la parrilla (nombre + conductor)');
 const md2 = run("cabinaMetadata(null, 'memo')");
 af(md2.type === 'metadata' && md2.data.title === 'Transmisión en vivo' && md2.data.artist === 'memo', '[KC-6] sin parrilla legible, metadata genérica con el locutor — la cartelera caída jamás frena el aire ni inventa un show');
+// [KAIO-CABINA-7] los efectos de voz: apagado = parámetros NEUTROS (la cadena
+// jamás se reconecta en vivo — reconectar mete clicks al aire).
+const fx0 = run('cabFxParams({})');
+af(fx0.comp.ratio === 1 && fx0.comp.threshold === 0 && fx0.hpFreq === 10 && fx0.lpFreq === 20000 && fx0.ecoWet === 0, '[KC-7] todo apagado = cadena NEUTRA (ratio 1, filtros abiertos, eco 0): el mic pasa intacto');
+const fx1 = run('cabFxParams({ locutor: true, radio: true, eco: 0.3 })');
+af(fx1.comp.ratio === 3 && fx1.comp.threshold === -24 && fx1.hpFreq === 300 && fx1.lpFreq === 3400 && fx1.ecoWet === 0.3, '[KC-7] prendidos: compresor de broadcast, pasa-banda 300-3400 (voz de radio) y eco al nivel pedido');
+af(run('cabFxParams({ eco: 9 })').ecoWet === 0.5 && run('cabFxParams({ eco: -1 })').ecoWet === 0, '[KC-7] el eco CLAMPA a [0, 0.5] — más de 0.5 se come la voz y un negativo no existe');
 
 console.log('\n[B] el ENCODER de verdad (vendor/lame.min.js) — control del instrumento');
 const lctx = {}; lctx.window = lctx; vm.createContext(lctx);
@@ -237,6 +244,16 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   r = await h(ev({ accion: 'dj_desconectar' }, bulma));
   af(r.statusCode === 403 && red.disconnects === 1, '[KC-6] y sigue siendo SOLO de Memo: bulma rebota sin tocar la estación');
 
+  // [KAIO-CABINA-7] el volumen POR SAMPLER vive en su fila (0–2)
+  r = await h(ev({ accion: 'sampler_crear', nombre: 'Aplausos', audio_b64: B64_MP3 }, roshi));
+  const idVol = JSON.parse(r.body).sampler.id;
+  r = await h(ev({ accion: 'sampler_volumen', id: idVol, volumen: 1.5 }, roshi));
+  af(r.statusCode === 200 && Number(SAMPLERS.find((s) => s.id === idVol).volumen) === 1.5, '[KC-7] el volumen del sampler se guarda EN SU FILA — vale en cualquier computadora, no en el navegador de una');
+  r = await h(ev({ accion: 'sampler_volumen', id: idVol, volumen: 3 }, roshi));
+  af(r.statusCode === 400 && /0 a 2/.test(JSON.parse(r.body).error) && Number(SAMPLERS.find((s) => s.id === idVol).volumen) === 1.5, '[KC-7] fuera de rango → 400 CON PALABRAS (no un 23514 pelado) y la fila no se mueve');
+  r = await h(ev({ accion: 'sampler_volumen', id: idVol, volumen: 0.5 }, bulma));
+  af(r.statusCode === 403 && Number(SAMPLERS.find((s) => s.id === idVol).volumen) === 1.5, '[KC-7] bulma rebota sin escribir: la cabina sigue siendo SOLO de Memo');
+
   // Estructura del front (lo que el vm no corre): la carga perezosa y el CSP.
   console.log('\n[D] los cables del front y el CSP');
   af(js.includes("s.src = '/vendor/lame.min.js'"), 'lamejs carga PEREZOSA desde /vendor/ (156 KB que solo paga quien transmite)');
@@ -254,7 +271,16 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(js.includes('async function cabMicCambiar') && fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('id="cab-mic-sel"'), '[KC-3] el selector vive en la Mezcladora y cambiarlo re-captura en vivo');
   // [KAIO-CABINA-4] El mic-monitor es un canal APARTE: micMonitorGain, jamás el
   // monitorGain general (la aserción del monitor sin mic sigue arriba, intacta).
-  af(js.includes('_cb.buses.mic.connect(_cb.micMonitorGain)') && js.includes('function cabMicMonitor'), '[KC-4] el locutor puede oír SU VOZ al instante por un canal propio (el delay de la radio es de 15-30 s y no se monitorea por ahí)');
+  // ⚠️ ACTUALIZADA EN KAIO-CABINA-7, con razón: el monitor del mic ya no bebe
+  // de buses.mic sino de micOut (POST-efectos) — te oyes COMO SALES AL AIRE.
+  af(js.includes('_cb.fx.micOut.connect(_cb.micMonitorGain)') && js.includes('function cabMicMonitor'), '[KC-4→7] el locutor oye SU VOZ al instante por un canal propio, y POST-efectos: lo que oyes es lo que sale');
+  // [KAIO-CABINA-7] la cadena de efectos y el ducking
+  af(js.includes('_cb.buses.mic.connect(_cb.fx.comp)') && js.includes('_cb.fx.micOut.connect(_cb.master)') && !js.includes('_cb.buses.mic.connect(_cb.master)'), '[KC-7] el mic SIEMPRE pasa por la cadena (comp→hp→lp→micOut) antes del master — apagar un efecto es parámetro neutro, no reconexión');
+  af(!js.includes('micOut.connect(_cb.monitorGain)'), '[KC-7] micOut tampoco toca el monitor general: el candado del acople sigue entero con la cadena nueva');
+  af(js.includes('_cb.buses.mus.connect(_cb.duckGain)') && js.includes('_cb.duckGain.connect(_cb.master)') && !/duckGain/.test(js.slice(js.indexOf('function cabVol'), js.indexOf('function cabMonitor'))), '[KC-7] el ducking es un gain APARTE en serie — jamás pisa el slider de música del usuario (cabVol no lo toca)');
+  af(js.includes('_cb.duckTimer') && /clearInterval\(_cb\.duckTimer\)/.test(js), '[KC-7] el reloj del ducking tiene DUEÑO (_cb.duckTimer) y muere al apagar el checkbox — un huérfano seguiría bajando la música');
+  af(js.includes('gv.gain.value') && js.includes('s.volumen'), '[KC-7] cada sampler suena con SU volumen de fila, encadenado al bus general (el slider de Samplers manda encima)');
+  af(fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('id="cab-fx-locutor"') && fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('id="cab-duck"'), '[KC-7] los controles viven en la Mezcladora y nacen APAGADOS (sin efecto = default de forma, DEFAULTS-1)');
   // [KAIO-CABINA-6] los cables de la metadata y del corte avisado — se miden
   // las LLAMADAS literales, no palabras que un comentario pueda contener.
   af(js.includes("fetch('/.netlify/functions/radio-cartelera')") && js.includes('ws.send(JSON.stringify(cabinaMetadata(cart6, usuario)))'), '[KC-6] cabAire pide la parrilla y manda la METADATA del show por el webcast — la web pública deja de quedarse con la última canción del AutoDJ');

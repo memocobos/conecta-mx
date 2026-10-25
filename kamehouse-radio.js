@@ -1464,6 +1464,24 @@ function cabinaMetadata(cartelera, locutor) {
     artist: (p && p.conductor) ? String(p.conductor) : (String(locutor || '') || 'Radio Conecta')
   } };
 }
+// [KAIO-CABINA-7] Los parámetros de la cadena de efectos del mic, PUROS.
+// La cadena va SIEMPRE conectada (mic → compresor → hp → lp → micOut, con el
+// eco en paralelo) y apagar un efecto es ponerle parámetros NEUTROS — así
+// jamás se reconecta el grafo en vivo, que es donde truenan los clicks.
+//   locutor → compresor de broadcast (voz pareja y con presencia)
+//   radio   → pasa-banda 300–3400 Hz (voz de radio viejita / teléfono)
+//   eco     → mezcla del reverb, 0 a 0.5 (más de 0.5 se come la voz)
+function cabFxParams(o) {
+  o = o || {};
+  return {
+    comp: o.locutor
+      ? { threshold: -24, knee: 12, ratio: 3, attack: 0.003, release: 0.25 }
+      : { threshold: 0, knee: 0, ratio: 1, attack: 0.003, release: 0.25 },
+    hpFreq: o.radio ? 300 : 10,
+    lpFreq: o.radio ? 3400 : 20000,
+    ecoWet: Math.max(0, Math.min(0.5, Number(o.eco) || 0))
+  };
+}
 // Float32 [-1,1] → Int16 para lamejs, con clamp (un pico >1.0 sin clamp da wrap).
 function cabF32aI16(f32) {
   const out = new Int16Array(f32.length);
@@ -1484,23 +1502,90 @@ function cabCtx() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   _cb.ctx = ctx;
   _cb.master = ctx.createGain();
-  ['mic', 'sam', 'mus'].forEach((b) => { _cb.buses[b] = ctx.createGain(); _cb.buses[b].connect(_cb.master); });
+  ['mic', 'sam', 'mus'].forEach((b) => { _cb.buses[b] = ctx.createGain(); });
+  _cb.buses.sam.connect(_cb.master);
+  // [KAIO-CABINA-7] La MÚSICA pasa por el duckGain antes del master: cuando el
+  // ducking está prendido y el locutor habla, este gain baja SOLO — es un gain
+  // APARTE del slider del usuario (buses.mus), que jamás se pisa.
+  _cb.duckGain = ctx.createGain();
+  _cb.buses.mus.connect(_cb.duckGain); _cb.duckGain.connect(_cb.master);
+  // [KAIO-CABINA-7] El MIC pasa por su CADENA DE EFECTOS antes del master:
+  // mic → compresor → hp → lp → micOut, con el eco (convolver) en paralelo
+  // lp → reverb → revWet → micOut. La cadena va SIEMPRE conectada y apagar un
+  // efecto es ponerle parámetros NEUTROS (cabFxParams) — reconectar en vivo
+  // mete clicks al aire. Lo que sale al aire, el VU y el vigilante de silencio
+  // miden DESPUÉS de los efectos: lo que mides es lo que suena.
+  _cb.fx = { comp: ctx.createDynamicsCompressor(), hp: ctx.createBiquadFilter(), lp: ctx.createBiquadFilter(), revConv: ctx.createConvolver(), revWet: ctx.createGain(), micOut: ctx.createGain() };
+  _cb.fx.hp.type = 'highpass'; _cb.fx.lp.type = 'lowpass'; _cb.fx.revWet.gain.value = 0;
+  _cb.buses.mic.connect(_cb.fx.comp); _cb.fx.comp.connect(_cb.fx.hp); _cb.fx.hp.connect(_cb.fx.lp);
+  _cb.fx.lp.connect(_cb.fx.micOut);
+  _cb.fx.lp.connect(_cb.fx.revConv); _cb.fx.revConv.connect(_cb.fx.revWet); _cb.fx.revWet.connect(_cb.fx.micOut);
+  _cb.fx.micOut.connect(_cb.master);
+  // Analizador del MIC (post-efectos) — lo lee el ducking.
+  _cb.micAna = ctx.createAnalyser(); _cb.micAna.fftSize = 512;
+  _cb.fx.micOut.connect(_cb.micAna);
+  cabFxAplicar();
   _cb.analyser = ctx.createAnalyser(); _cb.analyser.fftSize = 512;
   _cb.master.connect(_cb.analyser);
   // Monitor local: SOLO samplers y música — el mic a las bocinas se acopla.
+  // La música entra por el duckGain para que el ensayo suene como el aire.
   _cb.monitorGain = ctx.createGain(); _cb.monitorGain.gain.value = 0;
-  _cb.buses.sam.connect(_cb.monitorGain); _cb.buses.mus.connect(_cb.monitorGain);
+  _cb.buses.sam.connect(_cb.monitorGain); _cb.duckGain.connect(_cb.monitorGain);
   _cb.monitorGain.connect(ctx.destination);
   // [KAIO-CABINA-4] El mic-monitor es un canal APARTE y opt-in: la radio trae
   // 15-30 s de delay (buffers de liquidsoap/Icecast/reproductor — normal en
   // toda radio por internet) y un locutor se monitorea LOCAL, al instante,
   // CON AUDÍFONOS. Jamás se conecta al monitorGain general: esa separación es
   // la que impide que el checkbox de sam+mus acople el mic con las bocinas.
+  // [KAIO-CABINA-7] Bebe de micOut (POST-efectos): te oyes como sales al aire.
   _cb.micMonitorGain = ctx.createGain(); _cb.micMonitorGain.gain.value = 0;
-  _cb.buses.mic.connect(_cb.micMonitorGain);
+  _cb.fx.micOut.connect(_cb.micMonitorGain);
   _cb.micMonitorGain.connect(ctx.destination);
   _cbVuLoop();
   return ctx;
+}
+// [KAIO-CABINA-7] Aplica los efectos de voz leyendo los controles de la
+// Mezcladora. Nunca reconecta: solo mueve parámetros (cabFxParams, pura).
+function cabFxAplicar() {
+  if (!_cb.fx || !_cb.ctx) return;
+  const t = _cb.ctx.currentTime;
+  const p = cabFxParams({
+    locutor: !!(_cbEl('cab-fx-locutor') || {}).checked,
+    radio: !!(_cbEl('cab-fx-radio') || {}).checked,
+    eco: Number((_cbEl('cab-fx-eco') || {}).value || 0) / 100
+  });
+  _cb.fx.comp.threshold.setTargetAtTime(p.comp.threshold, t, 0.05);
+  _cb.fx.comp.knee.setTargetAtTime(p.comp.knee, t, 0.05);
+  _cb.fx.comp.ratio.setTargetAtTime(p.comp.ratio, t, 0.05);
+  _cb.fx.comp.attack.value = p.comp.attack; _cb.fx.comp.release.value = p.comp.release;
+  _cb.fx.hp.frequency.setTargetAtTime(p.hpFreq, t, 0.05);
+  _cb.fx.lp.frequency.setTargetAtTime(p.lpFreq, t, 0.05);
+  if (p.ecoWet > 0 && !_cb.fx.revConv.buffer) {
+    // Impulso sintético (1.4 s de ruido con caída exponencial) — se crea una
+    // sola vez, perezoso: quien nunca prende el eco no paga el buffer.
+    const sr = _cb.ctx.sampleRate, n = Math.floor(sr * 1.4);
+    const imp = _cb.ctx.createBuffer(2, n, sr);
+    for (let c = 0; c < 2; c++) { const d = imp.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.8); }
+    _cb.fx.revConv.buffer = imp;
+  }
+  _cb.fx.revWet.gain.setTargetAtTime(p.ecoWet, t, 0.05);
+}
+// [KAIO-CABINA-7] DUCKING: la música baja sola cuando el locutor habla.
+// Lee el nivel del mic POST-efectos (micAna) cada 80 ms y mueve el duckGain —
+// ataque rápido (la música cede en cuanto hablas), regreso suave (no bombea).
+// El dueño del reloj es _cb.duckTimer y muere al apagar el checkbox.
+function cabDuck(on) {
+  cabCtx();
+  if (_cb.duckTimer) { clearInterval(_cb.duckTimer); _cb.duckTimer = null; }
+  if (!on) { _cb.duckGain.gain.setTargetAtTime(1, _cb.ctx.currentTime, 0.3); return; }
+  const datos = new Uint8Array(_cb.micAna.fftSize);
+  _cb.duckTimer = setInterval(() => {
+    _cb.micAna.getByteTimeDomainData(datos);
+    let max = 0;
+    for (let i = 0; i < datos.length; i += 4) max = Math.max(max, Math.abs(datos[i] - 128));
+    const hablando = max / 128 > 0.04;
+    _cb.duckGain.gain.setTargetAtTime(hablando ? 0.3 : 1, _cb.ctx.currentTime, hablando ? 0.06 : 0.45);
+  }, 80);
 }
 function cabVol(bus, v) { if (_cb.buses[bus]) _cb.buses[bus].gain.value = Number(v) / 100; }
 function cabMonitor(on) { cabCtx(); _cb.monitorGain.gain.value = on ? 1 : 0; }
@@ -1742,12 +1827,20 @@ function _cbSamplersPintar() {
   } else {
     box.innerHTML = _cb.samplers.map((s) => `<button class="btn" style="padding:14px 8px;font-weight:800;border:2px solid ${_rcEsc(s.color || 'var(--border)')};border-radius:12px;background:transparent;color:var(--text);cursor:pointer" onclick="cabPad('${_rcEsc(s.id)}')">${_rcEsc(s.nombre)}</button>`).join('');
   }
-  if (lista) lista.innerHTML = _cb.samplers.map((s) => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+  if (lista) lista.innerHTML = _cb.samplers.map((s) => {
+    // [KAIO-CABINA-7] volumen POR SAMPLER (0–200 %), guardado en su fila: se
+    // ajusta una vez y vale en cualquier computadora desde la que transmitas.
+    const vol = Math.round(((s.volumen === undefined || s.volumen === null) ? 1 : Number(s.volumen)) * 100);
+    return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
     <span style="width:10px;height:10px;border-radius:50%;background:${_rcEsc(s.color || 'var(--ts)')}"></span>
     <span style="flex:1">${_rcEsc(s.nombre)}</span>
+    <input type="range" min="0" max="200" value="${vol}" style="width:90px" title="Volumen del sampler"
+      oninput="this.nextElementSibling.textContent=this.value+'%'" onchange="cabSamplerVolumen('${_rcEsc(s.id)}', this.value)">
+    <span style="font-size:11px;color:var(--ts);width:36px;text-align:right">${vol}%</span>
     <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cabSamplerRenombrar('${_rcEsc(s.id)}')">Renombrar</button>
     <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" onclick="cabSamplerEliminar('${_rcEsc(s.id)}')">🗑</button>
-  </div>`).join('') || '<div style="color:var(--ts);font-size:12px">Nada que administrar.</div>';
+  </div>`;
+  }).join('') || '<div style="color:var(--ts);font-size:12px">Nada que administrar.</div>';
 }
 async function cabPad(id) {
   const s = _cb.samplers.find((x) => String(x.id) === String(id));
@@ -1762,7 +1855,11 @@ async function cabPad(id) {
     }
     const src = ctx.createBufferSource();
     src.buffer = _cb.cacheAudio[s.audio_url];
-    src.connect(_cb.buses.sam);
+    // [KAIO-CABINA-7] cada sampler suena con SU volumen (columna de la fila),
+    // encadenado al bus general: el slider de Samplers sigue mandando encima.
+    const gv = ctx.createGain();
+    gv.gain.value = (s.volumen === undefined || s.volumen === null) ? 1 : Number(s.volumen);
+    src.connect(gv); gv.connect(_cb.buses.sam);
     src.onended = () => { _cb.vivos = _cb.vivos.filter((v) => v !== src); };
     src.start();
     _cb.vivos.push(src);
@@ -1808,6 +1905,16 @@ async function cabSamplerEliminar(id) {
   if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
   showToast('Sampler eliminado', 'success');
   loadRadioCabina();
+}
+// [KAIO-CABINA-7] Guarda el volumen del sampler EN SU FILA (0–200 % → 0–2).
+// Optimista en pantalla (la próxima reproducción ya lo usa); si el servidor
+// rebota, se DICE y se repinta con el valor que sí quedó.
+async function cabSamplerVolumen(id, v) {
+  const s = _cb.samplers.find((x) => String(x.id) === String(id));
+  const vol = Math.max(0, Math.min(2, Number(v) / 100));
+  if (s) s.volumen = vol;
+  const { st, j } = await _cbApi({ accion: 'sampler_volumen', id, volumen: vol });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); loadRadioCabina(); }
 }
 
 // ── Música (catálogo + archivo local) ───────────────────────────────────────

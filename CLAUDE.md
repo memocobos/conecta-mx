@@ -414,6 +414,35 @@ está caduco antes de escribirse.
       corte (latido 15 s + el disconnect); una pestaña en SEGUNDO PLANO tarda
       más (Chrome frena los timers de fondo) — dicho, no es defecto.
       `mide:kaio-cabina-1` **59** · `mide:radio-v2b` **36**.
+    - ✅ **KAIO-CABINA-7 (25-oct): efectos de voz + ducking + volumen por
+      sampler.** Palabra de Memo: «los samplers sí creo que debería tener
+      control de ellos y algunos ajustes extras o efectos de voz».
+      - **Efectos de voz en la Mezcladora** (nacen APAGADOS — DEFAULTS-1, es
+        forma): 🎚 Voz de locutor (compresor de broadcast) · 📻 radio viejita/
+        teléfono (pasa-banda 300–3400) · 🏟 Eco (reverb sintético, wet 0–50 %,
+        impulso perezoso). 🔒 **La cadena va SIEMPRE conectada**
+        (mic → comp → hp → lp → micOut, eco en paralelo) y apagar = parámetros
+        NEUTROS vía `cabFxParams` (pura, careada en vm) — reconectar el grafo
+        en vivo mete clicks al aire. El VU, el vigilante de silencio y el
+        uplink miden POST-efectos: lo que mides es lo que suena, y el
+        **mic-monitor 🎧 ahora bebe de micOut** — te oyes como sales (la
+        aserción [KC-4] se ACTUALIZÓ a esta verdad, con razón escrita).
+      - **🎵 Ducking**: la música baja sola cuando hablas — `duckGain` en
+        SERIE tras el slider del usuario (jamás lo pisa), analyser del mic
+        post-FX cada 80 ms, ataque rápido/regreso suave; el reloj tiene DUEÑO
+        (`_cb.duckTimer`) y muere al apagar. El monitor general bebe del
+        duckGain: el ensayo suena como el aire.
+      - **Volumen POR sampler** (0–200 %): columna `radio_samplers.volumen`
+        (0–2, CHECK probado con insert que rebotó; acta `migraciones/
+        KAIO-CABINA-7.sql`, YA CORRIDA — el GRANT de tabla de CABINA-1 la
+        cubre) · slider por fila en «Administrar samplers» · acción
+        `sampler_volumen` (solo roshi, 400 con palabras fuera de rango) ·
+        `cabPad` encadena gain propio → bus general (el slider de Samplers
+        manda encima). En la fila y no en localStorage: vale en cualquier
+        computadora.
+      - 💡 **El mixer de Memo**: si trae salida USB, se elige en el SELECTOR
+        DE MICRÓFONO y todo llega junto ya regulado — dicho en el HTML que los
+        efectos aplicarían a TODO ese canal. `mide:kaio-cabina-1` **71**.
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
 

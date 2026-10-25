@@ -245,6 +245,21 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('SOLO con audífonos'), '[KC-4] el checkbox ADVIERTE lo de los audífonos — con bocinas se acopla');
   const csp = fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8');
   af(/connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja salir el WebSocket del uplink (sin esto la cabina moriría muda en producción)');
+  // [KAIO-CABINA-5] La Permissions-Policy del sitio vetaba el mic con microphone=()
+  // (lista vacía = NADIE, por encima del permiso de Chrome): getUserMedia daba
+  // NotAllowedError con el candado en "Permitir en cada visita" — medido en el
+  // navegador de Memo (politica_permite_mic:false · permiso denied). Era la causa
+  // de TODOS los "Permission denied" de la cabina, y de que la transmisión del
+  // 25-oct saliera en silencio digital: el mic jamás se abrió en este sitio.
+  // El hecho se mide sobre LA LÍNEA DEL HEADER, no sobre el archivo: el comentario
+  // que explica el veto retirado CONTIENE "microphone=()" y un grep del archivo
+  // entero se caza solo (ley de la casa — ya pasó aquí mismo, primer rojo de KC-5).
+  const lineasPP = csp.split('\n').filter(l => /^\s*Permissions-Policy\s*=/.test(l));
+  af(lineasPP.length === 1, '[KC-5] hay EXACTAMENTE un header Permissions-Policy (dos serían dos listas que divergen)');
+  const pp = lineasPP[0] || '';
+  af(/microphone=\(self\)/.test(pp), '[KC-5] la Permissions-Policy permite el mic AL PROPIO SITIO — sin esto la cabina muere con NotAllowedError aunque Chrome diga Permitir');
+  af(!/microphone=\(\)/.test(pp), '[KC-5] el veto microphone=() (lista vacía) ya no está EN EL HEADER');
+  af(/camera=\(\)/.test(pp) && /geolocation=\(\)/.test(pp) && /payment=\(\)/.test(pp), '[KC-5] cámara, geolocalización y pago SIGUEN vetados — solo se abrió lo que la cabina usa');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
   af(html.includes('id="radio-tab-cabina"') && html.includes("showRadioTab('cabina'"), 'la pestaña Cabina existe y tiene botón');
   af(html.includes('value="">— elige tu cuenta de locutor —') , 'el selector de locutor nace VACÍO (DEFAULTS-1: con qué cuenta sales al aire es una atribución)');

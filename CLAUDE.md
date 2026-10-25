@@ -359,6 +359,35 @@ está caduco antes de escribirse.
       tocar el mic: esa separación impide el acople del checkbox sam+mus).
       Arañable: bajar el buffer de DJ en el panel de AzuraCast (Perfil →
       Transmisores) de 5 a ~2 s. `mide:kaio-cabina-1` **48**.
+    - 🏆🔴 **KAIO-CABINA-5 (25-oct, cuarta prueba de Memo — permiso de Chrome
+      en «Permitir en cada visita», mic Built-in elegido, barrita del popup
+      moviéndose… y la cabina igual en «Permission denied»): LA CAUSA RAÍZ ERA
+      NUESTRO PROPIO HEADER.** `netlify.toml` traía desde siempre, para `/*`:
+      `Permissions-Policy = "… microphone=(), …"` — **lista vacía = NADIE puede
+      usar el mic en este sitio, por ENCIMA del permiso del navegador.** Medido
+      en el Chrome de Memo, en su pestaña real:
+      `politica_permite_mic:false · permiso:denied · getUserMedia:NotAllowedError`
+      — con el candado diciendo «Con permiso». Fix: **`microphone=(self)`**;
+      cámara/geo/pago SIGUEN vetados (nada los usa: la foto de la requisición
+      va por `<input type=file>`, no por getUserMedia).
+      ⚰️🔒 **Esto CORRIGE el diagnóstico de CABINA-3/4: el «track muerto» era
+      hipótesis y es FALSA.** El mic **jamás se ha abierto en este sitio** — el
+      header lo vetaba en todas las pruebas; la transmisión del 25-oct salió en
+      silencio digital porque Memo salió al aire SIN mic (el grafo corre con
+      buses vacíos, y `cabAire` no exige mic a propósito: se puede transmitir
+      solo música). El selector de mic, el vigilante de silencio y el monitoreo
+      con audífonos de 3/4 **siguen valiendo** — atacaban síntomas reales de
+      otra causa. 🔒 **La lección: cuando el permiso del navegador dice
+      «Permitir» y getUserMedia dice «denied», el veto vive en la
+      Permissions-Policy del DOCUMENTO** (`document.featurePolicy
+      .allowsFeature('microphone')` lo contesta en un renglón — eso es lo que
+      había que medir desde la prueba 1, antes de mandar a Memo al candado).
+      `mide:kaio-cabina-1` **52** ([KC-5]: el header permite `self`, el veto ya
+      no está EN EL HEADER —la ausencia se mide sobre la línea del header, no
+      sobre el archivo: mi propio comentario contiene «microphone=()» y el grep
+      del archivo entero se cazó solo, primer rojo de la tanda— y los otros
+      tres vetos siguen). ⏳ **Espera push de Memo**; tras el deploy, recargar
+      kamehouse.html basta — el permiso de Chrome ya está dado.
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
 

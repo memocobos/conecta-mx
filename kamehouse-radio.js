@@ -1521,11 +1521,28 @@ async function cabMicToggle() {
   try {
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    // [KAIO-CABINA-3, medido en la primera transmisión real: el stream llevaba
+    // SILENCIO DIGITAL (pico 0.0000 en 12.7 s) con el icono del mic prendido]
+    // Chrome puede entregar un track MUERTO — el micrófono equivocado (uno
+    // virtual, un iPhone desconectado) o macOS dándole ceros. Por eso: (1) se
+    // puede ELEGIR el micrófono, (2) el nombre del dispositivo capturado se
+    // DICE, (3) un track muted se grita con su remedio.
+    const audio = { echoCancellation: true, noiseSuppression: true };
+    if (_cb.micDevice) audio.deviceId = { exact: _cb.micDevice };
+    const stream = await navigator.mediaDevices.getUserMedia({ audio });
     _cb.micStream = stream;
     _cb.micSrc = ctx.createMediaStreamSource(stream);
     _cb.micSrc.connect(_cb.buses.mic);
     if (btn) { btn.textContent = '🎤 Micrófono VIVO (clic para apagar)'; btn.style.color = 'var(--red)'; }
+    const track = stream.getAudioTracks()[0];
+    const etiqueta = (track && track.label) || 'micrófono sin nombre';
+    if (track && track.muted) {
+      _cbMsg('cab-msg', '⚠️ «' + etiqueta + '» está entregando SILENCIO (el sistema lo tiene mudo). En Mac: Ajustes del Sistema → Privacidad y seguridad → Micrófono → activa tu navegador y vuelve a intentar.', true);
+    } else {
+      _cbMsg('cab-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.');
+    }
+    if (track) track.addEventListener('mute', () => _cbMsg('cab-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true));
+    _cbLlenarMics();
   } catch (e) {
     // [KAIO-CABINA-2, cazado por Memo: «Permission denied» pelado no dice el
     // CAMINO] El nombre del error distingue las tres causas reales y cada una
@@ -1541,6 +1558,31 @@ async function cabMicToggle() {
       como = e.message;
     }
     _cbMsg('cab-msg', 'El micrófono no se pudo abrir: ' + como, true);
+  }
+}
+
+// [KAIO-CABINA-3] El selector de micrófono: los nombres de los dispositivos
+// solo existen DESPUÉS de un getUserMedia exitoso, así que se llena al capturar.
+async function _cbLlenarMics() {
+  const sel = _cbEl('cab-mic-sel');
+  if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId);
+    if (!devs.length) return;
+    const actual = _cb.micDevice || '';
+    sel.innerHTML = '<option value="">— micrófono del sistema —</option>' +
+      devs.map((d) => `<option value="${_rcEsc(d.deviceId)}"${d.deviceId === actual ? ' selected' : ''}>${_rcEsc(d.label || 'Micrófono')}</option>`).join('');
+    sel.style.display = '';
+  } catch (e) {}
+}
+async function cabMicCambiar(sel) {
+  _cb.micDevice = (sel && sel.value) || '';
+  if (_cb.micStream) {
+    // Re-capturar EN VIVO con el dispositivo elegido: apagar y volver a prender.
+    _cb.micStream.getTracks().forEach((t) => t.stop());
+    if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
+    _cb.micStream = null; _cb.micSrc = null;
+    await cabMicToggle();
   }
 }
 
@@ -1584,10 +1626,29 @@ async function cabAire() {
       _cb.procSink = ctx.createGain(); _cb.procSink.gain.value = 0;
       _cb.master.connect(_cb.proc);
       _cb.proc.connect(_cb.procSink); _cb.procSink.connect(ctx.destination);
+      _cb.silencioDesde = 0; _cb.silencioAvisado = false;
       _cb.proc.onaudioprocess = (e) => {
         if (!_cb.ws || _cb.ws.readyState !== 1 || !_cb.enc) return;
-        const mp3 = _cb.enc.encodeBuffer(cabF32aI16(e.inputBuffer.getChannelData(0)), cabF32aI16(e.inputBuffer.getChannelData(1)));
+        const L = e.inputBuffer.getChannelData(0);
+        const mp3 = _cb.enc.encodeBuffer(cabF32aI16(L), cabF32aI16(e.inputBuffer.getChannelData(1)));
         if (mp3.length) _cb.ws.send(mp3);
+        // [KAIO-CABINA-3, medido en la primera transmisión real: 12.7 s de
+        // stream con pico 0.0000] El SILENCIO AL AIRE SE DICE: un micrófono
+        // vivo mete ruido de piso aunque nadie hable — el cero digital
+        // sostenido es un track muerto o una ganancia en cero, y desde la
+        // cabina no se oye (el monitor no toca el mic a propósito).
+        let pico = 0;
+        for (let i = 0; i < L.length; i += 16) { const a = Math.abs(L[i]); if (a > pico) pico = a; }
+        if (pico < 0.0004) {
+          if (!_cb.silencioDesde) _cb.silencioDesde = Date.now();
+          else if (!_cb.silencioAvisado && Date.now() - _cb.silencioDesde > 7000) {
+            _cb.silencioAvisado = true;
+            _cbMsg('cab-msg', '⚠️ Estás AL AIRE pero la radio está recibiendo PURO SILENCIO desde hace varios segundos. Si tu micrófono está activo, Chrome está capturando un micrófono muerto: elige otro en el selector de micrófono, y en Mac revisa Ajustes del Sistema → Privacidad y seguridad → Micrófono → que tu navegador esté activado.', true);
+          }
+        } else if (_cb.silencioDesde) {
+          _cb.silencioDesde = 0;
+          if (_cb.silencioAvisado) { _cb.silencioAvisado = false; _cbMsg('cab-msg', '✓ Ya entra audio a la transmisión.'); }
+        }
       };
       _cb.ws = ws;
       _cb.aireDesde = Date.now();

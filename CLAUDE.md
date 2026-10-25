@@ -322,10 +322,26 @@ está caduco antes de escribirse.
       macOS → Privacidad; mic ocupado por otro programa; sin mic).
       `mide:kaio-cabina-1` **42** (la red falsa aprendió Range/206, la
       estación con DJs apagados y el admin sin poder).
+    - ✅ **KAIO-CABINA-3 (25-oct, medido EN VIVO en la segunda prueba de
+      Memo): EL SILENCIO AL AIRE SE DICE.** 🏆 **El uplink webcast QUEDÓ
+      ESTRENADO**: `is_live:true · locutor «Memo Cobos»` — la conexión, el
+      hello y los frames MP3 funcionan. 🔴 Pero «no se escucha»: bajé 12.7 s
+      del stream público y medí **pico 0.0000 en los dos canales — silencio
+      DIGITAL**. Un mic vivo mete ruido de piso aunque nadie hable; el cero
+      perfecto es un **track muerto**: Chrome capturó el micrófono equivocado
+      (virtual/iPhone) o macOS le da ceros con el icono prendido. (El permiso
+      del sitio seguía `denied` por origen — Memo dio «Permitir esta vez».)
+      Entró: (1) **selector de micrófono** (`cab-mic-sel`, deviceId exact,
+      nace oculto — los nombres solo existen tras capturar; cambiarlo
+      re-captura EN VIVO) · (2) el **nombre del dispositivo capturado se
+      DICE** al activar, y un `track.muted` se grita con el camino de macOS ·
+      (3) **vigilante de silencio al aire** en el `onaudioprocess`: ceros
+      sostenidos >7 s con el WS vivo → aviso rojo con remedio, y cuando entra
+      audio lo dice — desde la cabina no se oye uno mismo (el monitor no toca
+      el mic a propósito), así que sin esto el silencio es invisible para
+      quien transmite. `mide:kaio-cabina-1` **46**.
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
-      Y ⏳ **el uplink webcast sigue sin estrenarse**: la primera prueba de
-      Memo no llegó al aire (lo frenó la puerta de DJs apagada).
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

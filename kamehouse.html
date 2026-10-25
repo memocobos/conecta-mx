@@ -2473,6 +2473,9 @@
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Mezcladora</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
      <div><button class="btn btn-ghost btn-sm" id="cab-mic-btn" onclick="cabMicToggle()">🎤 Activar micrófono</button>
+      <!-- [KAIO-CABINA-3] El selector de micrófono nace oculto (sin permiso los
+           nombres no existen) y se llena al capturar — elegir otro re-captura en vivo. -->
+      <select id="cab-mic-sel" onchange="cabMicCambiar(this)" style="display:none;margin-top:6px;width:100%;font-size:12px"></select>
       <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts)">Mic</label>
       <input type="range" id="cab-vol-mic" min="0" max="150" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div></div>
      <div><label style="font-size:11px;color:var(--ts)">Samplers</label>

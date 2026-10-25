@@ -233,6 +233,12 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(js.includes("cancion_descargar', ruta, desde") && js.includes('j.completo'), '[KC-2] el front baja la canción en BUCLE de rebanadas hasta `completo`');
   af(js.includes("NotAllowedError") && /candado/.test(js) && /Privacidad y seguridad/.test(js), '[KC-2] el error del mic DICE el remedio: candado del navegador y Ajustes de macOS, por nombre de error');
   af(js.includes('if (j.nota) _cbMsg'), '[KC-2] si el servidor reinició la estación para abrir los DJs, la pantalla lo dice');
+  // [KAIO-CABINA-3] — medido en la primera transmisión real: is_live=true y el
+  // stream público con pico 0.0000 durante 12.7 s. El silencio al aire se DICE.
+  af(js.includes('PURO SILENCIO') && js.includes('_cb.silencioDesde'), '[KC-3] el vigilante de SILENCIO al aire existe: ceros sostenidos con el WS vivo se gritan con remedio');
+  af(js.includes('audio.deviceId = { exact: _cb.micDevice }'), '[KC-3] el micrófono se puede ELEGIR por deviceId exacto — el caso del track muerto de Chrome');
+  af(js.includes("track.label") && js.includes("track.muted"), '[KC-3] el nombre del dispositivo capturado se DICE y un track muted se grita con el camino de macOS');
+  af(js.includes('async function cabMicCambiar') && fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8').includes('id="cab-mic-sel"'), '[KC-3] el selector vive en la Mezcladora y cambiarlo re-captura en vivo');
   const csp = fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8');
   af(/connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja salir el WebSocket del uplink (sin esto la cabina moriría muda en producción)');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');

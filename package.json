@@ -94,6 +94,7 @@
     "mide:total-baja-1": "node scripts/mide-total-baja-1.js",
     "mide:mont-min-1": "node scripts/mide-mont-min-1.js",
     "mide:libro-solo-1": "node scripts/mide-libro-solo-1.js",
-    "mide:radio-v2a": "node scripts/mide-radio-v2a.js"
+    "mide:radio-v2a": "node scripts/mide-radio-v2a.js",
+    "mide:radio-v2b": "node scripts/mide-radio-v2b.js"
   }
 }

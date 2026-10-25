@@ -216,11 +216,23 @@ está caduco antes de escribirse.
     ⚠️ El `empieza_en_min` del «siguiente» cuenta minutos de PARED: la
     madrugada del cambio de horario desvía 60 min una vez al año — dicho aquí,
     la pantalla redondea a horas.
-  - ⏳ **V2b:** rediseño completo de `/radio` (1,309 líneas hoy: vistas vivo ·
-    recién · top · pedir · muro): estética de la casa, vista **Cartelera**, y
-    el hero con **🔴 AL AIRE: [programa] con [locutor]** — AzuraCast ya manda
-    `live.is_live` + `streamer_name` en el nowplaying público que la página ya
-    consume cada latido.
+  - ✅ **V2b (24-oct, en main local):** `/radio` aprende **AL AIRE** y
+    **Cartelera**, quirúrgico sobre la página viva (el reproductor, muro,
+    peticiones y top NO se tocaron). El banner 🔴 AL AIRE depende de
+    `live.is_live` del nowplaying (locutor conectado de VERDAD) — 🔒 **la
+    parrilla sola NO lo enciende**: la parrilla dice qué DEBERÍA sonar, el
+    banner qué SUENA; con programa en horario el banner toma su nombre y
+    conductor, sin programa dice «Transmisión en vivo · con {locutor}». Vista
+    **Cartelera** nueva (6º tab en las dos barras): AL AIRE resaltado → SIGUE →
+    especiales (chip AZUL #0000cd de marca) → semana ARRANCANDO EN HOY; vacía
+    tiene estado digno («por estrenarse» — las pruebas de Memo arrancan sin
+    programas) y el error de red se DICE, no se disfraza de parrilla vacía. En
+    el escenario, renglón «Próximo programa» con hoy/mañana derivado de la
+    FECHA proyectada del servidor, no de los minutos (a las 11 PM un programa
+    de mañana está a <24 h y habría dicho «hoy» — cazado en el careo). Las
+    funciones que arman HTML son PURAS y `mide:radio-v2b` (**25**, sin ancla)
+    las rebana y corre en vm; verificación visual con vistas previas sembradas
+    (radio-v2b-vivo/cartelera, fuera del repo).
   - ⏳ **V2c:** gestión de locutores (streamer accounts de AzuraCast vía
     `admin-radio-control`, whitelist nueva) + AL AIRE en el hero de Kaio-sama +
     el vigilante avisando si un programa de la parrilla debía empezar y nadie

@@ -608,6 +608,124 @@
   body.pantalla .cancion{font-size:clamp(40px, 6vw, 90px)}
   body.pantalla .artista{font-size:clamp(24px, 3.5vw, 44px)}
   body.pantalla #viz{max-width:480px;height:60px}
+
+  /* ═══ [RADIO-V2b] AL AIRE + CARTELERA ═══
+     El banner AL AIRE solo existe cuando AzuraCast dice live.is_live (hay un
+     locutor conectado): jamás se inventa un «en vivo» que no está pasando.
+     La cartelera bebe de /.netlify/functions/radio-cartelera (hora de Reynosa
+     resuelta en el SERVIDOR); aquí solo se pinta. Azul de marca #0000cd. */
+  :root{ --c-azul:#0000cd; }
+  .alAire{
+    display:none;
+    align-items:center;justify-content:center;gap:10px;
+    background:var(--c-rojo);color:#fff;
+    border-radius:12px;
+    padding:10px 16px;
+    margin:0 auto 18px;
+    max-width:420px;
+    font-family:var(--font-display);
+    font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+    box-shadow:0 10px 34px rgba(255,40,59,.35);
+    text-align:left;
+  }
+  .alAire.on{display:flex}
+  .alAire .dot{
+    width:10px;height:10px;border-radius:50%;flex-shrink:0;
+    background:#fff;box-shadow:0 0 10px #fff;
+    -webkit-animation:latido 1.1s infinite;animation:latido 1.1s infinite;
+  }
+  .alAire .aaTxt{min-width:0}
+  .alAire .aaProg{font-weight:900;font-size:19px;line-height:1.05;display:block}
+  .alAire .aaCon{font-size:13px;letter-spacing:.1em;opacity:.85;display:block}
+  .proximoProg{
+    font-size:12.5px;color:var(--c-muted);
+    margin:-8px 0 16px;min-height:16px;
+  }
+  .proximoProg b{color:var(--c-amarillo);font-weight:700}
+  .proximoProg .pChip{
+    display:inline-block;background:var(--c-azul);color:#fff;
+    font-family:var(--font-display);font-size:12px;letter-spacing:.1em;
+    text-transform:uppercase;border-radius:4px;padding:1px 8px;margin-right:7px;
+  }
+
+  .cartAhora{
+    border:1px solid var(--c-rojo);
+    background:rgba(255,40,59,.1);
+    border-radius:14px;padding:16px 18px;margin-bottom:14px;
+    text-align:left;
+    display:flex;align-items:center;gap:12px;
+  }
+  .cartAhora .dot{
+    width:11px;height:11px;border-radius:50%;flex-shrink:0;
+    background:var(--c-rojo);box-shadow:0 0 12px var(--c-rojo);
+    -webkit-animation:latido 1.1s infinite;animation:latido 1.1s infinite;
+  }
+  .cartAhoraTag{
+    font-family:var(--font-display);font-size:13px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--c-rojo);
+  }
+  .cartAhoraNom{
+    font-family:var(--font-display);font-size:24px;line-height:1;
+    text-transform:uppercase;margin-top:2px;
+  }
+  .cartAhoraSub{font-size:12px;color:var(--c-muted);margin-top:3px}
+  .cartSigue{
+    border:1px solid var(--c-line);
+    border-left:4px solid var(--c-amarillo);
+    border-radius:12px;padding:12px 16px;margin-bottom:22px;
+    text-align:left;
+  }
+  .cartSigueTag{
+    font-family:var(--font-display);font-size:12px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--c-amarillo);
+  }
+  .cartSigueNom{font-weight:700;font-size:15px;margin-top:2px}
+  .cartSigueCuando{font-size:12px;color:var(--c-muted);margin-top:2px}
+
+  .cartDia{margin-bottom:18px;text-align:left}
+  .cartDiaNom{
+    font-family:var(--font-display);
+    font-size:18px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--c-muted);
+    margin-bottom:6px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .cartDiaNom.hoy{color:var(--c-amarillo)}
+  .cartDiaNom .hoyChip{
+    font-size:11px;background:var(--c-amarillo);color:#000;
+    border-radius:4px;padding:0 7px;letter-spacing:.12em;
+  }
+  .cartProg{
+    display:flex;align-items:baseline;gap:12px;
+    padding:9px 0;border-bottom:1px solid var(--c-line);
+  }
+  .cartProg:last-child{border-bottom:none}
+  .cartHora{
+    font-family:var(--font-display);font-size:17px;
+    color:var(--c-ink);min-width:88px;flex-shrink:0;
+    font-variant-numeric:tabular-nums;
+  }
+  .cartNom{font-weight:700;font-size:14.5px}
+  .cartCon{font-size:12px;color:var(--c-muted)}
+  .cartDesc{font-size:12px;color:var(--c-muted);margin-top:2px;line-height:1.4}
+  .cartEsp{
+    display:inline-block;background:var(--c-azul);color:#fff;
+    font-family:var(--font-display);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;border-radius:4px;padding:1px 7px;
+    vertical-align:2px;margin-left:7px;
+  }
+  .cartVacia{
+    text-align:center;padding:34px 16px;
+    border:1px dashed var(--c-line);border-radius:14px;
+  }
+  .cartVacia .cvTit{
+    font-family:var(--font-display);font-size:26px;text-transform:uppercase;
+    line-height:1.05;margin-bottom:8px;
+  }
+  .cartVacia .cvTit em{font-style:normal;color:var(--c-amarillo)}
+  .cartVacia p{font-size:13px;color:var(--c-muted);max-width:360px;margin:0 auto}
+  body[data-vista="cartelera"] #sec-cartelera{display:block}
+  body[data-vista="cartelera"] .seccion{margin-top:10px}
 </style>
 </head>
 <body data-vista="vivo">
@@ -635,6 +753,7 @@
 <nav id="navDesktop" aria-label="Secciones de la radio">
   <div class="navBtns">
     <button class="navBtn activo" data-vista="vivo"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></svg></span>En Vivo</button>
+    <button class="navBtn" data-vista="cartelera"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/></svg></span>Cartelera</button>
     <button class="navBtn" data-vista="top"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5"/></svg></span>Top 10</button>
     <button class="navBtn" data-vista="recien"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>Recién</button>
     <button class="navBtn" data-vista="muro"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg></span>Muro</button>
@@ -645,6 +764,9 @@
 <main>
   <div class="escenario">
     <div class="kicker">SONANDO <b>AHORA</b></div>
+
+    <!-- [RADIO-V2b] Solo con live.is_live de AzuraCast (locutor conectado). -->
+    <div class="alAire" id="alAire"><span class="dot"></span><span class="aaTxt" id="alAireTxt"></span></div>
 
     <div class="artWrap">
       <img class="caratula" id="art" src="" alt="Carátula del álbum" crossorigin="anonymous">
@@ -661,6 +783,8 @@
       <span id="tTot">0:00</span>
     </div>
     <div class="siguiente" id="siguiente"></div>
+    <!-- [RADIO-V2b] El próximo programa de la parrilla (radio-cartelera). -->
+    <div class="proximoProg" id="proximoProg"></div>
 
     <canvas id="viz"></canvas>
 
@@ -677,6 +801,13 @@
 
     <div class="oyentes" id="oyentes"></div>
     <div id="avisoPlay"></div>
+  </div>
+
+  <!-- [RADIO-V2b] CARTELERA — la parrilla de programas en vivo. Se pinta del
+       endpoint radio-cartelera (hora de Reynosa resuelta en el servidor). -->
+  <div class="seccion" id="sec-cartelera">
+    <div class="seccionTitulo">Cartelera</div>
+    <div id="cartContenido"><div class="topVacio">Cargando la programación…</div></div>
   </div>
 
   <div class="seccion" id="sec-top">
@@ -751,6 +882,7 @@
 <nav id="navMovil">
   <div class="navBtns">
     <button class="navBtn activo" data-vista="vivo"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></svg></span>En Vivo</button>
+    <button class="navBtn" data-vista="cartelera"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/></svg></span>Cartelera</button>
     <button class="navBtn" data-vista="top"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5"/></svg></span>Top 10</button>
     <button class="navBtn" data-vista="recien"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>Recién</button>
     <button class="navBtn" data-vista="muro"><span class="nIco"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg></span>Muro</button>
@@ -773,6 +905,7 @@ var FN_MURO = '/.netlify/functions/radio-muro';
 var FN_PETICION = '/.netlify/functions/radio-peticion';
 var FN_LIKE = '/.netlify/functions/radio-like';
 var FN_NOTICIAS = '/.netlify/functions/radio-noticias';
+var FN_CARTELERA = '/.netlify/functions/radio-cartelera';
 var URL_RADIO = 'https://conectareynosa.mx/radio';
 var MARCA = '<b>RADIO CONECTA</b> EN VIVO 24/7 · CONECTAREYNOSA.MX/RADIO';
 
@@ -875,6 +1008,7 @@ function actualizar(){
     document.getElementById('oyentes').innerHTML = (oy && oy > 0)
       ? '<b>' + oy + '</b> ' + (oy === 1 ? 'persona escuchando ahora' : 'personas escuchando ahora')
       : '';
+    pintarAlAire(data.live || null);
     var hist = data.song_history || [];
     if(hist.length){
       var html = '';
@@ -1149,6 +1283,126 @@ function dibujarViz(){
   fase += 0.055;
 }
 dibujarViz();
+
+/* ═══ [RADIO-V2b] CARTELERA + AL AIRE ═══════════════════════════════════════
+   La parrilla viene de radio-cartelera, que ya resuelve «qué está al aire y
+   qué sigue» EN HORA DE REYNOSA del lado del servidor — aquí solo se pinta.
+   El banner AL AIRE depende de live.is_live de AzuraCast (hay un locutor
+   conectado de verdad): la parrilla dice qué DEBERÍA sonar; el banner, qué
+   SUENA. No se mezclan, para no anunciar un vivo que no está pasando.
+   Las funciones que arman HTML son PURAS (entra dato, sale cadena): el careo
+   mide:radio-v2b las rebana y las corre en un vm. */
+var cart = null;        // la última respuesta buena de radio-cartelera
+var cartError = false;  // true = el fetch falló (distinto de parrilla vacía)
+var DIAS_CORTOS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+function hora12(hhmm){
+  var p = String(hhmm || '').split(':');
+  var h = parseInt(p[0], 10); var m = p[1] || '00';
+  if(isNaN(h)) return esc(hhmm);
+  var ap = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if(h12 === 0) h12 = 12;
+  return h12 + (m === '00' ? '' : ':' + m) + ' ' + ap;
+}
+function cuandoSiguiente(sig, hoyISO){
+  if(!sig) return '';
+  // «hoy/mañana» se deriva de la FECHA proyectada que manda el servidor, no de
+  // los minutos (a las 11 PM, un programa de mañana está a <24 h y mentiría).
+  var hoy = hoyISO || new Date().toLocaleDateString('en-CA');
+  var man = new Date(Date.parse(hoy + 'T12:00:00Z') + 864e5).toISOString().slice(0,10);
+  var dia = sig.fecha === hoy ? 'hoy' : (sig.fecha === man ? 'mañana' : ('el ' + (sig.dia_nombre || '')));
+  var base = dia + ' a las ' + hora12(sig.hora_inicio);
+  var min = Number(sig.empieza_en_min || 0);
+  if(min > 0 && min < 360){
+    var h = Math.floor(min/60), r = min % 60;
+    base += ' · empieza en ' + (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r ? r + ' min' : '');
+  }
+  return base.replace(/\s+/g,' ').replace(/ $/,'');
+}
+function alAireHtml(live, c){
+  if(!live || !live.is_live) return null;
+  var prog = c && c.al_aire ? c.al_aire : null;
+  var nombre = prog ? prog.nombre : 'Transmisión en vivo';
+  var sub = prog && prog.conductor ? 'con ' + prog.conductor
+          : (live.streamer_name ? 'con ' + live.streamer_name : 'desde la cabina de Radio Conecta');
+  return '<span class="aaProg">AL AIRE: ' + esc(nombre) + '</span>' +
+         '<span class="aaCon">' + esc(sub) + '</span>';
+}
+function proximoHtml(c){
+  if(!c) return '';
+  if(c.al_aire) return '<span class="pChip">En la parrilla</span><b>' + esc(c.al_aire.nombre) + '</b> · hasta las ' + hora12(c.al_aire.hora_fin);
+  if(c.siguiente) return '<span class="pChip">Próximo programa</span><b>' + esc(c.siguiente.nombre) + '</b> · ' + esc(cuandoSiguiente(c.siguiente));
+  return '';
+}
+function cartHtml(c, errorRed, dowHoy){
+  if(errorRed) return '<div class="topVacio">No se pudo cargar la programación — intenta más tarde</div>';
+  if(!c) return '<div class="topVacio">Cargando la programación…</div>';
+  var sem = c.semanales || [], esp = c.especiales || [];
+  var html = '';
+  if(c.al_aire){
+    html += '<div class="cartAhora"><span class="dot"></span><div>' +
+      '<div class="cartAhoraTag">Al aire ahora</div>' +
+      '<div class="cartAhoraNom">' + esc(c.al_aire.nombre) + (c.al_aire.tipo === 'especial' ? '<span class="cartEsp">Especial</span>' : '') + '</div>' +
+      '<div class="cartAhoraSub">' + hora12(c.al_aire.hora_inicio) + '–' + hora12(c.al_aire.hora_fin) +
+      (c.al_aire.conductor ? ' · con ' + esc(c.al_aire.conductor) : '') + '</div>' +
+      '</div></div>';
+  }
+  if(c.siguiente && !(c.al_aire && c.siguiente.id === c.al_aire.id)){
+    html += '<div class="cartSigue"><div class="cartSigueTag">Sigue</div>' +
+      '<div class="cartSigueNom">' + esc(c.siguiente.nombre) + (c.siguiente.tipo === 'especial' ? '<span class="cartEsp">Especial</span>' : '') + '</div>' +
+      '<div class="cartSigueCuando">' + esc(cuandoSiguiente(c.siguiente)) + '</div></div>';
+  }
+  if(!sem.length && !esp.length){
+    return html + '<div class="cartVacia">' +
+      '<div class="cvTit">La programación en vivo<br><em>está por estrenarse</em></div>' +
+      '<p>Muy pronto: programas, entrevistas y especiales en vivo. Mientras, la música de Conecta no para — 24/7.</p></div>';
+  }
+  var fila = function(p){
+    return '<div class="cartProg"><div class="cartHora">' + hora12(p.hora_inicio) + '–' + hora12(p.hora_fin) + '</div>' +
+      '<div><div class="cartNom">' + esc(p.nombre) + (p.tipo === 'especial' ? '<span class="cartEsp">Especial · ' + esc(p.fecha || '') + '</span>' : '') + '</div>' +
+      (p.conductor ? '<div class="cartCon">con ' + esc(p.conductor) + '</div>' : '') +
+      (p.descripcion ? '<div class="cartDesc">' + esc(p.descripcion) + '</div>' : '') +
+      '</div></div>';
+  };
+  if(esp.length){
+    html += '<div class="cartDia"><div class="cartDiaNom">Especiales</div>' + esp.map(fila).join('') + '</div>';
+  }
+  // La semana arranca en HOY (cosmético, día del navegador; el AL AIRE real lo
+  // decide el servidor en hora de Reynosa).
+  var hoy = typeof dowHoy === 'number' ? dowHoy : new Date().getDay();
+  for(var off = 0; off < 7; off++){
+    var d = (hoy + off) % 7;
+    var delDia = sem.filter(function(p){ return Number(p.dia_semana) === d; });
+    if(!delDia.length) continue;
+    html += '<div class="cartDia"><div class="cartDiaNom' + (off === 0 ? ' hoy' : '') + '">' +
+      DIAS_CORTOS[d] + (off === 0 ? '<span class="hoyChip">HOY</span>' : '') + '</div>' +
+      delDia.map(fila).join('') + '</div>';
+  }
+  return html;
+}
+function pintarCartelera(){
+  var el = document.getElementById('cartContenido');
+  if(el) el.innerHTML = cartHtml(cart, cartError);
+  var px = document.getElementById('proximoProg');
+  if(px) px.innerHTML = proximoHtml(cart);
+}
+function pintarAlAire(live){
+  var box = document.getElementById('alAire');
+  var txt = document.getElementById('alAireTxt');
+  if(!box || !txt) return;
+  var html = alAireHtml(live, cart);
+  if(html){ txt.innerHTML = html; box.classList.add('on'); }
+  else { box.classList.remove('on'); txt.innerHTML = ''; }
+}
+function cargarCartelera(){
+  fetch(FN_CARTELERA).then(function(r){ return r.json(); }).then(function(data){
+    if(data && data.ok){ cart = data; cartError = false; }
+    else { cartError = true; }
+    pintarCartelera();
+  }).catch(function(){ cartError = true; pintarCartelera(); });
+}
+cargarCartelera();
+setInterval(cargarCartelera, 300000);
 
 /* ===== Navegación móvil por tabs ===== */
 var navBtns = document.querySelectorAll('.navBtn');

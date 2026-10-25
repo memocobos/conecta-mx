@@ -308,6 +308,41 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(html.includes('id="radio-tab-cabina"') && html.includes("showRadioTab('cabina'"), 'la pestaña Cabina existe y tiene botón');
   af(html.includes('value="">— elige tu cuenta de locutor —') , 'el selector de locutor nace VACÍO (DEFAULTS-1: con qué cuenta sales al aire es una atribución)');
 
+  // ── [KC-8] AL AIRE en el hero · oyentes en la cabina · programa sin locutor ──
+  // El núcleo _decidirPrograma se corre DE VERDAD (require del handler real) y
+  // el programa al aire se le pide al DUEÑO (_lib/radio-cartelera) sobre un
+  // instante FIJO; el dia_semana del fixture se DERIVA de paredReynosa sobre ese
+  // instante — tecleado a mano, equivocarse de día dejaría el caso midiendo nada.
+  const vig = require(path.join(RAIZ, 'netlify/functions/radio-vigilante.js'));
+  const cart8 = require(path.join(RAIZ, 'netlify/functions/_lib/radio-cartelera.js'));
+  const T8 = Date.parse('2026-10-21T20:00:00-05:00');   // pared Reynosa: 20:00 (CDT hasta el 1-nov)
+  const pared8 = cart8.paredReynosa(T8);
+  const prog8 = { id: 'p1', nombre: 'La Hora del Rock', conductor: 'Memo', dia_semana: pared8.dow, fecha: null, hora_inicio: '19:30', hora_fin: null, activo: true, archivado: false };
+  const aire8 = cart8.alAireYSiguiente([prog8], T8).al_aire;
+  af(aire8 && aire8.id === 'p1' && pared8.min - (19 * 60 + 30) === 30, '[KC-8] la premisa del caso se AFIRMA: el dueño dice que el programa cubre el instante y van 30 min de su inicio');
+  const llave8 = 'p1|' + pared8.fecha;
+  let d8 = vig._decidirPrograma(aire8, false, null, 30);
+  af(d8.avisar === true && d8.llave === llave8, '[KC-8] programa en horario + NADIE al aire + pasada la gracia → AVISA, con llave id|fecha');
+  af(vig._decidirPrograma(aire8, true, null, 30).avisar === false, '[KC-8] con locutor conectado (is_live) NO avisa — la parrilla dice qué debería sonar, is_live qué suena');
+  af(vig._decidirPrograma(aire8, false, null, 5).avisar === false, '[KC-8] a 5 min del inicio NO avisa: 12 min de gracia para conectarse (el cron corre cada 10)');
+  af(vig._decidirPrograma(aire8, false, llave8, 30).avisar === false, '[KC-8] la MISMA instancia ya avisada no se re-avisa cada 10 min (el sello programa_avisado)');
+  af(vig._decidirPrograma(aire8, false, 'p1|2026-10-20', 30).avisar === true, '[KC-8] el sello es POR INSTANCIA: el aviso de ayer no calla la falta de hoy');
+  af(vig._decidirPrograma(null, false, null, 999).avisar === false, '[KC-8] sin programa en la parrilla, un AutoDJ sin locutor es lo normal: silencio');
+  const vg8 = fs.readFileSync(path.join(RAIZ, 'netlify/functions/radio-vigilante.js'), 'utf8');
+  af(vg8.includes('if (viva && row)') && vg8.includes("console.error('[radio-vigilante] Chequeo de programa:"), '[KC-8] el chequeo de programa corre SOLO con la radio viva y en su propio try — jamás tumba al vigilante de caída');
+  af(vg8.includes('if (enviado) await patchEstado({ programa_avisado: d.llave })'), '[KC-8] el sello SOLO se escribe si el correo salió (si Resend falla, la corrida siguiente reintenta)');
+  af(vg8.includes('select=caida_desde,ultimo_aviso,programa_avisado'), '[KC-8] leerEstado trae el sello (columna del acta migraciones/KAIO-CABINA-8.sql, YA CORRIDA)');
+  af(vg8.includes("require('./_lib/radio-cartelera')") && !/function\s+paredReynosa/.test(vg8), '[KC-8] «quién debería estar al aire» se le PREGUNTA al dueño — el vigilante no re-implementa un minuto de pared');
+  // El hero y los oyentes de la cabina (los cables, sobre el fuente real):
+  const jsR8 = fs.readFileSync(path.join(RAIZ, 'kamehouse-radio.js'), 'utf8');
+  const html8 = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
+  af(html8.includes('id="ks-hero-live"'), '[KC-8] el badge AL AIRE vive en el hero de Kaio-sama');
+  af((jsR8.match(/getElementById\('ks-hero-live'\)/g) || []).length >= 2 && jsR8.includes('lv.is_live'), '[KC-8] _loadRadioHero lo ENCIENDE con live.is_live y lo APAGA en el catch — sin dato no se afirma un AL AIRE');
+  af(html8.includes('id="cab-oyentes"'), '[KC-8] los oyentes en vivo viven junto al estado de la transmisión');
+  af(jsR8.slice(jsR8.indexOf('async function cabAire'), jsR8.indexOf('function cabCortar')).includes('_cbOyentesStart();'), '[KC-8] el latido de oyentes nace al abrir el WS (dentro del onopen)');
+  af(jsR8.slice(jsR8.indexOf('function cabCortar')).includes('_cbOyentesStop();') && /clearInterval\(_cb\.oyTimer\)/.test(jsR8), '[KC-8] y MUERE en cabCortar — el reloj tiene dueño (_cb.oyTimer), un huérfano seguiría pidiendo el nowplaying para siempre');
+  af(jsR8.includes("if (!_cb.ws) { _cbOyentesStop(); return; }"), '[KC-8] el tick se apaga solo si el aire ya se cortó mientras la red contestaba');
+
   console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
   process.exit(ko ? 1 : 0);
 })();

@@ -91,13 +91,23 @@ function _loadRadioHero() {
       if (a) a.textContent = s.artist || '';
       if (o) o.textContent = oy;
       if (ph) ph.textContent = _radioInicialesArt(s.artist || s.title);
+      // [KAIO-CABINA-8] 🔴 AL AIRE: live.is_live = locutor conectado de VERDAD
+      // (la parrilla sola no lo enciende — regla de V2b). Con nombre si viaja.
+      const lv = d && d.live;
+      const bL = document.getElementById('ks-hero-live');
+      if (bL) {
+        if (lv && lv.is_live) { bL.style.display = ''; bL.textContent = '🔴 AL AIRE' + (lv.streamer_name ? ' · ' + lv.streamer_name : ''); }
+        else bL.style.display = 'none';
+      }
       _radioSetArt(document.getElementById('ks-hero-art'), document.getElementById('ks-hero-bg'), s.art);
     })
     .catch(() => {
       const t = document.getElementById('ks-hero-titulo');
       const o = document.getElementById('ks-hero-oyentes');
+      const bL = document.getElementById('ks-hero-live');
       if (t) t.textContent = 'No disponible';
       if (o) o.textContent = '—';
+      if (bL) bL.style.display = 'none';   // sin dato no se afirma un AL AIRE
     });
 }
 // Pinta la carátula nítida sobre el placeholder y usa la misma imagen difuminada
@@ -1706,6 +1716,30 @@ function _cbCargarLame() {
   });
   return _cb.lamePromesa;
 }
+// [KAIO-CABINA-8] Oyentes EN VIVO mientras transmites. El dueño del reloj es
+// _cb.oyTimer (la ley del reloj con dueño): nace al abrir el WS y muere en
+// cabCortar. Pide el nowplaying público cada 15 s y además confirma que la
+// estación ya te RECONOCE al aire (live.is_live) — liquidsoap tarda unos
+// segundos en reportarlo, y verlo aquí cierra el circuito sin salir del panel.
+function _cbOyentesStart() {
+  _cbOyentesStop();
+  const tick = () => {
+    if (!_cb.ws) { _cbOyentesStop(); return; }
+    fetch(RADIO_NOWPLAYING).then((r) => r.json()).then((d) => {
+      if (!_cb.ws) return;   // ya cortó mientras contestaba la red
+      const el = _cbEl('cab-oyentes'); if (!el) return;
+      const n = (d && d.listeners && Number(d.listeners.current)) || 0;
+      const live = !!(d && d.live && d.live.is_live);
+      el.textContent = '👥 ' + n + (n === 1 ? ' oyente' : ' oyentes') + (live ? ' · la estación te tiene al aire ✓' : '');
+    }).catch(() => {});   // un latido fallido no borra el anterior ni habla
+  };
+  tick();
+  _cb.oyTimer = setInterval(tick, 15000);
+}
+function _cbOyentesStop() {
+  if (_cb.oyTimer) { clearInterval(_cb.oyTimer); _cb.oyTimer = null; }
+  const el = _cbEl('cab-oyentes'); if (el) el.textContent = '';
+}
 async function cabAire() {
   if (_cb.ws) { cabCortar('Cortaste la transmisión'); return; }
   const usuario = (_cbEl('cab-dj') || {}).value || '';
@@ -1777,6 +1811,7 @@ async function cabAire() {
       if (est) { est.textContent = '🔴 AL AIRE'; est.style.background = 'var(--red)'; est.style.color = '#fff'; }
       if (btn) { btn.disabled = false; btn.textContent = '⏹ Cortar transmisión'; }
       _cbMsg('cab-msg', 'Al aire. Lo que suena en la mezcladora está saliendo en la radio.');
+      _cbOyentesStart();   // [KAIO-CABINA-8] oyentes en vivo mientras dure el aire
     };
     // Un cierre/error se DICE con su motivo — el silencio se leería como «sigo al aire».
     ws.onclose = (ev) => { if (_cb.ws === ws || !abrio) cabCortar(abrio ? ('La estación cerró la conexión (código ' + ev.code + '). ¿La contraseña del locutor es la buena? ¿Hay otro DJ conectado?') : 'No se pudo conectar con la estación — revisa tu internet o usa el Web DJ (plan B)'); };
@@ -1802,6 +1837,7 @@ function cabCortar(motivo) {
     try { _cbApi({ accion: 'dj_desconectar' }).catch(() => {}); } catch (e) {}
   }
   _cb.enc = null; _cb.aireDesde = 0;
+  _cbOyentesStop();   // [KAIO-CABINA-8] el reloj de oyentes muere con el aire
   const est = _cbEl('cab-estado');
   if (est) { est.textContent = 'FUERA DEL AIRE'; est.style.background = 'var(--border)'; est.style.color = 'var(--ts)'; }
   const btn = _cbEl('cab-aire'); if (btn) { btn.disabled = false; btn.textContent = '🔴 Salir al aire'; }

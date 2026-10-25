@@ -443,8 +443,42 @@ está caduco antes de escribirse.
       - 💡 **El mixer de Memo**: si trae salida USB, se elige en el SELECTOR
         DE MICRÓFONO y todo llega junto ya regulado — dicho en el HTML que los
         efectos aplicarían a TODO ese canal. `mide:kaio-cabina-1` **71**.
-    - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
-      avisa si un programa de la parrilla debía empezar y nadie se conectó.
+    - ✅ **KAIO-CABINA-8 (25-oct): AL AIRE en el hero + oyentes en la cabina +
+      el vigilante de programa sin locutor.** Cierra los tres pendientes de V2c.
+      - **🔴 AL AIRE en el hero de Kaio-sama** (`ks-hero-live`): lo enciende
+        `live.is_live` del nowplaying que el hero YA late cada 15 s (con el
+        nombre del locutor si viaja) y lo apaga el else Y el catch — sin dato
+        no se afirma un AL AIRE. 🔒 La parrilla sola NO lo enciende (regla de
+        V2b). Los oyentes del hero ya existían; no se tocaron.
+      - **👥 Oyentes EN VIVO en la cabina** (`cab-oyentes`, junto al estado):
+        nace al abrir el WS y muere en cabCortar — el reloj tiene DUEÑO
+        (`_cb.oyTimer`, la ley del reloj). Pide el nowplaying cada 15 s y
+        además dice «la estación te tiene al aire ✓» cuando is_live llega —
+        cierra el circuito sin salir del panel (liquidsoap tarda unos s).
+      - **El vigilante de programa sin locutor VIVE EN `radio-vigilante`**
+        (el cron cada 10 min que ya vigila la radio caída — su dueño natural):
+        con la radio VIVA, pregunta a la parrilla (programas de KH +
+        `_lib/radio-cartelera`, jamás re-implementa un minuto de pared) si
+        DEBERÍA haber programa, y al nowplaying si alguien transmite. Programa
+        en horario + nadie al aire + **12 min de gracia** (el cron corre cada
+        10: el aviso cae entre el min 12 y ~22) → **correo directo a Memo**
+        (misma excepción de emergencia que la alerta de caída) con el remedio:
+        salir al aire o archivar el programa. 🔒 **UN aviso por INSTANCIA**
+        (sello `programa_avisado` = «id|fecha», acta `migraciones/
+        KAIO-CABINA-8.sql` YA CORRIDA en el Portal; el de ayer no calla la
+        falta de hoy) y el sello SOLO se escribe si el correo salió. 🔒 El
+        chequeo corre en su propio try: un KH ilegible JAMÁS tumba al
+        vigilante de caída. Núcleo puro `_decidirPrograma` exportado y careado
+        con el dueño real (el dia_semana del fixture se DERIVA de paredReynosa
+        sobre un instante fijo — tecleado a mano, equivocarse de día dejaría
+        el caso midiendo nada). `mide:kaio-cabina-1` **88**.
+      - ✅ **Y el buffer de DJ de AzuraCast bajó de 5 a 2 s** (panel, vía
+        Chrome con la sesión de Memo, 25-oct): menos delay del locutor.
+        Guardado + «Reiniciar la transmisión» con 0 oyentes; verificado
+        releyendo el campo tras el reinicio y el nowplaying vivo. ⚠️ La
+        casilla «Grabar Transmisiones en Vivo» sigue APAGADA a propósito
+        (palabra de Memo: sin grabados por ahora) — está ahí el día que los
+        quiera.
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

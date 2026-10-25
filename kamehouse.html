@@ -2385,6 +2385,10 @@
     </div>
     <div class="ks-hero-body">
      <div class="ks-eyebrow"><span class="ks-live-dot"></span> En vivo · Sonando ahora</div>
+     <!-- [KAIO-CABINA-8] 🔴 AL AIRE en el hero: live.is_live del nowplaying (la
+          parrilla dice qué DEBERÍA sonar; este badge, qué SUENA — regla de V2b).
+          Nace oculto y lo pinta/apaga _loadRadioHero en cada latido de 15 s. -->
+     <div id="ks-hero-live" style="display:none;width:fit-content;margin-bottom:6px;font-size:11px;font-weight:800;letter-spacing:.08em;padding:2px 10px;border-radius:20px;background:var(--red);color:#fff">🔴 AL AIRE</div>
      <div class="ks-hero-titulo ks-hero-click" id="ks-hero-titulo" onclick="radioMediaAbrirSonando()" title="Editar esta canción">Cargando…</div>
      <div class="ks-hero-artista" id="ks-hero-artista"></div>
      <div class="ks-hero-foot">
@@ -2449,6 +2453,9 @@
      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">🎙 Transmisión en vivo</div>
      <span id="cab-estado" style="font-size:11px;font-weight:800;letter-spacing:.08em;padding:2px 10px;border-radius:20px;background:var(--border);color:var(--ts)">FUERA DEL AIRE</span>
      <span id="cab-reloj" style="font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums"></span>
+     <!-- [KAIO-CABINA-8] Oyentes EN VIVO mientras transmites (nowplaying cada
+          15 s, reloj con dueño _cb.oyTimer: nace al abrir el WS, muere al cortar) -->
+     <span id="cab-oyentes" style="font-size:12px;color:var(--text);font-weight:700"></span>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
      <select class="form-input" id="cab-dj" style="max-width:220px"><option value="">— elige tu cuenta de locutor —</option></select>

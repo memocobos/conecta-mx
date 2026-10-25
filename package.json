@@ -95,6 +95,7 @@
     "mide:mont-min-1": "node scripts/mide-mont-min-1.js",
     "mide:libro-solo-1": "node scripts/mide-libro-solo-1.js",
     "mide:radio-v2a": "node scripts/mide-radio-v2a.js",
-    "mide:radio-v2b": "node scripts/mide-radio-v2b.js"
+    "mide:radio-v2b": "node scripts/mide-radio-v2b.js",
+    "mide:kaio-cabina-1": "node scripts/mide-kaio-cabina-1.js"
   }
 }

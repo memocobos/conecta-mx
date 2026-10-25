@@ -2404,6 +2404,7 @@
    <button class="ks-tab" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
    <!-- [RADIO-V2a] La parrilla de programas: semanales + especiales. -->
    <button class="ks-tab" id="radio-tab-btn-cartelera" onclick="showRadioTab('cartelera',this)">Cartelera</button>
+   <button class="ks-tab" id="radio-tab-btn-cabina" onclick="showRadioTab('cabina',this)">🎙 Cabina</button>
    <button class="ks-tab" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
    <button class="ks-tab" id="radio-tab-btn-control" onclick="showRadioTab('control',this)">Control</button>
    <button class="ks-tab" id="radio-tab-btn-biblioteca" onclick="showRadioTab('biblioteca',this)">Biblioteca</button>
@@ -2433,6 +2434,97 @@
       <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
      </tbody>
     </table>
+   </div>
+  </div>
+
+  <!-- [KAIO-CABINA-1] TAB Cabina — transmitir desde Kaio-sama: mezcladora
+       (mic + samplers + música), soundboard, música del catálogo y el uplink
+       webcast a AzuraCast. El candado real de cada escritura vive en
+       admin-radio-cabina (solo maestro_roshi). -->
+  <div id="radio-tab-cabina" style="display:none">
+
+   <!-- SALIR AL AIRE -->
+   <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">🎙 Transmisión en vivo</div>
+     <span id="cab-estado" style="font-size:11px;font-weight:800;letter-spacing:.08em;padding:2px 10px;border-radius:20px;background:var(--border);color:var(--ts)">FUERA DEL AIRE</span>
+     <span id="cab-reloj" style="font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums"></span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+     <select class="form-input" id="cab-dj" style="max-width:220px"><option value="">— elige tu cuenta de locutor —</option></select>
+     <input class="form-input" type="password" id="cab-pass" placeholder="Contraseña del locutor" style="max-width:220px" autocomplete="off">
+     <button class="btn btn-primary" id="cab-aire" onclick="cabAire()">🔴 Salir al aire</button>
+    </div>
+    <div id="cab-msg" style="margin-top:8px;font-size:12px"></div>
+    <div style="margin-top:6px;font-size:11px;color:var(--ts)">Activa tu micrófono en la mezcladora antes de salir al aire. Lo que se transmite es LA MEZCLA: mic + samplers + música. Plan B si esto falla: <a href="https://radio.conectareynosa.mx/public/radioconecta/dj" target="_blank" rel="noopener" style="color:var(--ts)">el Web DJ de AzuraCast</a>.</div>
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--ts)">Locutores (cuentas de DJ)</summary>
+     <div id="cab-djs-lista" style="margin-top:8px;font-size:13px"></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input class="form-input" id="cab-dj-user" placeholder="usuario (ej. memo)" style="max-width:150px" autocomplete="off">
+      <input class="form-input" type="password" id="cab-dj-pass" placeholder="contraseña (8+)" style="max-width:160px" autocomplete="new-password">
+      <input class="form-input" id="cab-dj-nombre" placeholder="Nombre al aire" style="max-width:160px">
+      <button class="btn btn-ghost btn-sm" onclick="cabDjCrear()">+ Crear locutor</button>
+     </div>
+    </details>
+   </div>
+
+   <!-- MEZCLADORA -->
+   <div class="card" style="margin-bottom:14px">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Mezcladora</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+     <div><button class="btn btn-ghost btn-sm" id="cab-mic-btn" onclick="cabMicToggle()">🎤 Activar micrófono</button>
+      <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts)">Mic</label>
+      <input type="range" id="cab-vol-mic" min="0" max="150" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div></div>
+     <div><label style="font-size:11px;color:var(--ts)">Samplers</label>
+      <input type="range" id="cab-vol-sam" min="0" max="150" value="100" oninput="cabVol('sam',this.value)" style="width:100%"></div>
+     <div><label style="font-size:11px;color:var(--ts)">Música</label>
+      <input type="range" id="cab-vol-mus" min="0" max="150" value="100" oninput="cabVol('mus',this.value)" style="width:100%"></div>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;margin-top:10px;flex-wrap:wrap">
+     <canvas id="cab-vu" width="260" height="14" style="background:var(--border);border-radius:7px"></canvas>
+     <label style="font-size:12px;color:var(--ts);display:flex;gap:6px;align-items:center">
+      <input type="checkbox" id="cab-monitor" onchange="cabMonitor(this.checked)"> Escuchar aquí samplers y música (el mic nunca se monitorea — se acopla)</label>
+    </div>
+   </div>
+
+   <!-- SOUNDBOARD -->
+   <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Soundboard</div>
+     <button class="btn btn-ghost btn-sm" onclick="cabPadsStop()">⏹ Cortar sonidos</button>
+    </div>
+    <div id="cab-pads" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+     <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
+     <input class="form-input" id="cab-sam-nombre" maxlength="60" placeholder="Nombre (ej. Risas)" style="max-width:170px">
+     <input type="color" id="cab-sam-color" value="#e8ff4c" title="Color del botón" style="width:40px;height:34px;border:none;background:none;cursor:pointer">
+     <input type="file" id="cab-sam-file" accept="audio/*" style="font-size:12px">
+     <button class="btn btn-ghost btn-sm" onclick="cabSamplerSubir()">⬆ Subir sampler</button>
+    </div>
+    <div id="cab-sam-msg" style="margin-top:6px;font-size:12px"></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--ts)">Administrar samplers</summary>
+     <div id="cab-sam-lista" style="margin-top:8px"></div>
+    </details>
+   </div>
+
+   <!-- MÚSICA DEL CATÁLOGO -->
+   <div class="card">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Música</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px">
+     <button class="btn btn-ghost btn-sm" onclick="cabMusPlayPausa()" id="cab-mus-play">▶</button>
+     <button class="btn btn-ghost btn-sm" onclick="cabMusStop()">⏹</button>
+     <div style="flex:1;min-width:0">
+      <div id="cab-mus-nombre" style="font-size:13px;font-weight:700">— nada cargado —</div>
+      <div id="cab-mus-prog" style="font-size:11px;color:var(--ts);font-variant-numeric:tabular-nums"></div>
+     </div>
+     <label class="btn btn-ghost btn-sm" style="cursor:pointer">📁 Archivo local<input type="file" id="cab-local" accept="audio/*" onchange="cabMusLocal(this)" style="display:none"></label>
+    </div>
+    <div style="display:flex;gap:8px">
+     <input class="form-input" id="cab-q" placeholder="Buscar en el catálogo de la radio…" onkeydown="if(event.key==='Enter')cabBuscar()">
+     <button class="btn btn-ghost btn-sm" onclick="cabBuscar()">Buscar</button>
+    </div>
+    <div id="cab-resultados" style="margin-top:8px"></div>
    </div>
   </div>
 

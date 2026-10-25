@@ -262,10 +262,45 @@ está caduco antes de escribirse.
     `mide:radio-v2a` **32** · `mide:radio-v2b` **34** (la red falsa aprendió
     storage y DELETE respetando filtros e id — un GET por id que devolviera la
     tabla entera barrería la foto del programa equivocado).
-  - ⏳ **V2c:** gestión de locutores (streamer accounts de AzuraCast vía
-    `admin-radio-control`, whitelist nueva) + AL AIRE en el hero de Kaio-sama +
-    el vigilante avisando si un programa de la parrilla debía empezar y nadie
-    se conectó.
+  - ✅ **V2c · KAIO-CABINA-1 (24-oct, en main local): LA CABINA — Kaio-sama
+    transmite.** Palabra de Memo: *«mejórame los controles en kaio sama, para
+    transmitir desde ahí, poder meter audios como samplers de ruido como risas
+    grabadas y poder cambiar esos audios, buscar y reproducir música de nuestro
+    catálogo… la versión Ultra Instinto del kaio sama»*. Pestaña **🎙 Cabina**
+    (SOLO maestro_roshi), 4 cards: Transmisión · Mezcladora · Soundboard ·
+    Música. `npm run mide:kaio-cabina-1` (**33**, sin ancla — árbol).
+    - **La transmisión sale de NUESTRA página**: mezcla Web Audio (mic +
+      samplers + música → master) → MP3 en el navegador (**lamejs vendorizado
+      en `vendor/lame.min.js`**, 156 KB, carga PEREZOSA solo al transmitir; el
+      careo carga el encoder REAL en vm y exige frames con sync 0xFF) →
+      `WebSocket('wss://radio.conectareynosa.mx/webdj/radioconecta/',
+      'webcast')` con hello JSON (user/password del locutor, samplerate REAL
+      del contexto). Es la única forma de que samplers y música ENTREN al
+      aire; **el Web DJ nativo de AzuraCast queda como plan B** enlazado en la
+      UI. El CSP (netlify.toml) aprendió `wss://radio.conectareynosa.mx` en
+      connect-src — sin eso la cabina moría muda en producción.
+      🔒 **El MIC jamás va al monitor local** (feedback con las bocinas): el
+      monitor toca solo samplers + música, y el careo lo afirma.
+      ⚠️ **El uplink webcast NO se pudo probar desde el sandbox** — la prueba
+      de fuego es Memo conectándose; el onclose DICE el código y sugiere causa.
+    - **Soundboard:** tabla `radio_samplers` + bucket PÚBLICO `radio-samplers`
+      (acta `migraciones/KAIO-CABINA-1.sql`, YA CORRIDA, con su GRANT). El
+      servidor (`admin-radio-cabina`) valida MAGIA DE BYTES mp3/wav/ogg y tope
+      **3.5 MB DICHO** (el request de la function topa ~6 MB y base64 infla
+      4/3 — un tope de 5 se volvía inalcanzable); el audio sube PRIMERO (sin
+      audio no nace fila), editar reemplaza y barre el viejo, eliminar exige
+      `confirmar:true` y barre su objeto (contenido, no dinero).
+    - **Música:** la búsqueda reutiliza `admin-radio-media?buscar=` (UN
+      buscador, no se gemelea); `cancion_descargar` baja por proxy con tope
+      **4.2 MB** (la respuesta topa ~6) → 413 CON el tamaño y el camino
+      alterno (archivo local, que también existe en la card).
+    - **Locutores:** altas/bajas de streamers de AzuraCast desde la misma
+      pestaña (usuario válido, contraseña ≥8, eliminar con confirmar). 🔒 La
+      proyección de la lista **jamás deja viajar una contraseña** (careado
+      aunque AzuraCast la mandara) y el selector de cuenta para salir al aire
+      nace VACÍO (DEFAULTS-1: es una atribución).
+    - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
+      avisa si un programa de la parrilla debía empezar y nadie se conectó.
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

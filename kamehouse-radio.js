@@ -55,10 +55,11 @@ async function loadRadio() {
 function showRadioTab(sub, btn) {
   document.querySelectorAll('#page-radio .ks-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['peticiones', 'muro', 'cartelera', 'numeros', 'control', 'biblioteca'].forEach(s => {
+  ['peticiones', 'muro', 'cabina', 'cartelera', 'numeros', 'control', 'biblioteca'].forEach(s => {
     const el = document.getElementById('radio-tab-' + s);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
+  if (sub === 'cabina') loadRadioCabina();
   if (sub === 'cartelera') loadRadioCartelera();
   if (sub === 'numeros') loadRadioNumeros();
   if (sub === 'control') loadRadioControl();
@@ -1400,4 +1401,406 @@ async function radioCartArchivar(id, archivado) {
   if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
   showToast(archivado ? 'Programa archivado' : 'Programa restaurado', 'success');
   loadRadioCartelera();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// [KAIO-CABINA-1 · 24-oct-2026] LA CABINA — transmitir desde Kaio-sama
+// ═════════════════════════════════════════════════════════════════════════════
+// Palabra de Memo: «transmitir desde ahí, meter audios como samplers de ruido
+// como risas grabadas y poder cambiar esos audios, buscar y reproducir música
+// de nuestro catálogo». La forma:
+//   · UNA mezcladora Web Audio con tres canales (mic · samplers · música) que
+//     alimentan el bus MASTER. Lo que sale al aire es LA MEZCLA.
+//   · El uplink es el protocolo WEBCAST de AzuraCast (wss://…/webdj/<estación>):
+//     hello JSON con las credenciales del LOCUTOR + frames MP3 codificados en
+//     el navegador con lamejs (vendorizado en /vendor/lame.min.js, carga
+//     PEREZOSA — 156 KB que solo paga quien abre la cabina).
+//   · El monitor local toca samplers+música; el MIC jamás se monitorea (se
+//     acopla con las bocinas). El soundboard vive en radio_samplers + bucket
+//     público; la búsqueda de música es la de admin-radio-media (?buscar=) —
+//     la que ya usan Control y Biblioteca: no se gemelea.
+// Las funciones cabinaWsUrl/cabinaHello/cabF32aI16/cabMMSS son PURAS a
+// propósito: mide:kaio-cabina-1 las rebana y las corre en vm.
+
+const _cb = {
+  ctx: null, master: null, buses: {}, monitorGain: null, analyser: null,
+  micStream: null, micSrc: null,
+  ws: null, enc: null, proc: null, procSink: null, reloj: null, aireDesde: 0,
+  samplers: [], cacheAudio: {}, vivos: [],
+  mus: { buffer: null, src: null, nombre: '', offset: 0, inicioCtx: 0, sonando: false },
+  vuRAF: null, lamePromesa: null,
+};
+function _cbEl(id) { return document.getElementById(id); }
+function _cbMsg(id, txt, esError) {
+  const m = _cbEl(id);
+  if (m) m.innerHTML = txt ? `<span style="color:${esError ? 'var(--red)' : 'var(--green)'}">${_rcEsc(txt)}</span>` : '';
+}
+async function _cbApi(body) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-cabina', { method: 'POST', body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  return { st: r.status, j };
+}
+
+// ── Las PURAS del uplink ─────────────────────────────────────────────────────
+// La URL del webcast: el shortcode es el MISMO del nowplaying público
+// (/api/nowplaying/radioconecta) — una estación, un nombre.
+function cabinaWsUrl() { return 'wss://radio.conectareynosa.mx/webdj/radioconecta/'; }
+// El hello del protocolo webcast (webcast.js): mime + credenciales del locutor
+// + la ficha del audio. Sin user/password AzuraCast rechaza la conexión.
+function cabinaHello(usuario, contrasena, sampleRate) {
+  return { type: 'hello', data: { mime: 'audio/mpeg', user: String(usuario || ''), password: String(contrasena || ''),
+    audio: { channels: 2, samplerate: Number(sampleRate) || 44100, bitrate: 192, encoder: 'lamejs' } } };
+}
+// Float32 [-1,1] → Int16 para lamejs, con clamp (un pico >1.0 sin clamp da wrap).
+function cabF32aI16(f32) {
+  const out = new Int16Array(f32.length);
+  for (let i = 0; i < f32.length; i++) {
+    const v = Math.max(-1, Math.min(1, f32[i]));
+    out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  return out;
+}
+function cabMMSS(seg) {
+  const s = Math.max(0, Math.floor(Number(seg) || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+// ── El grafo de audio (nace al primer uso) ───────────────────────────────────
+function cabCtx() {
+  if (_cb.ctx) return _cb.ctx;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  _cb.ctx = ctx;
+  _cb.master = ctx.createGain();
+  ['mic', 'sam', 'mus'].forEach((b) => { _cb.buses[b] = ctx.createGain(); _cb.buses[b].connect(_cb.master); });
+  _cb.analyser = ctx.createAnalyser(); _cb.analyser.fftSize = 512;
+  _cb.master.connect(_cb.analyser);
+  // Monitor local: SOLO samplers y música — el mic a las bocinas se acopla.
+  _cb.monitorGain = ctx.createGain(); _cb.monitorGain.gain.value = 0;
+  _cb.buses.sam.connect(_cb.monitorGain); _cb.buses.mus.connect(_cb.monitorGain);
+  _cb.monitorGain.connect(ctx.destination);
+  _cbVuLoop();
+  return ctx;
+}
+function cabVol(bus, v) { if (_cb.buses[bus]) _cb.buses[bus].gain.value = Number(v) / 100; }
+function cabMonitor(on) { cabCtx(); _cb.monitorGain.gain.value = on ? 1 : 0; }
+function _cbVuLoop() {
+  const cv = _cbEl('cab-vu');
+  if (!cv || !_cb.analyser) return;
+  const g = cv.getContext('2d');
+  const datos = new Uint8Array(_cb.analyser.fftSize);
+  const paso = () => {
+    _cb.analyser.getByteTimeDomainData(datos);
+    let max = 0;
+    for (let i = 0; i < datos.length; i++) max = Math.max(max, Math.abs(datos[i] - 128));
+    const nivel = max / 128;
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = nivel > 0.9 ? '#ff283b' : (nivel > 0.7 ? '#e8ff4c' : '#88ea4e');
+    g.fillRect(0, 0, Math.round(cv.width * nivel), cv.height);
+    // El reloj del aire y el progreso de la música viven en el mismo latido.
+    if (_cb.ws && _cb.aireDesde) { const r = _cbEl('cab-reloj'); if (r) r.textContent = '· ' + cabMMSS((Date.now() - _cb.aireDesde) / 1000) + ' al aire'; }
+    const p = _cbEl('cab-mus-prog');
+    if (p && _cb.mus.buffer) {
+      const pos = _cb.mus.sonando ? (_cb.ctx.currentTime - _cb.mus.inicioCtx) : _cb.mus.offset;
+      p.textContent = cabMMSS(pos) + ' / ' + cabMMSS(_cb.mus.buffer.duration);
+    }
+    _cb.vuRAF = requestAnimationFrame(paso);
+  };
+  if (!_cb.vuRAF) _cb.vuRAF = requestAnimationFrame(paso);
+}
+
+// ── Micrófono ────────────────────────────────────────────────────────────────
+async function cabMicToggle() {
+  const btn = _cbEl('cab-mic-btn');
+  if (_cb.micStream) {
+    _cb.micStream.getTracks().forEach((t) => t.stop());
+    if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
+    _cb.micStream = null; _cb.micSrc = null;
+    if (btn) { btn.textContent = '🎤 Activar micrófono'; btn.style.color = ''; }
+    return;
+  }
+  try {
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    _cb.micStream = stream;
+    _cb.micSrc = ctx.createMediaStreamSource(stream);
+    _cb.micSrc.connect(_cb.buses.mic);
+    if (btn) { btn.textContent = '🎤 Micrófono VIVO (clic para apagar)'; btn.style.color = 'var(--red)'; }
+  } catch (e) {
+    _cbMsg('cab-msg', 'El micrófono no se pudo abrir: ' + e.message, true);
+  }
+}
+
+// ── El uplink (webcast → AzuraCast) ─────────────────────────────────────────
+function _cbCargarLame() {
+  if (window.lamejs) return Promise.resolve();
+  if (_cb.lamePromesa) return _cb.lamePromesa;
+  _cb.lamePromesa = new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = '/vendor/lame.min.js';
+    s.onload = () => ok();
+    s.onerror = () => { _cb.lamePromesa = null; mal(new Error('No se pudo cargar el codificador (vendor/lame.min.js)')); };
+    document.head.appendChild(s);
+  });
+  return _cb.lamePromesa;
+}
+async function cabAire() {
+  if (_cb.ws) { cabCortar('Cortaste la transmisión'); return; }
+  const usuario = (_cbEl('cab-dj') || {}).value || '';
+  const pass = (_cbEl('cab-pass') || {}).value || '';
+  if (!usuario) { _cbMsg('cab-msg', 'Elige tu cuenta de locutor', true); return; }
+  if (!pass) { _cbMsg('cab-msg', 'Teclea la contraseña del locutor', true); return; }
+  const btn = _cbEl('cab-aire');
+  if (btn) btn.disabled = true;
+  try {
+    await _cbCargarLame();
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    _cbMsg('cab-msg', 'Conectando con la estación…');
+    const ws = new WebSocket(cabinaWsUrl(), 'webcast');
+    ws.binaryType = 'arraybuffer';
+    let abrio = false;
+    ws.onopen = () => {
+      abrio = true;
+      ws.send(JSON.stringify(cabinaHello(usuario, pass, ctx.sampleRate)));
+      _cb.enc = new lamejs.Mp3Encoder(2, ctx.sampleRate, 192);
+      // ScriptProcessor: el master entra, se codifica a MP3 y viaja por el WS.
+      // Va conectado a un sink en silencio (gain 0) porque un processor suelto
+      // no procesa — y a destination directo DUPLICARÍA el monitor.
+      _cb.proc = ctx.createScriptProcessor(4096, 2, 2);
+      _cb.procSink = ctx.createGain(); _cb.procSink.gain.value = 0;
+      _cb.master.connect(_cb.proc);
+      _cb.proc.connect(_cb.procSink); _cb.procSink.connect(ctx.destination);
+      _cb.proc.onaudioprocess = (e) => {
+        if (!_cb.ws || _cb.ws.readyState !== 1 || !_cb.enc) return;
+        const mp3 = _cb.enc.encodeBuffer(cabF32aI16(e.inputBuffer.getChannelData(0)), cabF32aI16(e.inputBuffer.getChannelData(1)));
+        if (mp3.length) _cb.ws.send(mp3);
+      };
+      _cb.ws = ws;
+      _cb.aireDesde = Date.now();
+      const est = _cbEl('cab-estado');
+      if (est) { est.textContent = '🔴 AL AIRE'; est.style.background = 'var(--red)'; est.style.color = '#fff'; }
+      if (btn) { btn.disabled = false; btn.textContent = '⏹ Cortar transmisión'; }
+      _cbMsg('cab-msg', 'Al aire. Lo que suena en la mezcladora está saliendo en la radio.');
+    };
+    // Un cierre/error se DICE con su motivo — el silencio se leería como «sigo al aire».
+    ws.onclose = (ev) => { if (_cb.ws === ws || !abrio) cabCortar(abrio ? ('La estación cerró la conexión (código ' + ev.code + '). ¿La contraseña del locutor es la buena? ¿Hay otro DJ conectado?') : 'No se pudo conectar con la estación — revisa tu internet o usa el Web DJ (plan B)'); };
+    ws.onerror = () => {};   // onclose llega después con el código; ahí se habla
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    _cbMsg('cab-msg', e.message, true);
+  }
+}
+function cabCortar(motivo) {
+  if (_cb.proc) { try { _cb.master.disconnect(_cb.proc); } catch (e) {} try { _cb.proc.disconnect(); } catch (e) {} _cb.proc.onaudioprocess = null; _cb.proc = null; }
+  if (_cb.procSink) { try { _cb.procSink.disconnect(); } catch (e) {} _cb.procSink = null; }
+  if (_cb.ws) {
+    const ws = _cb.ws; _cb.ws = null;
+    try { if (_cb.enc && ws.readyState === 1) { const fin = _cb.enc.flush(); if (fin.length) ws.send(fin); } } catch (e) {}
+    try { ws.onclose = null; ws.close(); } catch (e) {}
+  }
+  _cb.enc = null; _cb.aireDesde = 0;
+  const est = _cbEl('cab-estado');
+  if (est) { est.textContent = 'FUERA DEL AIRE'; est.style.background = 'var(--border)'; est.style.color = 'var(--ts)'; }
+  const btn = _cbEl('cab-aire'); if (btn) { btn.disabled = false; btn.textContent = '🔴 Salir al aire'; }
+  const r = _cbEl('cab-reloj'); if (r) r.textContent = '';
+  if (motivo) _cbMsg('cab-msg', motivo, /cerró|No se pudo|no se pudo/.test(motivo));
+}
+
+// ── Soundboard ───────────────────────────────────────────────────────────────
+async function loadRadioCabina() {
+  _cbSamplersPintar();
+  _cbDjsPintar();
+  const { st, j } = await _cbApi({ accion: 'samplers_listar' });
+  if (st === 200 && j.ok) { _cb.samplers = j.samplers || []; _cbSamplersPintar(); }
+  else { const box = _cbEl('cab-pads'); if (box) box.innerHTML = `<div class="alert alert-error">${_rcEsc(j.error || ('HTTP ' + st))}</div>`; }
+  const d = await _cbApi({ accion: 'streamers_listar' });
+  if (d.st === 200 && d.j.ok) _cbDjsPintar(d.j.streamers || []);
+}
+function _cbSamplersPintar() {
+  const box = _cbEl('cab-pads'), lista = _cbEl('cab-sam-lista');
+  if (!box) return;
+  if (!_cb.samplers.length) {
+    box.innerHTML = '<div style="color:var(--ts);font-size:13px">Sin samplers todavía — sube el primero abajo (risas, aplausos, cortinillas…).</div>';
+  } else {
+    box.innerHTML = _cb.samplers.map((s) => `<button class="btn" style="padding:14px 8px;font-weight:800;border:2px solid ${_rcEsc(s.color || 'var(--border)')};border-radius:12px;background:transparent;color:var(--text);cursor:pointer" onclick="cabPad('${_rcEsc(s.id)}')">${_rcEsc(s.nombre)}</button>`).join('');
+  }
+  if (lista) lista.innerHTML = _cb.samplers.map((s) => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+    <span style="width:10px;height:10px;border-radius:50%;background:${_rcEsc(s.color || 'var(--ts)')}"></span>
+    <span style="flex:1">${_rcEsc(s.nombre)}</span>
+    <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cabSamplerRenombrar('${_rcEsc(s.id)}')">Renombrar</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" onclick="cabSamplerEliminar('${_rcEsc(s.id)}')">🗑</button>
+  </div>`).join('') || '<div style="color:var(--ts);font-size:12px">Nada que administrar.</div>';
+}
+async function cabPad(id) {
+  const s = _cb.samplers.find((x) => String(x.id) === String(id));
+  if (!s) return;
+  try {
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    if (!_cb.cacheAudio[s.audio_url]) {
+      const r = await fetch(s.audio_url);
+      if (!r.ok) throw new Error('el audio no bajó (HTTP ' + r.status + ')');
+      _cb.cacheAudio[s.audio_url] = await ctx.decodeAudioData(await r.arrayBuffer());
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = _cb.cacheAudio[s.audio_url];
+    src.connect(_cb.buses.sam);
+    src.onended = () => { _cb.vivos = _cb.vivos.filter((v) => v !== src); };
+    src.start();
+    _cb.vivos.push(src);
+  } catch (e) { _cbMsg('cab-sam-msg', 'Ese sampler no sonó: ' + e.message, true); }
+}
+function cabPadsStop() { _cb.vivos.forEach((s) => { try { s.stop(); } catch (e) {} }); _cb.vivos = []; }
+function _cbArchivoB64(input) {
+  return new Promise((ok, mal) => {
+    const f = input && input.files && input.files[0];
+    if (!f) return mal(new Error('Elige un archivo de audio'));
+    const rd = new FileReader();
+    rd.onload = () => ok(rd.result);
+    rd.onerror = () => mal(new Error('No se pudo leer el archivo'));
+    rd.readAsDataURL(f);
+  });
+}
+async function cabSamplerSubir() {
+  try {
+    const nombre = (_cbEl('cab-sam-nombre') || {}).value || '';
+    if (!nombre.trim()) { _cbMsg('cab-sam-msg', 'Ponle nombre al sampler', true); return; }
+    const b64 = await _cbArchivoB64(_cbEl('cab-sam-file'));
+    _cbMsg('cab-sam-msg', 'Subiendo…');
+    const { st, j } = await _cbApi({ accion: 'sampler_crear', nombre: nombre.trim(), color: (_cbEl('cab-sam-color') || {}).value || null, audio_b64: b64 });
+    if (st !== 200 || !j.ok) { _cbMsg('cab-sam-msg', j.error || ('HTTP ' + st), true); return; }
+    _cbMsg('cab-sam-msg', 'Sampler listo ✓');
+    const n = _cbEl('cab-sam-nombre'); if (n) n.value = '';
+    const f = _cbEl('cab-sam-file'); if (f) f.value = '';
+    loadRadioCabina();
+  } catch (e) { _cbMsg('cab-sam-msg', e.message, true); }
+}
+async function cabSamplerRenombrar(id) {
+  const s = _cb.samplers.find((x) => String(x.id) === String(id));
+  const nombre = prompt('Nuevo nombre del sampler:', (s || {}).nombre || '');
+  if (!nombre || !nombre.trim()) return;
+  const { st, j } = await _cbApi({ accion: 'sampler_editar', id, nombre: nombre.trim() });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  loadRadioCabina();
+}
+async function cabSamplerEliminar(id) {
+  const s = _cb.samplers.find((x) => String(x.id) === String(id));
+  if (!confirm(`¿ELIMINAR el sampler «${(s || {}).nombre || ''}» para siempre?`)) return;
+  const { st, j } = await _cbApi({ accion: 'sampler_eliminar', id, confirmar: true });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  showToast('Sampler eliminado', 'success');
+  loadRadioCabina();
+}
+
+// ── Música (catálogo + archivo local) ───────────────────────────────────────
+async function cabBuscar() {
+  const q = ((_cbEl('cab-q') || {}).value || '').trim();
+  const box = _cbEl('cab-resultados');
+  if (!q || !box) return;
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    // La búsqueda es la de admin-radio-media (?buscar=) — la MISMA del Control
+    // y la Biblioteca: un catálogo, un buscador.
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media?buscar=' + encodeURIComponent(q));
+    const j = await r.json().catch(() => ({}));
+    const archivos = (j && j.archivos) || [];
+    box.innerHTML = archivos.length
+      ? archivos.map((a) => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${_rcEsc(a.titulo || a.ruta)}</div>
+          <div style="font-size:11px;color:var(--ts)">${_rcEsc(a.artista || '')}</div></div>
+          <button class="btn btn-ghost btn-sm" onclick='cabTocarRuta(${JSON.stringify(String(a.ruta))},${JSON.stringify(String(a.titulo || a.ruta))})'>▶ Tocar en cabina</button>
+        </div>`).join('')
+      : '<div style="color:var(--ts);font-size:13px">Sin resultados en el catálogo.</div>';
+  } catch (e) { box.innerHTML = `<div class="alert alert-error">${_rcEsc(e.message)}</div>`; }
+}
+async function cabTocarRuta(ruta, titulo) {
+  const box = _cbEl('cab-mus-nombre');
+  if (box) box.textContent = 'Bajando «' + titulo + '»…';
+  const { st, j } = await _cbApi({ accion: 'cancion_descargar', ruta });
+  if (st !== 200 || !j.ok) { if (box) box.textContent = '— nada cargado —'; showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  try {
+    const bin = atob(j.b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    _cbMusCargar(await ctx.decodeAudioData(buf.buffer), titulo);
+  } catch (e) { if (box) box.textContent = '— nada cargado —'; showToast('Ese audio no se pudo decodificar: ' + e.message, 'error'); }
+}
+async function cabMusLocal(input) {
+  const f = input && input.files && input.files[0];
+  if (!f) return;
+  try {
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    _cbMusCargar(await ctx.decodeAudioData(await f.arrayBuffer()), f.name);
+  } catch (e) { showToast('Ese archivo no se pudo decodificar: ' + e.message, 'error'); }
+  input.value = '';
+}
+function _cbMusCargar(buffer, nombre) {
+  cabMusStop();
+  _cb.mus.buffer = buffer; _cb.mus.nombre = nombre; _cb.mus.offset = 0;
+  const n = _cbEl('cab-mus-nombre'); if (n) n.textContent = nombre;
+  cabMusPlayPausa();
+}
+function cabMusPlayPausa() {
+  const m = _cb.mus;
+  if (!m.buffer) return;
+  const ctx = cabCtx();
+  if (m.sonando) {           // pausa
+    m.offset = ctx.currentTime - m.inicioCtx;
+    try { m.src.onended = null; m.src.stop(); } catch (e) {}
+    m.src = null; m.sonando = false;
+    const b = _cbEl('cab-mus-play'); if (b) b.textContent = '▶';
+    return;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = m.buffer;
+  src.connect(_cb.buses.mus);
+  src.onended = () => { if (_cb.mus.src === src) { _cb.mus.sonando = false; _cb.mus.offset = 0; _cb.mus.src = null; const b = _cbEl('cab-mus-play'); if (b) b.textContent = '▶'; } };
+  src.start(0, Math.min(m.offset, Math.max(0, m.buffer.duration - 0.05)));
+  m.src = src; m.inicioCtx = ctx.currentTime - m.offset; m.sonando = true;
+  const b = _cbEl('cab-mus-play'); if (b) b.textContent = '⏸';
+}
+function cabMusStop() {
+  const m = _cb.mus;
+  if (m.src) { try { m.src.onended = null; m.src.stop(); } catch (e) {} }
+  m.src = null; m.sonando = false; m.offset = 0;
+  const b = _cbEl('cab-mus-play'); if (b) b.textContent = '▶';
+}
+
+// ── Locutores ────────────────────────────────────────────────────────────────
+function _cbDjsPintar(streamers) {
+  const sel = _cbEl('cab-dj'), lista = _cbEl('cab-djs-lista');
+  if (streamers === undefined) { if (lista) lista.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>'; return; }
+  if (sel) {
+    const elegido = sel.value;
+    sel.innerHTML = '<option value="">— elige tu cuenta de locutor —</option>' +
+      streamers.map((s) => `<option value="${_rcEsc(s.usuario)}">${_rcEsc(s.nombre)} (${_rcEsc(s.usuario)})</option>`).join('');
+    if (elegido) sel.value = elegido;
+  }
+  if (lista) lista.innerHTML = streamers.length
+    ? streamers.map((s) => `<div style="display:flex;gap:8px;align-items:center;padding:4px 0">
+        <span style="flex:1">${_rcEsc(s.nombre)} · <code>${_rcEsc(s.usuario)}</code>${s.activo ? '' : ' <span style="color:var(--ts)">(inactivo)</span>'}</span>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)" onclick="cabDjEliminar(${Number(s.id)},'${_rcEsc(s.usuario)}')">🗑</button>
+      </div>`).join('')
+    : '<div style="color:var(--ts);font-size:12px">Sin locutores — crea el primero abajo (tu cuenta de DJ).</div>';
+}
+async function cabDjCrear() {
+  const usuario = ((_cbEl('cab-dj-user') || {}).value || '').trim();
+  const contrasena = (_cbEl('cab-dj-pass') || {}).value || '';
+  const nombre = ((_cbEl('cab-dj-nombre') || {}).value || '').trim();
+  const { st, j } = await _cbApi({ accion: 'streamer_crear', usuario, contrasena, nombre });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  showToast('Locutor creado: ' + usuario, 'success');
+  ['cab-dj-user', 'cab-dj-pass', 'cab-dj-nombre'].forEach((id) => { const e = _cbEl(id); if (e) e.value = ''; });
+  loadRadioCabina();
+}
+async function cabDjEliminar(id, usuario) {
+  if (!confirm(`¿Eliminar la cuenta de locutor «${usuario}»? Ya no podrá conectarse a transmitir.`)) return;
+  const { st, j } = await _cbApi({ accion: 'streamer_eliminar', id, confirmar: true });
+  if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
+  showToast('Locutor eliminado', 'success');
+  loadRadioCabina();
 }

@@ -423,11 +423,34 @@ function fundirNumerologia(personasPestana, personasLibro, paqueteBase) {
       ya.filas = (ya.filas || 0) + 1;
       ya.boletos_numerologia = (ya.boletos_numerologia || 0) + Number(n.boletos || 0);
       if (!ya.fuentes.includes('numerologia')) ya.fuentes.push('numerologia');
-      // ⚠️ `total` NO se toca: el libro no lo trae y pisarlo con nada lo perdería.
+      // ⚠️ El `total` de quien vive en la PESTAÑA no se toca: ahí manda la
+      // pestaña, intacto (ley de CUADRE-FUENTE-1).
+      // 🔴 [LIBRO-SOLO-1] Pero el de una persona SOLO-LIBRO sí es del libro
+      // (CUADRE-2c: su contrato es el «Costo al Publico»), y con 2+ compras es
+      // la SUMA — una fila por boleto, como en la pestaña. Antes se quedaba el
+      // de la PRIMERA fila y totales_contrato proponía encoger el contrato de
+      // quien compró dos veces (Marian: $19,200 → $9,600).
+      // 🔒 Y el hueco sigue mandando: si CUALQUIER fila no sabe su costo, el
+      // total es null — una suma parcial rotulada de total mentiría igual.
+      if (!ya.fuentes.includes('pestana')) {
+        if (n.costo_publico == null || ya.total == null) ya.total = null;
+        else ya.total = Number(ya.total) + Number(n.costo_publico);
+      }
       continue;
     }
     out.set(n.clave, {
       nombre: n.nombre, clave: n.clave, abonado: Number(n.abonado || 0), filas: 1,
+      // 🔴 [LIBRO-SOLO-1 · 24-oct-2026] LA BANDERA NACE PUESTA. `__libroManda`
+      // existe para que la PRIMERA fila del libro REEMPLACE el reflejo de la
+      // pestaña y las siguientes SUMEN. Para una persona SOLO-LIBRO —creada
+      // aquí, sin pestaña— la bandera nacía apagada, así que su segunda fila
+      // trataba a la primera como «reflejo» y la reemplazaba: dos compras =
+      // el dinero de UNA. Cazado con Marian (Stray Kids): 2 filas de $9,600
+      // en el libro y el careo leía $9,600 con filas:2 — y encima proponía
+      // pisarle el contrato de $19,200 a $9,600. El dinero de esta entrada YA
+      // es del libro: lo que siga, suma.
+      __libroManda: true,
+      abonado_libro: Number(n.abonado || 0),
       // [CUADRE-2c] LA ZONA Y EL PAQUETE SALEN DEL LIBRO. «Tipo de Boleto» es
       // la zona, y el paquete es CHEAP porque esto ES la venta directa de Memo
       // —boleto solo, sin viaje—. Sin estos dos, CUADRE-1b los salta: su alta

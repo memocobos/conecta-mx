@@ -92,6 +92,7 @@
     "mide:rep-popo-1": "node scripts/mide-rep-popo-1.js",
     "mide:emma-1": "node scripts/mide-emma-1.js",
     "mide:total-baja-1": "node scripts/mide-total-baja-1.js",
-    "mide:mont-min-1": "node scripts/mide-mont-min-1.js"
+    "mide:mont-min-1": "node scripts/mide-mont-min-1.js",
+    "mide:libro-solo-1": "node scripts/mide-libro-solo-1.js"
   }
 }

@@ -54,12 +54,17 @@ const OBJETOS = {};
 const STREAMERS = [{ id: 5, streamer_username: 'memo', display_name: 'Memo al aire', is_active: true, streamer_password: 'NUNCA-DEBE-VIAJAR' }];
 const MP3 = Buffer.concat([Buffer.from([0x49, 0x44, 0x33]), Buffer.alloc(900, 7)]);           // ID3 → mp3
 const CANCION_CHICA = Buffer.concat([Buffer.from([0xff, 0xfb]), Buffer.alloc(200000, 3)]);    // frame sync
-const CANCION_GORDA = Buffer.alloc(Math.round(4.6 * 1024 * 1024), 9);
+// [KAIO-CABINA-2] La MEDIANA mide 9 MB = 3 rebanadas (4+4+1) — el caso de Memo
+// (11.3 MB rebotada) a escala; cada byte lleva su posición para carear que la
+// concatenación no revuelva rebanadas. La ENORME (26 MB) rebota el tope TOTAL.
+const CANCION_MEDIANA = (() => { const b = Buffer.alloc(9 * 1024 * 1024); b[0] = 0xff; b[1] = 0xfb; for (let i = 2; i < b.length; i++) b[i] = i % 251; return b; })();
+const CANCION_ENORME = Buffer.alloc(26 * 1024 * 1024, 9);
 function redNueva() {
-  const st = { deletes: 0 };
+  const st = { deletes: 0, djsOn: false, adminOk: true, restarts: 0 };
   st.fetch = async (url, init) => {
     const U = String(url); const met = ((init || {}).method || 'GET').toUpperCase();
-    const resp = (s, b, bin) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b), arrayBuffer: async () => bin });
+    const resp = (s, b, bin, hdrs) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b), arrayBuffer: async () => bin,
+      headers: { get: (k) => (hdrs && hdrs[String(k).toLowerCase()]) || null } });
     if (U.includes('/storage/v1/object/radio-samplers/')) {
       const p = U.split('/storage/v1/object/radio-samplers/')[1];
       if (met === 'POST') { OBJETOS[p] = (init.body && init.body.length) || 0; return resp(200, { Key: p }); }
@@ -84,8 +89,19 @@ function redNueva() {
     }
     if (U.includes('radio.conectareynosa.mx/api/station/1/streamers')) {
       if (met === 'GET') return resp(200, STREAMERS);
-      if (met === 'POST') { const b = JSON.parse(init.body); const s = { id: 9, ...b }; STREAMERS.push(s); return resp(200, s); }
+      if (met === 'POST') {
+        // [KAIO-CABINA-2] El AzuraCast de Memo nació con los DJs APAGADOS:
+        // así contestó en su primera prueba, literal.
+        if (!st.djsOn) return resp(500, { code: 500, type: 'StationUnsupportedException', message: 'This station does not currently support this functionality.' });
+        const b = JSON.parse(init.body); const s = { id: 9 + STREAMERS.length, ...b }; STREAMERS.push(s); return resp(200, s);
+      }
     }
+    if (U.includes('radio.conectareynosa.mx/api/admin/station/1') && met === 'PUT') {
+      if (!st.adminOk) return resp(403, {});
+      if (JSON.parse(init.body).enable_streamers === true) st.djsOn = true;
+      return resp(200, {});
+    }
+    if (U.includes('radio.conectareynosa.mx/api/station/1/restart') && met === 'POST') { st.restarts++; return resp(200, {}); }
     if (U.includes('radio.conectareynosa.mx/api/station/1/streamer/') && met === 'DELETE') {
       const id = Number(U.split('/streamer/')[1]);
       const i = STREAMERS.findIndex((s) => s.id === id);
@@ -94,9 +110,23 @@ function redNueva() {
       return resp(200, {});
     }
     if (U.includes('/files/download')) {
-      const f = decodeURIComponent(U.split('file=')[1] || '');
-      if (f === 'rock/chica.mp3') return resp(200, null, CANCION_CHICA.buffer.slice(CANCION_CHICA.byteOffset, CANCION_CHICA.byteOffset + CANCION_CHICA.length));
-      if (f === 'rock/gorda.mp3') return resp(200, null, CANCION_GORDA.buffer.slice(0, CANCION_GORDA.length));
+      const f = decodeURIComponent((U.split('file=')[1] || '').split('&')[0]);
+      const entero = (buf) => resp(200, null, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));
+      if (f === 'rock/chica.mp3') return entero(CANCION_CHICA);
+      // mediana.mp3 HONRA el Range (206 + content-range); mediana-sinrange.mp3 lo
+      // ignora y manda todo (200) — los DOS servidores existen, el handler aguanta ambos.
+      if (f === 'rock/mediana.mp3') {
+        const m = String(((init || {}).headers || {}).Range || '').match(/bytes=(\d+)-(\d+)/);
+        if (m) {
+          const d = Number(m[1]); const h = Math.min(Number(m[2]), CANCION_MEDIANA.length - 1);
+          const reb = CANCION_MEDIANA.slice(d, h + 1);
+          return resp(206, null, reb.buffer.slice(reb.byteOffset, reb.byteOffset + reb.length),
+            { 'content-range': `bytes ${d}-${h}/${CANCION_MEDIANA.length}` });
+        }
+        return entero(CANCION_MEDIANA);
+      }
+      if (f === 'rock/mediana-sinrange.mp3') return entero(CANCION_MEDIANA);
+      if (f === 'rock/enorme.mp3') return entero(CANCION_ENORME);
       return resp(404, {});
     }
     return resp(404, {});
@@ -140,29 +170,59 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   r = await h(ev({ accion: 'sampler_eliminar', id: id1, confirmar: true }, roshi));
   af(r.statusCode === 200 && SAMPLERS.length === 0 && Object.keys(OBJETOS).length === 0, 'con confirmar la fila se va Y su audio también (contenido, no dinero)');
 
-  // Música del catálogo
-  r = await h(ev({ accion: 'cancion_descargar', ruta: 'rock/chica.mp3' }, roshi));
+  // Música del catálogo — [KAIO-CABINA-2] baja por REBANADAS, como el front
+  async function bajar(ruta) {
+    const pedazos = []; let desde = 0, total = 0, llamadas = 0, mime = null;
+    for (let i = 0; i < 12; i++) {
+      const rr = await h(ev({ accion: 'cancion_descargar', ruta, desde }, roshi));
+      const jj = JSON.parse(rr.body);
+      if (rr.statusCode !== 200) return { statusCode: rr.statusCode, j: jj, llamadas };
+      llamadas++;
+      if (desde === 0) mime = jj.mime;
+      const buf = Buffer.from(jj.b64, 'base64');
+      pedazos.push(buf); total = jj.bytes_total; desde += buf.length;
+      if (jj.completo) break;
+    }
+    return { statusCode: 200, buf: Buffer.concat(pedazos), total, llamadas, mime };
+  }
+  let d = await bajar('rock/chica.mp3');
+  af(d.statusCode === 200 && d.llamadas === 1 && d.mime === 'audio/mpeg' && d.buf.equals(CANCION_CHICA), 'una canción chica baja en UNA llamada con su mime por bytes');
+  d = await bajar('rock/mediana.mp3');
+  af(d.statusCode === 200 && d.llamadas === 3 && d.total === CANCION_MEDIANA.length && d.buf.equals(CANCION_MEDIANA), '🔒 el caso de Memo (11.3 MB rebotada): una canción de 9 MB baja por 3 REBANADAS y la concatenación es BYTE A BYTE el archivo (servidor que honra Range)');
+  d = await bajar('rock/mediana-sinrange.mp3');
+  af(d.statusCode === 200 && d.llamadas === 3 && d.buf.equals(CANCION_MEDIANA), 'y con un servidor que IGNORA el Range, el handler rebana él mismo: mismo resultado byte a byte');
+  r = await h(ev({ accion: 'cancion_descargar', ruta: 'rock/mediana.mp3', desde: 4194304 }, roshi));
   b = JSON.parse(r.body);
-  af(r.statusCode === 200 && b.ok && b.mime === 'audio/mpeg' && Buffer.from(b.b64, 'base64').length === CANCION_CHICA.length, 'una canción chica baja entera en base64 con su mime por bytes');
-  r = await h(ev({ accion: 'cancion_descargar', ruta: 'rock/gorda.mp3' }, roshi));
+  af(r.statusCode === 200 && b.mime === undefined && b.desde === 4194304, 'el mime solo se afirma en la rebanada 0 — la magia de bytes vive al INICIO del archivo');
+  r = await h(ev({ accion: 'cancion_descargar', ruta: 'rock/enorme.mp3' }, roshi));
   b = JSON.parse(r.body);
-  af(r.statusCode === 413 && /4\.6 MB/.test(b.error) && /archivo local/.test(b.error), '🔒 la canción que no cabe en el puente contesta 413 CON su tamaño y el camino alterno — no un 502 mudo');
+  af(r.statusCode === 413 && /26\.0 MB/.test(b.error) && /archivo local/.test(b.error), '🔒 el tope que queda es TOTAL (25 MB, por los 10 s de Netlify) y se DICE con el tamaño y el camino alterno');
   r = await h(ev({ accion: 'cancion_descargar', ruta: '../etc/passwd' }, roshi));
   af(r.statusCode === 400, 'una ruta con .. se rechaza en la puerta');
 
-  // Locutores
+  // Locutores — [KAIO-CABINA-2] el AzuraCast de Memo nació con los DJs APAGADOS
   r = await h(ev({ accion: 'streamers_listar' }, roshi));
   b = JSON.parse(r.body);
   af(r.statusCode === 200 && b.streamers.length === 1 && b.streamers[0].usuario === 'memo', 'los locutores se listan con usuario y nombre');
   af(!JSON.stringify(b).includes('NUNCA-DEBE-VIAJAR') && b.streamers[0].streamer_password === undefined, '🔒 NINGUNA contraseña viaja en la lista — aunque AzuraCast la mandara');
   r = await h(ev({ accion: 'streamer_crear', usuario: 'dj', contrasena: 'corta' }, roshi));
   af(r.statusCode === 400, 'usuario corto o contraseña <8 se rechazan con palabras');
+  red.adminOk = false;
+  r = await h(ev({ accion: 'streamer_crear', usuario: 'invitado1', contrasena: 'ochoexactos' }, roshi));
+  b = JSON.parse(r.body);
+  af(r.statusCode === 502 && /[Cc]amino manual/.test(b.error) && STREAMERS.length === 1 && red.djsOn === false, 'DJs apagados Y sin poder de admin → el error trae el CAMINO MANUAL del panel, nada se crea');
+  red.adminOk = true;
   r = await h(ev({ accion: 'streamer_crear', usuario: 'invitado1', contrasena: 'ochoexactos', nombre: 'El Invitado' }, roshi));
-  af(r.statusCode === 200 && STREAMERS.length === 2, 'crear locutor pega en AzuraCast y nace la cuenta');
-  r = await h(ev({ accion: 'streamer_eliminar', id: 9 }, roshi));
-  af(r.statusCode === 400 && STREAMERS.length === 2, 'eliminar locutor también exige confirmar:true');
-  r = await h(ev({ accion: 'streamer_eliminar', id: 9, confirmar: true }, roshi));
-  af(r.statusCode === 200 && STREAMERS.length === 1, 'y con confirmar la cuenta se va');
+  b = JSON.parse(r.body);
+  af(r.statusCode === 200 && STREAMERS.length === 2 && red.djsOn === true && red.restarts === 1, '🔒 el caso de Memo (StationUnsupportedException): el handler ENCIENDE la puerta de DJs, reinicia la estación y reintenta — la cuenta nace');
+  af(typeof b.nota === 'string' && /reinici/.test(b.nota), 'y la pantalla se entera: la nota DICE que la estación se reinició');
+  r = await h(ev({ accion: 'streamer_crear', usuario: 'invitado2', contrasena: 'ochoexactos' }, roshi));
+  b = JSON.parse(r.body);
+  af(r.statusCode === 200 && STREAMERS.length === 3 && red.restarts === 1 && !b.nota, 'con la puerta ya abierta, crear otro NO reinicia nada ni avisa de más');
+  r = await h(ev({ accion: 'streamer_eliminar', id: 11 }, roshi));
+  af(r.statusCode === 400 && STREAMERS.length === 3, 'eliminar locutor también exige confirmar:true');
+  r = await h(ev({ accion: 'streamer_eliminar', id: 11, confirmar: true }, roshi));
+  af(r.statusCode === 200 && STREAMERS.length === 2, 'y con confirmar la cuenta se va');
 
   // Estructura del front (lo que el vm no corre): la carga perezosa y el CSP.
   console.log('\n[D] los cables del front y el CSP');
@@ -170,6 +230,9 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(js.includes("new WebSocket(cabinaWsUrl(), 'webcast')"), 'el WS pide el subprotocolo webcast (sin él, AzuraCast no entiende el hello)');
   af(js.includes('_cb.buses.sam.connect(_cb.monitorGain)') && !/buses\.mic\.connect\(_cb\.monitorGain\)/.test(js), '🔒 el monitor toca samplers y música — el MIC jamás (se acopla con las bocinas)');
   af(js.includes("admin-radio-media?buscar="), 'la búsqueda de música es la de admin-radio-media — el catálogo tiene UN buscador, no se gemelea');
+  af(js.includes("cancion_descargar', ruta, desde") && js.includes('j.completo'), '[KC-2] el front baja la canción en BUCLE de rebanadas hasta `completo`');
+  af(js.includes("NotAllowedError") && /candado/.test(js) && /Privacidad y seguridad/.test(js), '[KC-2] el error del mic DICE el remedio: candado del navegador y Ajustes de macOS, por nombre de error');
+  af(js.includes('if (j.nota) _cbMsg'), '[KC-2] si el servidor reinició la estación para abrir los DJs, la pantalla lo dice');
   const csp = fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8');
   af(/connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja salir el WebSocket del uplink (sin esto la cabina moriría muda en producción)');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');

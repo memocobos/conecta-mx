@@ -299,8 +299,33 @@ está caduco antes de escribirse.
       proyección de la lista **jamás deja viajar una contraseña** (careado
       aunque AzuraCast la mandara) y el selector de cuenta para salir al aire
       nace VACÍO (DEFAULTS-1: es una atribución).
+    - ✅ **KAIO-CABINA-2 (24-oct, los 3 hallazgos de la primera prueba de
+      Memo, con capturas):**
+      (1) 🔴 **«La canción pesa 11.3 MB y el tope es 4.2»** — el tope de 4.2
+      era el de la RESPUESTA de la function, no del cable: hoy la canción baja
+      por **REBANADAS de 4 MB** (`cancion_descargar` aprende `desde`; se le
+      pide Range a AzuraCast y si lo ignora el handler rebana él mismo — los
+      DOS servidores careados byte a byte) y el front concatena en bucle con
+      progreso. El tope que queda es TOTAL: **25 MB** (los 10 s de Netlify),
+      dicho en el 413 con el camino alterno.
+      (2) 🔴 **«StationUnsupportedException» al crear locutor** — la estación
+      nació con la puerta de DJs APAGADA: `streamer_crear` la **ENCIENDE por
+      la API de admin** (`enable_streamers`) + reinicia la estación
+      (liquidsoap abre el puerto del webdj al reiniciar) + reintenta UNA vez,
+      y la `nota` le dice a la pantalla que hubo reinicio (~20 s de radio
+      caída que vuelve sola). Sin poder de admin → 502 con el **camino
+      manual** del panel. Con la puerta ya abierta no reinicia de más
+      (careado: restarts === 1).
+      (3) 🔴 **«El micrófono no se pudo abrir: Permission denied»** — un error
+      sin remedio manda a adivinar: hoy distingue por `e.name` y DICE el
+      camino (candado 🔒 junto a la URL → Micrófono → Permitir + Ajustes de
+      macOS → Privacidad; mic ocupado por otro programa; sin mic).
+      `mide:kaio-cabina-1` **42** (la red falsa aprendió Range/206, la
+      estación con DJs apagados y el admin sin poder).
     - ⏳ **Queda de V2c:** AL AIRE en el hero de Kaio-sama + el vigilante que
       avisa si un programa de la parrilla debía empezar y nadie se conectó.
+      Y ⏳ **el uplink webcast sigue sin estrenarse**: la primera prueba de
+      Memo no llegó al aire (lo frenó la puerta de DJs apagada).
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

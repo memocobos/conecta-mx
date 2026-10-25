@@ -1527,7 +1527,20 @@ async function cabMicToggle() {
     _cb.micSrc.connect(_cb.buses.mic);
     if (btn) { btn.textContent = '🎤 Micrófono VIVO (clic para apagar)'; btn.style.color = 'var(--red)'; }
   } catch (e) {
-    _cbMsg('cab-msg', 'El micrófono no se pudo abrir: ' + e.message, true);
+    // [KAIO-CABINA-2, cazado por Memo: «Permission denied» pelado no dice el
+    // CAMINO] El nombre del error distingue las tres causas reales y cada una
+    // trae su remedio — un mensaje sin remedio manda a adivinar.
+    let como;
+    if (e.name === 'NotAllowedError' || /denied/i.test(e.message)) {
+      como = 'El navegador tiene BLOQUEADO el micrófono para este sitio. Desbloquéalo: clic en el candado 🔒 junto a la dirección → Micrófono → Permitir, y recarga la página. En Mac revisa también Ajustes del Sistema → Privacidad y seguridad → Micrófono → activa tu navegador.';
+    } else if (e.name === 'NotFoundError') {
+      como = 'No se encontró ningún micrófono conectado.';
+    } else if (e.name === 'NotReadableError') {
+      como = 'Otro programa tiene tomado el micrófono (Zoom, OBS, etc.) — ciérralo y vuelve a intentar.';
+    } else {
+      como = e.message;
+    }
+    _cbMsg('cab-msg', 'El micrófono no se pudo abrir: ' + como, true);
   }
 }
 
@@ -1717,15 +1730,30 @@ async function cabBuscar() {
 async function cabTocarRuta(ruta, titulo) {
   const box = _cbEl('cab-mus-nombre');
   if (box) box.textContent = 'Bajando «' + titulo + '»…';
-  const { st, j } = await _cbApi({ accion: 'cancion_descargar', ruta });
-  if (st !== 200 || !j.ok) { if (box) box.textContent = '— nada cargado —'; showToast(j.error || ('HTTP ' + st), 'error'); return; }
   try {
-    const bin = atob(j.b64);
-    const buf = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    // [KAIO-CABINA-2] La canción baja por REBANADAS (el 413 de 4.2 MB murió):
+    // se pide {desde} en bucle hasta `completo` y se concatena aquí.
+    const pedazos = [];
+    let desde = 0, total = 0;
+    for (let i = 0; i < 12; i++) {
+      const { st, j } = await _cbApi({ accion: 'cancion_descargar', ruta, desde });
+      if (st !== 200 || !j.ok) { if (box) box.textContent = '— nada cargado —'; showToast(j.error || ('HTTP ' + st), 'error'); return; }
+      const bin = atob(j.b64);
+      const buf = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
+      pedazos.push(buf);
+      total = j.bytes_total || (desde + buf.length);
+      desde += buf.length;
+      if (j.completo) break;
+      if (box) box.textContent = 'Bajando «' + titulo + '»… ' + Math.round((desde / total) * 100) + '%';
+    }
+    if (desde < total) { if (box) box.textContent = '— nada cargado —'; showToast('La descarga quedó incompleta (' + desde + ' de ' + total + ' bytes)', 'error'); return; }
+    const todo = new Uint8Array(total);
+    let pos = 0;
+    for (const p of pedazos) { todo.set(p, pos); pos += p.length; }
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
-    _cbMusCargar(await ctx.decodeAudioData(buf.buffer), titulo);
+    _cbMusCargar(await ctx.decodeAudioData(todo.buffer), titulo);
   } catch (e) { if (box) box.textContent = '— nada cargado —'; showToast('Ese audio no se pudo decodificar: ' + e.message, 'error'); }
 }
 async function cabMusLocal(input) {
@@ -1794,6 +1822,9 @@ async function cabDjCrear() {
   const { st, j } = await _cbApi({ accion: 'streamer_crear', usuario, contrasena, nombre });
   if (st !== 200 || !j.ok) { showToast(j.error || ('HTTP ' + st), 'error'); return; }
   showToast('Locutor creado: ' + usuario, 'success');
+  // [KAIO-CABINA-2] Si el servidor tuvo que encender la puerta de DJs y
+  // reiniciar la estación, se DICE — el silencio se leería como radio caída.
+  if (j.nota) _cbMsg('cab-msg', j.nota, false);
   ['cab-dj-user', 'cab-dj-pass', 'cab-dj-nombre'].forEach((id) => { const e = _cbEl(id); if (e) e.value = ''; });
   loadRadioCabina();
 }

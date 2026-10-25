@@ -15,15 +15,20 @@
 //
 //  MÚSICA DEL CATÁLOGO (la BÚSQUEDA ya es de admin-radio-media ?buscar= — aquí
 //  solo vive la DESCARGA para tocarla dentro de la mezcla de la cabina):
-//   POST { accion:'cancion_descargar', ruta } → { ok, b64, mime, bytes }
-//     ⚠️ Tope 4.2 MB (el límite de respuesta de la function, dicho): una
-//     canción más pesada contesta 413 CON su tamaño y el consejo de tocarla
-//     desde archivo local — un tope que no se dice se lee como «no existe».
+//   POST { accion:'cancion_descargar', ruta, desde? }
+//        → { ok, b64, mime? (solo rebanada 0), desde, bytes, bytes_total, completo }
+//     [KAIO-CABINA-2] Por REBANADAS de 4 MB: el front pide {desde} en bucle y
+//     concatena. Tope TOTAL 25 MB (los 10 s de Netlify), dicho en el 413 — más
+//     grande va por archivo local.
 //
 //  LOCUTORES (streamers de AzuraCast — las cuentas de DJ para transmitir):
 //   POST { accion:'streamers_listar' } → { ok, streamers:[{id,usuario,nombre,activo}] }
 //     (SIN contraseñas: AzuraCast no las regresa y aquí tampoco viajarían)
-//   POST { accion:'streamer_crear', usuario, contrasena, nombre? } → { ok, streamer }
+//   POST { accion:'streamer_crear', usuario, contrasena, nombre? } → { ok, streamer, nota? }
+//     [KAIO-CABINA-2] Si la estación tiene los DJs APAGADOS
+//     (StationUnsupportedException), se ENCIENDEN por la API de admin + reinicio
+//     de la estación y se reintenta; la `nota` le dice a la pantalla que hubo
+//     reinicio. Sin poder de admin, el error trae el camino manual del panel.
 //   POST { accion:'streamer_eliminar', id, confirmar:true }        → { ok }
 //
 // La TRANSMISIÓN en sí NO pasa por aquí: la cabina del navegador se conecta
@@ -42,7 +47,14 @@ const TIMEOUT_MS = 8000;
 // base64 infla 4/3 — un sampler de 5 MB jamás habría llegado. Un efecto de
 // 10 s en MP3 128 kbps pesa ~160 KB: sobra. El error DICE el tope.
 const MAX_SAMPLER_BYTES = 3.5 * 1024 * 1024;
-const MAX_CANCION_BYTES = 4.2 * 1024 * 1024; // límite de respuesta de la function
+// [KAIO-CABINA-2, cazado por Memo en la primera prueba: «11.3 MB y el tope es
+// 4.2»] La canción ya NO topa en 4.2 MB: viaja por REBANADAS de 4 MB (4 MB
+// crudos ≈ 5.4 MB en base64, bajo el techo de ~6 MB de la RESPUESTA de una
+// function). El tope que queda es TOTAL y de tiempo: si AzuraCast no honra el
+// header Range, cada rebanada baja el archivo entero servidor-a-servidor, y un
+// archivo de 25 MB roza los 10 s de Netlify — más grande va por archivo local.
+const MAX_CANCION_BYTES = 25 * 1024 * 1024;  // tope TOTAL del puente, dicho en el 413
+const CHUNK_CANCION = 4 * 1024 * 1024;       // la rebanada que SÍ cabe en una respuesta
 
 function azFetch(url, init) {
   const ctl = new AbortController();
@@ -183,15 +195,31 @@ exports.handler = async (event) => {
       if (!ruta || ruta.includes('..')) return res(400, { error: 'ruta inválida' });
       const API_KEY = process.env.AZURACAST_API_KEY;
       if (!API_KEY) return res(500, { error: 'Falta env var AZURACAST_API_KEY' });
+      const desde = Math.max(0, Math.round(Number(body.desde) || 0));
+      // Se le PIDE la rebanada a AzuraCast (Range): si contesta 206 solo baja lo
+      // suyo; si contesta 200 con todo, se rebana AQUÍ — el límite era la
+      // respuesta al navegador, no el cable servidor-a-servidor.
       const r = await azFetch(`${AZ_BASE}/api/station/${STATION}/files/download?file=${encodeURIComponent(ruta)}`,
-        { headers: { 'X-API-Key': API_KEY } });
+        { headers: { 'X-API-Key': API_KEY, Range: `bytes=${desde}-${desde + CHUNK_CANCION - 1}` } });
       if (!r.ok) return res(502, { error: 'AzuraCast no soltó el archivo: HTTP ' + r.status });
-      const buf = Buffer.from(await r.arrayBuffer());
-      if (buf.length > MAX_CANCION_BYTES) {
-        return res(413, { error: `La canción pesa ${(buf.length / 1048576).toFixed(1)} MB y el tope del puente es 4.2 MB — tócala desde «archivo local» en la cabina (el MP3 vive en tu NAS/compu)`, bytes: buf.length });
+      const cuerpo = Buffer.from(await r.arrayBuffer());
+      let total, rebanada;
+      if (r.status === 206) {
+        const m = String((r.headers && r.headers.get && r.headers.get('content-range')) || '').match(/\/(\d+)\s*$/);
+        total = m ? Number(m[1]) : desde + cuerpo.length;
+        rebanada = cuerpo.length > CHUNK_CANCION ? cuerpo.slice(0, CHUNK_CANCION) : cuerpo;
+      } else {
+        total = cuerpo.length;
+        rebanada = cuerpo.slice(desde, desde + CHUNK_CANCION);
       }
-      const tipo = tipoAudio(buf) || { mime: 'audio/mpeg' };
-      return res(200, { ok: true, b64: buf.toString('base64'), mime: tipo.mime, bytes: buf.length });
+      if (total > MAX_CANCION_BYTES) {
+        return res(413, { error: `La canción pesa ${(total / 1048576).toFixed(1)} MB y el tope de la cabina es 25 MB — esa tócala desde «archivo local» (el MP3 vive en tu NAS/compu)`, bytes: total });
+      }
+      if (!rebanada.length) return res(400, { error: `desde=${desde} queda fuera del archivo (${total} bytes)` });
+      // El mime se lee por bytes SOLO en la rebanada 0 — la magia vive al inicio del archivo.
+      const tipo = desde === 0 ? (tipoAudio(rebanada) || { mime: 'audio/mpeg' }) : null;
+      return res(200, { ok: true, b64: rebanada.toString('base64'), mime: tipo ? tipo.mime : undefined,
+        desde, bytes: rebanada.length, bytes_total: total, completo: desde + rebanada.length >= total });
     }
 
     // ── LOCUTORES (streamers de AzuraCast) ──────────────────────────────────
@@ -214,12 +242,33 @@ exports.handler = async (event) => {
       if (contrasena.length < 8) return res(400, { error: 'La contraseña va de 8 caracteres para arriba' });
       const API_KEY = process.env.AZURACAST_API_KEY;
       if (!API_KEY) return res(500, { error: 'Falta env var AZURACAST_API_KEY' });
-      const r = await azFetch(`${AZ_BASE}/api/station/${STATION}/streamers`, {
+      const crear = () => azFetch(`${AZ_BASE}/api/station/${STATION}/streamers`, {
         method: 'POST', headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ streamer_username: usuario, streamer_password: contrasena, display_name: nombre, is_active: true }) });
-      if (!r.ok) return res(502, { error: 'AzuraCast no lo creó: ' + (await r.text()).slice(0, 200) });
+      let r = await crear();
+      let nota = null;
+      if (!r.ok) {
+        const texto = (await r.text().catch(() => '')).slice(0, 300);
+        // [KAIO-CABINA-2, cazado por Memo en la primera prueba] La estación nació
+        // con la puerta de DJs APAGADA y AzuraCast contesta
+        // StationUnsupportedException. Se enciende por la API de admin
+        // (enable_streamers) + reinicio de la estación — liquidsoap abre el
+        // puerto del webdj al reiniciar — y se reintenta UNA vez.
+        if (/StationUnsupportedException|does not currently support/i.test(texto)) {
+          const hab = await azFetch(`${AZ_BASE}/api/admin/station/${STATION}`, {
+            method: 'PUT', headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enable_streamers: true }) });
+          if (!hab.ok) return res(502, { error: 'La estación tiene APAGADA la puerta de DJs y no se pudo encender por API (HTTP ' + hab.status + '). Camino manual: AzuraCast → Administrar estaciones → Editar → pestaña Transmisores → «Permitir transmisores/DJs» → Guardar, y reinicia la estación. Luego vuelve a crear la cuenta aquí.' });
+          await azFetch(`${AZ_BASE}/api/station/${STATION}/restart`, { method: 'POST', headers: { 'X-API-Key': API_KEY } }).catch(() => {});
+          r = await crear();
+          nota = 'La estación tenía apagada la puerta de DJs: se encendió y la estación se reinició para abrirla (la radio vuelve sola en ~20 s).';
+          if (!r.ok) return res(502, { error: 'Se encendió la puerta de DJs pero el alta siguió fallando: ' + (await r.text().catch(() => '')).slice(0, 200) + ' — espera ~30 s a que la estación termine de reiniciar y vuelve a intentar.' });
+        } else {
+          return res(502, { error: 'AzuraCast no lo creó: ' + texto.slice(0, 200) });
+        }
+      }
       const s = await r.json().catch(() => ({}));
-      return res(200, { ok: true, streamer: { id: s.id, usuario, nombre } });
+      return res(200, { ok: true, streamer: { id: s.id, usuario, nombre }, nota });
     }
 
     if (accion === 'streamer_eliminar') {

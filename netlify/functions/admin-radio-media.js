@@ -22,12 +22,14 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { tipoAudio } = require('./_lib/audio-magia');   // [KAIO-V3b] el dueño de la magia de bytes
 
 const AZ_BASE     = 'https://radio.conectareynosa.mx';
 const EDITOR_BASE = 'https://editor.conectareynosa.mx';
 const STATION     = '1';
 const TIMEOUT_MS  = 8000;
 const MAX_IMG_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_AUDIO_BYTES = 4 * 1024 * 1024; // [KAIO-V3b] 4MB: el request topa ~6MB y base64 infla 4/3
 const MIME_OK = { 'image/jpeg': 1, 'image/png': 1 };
 const PUBLIC_ART_PREFIX = `${AZ_BASE}/api/station/${STATION}/art/`;
 
@@ -145,7 +147,9 @@ exports.handler = async (event) => {
 
     const accion = (body && body.accion) ? String(body.accion) : '';
     const ruta = (body && body.ruta != null) ? String(body.ruta) : '';
-    if (!rutaValida(ruta)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'ruta inválida' }) };
+    // [KAIO-V3b] mkdir no lleva `ruta` (lleva carpeta+nombre y los valida su
+    // rama); las demás acciones sí — la guarda global se queda para ellas.
+    if (accion !== 'mkdir' && !rutaValida(ruta)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'ruta inválida' }) };
 
     // POST editar → escribe tags en el archivo
     if (accion === 'editar') {
@@ -209,6 +213,84 @@ exports.handler = async (event) => {
         az_avisado = !!rb.ok;
       } catch (e) { /* best-effort: el escáner de AzuraCast lo levanta solo */ }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, az_avisado }) };
+    }
+
+    // ── [KAIO-V3b] El acomodo de la música — formas MEDIDAS en el AzuraCast
+    // REAL (25-oct, capturadas de su propia UI con la sesión de Memo):
+    //   mover → PUT  files/batch  {do:'move', currentDirectory, directory, files, dirs}
+    //           ⚠️ el campo es `dirs`, NO `directories` — escrito de memoria
+    //           habría muerto en silencio.
+    //   mkdir → POST files/mkdir  {currentDirectory, name}
+    // El move/mkdir NO tocan el disco por el editor: son operaciones del
+    // propio AzuraCast, que re-indexa solo.
+
+    // POST mover → mueve UNA canción (su `ruta`) a la carpeta `destino`
+    // ('' = raíz, válido a propósito).
+    if (accion === 'mover') {
+      const destino = (body && body.destino != null) ? String(body.destino) : null;
+      if (destino == null || (destino !== '' && !rutaValida(destino))) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'destino inválido' }) };
+      }
+      const r = await httpFetch(`${AZ_BASE}/api/station/${STATION}/files/batch`, {
+        method: 'PUT',
+        headers: { ...azHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ do: 'move', currentDirectory: '', directory: destino, files: [ruta], dirs: [] }),
+      });
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast no pudo mover el archivo', detail: detail.slice(0, 300) }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, destino }) };
+    }
+
+    // POST mkdir → crea una carpeta dentro de `carpeta` ('' = raíz). El nombre
+    // no puede traer separadores ni traversal: una carpeta, no una ruta.
+    if (accion === 'mkdir') {
+      const carpeta = (body && body.carpeta != null) ? String(body.carpeta) : '';
+      const nombre = (body && body.nombre != null) ? String(body.nombre).trim() : '';
+      if (carpeta !== '' && !rutaValida(carpeta)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'carpeta inválida' }) };
+      if (!nombre || nombre.length > 120 || /[\/\\]/.test(nombre) || nombre.includes('..') || nombre.indexOf('\0') !== -1) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'nombre de carpeta inválido (sin / ni ..)' }) };
+      }
+      const r = await httpFetch(`${AZ_BASE}/api/station/${STATION}/files/mkdir`, {
+        method: 'POST',
+        headers: { ...azHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentDirectory: carpeta, name: nombre }),
+      });
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast no pudo crear la carpeta', detail: detail.slice(0, 300) }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ruta: (carpeta ? carpeta + '/' : '') + nombre }) };
+    }
+
+    // POST subir → una canción NUEVA a `ruta` (carpeta/archivo.ext). Tope
+    // 4 MB DICHO (el request de la function topa ~6 MB y el base64 infla 4/3 —
+    // la lección del sampler); para tandas o archivos grandes, el gestor de
+    // AzuraCast. La magia de bytes es del DUEÑO (_lib/audio-magia, el mismo
+    // del soundboard): jamás se decide por el nombre.
+    if (accion === 'subir') {
+      const archivo = (body && body.archivo != null) ? String(body.archivo).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '') : '';
+      if (!archivo || !/^[A-Za-z0-9+/]+={0,2}$/.test(archivo)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'archivo base64 inválido' }) };
+      }
+      const bytes = Buffer.from(archivo, 'base64');
+      if (!bytes.length) return { statusCode: 400, headers, body: JSON.stringify({ error: 'el archivo llegó vacío' }) };
+      if (bytes.length > MAX_AUDIO_BYTES) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: `El archivo pesa ${(bytes.length / 1048576).toFixed(1)} MB y el tope por aquí es 4 MB — para archivos grandes usa el gestor de AzuraCast (botón «Subir en AzuraCast»)` }) };
+      }
+      const tipo = tipoAudio(bytes);
+      if (!tipo) return { statusCode: 400, headers, body: JSON.stringify({ error: 'El archivo no es MP3/WAV/OGG (se mira por los bytes, no por el nombre)' }) };
+      const r = await httpFetch(`${AZ_BASE}/api/station/${STATION}/files`, {
+        method: 'POST',
+        headers: { ...azHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: ruta, file: archivo }),
+      });
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast no aceptó la canción', detail: detail.slice(0, 300) }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ruta, bytes: bytes.length }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };

@@ -479,6 +479,55 @@ está caduco antes de escribirse.
         casilla «Grabar Transmisiones en Vivo» sigue APAGADA a propósito
         (palabra de Memo: sin grabados por ahora) — está ahí el día que los
         quiera.
+    - ✅ **SERIE KAIO-V3 (25-oct, en main local): Kaio-sama se vuelve centro
+      de control EN VIVO.** Palabra de Memo: «en números, control y biblioteca
+      necesitamos mejoras para que la interface sea más amigable… el muro y
+      todo eso en vivo para atender peticiones al transmitir… mejor control y
+      acomodo de la música, también las carpetas». Decisiones firmadas: panel
+      en vivo DENTRO de la Cabina · música = mover + crear carpetas + escuchar
+      (+ subir ≤4 MB). `npm run mide:kaio-v3` (**35**, sin ancla — árbol);
+      vecinos en verde la misma tarde (cabina-1 **88** · v2b **36** · v2a **32**).
+      - **V3a · «📨 Llegando del público» EN LA CABINA:** peticiones
+        pendientes + muro latiendo cada 10 s (dueño `_cb.pubTimer`; el tick se
+        SALTA con la pestaña del navegador o el tab oculto). Lo nuevo se
+        resalta 🆕 y la campana 🔔 (nace APAGADA — DEFAULTS-1) suena LOCAL:
+        osc→destination, JAMÁS por el master — nada que no sea la mezcla sale
+        al aire. Las acciones de un clic DELEGAN en los dueños (`radioAtender`
+        / `radioMuroVisible`) y los datos van a los MISMOS globals
+        (`_radioPeticiones`/`_radioMuro`): las pestañas Peticiones y Muro
+        quedan frescas gratis, sin segunda copia. El primer tick SIEMBRA sin
+        resaltar ni sonar — abrir la cabina no significa que llegó algo.
+      - **V3b · LA BIBLIOTECA ACOMODA:** botón 📁 «Mover a…» por canción
+        (a una carpeta de la lista real o a UNA NUEVA que nace por mkdir y
+        recibe la canción en el mismo paso) · ▶ escuchar LOCAL (baja por
+        `_radioBajarRuta` — la descarga por rebanadas ganó UN dueño,
+        compartido con la cabina — y toca en un `<audio>` propio: no pasa por
+        el grafo, no sale al aire; **`blob:` entró a media-src del CSP** — sin
+        él moría mudo, la lección REQ-FOTO-1 aplicada ANTES de morder) ·
+        ⬆ SUBIR a la carpeta abierta (magia de bytes, tope 4 MB DICHO con
+        camino alterno; para tandas, link al gestor de AzuraCast).
+        🔒 **LAS FORMAS DE LA API SE MIDIERON EN EL AZURACAST REAL** (25-oct,
+        capturadas de su propia UI con interceptor XHR y la sesión de Memo):
+        mover = `PUT files/batch {do:'move', currentDirectory, directory,
+        files, dirs}` — **el campo es `dirs`, NO `directories`**: escrito de
+        memoria habría muerto en silencio — y mkdir = `POST files/mkdir
+        {currentDirectory, name}`. La magia de bytes de audio se mudó a
+        **`_lib/audio-magia`** (UN dueño: cabina + biblioteca). La guarda
+        global de ruta exceptúa a `mkdir` (no lleva ruta; con la guarda vieja
+        daba 400), careado. ⚠️ Dicho: el buscador de archivos de AzuraCast NO
+        ve carpetas vacías (medido) — por eso la carpeta nueva nace desde
+        «Mover a…», ya con canción dentro. ⚠️ **Mover/mkdir/subir contra el
+        AzuraCast VIVO con la API key los estrena Memo** (desde el sandbox
+        solo se midió por la UI con su sesión); un rebote contesta 502 CON el
+        detalle.
+      - **V3c · Control y Números:** Control abre con el card **«Al aire
+        ahora»** (🔴 locutor / 🤖 AutoDJ, qué suena, oyentes, programa en
+        horario y el que SIGUE — la parrilla se le pregunta a
+        `radio-cartelera`, el dueño público: ni un minuto de pared se
+        re-calcula) + ⏭ Saltar canción e 🎙 Ir a la cabina a la mano. Las
+        tarjetas de Números **LATEN solas** cada 30 s (dueño `_rnVivoTimer`,
+        SOLO las piezas baratas — nowplaying y likes —, jamás los 6 reportes,
+        y nunca con la pestaña en fondo).
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

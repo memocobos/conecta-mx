@@ -2475,6 +2475,33 @@
     </details>
    </div>
 
+   <!-- [KAIO-V3a] LLEGANDO DEL PÚBLICO — EN VIVO. Peticiones y muro en tiempo
+        real para atenderlos SIN salir de la cabina mientras transmites. Late
+        cada 10 s (dueño _cb.pubTimer, solo con la pestaña visible); los datos
+        van a los MISMOS globals de las pestañas Peticiones/Muro, así que esas
+        tablas quedan frescas gratis. La campana nace APAGADA (DEFAULTS-1) y
+        suena LOCAL (jamás al aire: no pasa por el master). -->
+   <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">📨 Llegando del público</div>
+     <span style="font-size:10px;font-weight:800;letter-spacing:.08em;padding:2px 8px;border-radius:20px;background:var(--border);color:var(--ts)">EN VIVO</span>
+     <span id="cab-pub-sello" style="font-size:11px;color:var(--ts)"></span>
+     <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ts);cursor:pointer">
+      <input type="checkbox" id="cab-pub-ding"> 🔔 Sonido al llegar algo nuevo
+     </label>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+     <div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">Peticiones pendientes <span id="cab-pub-pet-n" style="color:var(--text)"></span></div>
+      <div id="cab-pub-pet" style="display:flex;flex-direction:column;gap:8px"><div style="color:var(--ts);font-size:13px">Cargando…</div></div>
+     </div>
+     <div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">El Muro (recientes)</div>
+      <div id="cab-pub-muro" style="display:flex;flex-direction:column;gap:8px"><div style="color:var(--ts);font-size:13px">Cargando…</div></div>
+     </div>
+    </div>
+   </div>
+
    <!-- MEZCLADORA -->
    <div class="card" style="margin-bottom:14px">
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Mezcladora</div>
@@ -2661,6 +2688,17 @@
   <!-- TAB 4: Control remoto -->
   <div id="radio-tab-control" style="display:none">
 
+   <!-- [KAIO-V3c] AL AIRE AHORA — el vistazo del centro de control: qué suena,
+        quién transmite, cuántos escuchan y qué programa sigue (de la parrilla). -->
+   <div class="ks-panel" style="margin-bottom:14px">
+    <div class="ks-panel-title">Al aire ahora</div>
+    <div id="radio-ctrl-aire" style="font-size:14px;line-height:1.7">Cargando…</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+     <button class="btn btn-ghost btn-sm" onclick="radioControlSaltar()" style="font-size:11px">⏭ Saltar canción</button>
+     <button class="btn btn-ghost btn-sm" onclick="showRadioTab('cabina',document.getElementById('radio-tab-btn-cabina'))" style="font-size:11px">🎙 Ir a la cabina</button>
+    </div>
+   </div>
+
    <div class="ks-panel">
     <div class="ks-panel-title">Buscar canción en la biblioteca</div>
     <div class="ks-search">
@@ -2717,8 +2755,46 @@
     <input type="text" id="bib-buscar" class="ks-search-input" placeholder="Buscar artista…" autocomplete="off" oninput="_bibOnBuscar(this.value)">
    </div>
    <div id="bib-abc" class="ks-abc"></div>
+   <!-- [KAIO-V3b] Subir UNA canción a la carpeta abierta (tope 4 MB dicho por
+        el servidor; tandas grandes → gestor de AzuraCast). Solo se muestra
+        DENTRO de una carpeta: en la raíz no hay «aquí» al que subir. -->
+   <div id="bib-subir" style="display:none;margin:10px 0;padding:10px 12px;border:1px dashed var(--border);border-radius:10px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+     <span style="font-size:12px;color:var(--ts)">Subir una canción a <b id="bib-subir-dest" style="color:var(--text)"></b> (MP3/WAV/OGG, máx 4 MB):</span>
+     <input type="file" id="bib-subir-file" accept="audio/*,.mp3,.wav,.ogg" style="font-size:12px;max-width:230px">
+     <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="bibSubir()">⬆ Subir aquí</button>
+     <a href="https://radio.conectareynosa.mx/station/1/files" target="_blank" rel="noopener" style="font-size:11px;color:var(--ts)">¿Muchas o pesadas? Subir en AzuraCast →</a>
+    </div>
+    <div id="bib-subir-msg" style="font-size:12px;margin-top:6px"></div>
+   </div>
    <div id="bib-contenido"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
    <div id="bib-paginacion" class="ks-pager"></div>
+   <!-- [KAIO-V3b] Reproductor LOCAL de la biblioteca (escuchar sin salir al
+        aire: NO pasa por el grafo de la cabina; el blob exige blob: en
+        media-src — ya está en el CSP). -->
+   <div id="bib-player" style="display:none;position:sticky;bottom:8px;margin-top:12px;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card, #111);box-shadow:0 6px 24px rgba(0,0,0,.35)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+     <span id="bib-player-nombre" style="font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46%"></span>
+     <audio id="bib-player-audio" controls style="flex:1;min-width:220px;height:34px"></audio>
+     <button class="btn btn-ghost btn-sm" style="font-size:12px" onclick="bibEscucharCerrar()">✕</button>
+    </div>
+   </div>
+   <!-- [KAIO-V3b] Modal «Mover a…»: carpeta destino de la lista REAL de la raíz
+        (o una NUEVA, que nace por mkdir y recibe la canción en el mismo paso). -->
+   <div id="bib-mover" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)bibMoverCerrar()">
+    <div style="background:var(--card, #111);border:1px solid var(--border);border-radius:14px;max-width:460px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:16px">
+     <div style="font-weight:800;font-size:15px;margin-bottom:2px">Mover canción</div>
+     <div id="bib-mover-cual" style="font-size:12px;color:var(--ts);margin-bottom:10px"></div>
+     <input type="text" id="bib-mover-q" class="ks-search-input" placeholder="Buscar carpeta…" autocomplete="off" oninput="_bibMoverFiltrar(this.value)" style="margin-bottom:8px">
+     <div id="bib-mover-lista" style="overflow:auto;flex:1;min-height:120px;border:1px solid var(--border);border-radius:10px;padding:6px"></div>
+     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="bib-mover-nueva" class="ks-search-input" placeholder="…o carpeta NUEVA (ej. el artista)" autocomplete="off" style="flex:1;min-width:160px">
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="bibMoverANueva()">➕ Crear y mover ahí</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="bibMoverCerrar()">Cancelar</button>
+     </div>
+     <div id="bib-mover-msg" style="font-size:12px;margin-top:6px"></div>
+    </div>
+   </div>
   </div>
 
  </div><!-- /page-radio -->

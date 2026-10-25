@@ -63,14 +63,9 @@ function azFetch(url, init) {
 }
 
 // El TIPO del audio por sus BYTES (jamás por el nombre — los SVG con nombre
-// .png ya mordieron): MP3 (ID3 o frame sync 0xFFEx), WAV (RIFF…WAVE), OGG (OggS).
-function tipoAudio(buf) {
-  if (buf.length > 3 && buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return { mime: 'audio/mpeg', ext: 'mp3' };
-  if (buf.length > 2 && buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) return { mime: 'audio/mpeg', ext: 'mp3' };
-  if (buf.length > 12 && buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WAVE') return { mime: 'audio/wav', ext: 'wav' };
-  if (buf.length > 4 && buf.slice(0, 4).toString('ascii') === 'OggS') return { mime: 'audio/ogg', ext: 'ogg' };
-  return null;
-}
+// .png ya mordieron). [KAIO-V3b] La magia se mudó a _lib/audio-magia: ahora
+// también la pide la Biblioteca al subir canciones — UN dueño, no dos copias.
+const { tipoAudio } = require('./_lib/audio-magia');
 
 exports.handler = async (event) => {
   const __rawOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';

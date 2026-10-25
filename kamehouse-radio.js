@@ -143,6 +143,20 @@ async function loadRadioNumeros() {
   // ── Reportes (lazy al abrir el tab; cada tarjeta es independiente) ──
   _rnOyentes(); _rnUnicos(); _rnHoras(); _rnMasTocadas(); _rnLikesDias(); _rnPeticionesResumen();
 
+  // [KAIO-V3c] Las tarjetas de arriba LATEN solas cada 30 s mientras el tab
+  // está visible (dueño _rnVivoTimer): solo las piezas BARATAS — nowplaying y
+  // likes públicos—, jamás los 6 reportes (ésos se piden al abrir el tab).
+  _rnVivos();
+  if (!_rnVivoTimer) {
+    _rnVivoTimer = setInterval(() => {
+      const tab = document.getElementById('radio-tab-numeros');
+      if (document.hidden || !tab || tab.style.display === 'none') return;
+      _rnVivos();
+    }, 30000);
+  }
+}
+let _rnVivoTimer = null;   // [KAIO-V3c] el dueño del latido de Números
+function _rnVivos() {
   // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
   fetch(RADIO_NOWPLAYING)
     .then(r => r.json())
@@ -467,8 +481,38 @@ function _radioSetNum(key, val, neutral) {
 // (API key server-side). "Recién sonaron" sale de song_history de nowplaying
 // pública. El "Sonando ahora" ya vive en el hero. Cada bloque falla-soft.
 function loadRadioControl() {
+  _ctrlAireCargar();   // [KAIO-V3c] el vistazo de arriba
   _loadRadioCola();
   _loadRadioHistorial();
+}
+// [KAIO-V3c] «Al aire ahora»: nowplaying (qué suena, locutor, oyentes) + la
+// PARRILLA (programa en horario y el que sigue — se le pregunta al dueño
+// público radio-cartelera, no se re-calcula un minuto de pared aquí).
+async function _ctrlAireCargar() {
+  const box = document.getElementById('radio-ctrl-aire');
+  if (!box) return;
+  try {
+    const [np, cart] = await Promise.all([
+      fetch(RADIO_NOWPLAYING).then(r => r.json()),
+      fetch('/.netlify/functions/radio-cartelera').then(r => r.json()).catch(() => null),
+    ]);
+    const s = (np && np.now_playing && np.now_playing.song) || {};
+    const live = !!(np && np.live && np.live.is_live);
+    const oy = (np && np.listeners && Number(np.listeners.current)) || 0;
+    const lineas = [];
+    lineas.push(live
+      ? '🔴 <b>EN VIVO</b> con ' + _spEscape((np.live && np.live.streamer_name) || 'locutor')
+      : '🤖 AutoDJ al aire');
+    lineas.push('🎵 ' + _spEscape([s.title, s.artist].filter(Boolean).join(' — ') || 'sin datos'));
+    lineas.push('👥 ' + oy + (oy === 1 ? ' oyente' : ' oyentes') + ' ahora');
+    if (cart && cart.ok) {
+      if (cart.al_aire) lineas.push('📺 Programa en horario: <b>' + _spEscape(cart.al_aire.nombre) + '</b>' + (cart.al_aire.conductor ? ' · con ' + _spEscape(cart.al_aire.conductor) : ''));
+      if (cart.siguiente) lineas.push('⏭ Sigue en la cartelera: <b>' + _spEscape(cart.siguiente.nombre) + '</b> · ' + _spEscape(cart.siguiente.dia_nombre || '') + ' ' + _spEscape(cart.siguiente.hora_inicio || ''));
+    }
+    box.innerHTML = lineas.join('<br>');
+  } catch (e) {
+    box.textContent = 'No disponible ahora.';
+  }
 }
 // "Recién sonaron" — últimas 5 de song_history (nowplaying pública).
 function _loadRadioHistorial() {
@@ -1008,13 +1052,144 @@ function _bibTrackHtml(a, i) {
   if (!String(a.artista || '').trim()) badges.push('<span class="badge badge-orange">sin artista</span>');
   if (!String(a.album || '').trim())   badges.push('<span class="badge badge-orange">sin álbum</span>');
   const sub = [a.artista, a.album].filter(Boolean).join(' · ');
+  // [KAIO-V3b] ▶ Escuchar (local, sin salir al aire) y 📁 Mover viven en la
+  // fila; el click normal sigue abriendo el editor. stopPropagation o cada
+  // botón abriría también el modal de edición.
   return `<div class="ks-result" onclick="_bibAbrirArchivo(${i})" title="Editar esta canción">
     <div class="ks-art">${ph}${img}</div>
     <div class="ks-track-txt">
       <div class="ks-track-t">${_spEscape(a.titulo || '(sin título)')}</div>
       <div class="ks-track-a">${_spEscape(sub || '—')}</div>
       ${badges.length ? `<div class="ks-badges">${badges.join('')}</div>` : ''}
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" title="Escuchar aquí (no sale al aire)" onclick="event.stopPropagation();bibEscuchar(${i})">▶</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" title="Mover a otra carpeta" onclick="event.stopPropagation();bibMoverAbrir(${i})">📁</button>
     </div></div>`;
+}
+// ── [KAIO-V3b] Estado propio de las piezas nuevas de la Biblioteca ───────────
+let _bibPlayerUrl = null;   // blob URL vivo del reproductor local (se revoca al cambiar/cerrar)
+let _bibMoverRuta = null;   // ruta de la canción que el modal «Mover a…» está moviendo
+// ── [KAIO-V3b] Escuchar LOCAL: baja por el dueño (_radioBajarRuta) y toca en
+// un <audio> propio — jamás por el grafo de la cabina, esto no sale al aire.
+async function bibEscuchar(i) {
+  const a = _bibArchivos[i]; if (!a) return;
+  const box = document.getElementById('bib-player');
+  const nom = document.getElementById('bib-player-nombre');
+  const au = document.getElementById('bib-player-audio');
+  if (!box || !au) return;
+  box.style.display = '';
+  if (nom) nom.textContent = 'Bajando «' + (a.titulo || a.ruta) + '»…';
+  try {
+    const bytes = await _radioBajarRuta(a.ruta, (pct) => { if (nom) nom.textContent = 'Bajando «' + (a.titulo || a.ruta) + '»… ' + pct + '%'; });
+    if (_bibPlayerUrl) { try { URL.revokeObjectURL(_bibPlayerUrl); } catch (e) {} }
+    _bibPlayerUrl = URL.createObjectURL(new Blob([bytes]));
+    au.src = _bibPlayerUrl;
+    au.play().catch(() => {});
+    if (nom) nom.textContent = (a.titulo || a.ruta) + (a.artista ? ' — ' + a.artista : '');
+  } catch (e) {
+    if (nom) nom.textContent = 'No se pudo: ' + e.message;
+  }
+}
+function bibEscucharCerrar() {
+  const box = document.getElementById('bib-player');
+  const au = document.getElementById('bib-player-audio');
+  if (au) { try { au.pause(); } catch (e) {} au.removeAttribute('src'); }
+  if (_bibPlayerUrl) { try { URL.revokeObjectURL(_bibPlayerUrl); } catch (e) {} _bibPlayerUrl = null; }
+  if (box) box.style.display = 'none';
+}
+// ── [KAIO-V3b] Mover a… — el destino sale de la lista REAL de carpetas de la
+// raíz (la misma de la Biblioteca), o de una carpeta NUEVA que nace por mkdir
+// y recibe la canción en el mismo paso. El servidor habla las formas MEDIDAS
+// en el AzuraCast real (files/batch con `dirs`, files/mkdir).
+async function bibMoverAbrir(i) {
+  const a = _bibArchivos[i]; if (!a) return;
+  _bibMoverRuta = a.ruta;
+  const m = document.getElementById('bib-mover'); if (!m) return;
+  const cual = document.getElementById('bib-mover-cual');
+  if (cual) cual.textContent = (a.titulo || a.ruta) + (a.artista ? ' — ' + a.artista : '');
+  const q = document.getElementById('bib-mover-q'); if (q) q.value = '';
+  const nv = document.getElementById('bib-mover-nueva'); if (nv) nv.value = '';
+  const msg = document.getElementById('bib-mover-msg'); if (msg) msg.textContent = '';
+  m.style.display = 'flex';
+  if (!_bibArtistas) { try { _bibArtistas = await _bibCargarRaizTodo(); } catch (e) {} }
+  _bibMoverFiltrar('');
+}
+function bibMoverCerrar() { const m = document.getElementById('bib-mover'); if (m) m.style.display = 'none'; _bibMoverRuta = null; }
+function _bibMoverFiltrar(q) {
+  const lista = document.getElementById('bib-mover-lista'); if (!lista) return;
+  const ql = String(q || '').toLowerCase();
+  const arr = (_bibArtistas || []).filter(c => !ql || String(c.nombre || '').toLowerCase().includes(ql)).slice(0, 60);
+  lista.innerHTML = arr.length
+    ? arr.map(c => `<div class="ks-folder" style="margin:2px 0" onclick="bibMoverElegir('${_radioJs(c.ruta)}')"><div class="ks-folder-name">${_spEscape(c.nombre)}</div><span class="ks-folder-chev">›</span></div>`).join('')
+    : '<div style="color:var(--ts);font-size:12px;padding:8px">Sin carpetas con ese nombre — créala abajo.</div>';
+}
+async function bibMoverElegir(destino) {
+  if (!_bibMoverRuta) return;
+  const msg = document.getElementById('bib-mover-msg');
+  if (msg) msg.textContent = 'Moviendo…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'mover', ruta: _bibMoverRuta, destino }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    showToast('Movida a ' + (destino || 'la raíz'), 'success');
+    bibMoverCerrar();
+    // Refrescar la carpeta abierta (la canción ya no vive aquí):
+    if (_bibCrumbs.length) _bibMostrarDir(_bibCrumbs[_bibCrumbs.length - 1].ruta, _bibPagina);
+  } catch (e) {
+    if (msg) msg.textContent = 'No se pudo: ' + e.message;
+  }
+}
+async function bibMoverANueva() {
+  const nv = document.getElementById('bib-mover-nueva');
+  const msg = document.getElementById('bib-mover-msg');
+  const nombre = ((nv && nv.value) || '').trim();
+  if (!nombre) { if (msg) msg.textContent = 'Escribe el nombre de la carpeta nueva.'; return; }
+  if (msg) msg.textContent = 'Creando carpeta…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'mkdir', carpeta: '', nombre }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    _bibArtistas = null;   // la raíz cambió: se recarga en la próxima visita
+    await bibMoverElegir(j.ruta || nombre);
+  } catch (e) {
+    if (msg) msg.textContent = 'No se pudo crear: ' + e.message;
+  }
+}
+// ── [KAIO-V3b] Subir UNA canción a la carpeta ABIERTA (tope 4 MB, lo dice el
+// servidor con palabras; tandas → el gestor de AzuraCast, enlazado al lado).
+async function bibSubir() {
+  const inp = document.getElementById('bib-subir-file');
+  const msg = document.getElementById('bib-subir-msg');
+  const f = inp && inp.files && inp.files[0];
+  if (!f) { if (msg) msg.textContent = 'Elige primero el archivo.'; return; }
+  const dir = _bibCrumbs.length ? _bibCrumbs[_bibCrumbs.length - 1].ruta : '';
+  if (!dir) { if (msg) msg.textContent = 'Entra a una carpeta para subir ahí.'; return; }
+  if (f.size > 4 * 1024 * 1024) { if (msg) msg.textContent = 'Pesa ' + (f.size / 1048576).toFixed(1) + ' MB y el tope por aquí es 4 MB — usa «Subir en AzuraCast».'; return; }
+  if (msg) msg.textContent = 'Subiendo «' + f.name + '»…';
+  try {
+    const b64 = await new Promise((ok, mal) => {
+      const fr = new FileReader();
+      fr.onload = () => ok(String(fr.result).split(',')[1] || '');
+      fr.onerror = () => mal(new Error('No se pudo leer el archivo'));
+      fr.readAsDataURL(f);
+    });
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'subir', ruta: dir + '/' + f.name, archivo: b64 }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    if (msg) msg.textContent = '✓ Subida. AzuraCast la procesa en un momento.';
+    if (inp) inp.value = '';
+    showToast('Canción subida a ' + dir, 'success');
+    _bibMostrarDir(dir, _bibPagina);
+  } catch (e) {
+    if (msg) msg.textContent = 'No se pudo: ' + e.message;
+  }
 }
 function _bibAbrirArchivo(i) {
   const a = _bibArchivos[i];
@@ -1057,6 +1232,18 @@ function _bibToggleRaizUI(show) {
   const tb = document.getElementById('bib-toolbar');
   if (abc) abc.style.display = show ? '' : 'none';
   if (tb) tb.style.display = show ? '' : 'none';
+  // [KAIO-V3b] El bloque de subir solo vive DENTRO de una carpeta: en la raíz
+  // no hay un «aquí» al que subir (y el buscador de AzuraCast no ve carpetas
+  // vacías — medido—, así que la carpeta nueva se crea desde «Mover a…»).
+  const up = document.getElementById('bib-subir');
+  if (up) {
+    const dir = _bibCrumbs.length ? _bibCrumbs[_bibCrumbs.length - 1].ruta : '';
+    up.style.display = (!show && dir) ? '' : 'none';
+    const d = document.getElementById('bib-subir-dest');
+    if (d) d.textContent = dir;
+    const msg = document.getElementById('bib-subir-msg');
+    if (msg) msg.textContent = '';
+  }
 }
 // Acción POST genérica al control. btnId se deshabilita mientras corre.
 async function _radioControlAccion(accion, btnId, okMsg) {
@@ -1845,10 +2032,117 @@ function cabCortar(motivo) {
   if (motivo) _cbMsg('cab-msg', motivo, /cerró|No se pudo|no se pudo/.test(motivo));
 }
 
+// ── [KAIO-V3a] Llegando del público — EN VIVO ────────────────────────────────
+// Peticiones + muro en la cabina, latiendo cada 10 s mientras la pestaña está
+// visible. El dueño del reloj es _cb.pubTimer (la ley del reloj); los datos se
+// escriben en los MISMOS globals (_radioPeticiones/_radioMuro) y se repintan
+// también las tablas de las pestañas Peticiones/Muro — una sola verdad.
+// «Nuevo» = id que no estaba en el tick anterior; el PRIMER tick siembra sin
+// resaltar ni sonar (abrir la cabina no es que llegó algo). La campana nace
+// APAGADA y suena LOCAL: osc → gain → destination, JAMÁS por el master (nada
+// que no sea la mezcla sale al aire).
+function _cbPubStart() {
+  if (_cb.pubTimer) return;
+  _cbPubTick();
+  _cb.pubTimer = setInterval(() => {
+    const tab = document.getElementById('radio-tab-cabina');
+    if (document.hidden || !tab || tab.style.display === 'none') return;
+    _cbPubTick();
+  }, 10000);
+}
+async function _cbPubTick() {
+  try {
+    const [rp, rm] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-radio-peticiones'),
+      khAdminFetch('/.netlify/functions/admin-radio-muro'),
+    ]);
+    const jp = await rp.json().catch(() => ({}));
+    const jm = await rm.json().catch(() => ({}));
+    if (!rp.ok || jp.ok === false || !rm.ok || jm.ok === false) throw new Error('lectura falló');
+    _radioPeticiones = Array.isArray(jp.peticiones) ? jp.peticiones : [];
+    _radioMuro = Array.isArray(jm.mensajes) ? jm.mensajes : [];
+    // Nuevos desde el tick anterior (el primer tick solo siembra):
+    const ids = new Set();
+    _radioPeticiones.forEach(p => ids.add('p' + p.id));
+    _radioMuro.forEach(m => ids.add('m' + m.id));
+    let nuevos = 0;
+    if (_cb.pubVistos) ids.forEach(id => { if (!_cb.pubVistos.has(id)) nuevos++; });
+    const primera = !_cb.pubVistos;
+    _cb.pubNuevos = primera ? new Set() : new Set([...ids].filter(id => !_cb.pubVistos.has(id)));
+    _cb.pubVistos = ids;
+    _cbPubRender();
+    _renderRadioPeticiones();   // las tablas de atrás quedan frescas gratis
+    _renderRadioMuro();
+    const sello = _cbEl('cab-pub-sello');
+    if (sello) sello.textContent = '· al ' + new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Matamoros', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h12' });
+    if (!primera && nuevos > 0 && (_cbEl('cab-pub-ding') || {}).checked) _cbDing();
+  } catch (e) {
+    const sello = _cbEl('cab-pub-sello');
+    if (sello) sello.textContent = '· sin conexión (reintenta solo)';
+  }
+}
+function _cbPubHace(ts) {
+  const min = Math.max(0, Math.round((Date.now() - Date.parse(ts)) / 60000));
+  if (!Number.isFinite(min)) return '';
+  if (min < 1) return 'ahora';
+  if (min < 60) return 'hace ' + min + ' min';
+  const h = Math.floor(min / 60);
+  return h < 24 ? ('hace ' + h + ' h') : ('hace ' + Math.floor(h / 24) + ' d');
+}
+function _cbPubRender() {
+  const bp = _cbEl('cab-pub-pet'), bm = _cbEl('cab-pub-muro');
+  const esNuevo = (pref, id) => _cb.pubNuevos && _cb.pubNuevos.has(pref + id);
+  if (bp) {
+    const pend = _radioPeticiones.filter(p => !p.atendida);
+    const n = _cbEl('cab-pub-pet-n'); if (n) n.textContent = pend.length ? ('· ' + pend.length) : '';
+    bp.innerHTML = pend.length ? pend.slice(0, 8).map(p => `
+      <div style="padding:10px 12px;border:1px solid ${esNuevo('p', p.id) ? 'var(--yellow, #e8ff4c)' : 'var(--border)'};border-radius:10px">
+        <div style="font-size:15px;line-height:1.45"><b>${_spEscape(p.nombre || 'Alguien')}</b> pide: ${_spEscape(p.peticion || '')}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <span style="font-size:11px;color:var(--ts)">${_cbPubHace(p.creado)}${esNuevo('p', p.id) ? ' · 🆕' : ''}</span>
+          <button class="btn btn-primary btn-sm" style="font-size:11px;margin-left:auto" onclick="_cbPubAtender('${_rcEsc(p.id)}')">✓ Ya la atendí</button>
+        </div>
+      </div>`).join('') : '<div style="color:var(--ts);font-size:13px">Sin peticiones pendientes — vas al día.</div>';
+  }
+  if (bm) {
+    const msgs = _radioMuro.slice(0, 6);
+    bm.innerHTML = msgs.length ? msgs.map(m => `
+      <div style="padding:10px 12px;border:1px solid ${esNuevo('m', m.id) ? 'var(--yellow, #e8ff4c)' : 'var(--border)'};border-radius:10px;${m.visible ? '' : 'opacity:.5'}">
+        <div style="font-size:15px;line-height:1.45"><b>${_spEscape(m.nombre || 'Anónimo')}</b>: ${_spEscape(m.mensaje || '')}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <span style="font-size:11px;color:var(--ts)">${_cbPubHace(m.creado)}${esNuevo('m', m.id) ? ' · 🆕' : ''}${m.visible ? '' : ' · oculto'}</span>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;margin-left:auto" onclick="_cbPubMuro('${_rcEsc(m.id)}',${m.visible ? 'false' : 'true'})">${m.visible ? 'Ocultar' : 'Mostrar'}</button>
+        </div>
+      </div>`).join('') : '<div style="color:var(--ts);font-size:13px">El muro está vacío.</div>';
+  }
+}
+// Acciones de un clic: delegan en los DUEÑOS existentes (radioAtender /
+// radioMuroVisible, que actualizan el global y las tablas) y repintan el panel.
+async function _cbPubAtender(id) { await radioAtender(id, true); _cbPubRender(); }
+async function _cbPubMuro(id, visible) { await radioMuroVisible(id, visible); _cbPubRender(); }
+// La campana LOCAL: dos blips cortos directo a destination (ni master ni
+// monitor — jamás al aire). Usa el ctx de la cabina solo si YA existe; crear
+// un AudioContext por un ding pelearía con el autoplay del navegador.
+function _cbDing() {
+  try {
+    const ctx = _cb.ctx; if (!ctx || ctx.state !== 'running') return;
+    [0, 0.12].forEach((t, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = i ? 1318 : 880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.25);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.3);
+    });
+  } catch (e) {}
+}
+
 // ── Soundboard ───────────────────────────────────────────────────────────────
 async function loadRadioCabina() {
   _cbSamplersPintar();
   _cbDjsPintar();
+  _cbPubStart();   // [KAIO-V3a] el panel del público late mientras la cabina está abierta
   const { st, j } = await _cbApi({ accion: 'samplers_listar' });
   if (st === 200 && j.ok) { _cb.samplers = j.samplers || []; _cbSamplersPintar(); }
   else { const box = _cbEl('cab-pads'); if (box) box.innerHTML = `<div class="alert alert-error">${_rcEsc(j.error || ('HTTP ' + st))}</div>`; }
@@ -1974,34 +2268,40 @@ async function cabBuscar() {
       : '<div style="color:var(--ts);font-size:13px">Sin resultados en el catálogo.</div>';
   } catch (e) { box.innerHTML = `<div class="alert alert-error">${_rcEsc(e.message)}</div>`; }
 }
+// [KAIO-V3b] LA DESCARGA tiene UN dueño: baja por REBANADAS (CABINA-2, el 413
+// de 4.2 MB murió así) y devuelve los bytes completos. La usan la CABINA
+// (tocar al aire por el grafo) y la BIBLIOTECA (escuchar local) — dos bucles
+// gemelos habrían divergido al primer arreglo.
+async function _radioBajarRuta(ruta, onProgreso) {
+  const pedazos = [];
+  let desde = 0, total = 0;
+  for (let i = 0; i < 12; i++) {
+    const { st, j } = await _cbApi({ accion: 'cancion_descargar', ruta, desde });
+    if (st !== 200 || !j.ok) throw new Error(j.error || ('HTTP ' + st));
+    const bin = atob(j.b64);
+    const buf = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
+    pedazos.push(buf);
+    total = j.bytes_total || (desde + buf.length);
+    desde += buf.length;
+    if (j.completo) break;
+    if (onProgreso) onProgreso(Math.round((desde / total) * 100));
+  }
+  if (desde < total) throw new Error('La descarga quedó incompleta (' + desde + ' de ' + total + ' bytes)');
+  const todo = new Uint8Array(total);
+  let pos = 0;
+  for (const p of pedazos) { todo.set(p, pos); pos += p.length; }
+  return todo;
+}
 async function cabTocarRuta(ruta, titulo) {
   const box = _cbEl('cab-mus-nombre');
   if (box) box.textContent = 'Bajando «' + titulo + '»…';
   try {
-    // [KAIO-CABINA-2] La canción baja por REBANADAS (el 413 de 4.2 MB murió):
-    // se pide {desde} en bucle hasta `completo` y se concatena aquí.
-    const pedazos = [];
-    let desde = 0, total = 0;
-    for (let i = 0; i < 12; i++) {
-      const { st, j } = await _cbApi({ accion: 'cancion_descargar', ruta, desde });
-      if (st !== 200 || !j.ok) { if (box) box.textContent = '— nada cargado —'; showToast(j.error || ('HTTP ' + st), 'error'); return; }
-      const bin = atob(j.b64);
-      const buf = new Uint8Array(bin.length);
-      for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
-      pedazos.push(buf);
-      total = j.bytes_total || (desde + buf.length);
-      desde += buf.length;
-      if (j.completo) break;
-      if (box) box.textContent = 'Bajando «' + titulo + '»… ' + Math.round((desde / total) * 100) + '%';
-    }
-    if (desde < total) { if (box) box.textContent = '— nada cargado —'; showToast('La descarga quedó incompleta (' + desde + ' de ' + total + ' bytes)', 'error'); return; }
-    const todo = new Uint8Array(total);
-    let pos = 0;
-    for (const p of pedazos) { todo.set(p, pos); pos += p.length; }
+    const todo = await _radioBajarRuta(ruta, (pct) => { if (box) box.textContent = 'Bajando «' + titulo + '»… ' + pct + '%'; });
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
     _cbMusCargar(await ctx.decodeAudioData(todo.buffer), titulo);
-  } catch (e) { if (box) box.textContent = '— nada cargado —'; showToast('Ese audio no se pudo decodificar: ' + e.message, 'error'); }
+  } catch (e) { if (box) box.textContent = '— nada cargado —'; showToast('Ese audio no se pudo cargar: ' + e.message, 'error'); }
 }
 async function cabMusLocal(input) {
   const f = input && input.files && input.files[0];

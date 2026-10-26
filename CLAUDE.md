@@ -188,6 +188,72 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 👻 **MAS-ALLA-1 (26-oct-2026, en main local): EL MÁS ALLÁ — el deep-link
+  aprende los estados y el agotado se SOLICITA.** Reporte de Memo, citado:
+  *«cuando ponemos los eventos en agotado, si la gente tiene el link directo
+  les aparece como si estuviera activo»*. Medido: el IIFE del deep-link
+  (`/<slug>` y `?evento=`) no tenía NINGUNA puerta de estado salvo `proceso` —
+  agotado, proximamente y hasta PASADO abrían el cotizador completo, mientras
+  la tarjeta y la tira sí guardaban. Decisiones firmadas (26-oct): el wizard
+  abre en **LAS TRES PUERTAS** (link directo + tarjeta del catálogo + tira del
+  hero) · lo atienden **roshi + bulma + milk**. `npm run mide:mas-alla-1`
+  (**71**, sin ancla — árbol; controles positivos por construcción).
+  - **El deep-link rutea POR EL VEREDICTO** (`_evVeredicto`, el MISMO dueño
+    que la clase .agotado de la tarjeta): proximamente/pronto → AVÍSAME ·
+    agotado → wizard del Más Allá · pasado → portada (antes también abría el
+    cotizador) · solo-viaje se quedó como estaba A PROPÓSITO (su RIDE vende).
+    🔒 **El agotado AUTOMÁTICO que Memo preguntó YA EXISTE y quedó cubierto**:
+    el veredicto enciende isAg solo (st vacío + todas las zonas ag — el
+    auto-semáforo), así que agotar desde Esferas (st) Y agotarse solas las
+    zonas caen igual al wizard — careado con los dos casos. Las zonas NO se
+    mutan al agotar: con las tres puertas cerradas + el servidor que ya rechaza
+    lo no-vendible (AUD-2), ninguna puerta vende; «Reabrir» restaura solo.
+    ⚠️ Los modales viven más abajo que el IIFE (corre a media parseada — la
+    ley de CARDS): la apertura se DIFIERE a DOM listo.
+  - **El wizard** (modal `ma-modal-bg`, REUSA las clases wl-* del AVÍSAME — dos
+    CSS gemelos serían dos listas esperando a divergir): nombre* + WhatsApp*
+    (10 díg — ahí se responde) + email opcional + cantidad (nace «1 boleto»
+    ANUNCIADO, DEFAULTS-1) + chips de paquetes (derivados: cheapOnly/rideOnly/
+    CDMX-sin-STAY/noCheap) y zonas (universo de la ficha: zonas+cheap+
+    multifecha, únicas) + honeypot `sitio_web`. La tarjeta agotada DEJÓ de
+    estar muerta (su CSS soltó pointer-events:none — sin eso el onclick sería
+    letra muerta) y la tira cambió su WhatsApp del 19-sep por `solicitar()`
+    (⚰️ la ruta de LAND-2 queda superada por la palabra nueva; informes() es
+    el respaldo).
+  - **La tabla `mas_alla_solicitudes`** (acta `migraciones/MAS-ALLA-1.sql`, YA
+    CORRIDA + candados MORDIDOS: RLS true · 0 policies · GRANT service_role ·
+    CHECK celular 10 díg y estado rebotaron inserts): esto es SEGUIMIENTO DE
+    DEMANDA, no dinero — una solicitud no crea viajero ni abono. SIN UNIQUE a
+    propósito (el anti-spam es el tope de 3 PENDIENTES por celular en el
+    endpoint; las atendidas NO cuentan — quien fue atendido puede volver a
+    pedir). `mas-alla-solicitar` público (corsCheck, honeypot → éxito de
+    UTILERÍA sin escribir, validaciones duras, INSERT directo).
+  - **La pantalla EL MÁS ALLÁ** (la Lista de espera RENOMBRADA — el id
+    `waitlist` NO cambia: permisos/carga llavean por él): dos vistas — 🔔
+    Avísame (la de siempre, intacta) y 👻 Solicitudes de agotados: grupos POR
+    EVENTO ordenados por CERCANÍA (ev_ds del catálogo servido vía
+    `_lib/catalogo-index`; catálogo caído = solicitudes IGUAL con
+    `catalogo_ok:false` — esconder demanda sería un cero falso), buscador,
+    filtros por estado y evento, ✓ Vendido / ✖ No se pudo / ↺ Pendiente
+    (`admin-mas-alla` acción `marcar`: PATCH CON filtro id=eq., sella
+    atendido_por del JWT, volver a pendiente lo limpia; CERO DELETEs), y el
+    celular clickeable abre **wa.me/52+10díg** con el mensaje DERIVADO del
+    dato («nos pediste N boletos para X en [zonas]… tenemos lugares en la zona
+    que buscas»). Bulma y milk GANARON `waitlist` en PERMISOS_TABS (firmado), y
+    el inicio MB trae la tarjeta «👻 El Más Allá · N buscando boletos» que se
+    calla en cero.
+  - ✅ **Verificado en navegador real CONTRA PRODUCCIÓN por inyección** (el
+    patrón de RADIO-V2a — las piezas nuevas tal cual el árbol, sobre el CSS y
+    CSP servidos): el wizard pinta con el Omar REAL (4 paquetes, sus 6 zonas),
+    celular corto rebota con 0 red, el payload viaja completo (correo en
+    minúsculas, chips elegidos, honeypot) y el éxito esconde el form.
+  - ⏳ **Pendientes:** push de Memo → verificación del deep-link en producción
+    (`conectareynosa.mx/omar` debe abrir el wizard, `/vivelatino` el AVÍSAME) ·
+    prueba humana: una solicitud real desde el celular y marcarla
+    vendido/pendiente en la pantalla · si Memo quiere aviso por correo al caer
+    una solicitud, es tuerca propia (hoy la visibilidad es la tarjeta del
+    inicio + el badge del tab).
+
 - 🔴✅ **CONCILIA-LOTE-1 (25-oct-2026, en main local): el careo caja↔contratos
   murió porque EL MES ENGORDÓ — los `in.(...)` van ahora por TANDAS.** Reporte
   de Memo, citado: *«No se pudo leer el lado CONTRATOS: Supabase rechazó la

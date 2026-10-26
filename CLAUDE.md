@@ -215,7 +215,12 @@ está caduco antes de escribirse.
     (10 díg — ahí se responde) + email opcional + cantidad (nace «1 boleto»
     ANUNCIADO, DEFAULTS-1) + chips de paquetes (derivados: cheapOnly/rideOnly/
     CDMX-sin-STAY/noCheap) y zonas (universo de la ficha: zonas+cheap+
-    multifecha, únicas) + honeypot `sitio_web`. La tarjeta agotada DEJÓ de
+    multifecha, únicas) + honeypot `sitio_web`. **MAS-ALLA-1b (26-oct, pedido
+    de Memo con captura: «se ve empalmado»): los chips calcan la grilla del
+    selector de viajeros** — `.ma-chips` grid 2 columnas y `.ma-chip` con la
+    forma de `.q-btn` (seleccionado = borde+texto amarillos, no relleno
+    sólido); SOLO CSS, la clase/toggle/payload no cambian y el careo siguió
+    en verde sin tocarse. La tarjeta agotada DEJÓ de
     estar muerta (su CSS soltó pointer-events:none — sin eso el onclick sería
     letra muerta) y la tira cambió su WhatsApp del 19-sep por `solicitar()`
     (⚰️ la ruta de LAND-2 queda superada por la palabra nueva; informes() es

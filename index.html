@@ -210,9 +210,14 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 /* [MAS-ALLA-1] Los chips del wizard del Más Allá (paquetes/zonas de interés).
    El esqueleto del modal reusa las clases wl-*; aquí solo lo que el AVÍSAME
    no tiene. Amarillo de marca (#e8ff4c) para el chip elegido. */
-.ma-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.ma-chip{padding:7px 13px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:transparent;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .12s}
-.ma-chip.on{background:#e8ff4c;border-color:#e8ff4c;color:#000}
+/* MAS-ALLA-1b: los chips calcan la grilla del selector de viajeros (.q-grid/.q-btn)
+   — pedido de Memo (26-oct): «seleccionador multiple como el de numero de viajeros
+   o boletos para que no se vea tan empalmado». Misma clase ma-chip (el JS y el
+   careo no cambian: sigue siendo toggle .on, selección múltiple). */
+.ma-chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ma-chip{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);padding:12px 8px;cursor:pointer;text-align:center;width:100%;color:#fff;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;transition:all .15s}
+.ma-chip:hover{border-color:rgba(232,255,76,.4)}
+.ma-chip.on{border-color:#e8ff4c;background:rgba(232,255,76,.09);color:#e8ff4c}
 .ma-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-top:14px;font-weight:800;font-family:'Montserrat',sans-serif}
 .ma-opc{text-transform:none;letter-spacing:0;font-weight:600;color:rgba(255,255,255,.4)}
 .ma-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}

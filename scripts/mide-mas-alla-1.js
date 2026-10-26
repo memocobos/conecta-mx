@@ -151,22 +151,40 @@ function iifeDeepLink(src) {
   af(fns.every(Boolean), () => 'no se pudieron rebanar las funciones del wizard: ' + ver(() => fns.map((f, i) => f ? 'ok' : i)));
 
   function domFalso() {
+    // MAS-ALLA-1c: las opciones ya no son hijas directas del contenedor —
+    // viven DENTRO del panel del desplegable, así que '.ma-opt.on' se busca
+    // RECURSIVO (como querySelectorAll real). Y _maChips arma el rótulo con
+    // createTextNode + innerHTML='' (que limpia hijos): el fake los modela
+    // o mediría un wizard que no existe.
     const nodos = {};
+    const qOn = (hijos) => {
+      const out = [];
+      const baja = (arr) => arr.forEach((h) => {
+        if (h && h.className === 'ma-opt' && h.classList && h.classList._s.has('on')) out.push(h);
+        if (h && h.children) baja(h.children);
+      });
+      baja(hijos);
+      return out;
+    };
+    const conInnerHtml = (n, hijos) => {
+      Object.defineProperty(n, 'innerHTML', {
+        get() { return ''; },
+        set() { hijos.length = 0; n.textContent = ''; },
+      });
+      return n;
+    };
     const mk = (id) => {
       const hijos = [];
       const n = {
-        id, value: '', textContent: '', innerHTML: '', className: '',
+        id, value: '', textContent: '', className: '',
         style: {}, children: hijos,
-        classList: { _s: new Set(), toggle(c, f) { f === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (f ? this._s.add(c) : this._s.delete(c)); }, add(c) { this._s.add(c); }, contains(c) { return this._s.has(c); } },
-        appendChild(x) { hijos.push(x); },
+        classList: { _s: new Set(), toggle(c, f) { f === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (f ? this._s.add(c) : this._s.delete(c)); }, add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+        appendChild(x) { if (x && x._texto !== undefined) { n.textContent += x._texto; } else hijos.push(x); },
         reset() {},
-        querySelectorAll(sel) {
-          if (sel === '.ma-chip.on') return hijos.filter((h) => h.classList._s.has('on') && h.className === 'ma-chip');
-          return [];
-        },
+        querySelectorAll(sel) { return sel === '.ma-opt.on' ? qOn(hijos) : []; },
         focus() {},
       };
-      return n;
+      return conInnerHtml(n, hijos);
     };
     const ids = ['ma-ev-name', 'ma-form', 'ma-paquetes', 'ma-zonas', 'ma-paq-lbl', 'ma-zonas-lbl', 'ma-msg', 'ma-submit', 'ma-modal-bg', 'ma-nombre', 'ma-celular', 'ma-correo', 'ma-cantidad', 'ma-hp'];
     ids.forEach((id) => { nodos[id] = mk(id); });
@@ -174,11 +192,16 @@ function iifeDeepLink(src) {
       nodos,
       document: {
         getElementById: (id) => nodos[id] || null,
+        createTextNode: (t) => ({ _texto: String(t) }),
         createElement: () => {
-          const b = { type: '', className: '', textContent: '', onclick: null, classList: { _s: new Set(), toggle(c) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); }, has(c) { return this._s.has(c); } } };
-          // el querySelectorAll de arriba filtra por className+on
-          Object.defineProperty(b.classList, 'contains', { value(c) { return this._s.has(c); } });
-          return b;
+          const hijos = [];
+          const b = {
+            type: '', className: '', textContent: '', onclick: null, children: hijos,
+            classList: { _s: new Set(), toggle(c) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+            appendChild(x) { if (x && x._texto !== undefined) { b.textContent += x._texto; } else hijos.push(x); },
+            querySelectorAll(sel) { return sel === '.ma-opt.on' ? qOn(hijos) : []; },
+          };
+          return conInnerHtml(b, hijos);
         },
       },
     };
@@ -224,7 +247,11 @@ function iifeDeepLink(src) {
     const evFx = { id: 'agst', a: 'Agotado St', zonas: [{ n: 'GA' }, { n: 'VIP' }], cheapZonas: [], ride: 2700 };
     vm.runInContext('abrirMasAllaModal', ctx)(evFx);
     af(nodos['ma-ev-name'].textContent === 'Agotado St', () => 'el modal no pintó el nombre del evento: ' + ver(() => nodos['ma-ev-name'].textContent));
-    af(nodos['ma-zonas'].children.length === 2, () => 'los chips de zonas no se pintaron: ' + ver(() => nodos['ma-zonas'].children.length));
+    // MAS-ALLA-1c: el contenedor arma botón-resumen + panel con las opciones.
+    af(nodos['ma-zonas'].children.length === 2 && nodos['ma-zonas'].children[1].children.length === 2,
+       () => 'el desplegable de zonas no se armó (botón + panel con las 2 opciones): ' + ver(() => nodos['ma-zonas'].children.map((h) => h.className)));
+    af(/elegir/i.test(nodos['ma-zonas'].children[0].textContent),
+       () => 'el botón-resumen no nace invitando a elegir: ' + ver(() => nodos['ma-zonas'].children[0].textContent));
     // nombre corto → error SIN red
     nodos['ma-nombre'].value = 'X'; nodos['ma-celular'].value = '8119771072'; nodos['ma-cantidad'].value = '2';
     vm.runInContext('enviarMasAlla', ctx)(null);
@@ -235,10 +262,13 @@ function iifeDeepLink(src) {
     vm.runInContext('enviarMasAlla', ctx)(null);
     af(red.urls.length === 0 && /10 dígitos/.test(nodos['ma-msg'].textContent),
        () => 'el celular corto tenía que rebotar SIN red: ' + ver(() => nodos['ma-msg'].textContent));
-    // feliz: payload con chips elegidos
+    // feliz: payload con la opción elegida — POR SU onclick (el camino del
+    // dedo), que además re-rotula el botón-resumen.
     nodos['ma-celular'].value = '8119771072';
-    nodos['ma-zonas'].children[0].classList.toggle('on');   // elige 'GA'
-    nodos['ma-zonas'].children[0].textContent = 'GA';
+    const optGA = nodos['ma-zonas'].children[1].children[0];   // 'GA'
+    optGA.onclick();
+    af(/GA/.test(nodos['ma-zonas'].children[0].textContent),
+       () => 'el botón-resumen no dice lo elegido («GA»): ' + ver(() => nodos['ma-zonas'].children[0].textContent));
     vm.runInContext('enviarMasAlla', ctx)(null);
     // ⚠️ enviarMasAlla NO es async (devuelve false; el fetch vive en .then):
     // un `await` sobre ese false NO drena la cadena de microtareas del fetch

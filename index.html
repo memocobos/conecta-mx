@@ -210,14 +210,21 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 /* [MAS-ALLA-1] Los chips del wizard del Más Allá (paquetes/zonas de interés).
    El esqueleto del modal reusa las clases wl-*; aquí solo lo que el AVÍSAME
    no tiene. Amarillo de marca (#e8ff4c) para el chip elegido. */
-/* MAS-ALLA-1b: los chips calcan la grilla del selector de viajeros (.q-grid/.q-btn)
-   — pedido de Memo (26-oct): «seleccionador multiple como el de numero de viajeros
-   o boletos para que no se vea tan empalmado». Misma clase ma-chip (el JS y el
-   careo no cambian: sigue siendo toggle .on, selección múltiple). */
-.ma-chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.ma-chip{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);padding:12px 8px;cursor:pointer;text-align:center;width:100%;color:#fff;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;transition:all .15s}
-.ma-chip:hover{border-color:rgba(232,255,76,.4)}
-.ma-chip.on{border-color:#e8ff4c;background:rgba(232,255,76,.09);color:#e8ff4c}
+/* MAS-ALLA-1c (26-oct, aclaración de Memo con captura): paquetes y zonas van
+   en un DESPLEGABLE como el select de boletos — se toca, se abre la lista y
+   se palomean varias (⚰️ la grilla de botones del 1b duró una tarde: «yo
+   queria que fuera un selector multiple como el de boletos»). El botón
+   cerrado calca el estilo de #ma-cantidad. */
+.ma-dd{margin-top:8px}
+.ma-dd-btn{width:100%;background:#111;border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;padding:10px 12px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:600;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ma-dd-fl{color:rgba(255,255,255,.55);flex:0 0 auto}
+.ma-dd-panel{display:none;background:#111;border:1px solid rgba(255,255,255,.25);border-radius:8px;margin-top:6px;overflow:hidden}
+.ma-dd.abierto .ma-dd-panel{display:block}
+.ma-dd.abierto .ma-dd-btn{border-color:#e8ff4c}
+.ma-opt{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.08);color:#fff;padding:11px 12px 11px 36px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:600;cursor:pointer;position:relative}
+.ma-opt:last-child{border-bottom:0}
+.ma-opt.on{color:#e8ff4c;background:rgba(232,255,76,.06)}
+.ma-opt.on::before{content:'✓';position:absolute;left:13px;font-weight:800}
 .ma-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-top:14px;font-weight:800;font-family:'Montserrat',sans-serif}
 .ma-opc{text-transform:none;letter-spacing:0;font-weight:600;color:rgba(255,255,255,.4)}
 .ma-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -7157,16 +7164,38 @@ function _maZonasDe(ev){
 }
 // Chips por createElement + textContent: los nombres vienen de la ficha, pero
 // un textContent no le debe nada a nadie.
+// MAS-ALLA-1c: el nombre _maChips SE QUEDA (sus llamadores y el careo entran
+// por él); lo que construye hoy es el desplegable — botón-resumen + panel de
+// opciones con palomita. La palomita vive en CSS (.ma-opt.on::before), así
+// textContent sigue siendo el nombre puro y el payload no cambia de forma.
 function _maChips(contId,lista){
   var c=document.getElementById(contId);
   if(!c)return;
   c.innerHTML='';
+  c.classList.remove('abierto');
+  var btn=document.createElement('button');
+  btn.type='button';btn.className='ma-dd-btn';
+  var panel=document.createElement('div');
+  panel.className='ma-dd-panel';
+  var rotular=function(){
+    var on=[];
+    panel.querySelectorAll('.ma-opt.on').forEach(function(b){on.push(b.textContent);});
+    var t=!on.length?'Toca para elegir':(on.length<=2?on.join(', '):'Elegiste '+on.length);
+    btn.innerHTML='';
+    btn.appendChild(document.createTextNode(t));
+    var fl=document.createElement('span');fl.className='ma-dd-fl';fl.textContent='▾';
+    btn.appendChild(fl);
+  };
+  btn.onclick=function(){c.classList.toggle('abierto');};
   lista.forEach(function(txt){
     var b=document.createElement('button');
-    b.type='button';b.className='ma-chip';b.textContent=txt;
-    b.onclick=function(){b.classList.toggle('on');};
-    c.appendChild(b);
+    b.type='button';b.className='ma-opt';b.textContent=txt;
+    b.onclick=function(){b.classList.toggle('on');rotular();};
+    panel.appendChild(b);
   });
+  c.appendChild(btn);
+  c.appendChild(panel);
+  rotular();
 }
 function abrirMasAllaModal(ev){
   _maEvento=ev;
@@ -7210,7 +7239,7 @@ function enviarMasAlla(e){
   var junta=function(contId){
     var out=[];
     var c=document.getElementById(contId);
-    if(c)c.querySelectorAll('.ma-chip.on').forEach(function(b){out.push(b.textContent);});
+    if(c)c.querySelectorAll('.ma-opt.on').forEach(function(b){out.push(b.textContent);});
     return out.length?out:null;
   };
   btn.disabled=true;btn.textContent='Enviando…';
@@ -8406,9 +8435,9 @@ function getQuincenas(from, until, max, diasAntes){
       </div>
       <div class="wl-field"><label for="ma-correo">Email (opcional)</label><input id="ma-correo" type="email" autocomplete="email" placeholder="tu@email.com"></div>
       <div class="ma-lbl" id="ma-paq-lbl">¿Qué paquete te interesa? <span class="ma-opc">(opcional, elige los que quieras)</span></div>
-      <div class="ma-chips" id="ma-paquetes"></div>
+      <div class="ma-dd" id="ma-paquetes"></div>
       <div class="ma-lbl" id="ma-zonas-lbl">¿Qué zonas te interesan? <span class="ma-opc">(opcional)</span></div>
-      <div class="ma-chips" id="ma-zonas"></div>
+      <div class="ma-dd" id="ma-zonas"></div>
       <input id="ma-hp" type="text" name="sitio_web" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0" aria-hidden="true">
       <button class="wl-cta" type="submit" id="ma-submit">Enviar mi solicitud</button>
       <div class="wl-msg" id="ma-msg"></div>

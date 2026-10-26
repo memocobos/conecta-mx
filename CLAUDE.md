@@ -215,12 +215,17 @@ está caduco antes de escribirse.
     (10 díg — ahí se responde) + email opcional + cantidad (nace «1 boleto»
     ANUNCIADO, DEFAULTS-1) + chips de paquetes (derivados: cheapOnly/rideOnly/
     CDMX-sin-STAY/noCheap) y zonas (universo de la ficha: zonas+cheap+
-    multifecha, únicas) + honeypot `sitio_web`. **MAS-ALLA-1b (26-oct, pedido
-    de Memo con captura: «se ve empalmado»): los chips calcan la grilla del
-    selector de viajeros** — `.ma-chips` grid 2 columnas y `.ma-chip` con la
-    forma de `.q-btn` (seleccionado = borde+texto amarillos, no relleno
-    sólido); SOLO CSS, la clase/toggle/payload no cambian y el careo siguió
-    en verde sin tocarse. La tarjeta agotada DEJÓ de
+    multifecha, únicas) + honeypot `sitio_web`. **MAS-ALLA-1c (26-oct):
+    paquetes y zonas van en un DESPLEGABLE múltiple como el select de
+    boletos** — botón-resumen que calca `#ma-cantidad` + panel con palomitas
+    (✓ por CSS `::before`: el textContent queda puro y el payload no cambia);
+    el panel expande EN EL FLUJO (sin absolute — no pelea con el overflow del
+    modal) y el rótulo resume (nombres hasta 2, luego «Elegiste N»).
+    ⚰️ El 1b (grilla de botones tipo q-btn) duró una tarde: Memo aclaró con
+    captura «yo queria un selector multiple como el de boletos». `_maChips`
+    conserva su NOMBRE y hoy arma el dropdown; careo 71 → **73** (DOM falso
+    con búsqueda RECURSIVA de `.ma-opt.on`, elección POR onclick). La tarjeta
+    agotada DEJÓ de
     estar muerta (su CSS soltó pointer-events:none — sin eso el onclick sería
     letra muerta) y la tira cambió su WhatsApp del 19-sep por `solicitar()`
     (⚰️ la ruta de LAND-2 queda superada por la palabra nueva; informes() es

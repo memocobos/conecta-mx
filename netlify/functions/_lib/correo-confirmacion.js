@@ -35,7 +35,7 @@ const PORTAL_URL = 'https://conectareynosa.mx/portal';
 const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 // Eventos donde el correo sale solo (palabra de Memo: «para los de Pa'l Norte,
 // solo esos por el momento»). Fuera de aquí la bandeja y la captura NO mandan.
-const EVENTOS_CORREO = ['palnorte'];
+const EVENTOS_CORREO = ['palnorte', 'nsqkmty'];   // [NSQK-PREVENTA-1]
 
 function baseSlug(id) { return String(id || '').split('#')[0]; }
 function correoActivo(evento_id) { return EVENTOS_CORREO.includes(baseSlug(evento_id)); }

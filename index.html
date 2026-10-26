@@ -5473,13 +5473,19 @@ function selViajeros(btn,n){
 // el EV y esto sobrevive.
 // 🔒 Exige UNA sola zona vendible: si mañana la ficha trae dos (fases reales),
 // el evento vuelve SOLO al flujo normal en vez de esconder una elección.
-function _esPreventaCiegas(ev){ return !!(ev&&ev.cheapOnly&&['palnorte'].indexOf(ev.id)>-1&&_preventaZona(ev)); }
+// [NSQK-PREVENTA-1] (26-oct-2026, palabra de Memo: «nsqkmty lo activamos como
+// Pal Norte con preventa de $300»). La lista es el gate por evento; entrar aquí
+// arrastra TODO el camino de la preventa: paquete único, banco BBVA (getBanco),
+// datos de viaje (_reqPideViaje) y el nombre derivado del evento.
+function _esPreventaCiegas(ev){ return !!(ev&&ev.cheapOnly&&['palnorte','nsqkmty'].indexOf(ev.id)>-1&&_preventaZona(ev)); }
 function _preventaZona(ev){
   var z=((ev&&ev.cheapZonas)||[]).filter(function(x){return x&&!x.ag&&!x.prox&&x.p>0;});
   return z.length===1?z[0]:null;
 }
 function _pvEsc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function _pvPkgNombre(){ return 'PREVENTA A CIEGAS — Pa\'l Norte 2027'; }
+// [NSQK-PREVENTA-1] El nombre del paquete se DERIVA del evento — tecleado
+// «Pa'l Norte 2027» mentía en cuanto entrara el segundo evento a la preventa.
+function _pvPkgNombre(ev){ return 'PREVENTA A CIEGAS — '+((ev&&ev.a)||''); }
 // Etiquetas del botón CHEAP y del título del paso: se guardan una vez y se
 // RESTAURAN en cada evento — los botones son GLOBALES y la pantalla se reusa
 // (la ley de CAT-AGOT-1 / NOCHEAP-1): sin restaurar, Pa'l Norte le pondría
@@ -6759,7 +6765,7 @@ var REQUISICION_VIVA=false;
 // de interruptor — aquí el interruptor es la lista. Agregar un slug ENCIENDE la
 // sección del modal solo en ese evento; el resto del sitio sigue como siempre
 // (cuentas + Messenger). Vaciar la lista apaga todo salvo el override ?req=1.
-var REQUISICION_EVENTOS=['palnorte'];
+var REQUISICION_EVENTOS=['palnorte','nsqkmty'];
 (function(){
   try{
     var v=new URLSearchParams(location.search).get('req');
@@ -7621,7 +7627,7 @@ var _lastQuincenas=[],_lastPagoQ=0;
 function generarImagenCotizacion(){
   if(!cur)return;
   var W=420,sc=Math.max(window.devicePixelRatio||1,2);
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre(cur):'CHEAP — Boleto + Kit Conecta'};
 
   // Collect rows
   var rows=[];
@@ -8057,7 +8063,7 @@ function calcular(){
   // [AIT-1] Con la promo de pareja las dos personas pagan distinto: el rótulo
   // dice PROMEDIO para no vender como "por viajero" una cifra que nadie paga.
   $$('r-np').textContent=_promoSegundoPax?'promedio por viajero':'por viajero';
-  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'}[selPkg];
+  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre(cur):'CHEAP — Boleto + Kit Conecta'}[selPkg];
   actualizarBankInfo();
   actualizarIncluye();
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
@@ -8192,7 +8198,7 @@ function calcular(){
 
 var _lastCotizacion='';
 function buildCotizacionMsg(quincenas,pagoQ){
-  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre():'CHEAP — Boleto + Kit Conecta'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:_esPreventaCiegas(cur)?_pvPkgNombre(cur):'CHEAP — Boleto + Kit Conecta'};
   var hoy=new Date();
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;

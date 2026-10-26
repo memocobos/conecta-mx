@@ -145,7 +145,10 @@ function extraerObj(contenido, id) {
   console.log('\n[B] gate · la requisición prende SOLO en palnorte');
   const litGlobal = (INDEX.match(/var REQUISICION_VIVA=false;/g) || []).length;
   af(litGlobal === 1, 'el interruptor GLOBAL sigue apagado, exactamente una declaración (hay ' + litGlobal + ')');
-  af(INDEX.includes("var REQUISICION_EVENTOS=['palnorte'];"), 'la lista por evento existe y trae SOLO palnorte');
+  // [NSQK-PREVENTA-1] La aserción vieja exigía «SOLO palnorte» y caducó el
+  // 26-oct con la palabra de Memo («nsqkmty lo activamos como Pal Norte»):
+  // se actualiza a la verdad nueva, no se silencia.
+  af(INDEX.includes("var REQUISICION_EVENTOS=['palnorte','nsqkmty'];"), 'la lista por evento trae palnorte Y nsqkmty (NSQK-PREVENTA-1)');
 
   const iGate = INDEX.indexOf('var REQUISICION_VIVA=false;');
   const fnGate = rebanarFn(INDEX.slice(iGate), 'function _requisicionActiva()');
@@ -163,9 +166,49 @@ function extraerObj(contenido, id) {
     return vm.runInContext('_requisicionActiva()', sandbox);
   }
   af(probarGate({ id: 'palnorte' }) === true, 'cur=palnorte → la sección PRENDE');
+  af(probarGate({ id: 'nsqkmty' }) === true, 'cur=nsqkmty → la sección PRENDE (NSQK-PREVENTA-1)');
   af(probarGate({ id: 'karolg' }) === false, 'cur=karolg → sigue APAGADA (el resto del sitio no cambia)');
   af(probarGate(undefined) === false, 'sin evento abierto → apagada');
   af(probarGate({ id: 'karolg' }, '1') === true, 'el override ?req=1 sigue vivo para probar en producción');
+
+  // ═══ [N] NSQK-PREVENTA-1 · el segundo evento de la preventa ═══════════════
+  console.log('\n[N] nsqkmty entra a la preventa — derivado, no disfrazado');
+  {
+    // _esPreventaCiegas y _pvPkgNombre, las REALES del index, corridas en vm.
+    const src = [rebanarFn(INDEX, 'function _esPreventaCiegas(ev)'),
+                 rebanarFn(INDEX, 'function _preventaZona(ev)'),
+                 rebanarFn(INDEX, 'function _pvPkgNombre(ev)')].join('\n');
+    const ctx = { String };
+    vm.createContext(ctx);
+    vm.runInContext(src, ctx);
+    const esPv = (ev) => vm.runInContext('_esPreventaCiegas', ctx)(ev);
+    const nom = (ev) => vm.runInContext('_pvPkgNombre', ctx)(ev);
+    const zonaPv = [{ n: 'Preventa a ciegas', p: 300 }];
+    af(esPv({ id: 'nsqkmty', cheapOnly: true, cheapZonas: zonaPv }) === true,
+       'nsqkmty cheapOnly con su zona ES preventa a ciegas');
+    af(esPv({ id: 'palnorte', cheapOnly: true, cheapZonas: zonaPv }) === true,
+       'palnorte sigue siendo preventa (regresión)');
+    af(esPv({ id: 'karolg', cheapOnly: true, cheapZonas: zonaPv }) === false,
+       'un evento FUERA de la lista no es preventa aunque tenga la forma');
+    af(esPv({ id: 'nsqkmty', cheapOnly: false, cheapZonas: zonaPv }) === false,
+       'sin cheapOnly no hay preventa — la lista sola no basta');
+    // El nombre se DERIVA del evento, en los dos sentidos.
+    af(nom({ a: 'NSQK - Mosca World Tour' }) === 'PREVENTA A CIEGAS — NSQK - Mosca World Tour',
+       'el nombre del paquete se deriva del evento (nsqk)');
+    af(nom({ a: 'Tecate Pa´l Norte 2027' }) === 'PREVENTA A CIEGAS — Tecate Pa´l Norte 2027',
+       'y palnorte dice su propio nombre — cero literal tecleado');
+    // Los TRES llamadores pasan el evento; el literal viejo murió.
+    const llam = (sinComentarios(INDEX).match(/_pvPkgNombre\(cur\)/g) || []).length;
+    af(llam === 3, 'los 3 llamadores pasan cur a _pvPkgNombre (hay ' + llam + ')');
+    af(!sinComentarios(INDEX).includes("'PREVENTA A CIEGAS — Pa\\'l Norte 2027'"),
+       'el nombre tecleado del paquete ya no vive en el código');
+    // El correo único y el redirect corto.
+    const correoLib = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/correo-confirmacion.js'), 'utf8');
+    af(/EVENTOS_CORREO\s*=\s*\['palnorte',\s*'nsqkmty'\]/.test(correoLib),
+       'EVENTOS_CORREO trae a los dos — la confirmación de nsqk saldrá al aprobar');
+    const redir = fs.readFileSync(path.join(RAIZ, '_redirects'), 'utf8');
+    af(/^\/nsqk\s+\/nsqkmty\s+301/m.test(redir), 'el redirect corto /nsqk → /nsqkmty existe');
+  }
 
   // ═══ [C] LA TIRA NO FUGA LA FECHA (la expresión real, ejecutada) ══════════
   console.log('\n[C] tira del hero · «Por confirmar» tapa la fecha del sistema');

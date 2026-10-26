@@ -24,6 +24,8 @@
 # 301 a la ficha real (/palnorte). El deep link del index casa por id EXACTO
 # (pase 1), así que sin esta regla /palnorte27 caería a la portada en silencio.
 /palnorte27  /palnorte  301
+# [NSQK-PREVENTA-1] La URL corta del anuncio de NSQK, misma razón que /palnorte27.
+/nsqk  /nsqkmty  301
 
 # Archivos especiales (Netlify los sirve directo si existen — protección extra)
 /robots.txt  /robots.txt       200

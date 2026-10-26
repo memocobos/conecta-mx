@@ -20,6 +20,11 @@ const RAIZ = path.join(__dirname, '..');
 process.env.AZURACAST_API_KEY = 'az-falsa';
 process.env.RADIO_EDITOR_KEY = 'editor-falso';
 process.env.JWT_SECRET = 'secreto-del-arnes';
+// [PET-DEL-1] Las del PORTAL sí van falsas: las lee SOLO admin-radio-peticiones
+// (el guard de sesión-viva pega contra KH, no contra el Portal — no rompe los
+// casos «sin red» de [A], que fue lo que pasó con SUPABASE_URL_KAMEHOUSE).
+process.env.PORTAL_SUPABASE_URL = 'https://portal.falso.test';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = 'service-portal-falsa';
 // ⚠️ SUPABASE_URL_KAMEHOUSE se deja SIN poner A PROPÓSITO: con una URL falsa el
 // guard de sesión-viva le PEGA a la red falsa (404 → fail-open) y esa llamada
 // rompe los casos «rebota 400 SIN pegarle a la red». Sin la var, el guard hace
@@ -40,6 +45,13 @@ function redNueva() {
     if (U.includes('/files/batch')) return resp(200, { success: true });
     if (U.includes('/files/mkdir')) return resp(200, { success: true });
     if (U.endsWith('/api/station/1/files') && m === 'POST') return resp(200, { id: 999 });
+    // [PET-DEL-1] radio_peticiones del Portal: la red falsa RESPETA el filtro —
+    // un DELETE/PATCH sin `id=eq.` contesta error, porque sin filtro barrería
+    // la tabla entera y un arnés que lo tolera pasa en vacío.
+    if (U.includes('/rest/v1/radio_peticiones')) {
+      if ((m === 'DELETE' || m === 'PATCH') && !/[?&]id=eq\./.test(U)) return resp(400, { error: 'DELETE/PATCH sin filtro id — barrería la tabla' });
+      return resp(m === 'GET' ? 200 : 204, m === 'GET' ? [] : {});
+    }
     return resp(404, { error: 'ruta no esperada: ' + U });
   };
   return st;
@@ -134,6 +146,36 @@ const MP3 = Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00]), Buffer.a
   af(js.includes('_ctrlAireCargar();   // [KAIO-V3c]') && js.includes("fetch('/.netlify/functions/radio-cartelera')"), '[V3c] Control abre con «Al aire ahora» y la parrilla se le PREGUNTA al dueño público — ni un minuto de pared se re-calcula');
   af(html.includes('id="radio-ctrl-aire"') && /radioControlSaltar\(\)/.test(html.slice(html.indexOf('id="radio-ctrl-aire"'), html.indexOf('id="radio-ctrl-aire"') + 800)), 'con Saltar canción a la mano');
   af(js.includes('let _rnVivoTimer = null') && (() => { const b = js.slice(js.indexOf('_rnVivoTimer = setInterval'), js.indexOf('_rnVivoTimer = setInterval') + 400); return b.includes('document.hidden') && !b.includes('_rnOyentes'); })(), 'las tarjetas de Números LATEN solas (dueño _rnVivoTimer), solo las piezas baratas y nunca en fondo');
+
+  console.log('\n[C] PET-DEL-1: borrar peticiones (handler real + cables)');
+  // El handler REAL de admin-radio-peticiones contra la misma red falsa.
+  Object.keys(require.cache).forEach((k) => { if (k.includes('netlify/functions') || k.includes('netlify\\functions')) delete require.cache[k]; });
+  const hp = require(path.join(RAIZ, 'netlify/functions/admin-radio-peticiones.js')).handler;
+  const soloPet = () => red.llamadas.filter(c => c.u.includes('radio_peticiones'));
+
+  const antesP = red.llamadas.length;
+  r = await hp(ev({ id: '42', eliminar: true }, roshi));
+  af(r.statusCode === 400 && /confirmar/.test(JSON.parse(r.body).error) && red.llamadas.length === antesP,
+    '🔒 eliminar SIN confirmar:true rebota 400 SIN pegarle a la base — el candado vive en el servidor, no en el botón');
+  r = await hp(ev({ id: '42', eliminar: true, confirmar: true }, roshi));
+  let del = soloPet().slice(-1)[0] || {};
+  af(r.statusCode === 200 && JSON.parse(r.body).ok === true && JSON.parse(r.body).eliminada === '42', 'con confirmar:true elimina y contesta ok + el id');
+  af(del.m === 'DELETE' && /[?&]id=eq\.42/.test(del.u), '🔒 el DELETE viaja CON su filtro id=eq. — sin filtro barrería la tabla entera (la red falsa lo rechaza)');
+  const antesP2 = red.llamadas.length;
+  r = await hp(ev({ id: 'x;drop table', eliminar: true, confirmar: true }, roshi));
+  af(r.statusCode === 400 && red.llamadas.length === antesP2, 'un id que no es uuid/entero rebota 400 sin red — el id viaja en la URL del DELETE');
+  r = await hp(ev({ id: '42', atendida: true }, roshi));
+  del = soloPet().slice(-1)[0] || {};
+  af(r.statusCode === 200 && del.m === 'PATCH' && /[?&]id=eq\.42/.test(del.u) && del.body && del.body.atendida === true,
+    'regresión: atender sigue siendo PATCH con su filtro — eliminar no se comió el camino viejo');
+  r = await hp(ev({ id: '42', eliminar: true, confirmar: true }, bulma));
+  af(r.statusCode === 403, 'las peticiones siguen siendo SOLO de Memo: bulma rebota');
+
+  // Los cables del front
+  af((js.match(/async function radioPeticionBorrar/g) || []).length === 1 && js.includes('eliminar: true, confirmar: true'), 'radioPeticionBorrar es el DUEÑO y manda {eliminar, confirmar} — el confirm() del navegador es cortesía');
+  af(js.includes("radioPeticionBorrar('${id}')"), 'el 🗑 vive en cada fila de la pestaña Peticiones');
+  af(js.includes("_cbPubBorrar('${_rcEsc(p.id)}')") && js.includes('await radioPeticionBorrar(id); _cbPubRender();'), 'y en el panel EN VIVO de la cabina, DELEGANDO en el dueño — cero segunda implementación');
+  af((() => { const b = js.slice(js.indexOf('async function radioPeticionBorrar'), js.indexOf('async function radioPeticionBorrar') + 1200); return b.includes('_radioPeticiones.filter(') && b.includes('_renderRadioPeticiones()'); })(), 'al borrar, la fila sale del global y la tabla se repinta — las dos pantallas quedan frescas');
 
   console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
   process.exit(ko ? 1 : 0);

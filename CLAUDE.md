@@ -528,6 +528,16 @@ está caduco antes de escribirse.
         tarjetas de Números **LATEN solas** cada 30 s (dueño `_rnVivoTimer`,
         SOLO las piezas baratas — nowplaying y likes —, jamás los 6 reportes,
         y nunca con la pestaña en fondo).
+      - ✅ **PET-DEL-1 (25-oct, pedido de Memo: «dame opción de borrar las
+        peticiones»):** botón 🗑 por petición en la pestaña Peticiones Y en el
+        panel EN VIVO de la cabina (que DELEGA en el dueño
+        `radioPeticionBorrar` — cero segunda implementación). Una petición es
+        CONTENIDO, no dinero (precedente RADIO-V2a2): eliminar existe, con
+        candado **`confirmar:true` EN EL SERVIDOR** (sin él, 400 sin red;
+        esconder el botón no basta — COB-MIG-1) y SOLO maestro_roshi. 🔒 El
+        DELETE viaja CON su filtro `id=eq.` y la red falsa del arnés RECHAZA
+        un DELETE sin filtro (barrería la tabla); Atender/Reabrir siguen
+        intactos (regresión careada). `mide:kaio-v3` **45**.
 
 
 - 🔥⏳ **PN27 · PREVENTA A CIEGAS PA'L NORTE 2027 (14-oct-2026) — construida y

@@ -6,6 +6,7 @@
 //
 //   GET  → { ok:true, peticiones:[...] }  (radio_peticiones, creado desc, 200)
 //   POST { id, atendida:bool } → PATCH radio_peticiones · { ok:true }
+//   POST { id, eliminar:true, confirmar:true } → DELETE (candado en servidor) [PET-DEL-1]
 //
 // Seguridad: mismo patrón que admin-solicitudes-list — Authorization Bearer <JWT>
 // validado por verifyAdminAuth(); Supabase PORTAL con service_role (bypass RLS,
@@ -72,6 +73,28 @@ exports.handler = async (event) => {
 
     const id = (body && body.id != null) ? String(body.id) : '';
     if (!ID_RE.test(id)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id inválido' }) };
+
+    // ---- [PET-DEL-1] POST { id, eliminar:true, confirmar:true } → DELETE ----
+    // Una petición es CONTENIDO, no dinero — eliminar existe y es deliberado
+    // (precedente RADIO-V2a2: la cartelera). El candado vive EN EL SERVIDOR:
+    // sin confirmar:true rebota 400 SIN pegarle a la base (esconder el botón
+    // no basta — COB-MIG-1). El DELETE va con su filtro id=eq.: un DELETE sin
+    // filtro barrería la tabla entera.
+    if (body.eliminar === true) {
+      if (body.confirmar !== true) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Eliminar exige confirmar:true' }) };
+      }
+      const rd = await fetch(`${env.PORTAL_SB_URL}/rest/v1/radio_peticiones?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { ...sbHeaders, Prefer: 'return=minimal' },
+      });
+      if (!rd.ok) {
+        const detail = await rd.text();
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo eliminar', detail }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, eliminada: id }) };
+    }
+
     if (typeof body.atendida !== 'boolean') return { statusCode: 400, headers, body: JSON.stringify({ error: 'atendida debe ser booleano' }) };
 
     const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/radio_peticiones?id=eq.${encodeURIComponent(id)}`, {

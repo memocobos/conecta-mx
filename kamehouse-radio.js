@@ -1326,12 +1326,14 @@ function _renderRadioPeticiones() {
     const accion = p.atendida
       ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioAtender('${id}',false)">Reabrir</button>`
       : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioAtender('${id}',true)">Atender</button>`;
+    // [PET-DEL-1] borrar PARA SIEMPRE — confirm() + candado confirmar:true en el servidor
+    const borrar = `<button class="btn btn-ghost btn-sm" style="font-size:11px" title="Borrar para siempre" onclick="radioPeticionBorrar('${id}')">🗑</button>`;
     return `<tr${p.atendida ? ' style="opacity:.55"' : ''}>
       <td data-label="Fecha" style="white-space:nowrap">${_spEscape(_radioFecha(p.creado))}</td>
       <td data-label="Nombre">${_spEscape(p.nombre || '—')}</td>
       <td data-label="Petición">${_spEscape(p.peticion || '')}</td>
       <td data-label="Estado">${estado}</td>
-      <td data-label="Acción">${accion}</td>
+      <td data-label="Acción" style="white-space:nowrap">${accion} ${borrar}</td>
     </tr>`;
   }).join('');
 }
@@ -1369,6 +1371,26 @@ async function radioAtender(id, atendida) {
     const it = _radioPeticiones.find(p => String(p.id) === String(id));
     if (it) it.atendida = atendida;
     _renderRadioPeticiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+// [PET-DEL-1] Borrar una petición PARA SIEMPRE. El confirm() de aquí es
+// cortesía; el candado real (confirmar:true) vive en el servidor. Es el DUEÑO:
+// la cabina delega aquí (_cbPubBorrar), nunca arma su propio fetch.
+async function radioPeticionBorrar(id) {
+  const it = _radioPeticiones.find(p => String(p.id) === String(id));
+  const quien = (it && it.nombre) ? (' de ' + it.nombre) : '';
+  if (!confirm('¿Borrar la petición' + quien + '?\n\nSe elimina PARA SIEMPRE (si solo quieres quitarla de pendientes, usa Atender).')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-peticiones', {
+      method: 'POST', body: JSON.stringify({ id, eliminar: true, confirmar: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    _radioPeticiones = _radioPeticiones.filter(p => String(p.id) !== String(id));
+    _renderRadioPeticiones();
+    showToast('Petición borrada', 'success');
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
@@ -2101,6 +2123,7 @@ function _cbPubRender() {
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
           <span style="font-size:11px;color:var(--ts)">${_cbPubHace(p.creado)}${esNuevo('p', p.id) ? ' · 🆕' : ''}</span>
           <button class="btn btn-primary btn-sm" style="font-size:11px;margin-left:auto" onclick="_cbPubAtender('${_rcEsc(p.id)}')">✓ Ya la atendí</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" title="Borrar para siempre" onclick="_cbPubBorrar('${_rcEsc(p.id)}')">🗑</button>
         </div>
       </div>`).join('') : '<div style="color:var(--ts);font-size:13px">Sin peticiones pendientes — vas al día.</div>';
   }
@@ -2120,6 +2143,7 @@ function _cbPubRender() {
 // radioMuroVisible, que actualizan el global y las tablas) y repintan el panel.
 async function _cbPubAtender(id) { await radioAtender(id, true); _cbPubRender(); }
 async function _cbPubMuro(id, visible) { await radioMuroVisible(id, visible); _cbPubRender(); }
+async function _cbPubBorrar(id) { await radioPeticionBorrar(id); _cbPubRender(); }   // [PET-DEL-1]
 // La campana LOCAL: dos blips cortos directo a destination (ni master ni
 // monitor — jamás al aire). Usa el ctx de la cabina solo si YA existe; crear
 // un AudioContext por un ding pelearía con el autoplay del navegador.

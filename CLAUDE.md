@@ -188,6 +188,45 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴✅ **CONCILIA-LOTE-1 (25-oct-2026, en main local): el careo caja↔contratos
+  murió porque EL MES ENGORDÓ — los `in.(...)` van ahora por TANDAS.** Reporte
+  de Memo, citado: *«No se pudo leer el lado CONTRATOS: Supabase rechazó la
+  consulta de viajeros_evento»*. Ese texto es el fail-soft de CONCILIA-1
+  haciendo su trabajo (502, `diferencia:null`, jamás un cero falso); lo roto
+  era la lectura. **La causa, MEDIDA y no supuesta:** el `id=in.(...)` de
+  `_lib/concilia` crece ~39 chars por viajero y octubre trae **653 viajeros
+  únicos con abono** → URL de **25.6 KB** → **el gateway de Supabase la
+  rechaza con 400 «Bad Request» EN TEXTO PLANO, antes de PostgREST**.
+  Reproducido en el navegador real con el anon key: 500 ids pasan, 653
+  rebotan; con headers mínimos la misma URL PASA (el tope es URL+headers
+  combinados, ~25.5 KB). Y la progresión clava la fecha: el acumulado del mes
+  cruzó ~643 el **22-23 de octubre** — el careo funcionó todo el mes y murió
+  esa semana. 🔒 **La lección: un in-list sobre ids SIN TOPE PROPIO crece con
+  el negocio hasta reventar el tope del transporte** — y el primer careo
+  (fixture de 6 abonos) jamás lo pudo ver.
+  - **El arreglo:** `leerEnLotes` en `_lib/concilia` — tandas de **150 ids**
+    (~5.9 KB por URL, 4× de margen) que se JUNTAN; aplicado a los CUATRO
+    `in.(...)` del módulo (viajeros_evento, abonos_viajero, solicitudes_tour,
+    clientes). 🔒 **Una tanda caída tira el lado ENTERO** (el error sube tal
+    cual): media lista casada contra una lista completa INVENTARÍA descuadres.
+    Sigue solo-lectura; el handler y el front no se tocaron.
+  - **Careo:** `mide:concilia-1` **71 → 83**, re-anclado a `89f0c2e`. La red
+    falsa aprendió el TOPE del gateway (URL > 25 KB → 400 'Bad Request', como
+    el real) y el bloque [L] siembra 700 viajeros con uuids de largo REAL:
+    **BASE_LOTES (`24c9d42`, el merge viejo) reproduce EXACTO el texto que
+    Memo pegó**, HEAD contesta 200 con 5 tandas (la más larga 5,942 chars),
+    los 700 salen completos (cardinalidad: una tanda perdida en silencio es
+    un descuadre inventado), y la tanda 2 caída rinde el careo entero.
+  - ⚠️ **Vecino de la misma familia, NOMBRADO sin tocar:**
+    `_lib/excel-careo-correr` arma `viajero_id=in.(...)` con los viajeros de
+    UNA pestaña — peor caso real hoy **dalemix 238 ≈ 9.3 KB** (2.7× de
+    margen). Muerde el día que un evento cruce ~600 viajeros; es tuerca propia
+    con su propio careo, no se coló aquí. Los demás 40+ archivos con `in.(`
+    van acotados por contexto (estados fijos, el equipo, los lugares de una
+    solicitud).
+  - ⏳ **Pendiente: push de Memo** — producción sigue con el código viejo y el
+    renglón del Radar seguirá diciendo «no se pudo mirar» hasta el deploy.
+
 - ✅ **REP-TICKET-1 + GZ-HIST-1 (25-oct-2026, en main local): los dos reportes
   de los coordinadores.** Palabra de Memo: «a la hora de enviar sus reportes no
   tienen cómo subir los tickets de los gastos» y «en su perfil no pueden subir

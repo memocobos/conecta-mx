@@ -144,7 +144,12 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-card{background:#111;border:1px solid rgba(255,255,255,.08);margin-bottom:8px;cursor:pointer;overflow:hidden;position:relative;opacity:0;transform:translateY(20px);transition:opacity .4s ease,transform .4s ease}
 .ev-card.visible{opacity:1;transform:translateY(0)}
 .ev-card:hover{border-color:#ff283b}
-.ev-card.agotado{cursor:default;pointer-events:none;position:relative}
+/* [MAS-ALLA-1 · 26-oct-2026] La tarjeta agotada DEJA DE ESTAR MUERTA: abre el
+   wizard del Más Allá (solicitud de boletos). Firmado por Memo: las TRES
+   puertas —tarjeta, tira del hero y link directo— capturan la demanda del
+   agotado en vez de perderla. El sello AGOTADO (::after) conserva SU
+   pointer-events:none, así que el clic atraviesa al card. */
+.ev-card.agotado{cursor:pointer;position:relative}
 .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(255,40,59,.85);display:grid;place-items:center;font-size:26px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
 .ev-card.agotado .ev-img{filter:brightness(.25) grayscale(1)}
 .ev-card.proceso{position:relative}
@@ -202,6 +207,17 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .nf-modal-skip:hover{color:rgba(255,255,255,.6)}
 /* ── WAITLIST MODAL ─────────────────────────────────────── */
 .wl-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9998;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+/* [MAS-ALLA-1] Los chips del wizard del Más Allá (paquetes/zonas de interés).
+   El esqueleto del modal reusa las clases wl-*; aquí solo lo que el AVÍSAME
+   no tiene. Amarillo de marca (#e8ff4c) para el chip elegido. */
+.ma-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ma-chip{padding:7px 13px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:transparent;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .12s}
+.ma-chip.on{background:#e8ff4c;border-color:#e8ff4c;color:#000}
+.ma-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-top:14px;font-weight:800;font-family:'Montserrat',sans-serif}
+.ma-opc{text-transform:none;letter-spacing:0;font-weight:600;color:rgba(255,255,255,.4)}
+.ma-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.ma-row2{grid-template-columns:1fr}}
+#ma-cantidad{width:100%;background:#111;border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;padding:10px;font-family:'Montserrat',sans-serif;font-size:14px}
 .wl-modal{background:#0a0a1a;border:1.5px solid rgba(232,255,76,.25);border-radius:var(--r-card,16px);max-width:420px;width:100%;padding:32px 28px 26px;position:relative;box-shadow:var(--sombra-alta);font-family:'Montserrat',sans-serif}
 .wl-modal-close{position:absolute;top:12px;right:14px;background:rgba(255,255,255,.08);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .wl-modal-close:hover{background:rgba(255,255,255,.2)}
@@ -3441,6 +3457,13 @@ function renderCatalog(){
           else{showDetail(evv.id);}
         };
       })(ev,isSV,isProc,isNF,isProxi);
+    } else if(isAg&&!isPast){
+      // [MAS-ALLA-1] El agotado abre el wizard del Más Allá: la demanda se
+      // ANOTA (nombre, WhatsApp, zonas de interés) en vez de perderse en una
+      // tarjeta muerta. El CSS de .ev-card.agotado soltó su pointer-events a
+      // la par — sin eso este onclick sería letra muerta (la ley del selector
+      // que no alcanza nada).
+      (function(evv){ card.onclick=function(){ if(typeof abrirMasAllaModal==='function')abrirMasAllaModal(evv); }; })(ev);
     }
     list.appendChild(card);
     // Load image via API if no static image
@@ -4435,6 +4458,14 @@ var _landTick = null;
     window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
   }
 
+  // [MAS-ALLA-1] El agotado se SOLICITA: el wizard del Más Allá anota la
+  // demanda (nombre, WhatsApp, zonas) para que el equipo vaya a buscar
+  // boletos. Fallback a WhatsApp si el modal no existe — nunca el cotizador.
+  function solicitar(ev){
+    if(typeof abrirMasAllaModal==='function'){abrirMasAllaModal(ev);return;}
+    informes(ev);
+  }
+
   function construir(){
     if(typeof EV==='undefined')return;
     var wrap=document.getElementById('hh-next-wrap');
@@ -4523,7 +4554,12 @@ var _landTick = null;
         sello.textContent=ag?'AGOTADO':'PRÓXIMAMENTE';
         it.appendChild(sello);
       }
-      it.onclick=ag?function(){informes(e);}:px?function(){avisame(e);}:function(){abrir(e.id);};
+      // [MAS-ALLA-1 · 26-oct-2026] El agotado de la tira ya NO va a WhatsApp:
+      // abre el wizard del Más Allá (firmado por Memo — las TRES puertas).
+      // ⚰️ La ruta del 19-sep (agotado→informes/WhatsApp, decisión de LAND-2)
+      // queda superada por esta palabra nueva; `informes()` sobrevive como el
+      // RESPALDO si el modal no existe en esta página.
+      it.onclick=ag?function(){solicitar(e);}:px?function(){avisame(e);}:function(){abrir(e.id);};
       strip.appendChild(it);
     });
     // [LAND-2] N SE CUENTA, NO SE RESTA. El letrero promete «los que quedan a
@@ -4919,6 +4955,38 @@ function _filPinta(){
   }
   if(!found||found.listOnly)return;
   if(found.st==='proceso'&&found.waChannel){window.location.href=found.waChannel;return;}
+  // ── [MAS-ALLA-1 · 26-oct-2026] EL DEEP-LINK APRENDE LOS ESTADOS ────────────
+  // Reporte de Memo: «si la gente tiene el link directo les aparece como si
+  // estuviera activo». Medido: este IIFE no tenía NINGUNA puerta de estado
+  // salvo `proceso` — un agotado o un proximamente con link directo caían en
+  // `showDetail()`, el cotizador completo, mientras la tarjeta y la tira sí
+  // guardaban. El veredicto SE LE PREGUNTA a `_evVeredicto` (el MISMO dueño
+  // que decide la clase .agotado de la tarjeta — cubre el st de Esferas Y el
+  // auto-semáforo de zonas), jamás se re-deriva aquí.
+  // · proximamente / pronto → el AVÍSAME (lista de espera), como su tarjeta.
+  // · agotado → el wizard del MÁS ALLÁ (solicitud de boletos).
+  // · pasado → se queda en la portada (antes también abría el cotizador).
+  // ⚠️ Los modales viven MÁS ABAJO en el documento y este IIFE corre a media
+  // parseada (la ley de CARDS): la apertura se DIFIERE a DOM listo, no se
+  // llama en caliente — getElementById sobre lo no parseado truena mudo.
+  // ⚠️ `solo-viaje` se queda como estaba (showDetail) A PROPÓSITO: su flujo
+  // RIDE sí vende, y _evVeredicto no enciende isAg para un rideOnly vivo.
+  var _v=(typeof _evVeredicto==='function')?_evVeredicto(found):null;
+  if(_v){
+    var _alListo=function(fn){
+      if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn);}
+      else{fn();}
+    };
+    if(_v.isPast){return;}
+    if(_v.isProxi||_v.isPronto){
+      _alListo(function(){ if(typeof abrirWaitlistModal==='function')abrirWaitlistModal(found); });
+      return;
+    }
+    if(_v.isAg){
+      _alListo(function(){ if(typeof abrirMasAllaModal==='function')abrirMasAllaModal(found); });
+      return;
+    }
+  }
   // Deep link: usar replaceState para evitar entrada duplicada en history
   try{
     if(typeof history!=='undefined' && history.replaceState){
@@ -7048,6 +7116,123 @@ function enviarWaitlist(e){
   return false;
 }
 
+// ═══ [MAS-ALLA-1 · 26-oct-2026] EL WIZARD DEL MÁS ALLÁ ════════════════════
+// El evento AGOTADO ya no es una puerta muerta: se SOLICITA. Nombre + WhatsApp
+// (ahí se responde) + cantidad + paquetes/zonas de interés → la tabla
+// `mas_alla_solicitudes` de KH, que el equipo atiende desde la pantalla
+// EL MÁS ALLÁ. Esto NO es dinero: es demanda anotada para ir a buscar boletos.
+// Lo abren las TRES puertas (firmado por Memo): deep-link, tarjeta del
+// catálogo y tira del hero.
+var _maEvento=null;
+// Los paquetes que ESTE evento vende — etiquetas de interés, no inventario:
+// por eso la derivación es gruesa a propósito (cheapOnly/rideOnly/cdmx) y no
+// re-implementa la aritmética del cotizador.
+function _maPaquetesDe(ev){
+  if(ev.rideOnly)return['Solo viaje (RIDE)'];
+  if(ev.cheapOnly)return['Solo boleto (CHEAP)'];
+  var p=['Todo incluido (PLUS)'];
+  if(!ev.cdmx)p.push('Sin transporte (STAY)');
+  if(Number(ev.ride)>0)p.push('Solo viaje (RIDE)');
+  if(!ev.noCheap)p.push('Solo boleto (CHEAP)');
+  return p;
+}
+// El universo de zonas de la ficha: zonas + cheapZonas + las de cada fecha de
+// un multifecha, únicas por nombre (la forma de _lib/zona-ficha, en chiquito).
+function _maZonasDe(ev){
+  var out=[],vis={};
+  var mete=function(z){var n=z&&z.n?String(z.n):'';if(n&&!vis[n]){vis[n]=1;out.push(n);}};
+  (ev.zonas||[]).forEach(mete);
+  (ev.cheapZonas||[]).forEach(mete);
+  (ev.multifecha||[]).forEach(function(mf){
+    ((mf&&mf.zonas)||[]).forEach(mete);
+    ((mf&&mf.cheapZonas)||[]).forEach(mete);
+  });
+  return out.slice(0,12);
+}
+// Chips por createElement + textContent: los nombres vienen de la ficha, pero
+// un textContent no le debe nada a nadie.
+function _maChips(contId,lista){
+  var c=document.getElementById(contId);
+  if(!c)return;
+  c.innerHTML='';
+  lista.forEach(function(txt){
+    var b=document.createElement('button');
+    b.type='button';b.className='ma-chip';b.textContent=txt;
+    b.onclick=function(){b.classList.toggle('on');};
+    c.appendChild(b);
+  });
+}
+function abrirMasAllaModal(ev){
+  _maEvento=ev;
+  var n=document.getElementById('ma-ev-name');if(n)n.textContent=ev.a;
+  var f=document.getElementById('ma-form');
+  if(f){f.style.display='block';f.reset();}
+  var paqs=_maPaquetesDe(ev),zonas=_maZonasDe(ev);
+  _maChips('ma-paquetes',paqs);
+  _maChips('ma-zonas',zonas);
+  // Una sección sin opciones no se pinta vacía: se esconde con su rótulo.
+  var pl=document.getElementById('ma-paq-lbl'),pc=document.getElementById('ma-paquetes');
+  if(pl&&pc){pl.style.display=paqs.length>1?'':'none';pc.style.display=paqs.length>1?'':'none';}
+  var zl=document.getElementById('ma-zonas-lbl'),zc=document.getElementById('ma-zonas');
+  if(zl&&zc){zl.style.display=zonas.length?'':'none';zc.style.display=zonas.length?'':'none';}
+  var msg=document.getElementById('ma-msg');
+  if(msg){msg.className='wl-msg';msg.textContent='';}
+  var btn=document.getElementById('ma-submit');
+  if(btn){btn.disabled=false;btn.textContent='Enviar mi solicitud';}
+  document.getElementById('ma-modal-bg').style.display='flex';
+  try{window.stopAllPreviews&&window.stopAllPreviews();}catch(e){}
+  setTimeout(function(){var i=document.getElementById('ma-nombre');if(i)i.focus();},120);
+}
+function cerrarMasAllaModal(){
+  document.getElementById('ma-modal-bg').style.display='none';
+  _maEvento=null;
+}
+function enviarMasAlla(e){
+  if(e&&e.preventDefault)e.preventDefault();
+  if(!_maEvento)return false;
+  var nombre=(document.getElementById('ma-nombre').value||'').trim();
+  var celular=(document.getElementById('ma-celular').value||'').replace(/\D/g,'');
+  var correo=(document.getElementById('ma-correo').value||'').trim().toLowerCase();
+  var cantidad=parseInt(document.getElementById('ma-cantidad').value,10)||1;
+  var hp=(document.getElementById('ma-hp')||{}).value||'';
+  var msg=document.getElementById('ma-msg');
+  var btn=document.getElementById('ma-submit');
+  var setMsg=function(cls,txt){msg.className='wl-msg '+cls;msg.textContent=txt;};
+  if(nombre.length<2){setMsg('err','Pon tu nombre completo.');return false;}
+  if(celular.length!==10){setMsg('err','Tu WhatsApp va a 10 dígitos — ahí te avisamos.');return false;}
+  if(correo&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){setMsg('err','Tu email no se ve bien (o déjalo vacío).');return false;}
+  var junta=function(contId){
+    var out=[];
+    var c=document.getElementById(contId);
+    if(c)c.querySelectorAll('.ma-chip.on').forEach(function(b){out.push(b.textContent);});
+    return out.length?out:null;
+  };
+  btn.disabled=true;btn.textContent='Enviando…';
+  fetch('/.netlify/functions/mas-alla-solicitar',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      evento_id:_maEvento.id,evento_nombre:_maEvento.a,
+      nombre:nombre,celular:celular,correo:correo||null,cantidad:cantidad,
+      paquetes:junta('ma-paquetes'),zonas:junta('ma-zonas'),
+      sitio_web:hp
+    })
+  })
+  .then(function(r){return r.json().then(function(d){return{st:r.status,d:d};}).catch(function(){return{st:r.status,d:null};});})
+  .then(function(x){
+    if(!x.d||!x.d.ok){
+      setMsg('err',(x.d&&x.d.error)||'No pudimos anotar tu solicitud. Inténtalo otra vez o escríbenos por WhatsApp.');
+      btn.disabled=false;btn.textContent='Enviar mi solicitud';
+      return;
+    }
+    document.getElementById('ma-form').style.display='none';
+    setMsg('ok','✓ Listo '+nombre.split(' ')[0]+', anotamos tu solicitud. Si conseguimos lugares te escribimos por WhatsApp.');
+    try{window.trackEventClick&&window.trackEventClick(_maEvento.id+':masalla',_maEvento.a);}catch(e){}
+  })
+  .catch(function(){setMsg('err','Error de conexión. Inténtalo de nuevo.');btn.disabled=false;btn.textContent='Enviar mi solicitud';});
+  return false;
+}
+
 // ═══ [CARD-GUIA-1] EL COTIZADOR QUE ACOMPAÑA ══════════════════════════════
 // Mensajes de apoyo POR PASO, con las palabras de Memo: «ahora elige tu
 // paquete» → «tu zona» → «tu habitación».
@@ -8192,6 +8377,37 @@ function getQuincenas(from, until, max, diasAntes){
       <div class="wl-msg" id="wl-msg"></div>
     </form>
     <div class="wl-fine">Solo te enviaremos un correo cuando este evento esté disponible. Sin spam.</div>
+  </div>
+</div>
+<!-- [MAS-ALLA-1 · 26-oct-2026] EL WIZARD DEL MÁS ALLÁ: la solicitud del evento
+     AGOTADO. Reusa el esqueleto y las clases del modal del AVÍSAME (wl-*) a
+     propósito — dos modales gemelos con dos CSS serían dos listas esperando a
+     divergir. Lo abre abrirMasAllaModal(ev) desde las TRES puertas (deep-link,
+     tarjeta del catálogo, tira del hero). El campo sitio_web es HONEYPOT: vive
+     fuera de pantalla y un humano jamás lo llena. -->
+<div class="wl-modal-bg" id="ma-modal-bg" onclick="cerrarMasAllaModal()">
+  <div class="wl-modal" onclick="event.stopPropagation()">
+    <button class="wl-modal-close" onclick="cerrarMasAllaModal()" aria-label="Cerrar">✕</button>
+    <div class="wl-brand"><span class="wl-brand-conecta">Conecta</span><span class="wl-brand-mx">MX</span></div>
+    <div class="wl-eyebrow">Agotado — pero no para ti</div>
+    <div class="wl-title"><em id="ma-ev-name">—</em></div>
+    <div class="wl-lead">Este evento está agotado, pero podemos ir a buscarte lugares. Cuéntanos qué necesitas y te avisamos por WhatsApp si conseguimos.</div>
+    <form id="ma-form" onsubmit="return enviarMasAlla(event)" autocomplete="on" novalidate>
+      <div class="wl-field"><label for="ma-nombre">Nombre completo</label><input id="ma-nombre" type="text" required autocomplete="name" placeholder="Tu nombre"></div>
+      <div class="ma-row2">
+        <div class="wl-field"><label for="ma-celular">WhatsApp (10 dígitos)</label><input id="ma-celular" type="tel" required inputmode="numeric" maxlength="14" autocomplete="tel" placeholder="8110000000"></div>
+        <div class="wl-field"><label for="ma-cantidad">¿Cuántos boletos?</label><select id="ma-cantidad"><option value="1" selected>1 boleto</option><option value="2">2 boletos</option><option value="3">3 boletos</option><option value="4">4 boletos</option><option value="5">5 boletos</option><option value="6">6 boletos</option><option value="7">7 boletos</option><option value="8">8 boletos</option><option value="9">9 boletos</option><option value="10">10 boletos</option></select></div>
+      </div>
+      <div class="wl-field"><label for="ma-correo">Email (opcional)</label><input id="ma-correo" type="email" autocomplete="email" placeholder="tu@email.com"></div>
+      <div class="ma-lbl" id="ma-paq-lbl">¿Qué paquete te interesa? <span class="ma-opc">(opcional, elige los que quieras)</span></div>
+      <div class="ma-chips" id="ma-paquetes"></div>
+      <div class="ma-lbl" id="ma-zonas-lbl">¿Qué zonas te interesan? <span class="ma-opc">(opcional)</span></div>
+      <div class="ma-chips" id="ma-zonas"></div>
+      <input id="ma-hp" type="text" name="sitio_web" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0" aria-hidden="true">
+      <button class="wl-cta" type="submit" id="ma-submit">Enviar mi solicitud</button>
+      <div class="wl-msg" id="ma-msg"></div>
+    </form>
+    <div class="wl-fine">Buscamos lugares con nuestros proveedores y te escribimos por WhatsApp si los conseguimos. Sin compromiso y sin spam.</div>
   </div>
 </div>
 <div class="pago-modal-bg" id="pago-modal-bg" onclick="cerrarModalPago()">

@@ -196,7 +196,11 @@
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNavGroup(this)}">Herramientas</div>
    <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')"><svg class="nav-ic"><use href="#ic-recibos"/></svg><span>Recibos</span></button>
    <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')"><svg class="nav-ic"><use href="#ic-contratos"/></svg><span>Contratos</span></button>
-   <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Lista de espera</span></button>
+   <!-- [MAS-ALLA-1 · 26-oct] La Lista de espera se llama ahora EL MÁS ALLÁ
+        (palabra de Memo). El id `waitlist` NO cambia: permisos, showHerramienta
+        y la carga llavean por él — renombrar el id rompería tres cables para
+        cambiar un letrero. -->
+   <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>El Más Allá</span></button>
    <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')"><svg class="nav-ic"><use href="#ic-diseno"/></svg><span>Diseño</span></button>
    <!-- [NUBE-1] Entra como HERRAMIENTA y no como tab nueva: bulma y milk ya
         ven «herramientas», así que no se estrena permiso ni se toca el menú
@@ -3343,31 +3347,64 @@
 
  <div class="page" id="page-waitlist">
    <!-- [FLUJO-UX-5] Al patrón de la casa, por lo mismo que Contratos. -->
+   <!-- [MAS-ALLA-1 · 26-oct-2026] LA LISTA DE ESPERA SE VUELVE **EL MÁS ALLÁ**
+        (palabra de Memo) con DOS vistas: 🔔 Avísame (la lista de espera de
+        próximos, intacta) y 👻 Solicitudes de agotados (lo que la gente pidió
+        por el wizard cuando el evento ya no vende). El id `waitlist` de la
+        página NO cambia — permisos y carga llavean por él. -->
    <div class="page-hero">
     <div>
-     <div class="page-title">LISTA DE ESPERA</div>
-     <div class="page-sub">// quién avisa cuando un evento sale a la venta</div>
+     <div class="page-title">EL MÁS ALLÁ</div>
+     <div class="page-sub">// la demanda que no cupo: avisos de próximos + solicitudes de agotados</div>
     </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
        <!-- [COLOR-1] `color:#000` NO baja: es TINTA SOBRE UN ACENTO CLARO. El fondo es var(--gold), y los 7 temas lo pintan claro (#e8ff4c, #FFB6E1, #D4688A, #FFB3CC…), así que el negro es legible en todos. No existe token «tinta sobre acento»; ponerle var(--bg) lo ROMPERÍA en tema-america, que tiene --bg:#FAFAFA. -->
        <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900"><svg class="ic"><use href="#ic-portapapeles"/></svg> Copiar link de próximos tours</button>
-       <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
+       <button class="btn btn-ghost btn-sm" onclick="maRefrescar()">↻ Refrescar</button>
      </div>
    </div>
-   <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
-   <!-- [HER-1g] Los chips, mismos `.gz-filter` de Esferas y Contratos. El
-        conteo va en PERSONAS, que es la unidad del resumen de arriba. -->
-   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-    <button class="gz-filter active" id="wlf-activos" onclick="filtrarWaitlist('activos',this)">// activos</button>
-    <button class="gz-filter" id="wlf-archivo" onclick="filtrarWaitlist('archivo',this)" title="Eventos cuya gente YA fue notificada. Nada se borra: los correos siguen ahí para las promos que vienen.">// archivo</button>
-    <button class="gz-filter" id="wlf-todos" onclick="filtrarWaitlist('todos',this)">// todos</button>
+   <!-- [MAS-ALLA-1] El cambio de vista. El badge del tab de agotados dice los
+        PENDIENTES — se calla en cero (un contador permanente se vuelve mueble). -->
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    <button class="gz-filter active" id="mav-avisame" onclick="maVista('avisame',this)">🔔 Avísame (próximos)</button>
+    <button class="gz-filter" id="mav-agotados" onclick="maVista('agotados',this)">👻 Solicitudes de agotados<span id="mav-agotados-n"></span></button>
    </div>
-   <!-- [HER-1f] El buscador: 438 personas en 12 eventos y ni una caja. Filtra en
-        vivo lo pintado; no le pide nada al servidor. -->
-   <input type="search" id="wl-buscar" class="cot-input" placeholder="Buscar por evento, nombre o correo…"
-          autocomplete="off" oninput="_wlBuscarEnLista()" aria-label="Buscar en la lista de espera"
-          style="width:100%;font-size:13px;margin-bottom:14px">
-   <div id="wl-groups" style="display:grid;gap:12px"></div>
+   <div id="wl-vista-avisame">
+    <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
+    <!-- [HER-1g] Los chips, mismos `.gz-filter` de Esferas y Contratos. El
+         conteo va en PERSONAS, que es la unidad del resumen de arriba. -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+     <button class="gz-filter active" id="wlf-activos" onclick="filtrarWaitlist('activos',this)">// activos</button>
+     <button class="gz-filter" id="wlf-archivo" onclick="filtrarWaitlist('archivo',this)" title="Eventos cuya gente YA fue notificada. Nada se borra: los correos siguen ahí para las promos que vienen.">// archivo</button>
+     <button class="gz-filter" id="wlf-todos" onclick="filtrarWaitlist('todos',this)">// todos</button>
+    </div>
+    <!-- [HER-1f] El buscador: 438 personas en 12 eventos y ni una caja. Filtra en
+         vivo lo pintado; no le pide nada al servidor. -->
+    <input type="search" id="wl-buscar" class="cot-input" placeholder="Buscar por evento, nombre o correo…"
+           autocomplete="off" oninput="_wlBuscarEnLista()" aria-label="Buscar en la lista de espera"
+           style="width:100%;font-size:13px;margin-bottom:14px">
+    <div id="wl-groups" style="display:grid;gap:12px"></div>
+   </div>
+   <div id="ma-vista-agotados" style="display:none">
+    <div id="ma-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+     <button class="gz-filter active" id="maf-pendiente" onclick="maFiltroEstado('pendiente',this)">// pendientes</button>
+     <button class="gz-filter" id="maf-vendido" onclick="maFiltroEstado('vendido',this)">// vendidos ✓</button>
+     <button class="gz-filter" id="maf-no_vendido" onclick="maFiltroEstado('no_vendido',this)">// no se pudo</button>
+     <button class="gz-filter" id="maf-todos" onclick="maFiltroEstado('todos',this)">// todos</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+     <!-- DEFAULTS-1: «Todos los eventos» es FILTRO (forma), no atribución — y
+          está anunciado en la opción. -->
+     <select id="ma-f-evento" class="cot-input" onchange="maFiltroEvento(this.value)" style="font-size:13px;max-width:280px">
+      <option value="">Todos los eventos</option>
+     </select>
+     <input type="search" id="ma-buscar" class="cot-input" placeholder="Buscar por nombre, celular, correo o evento…"
+            autocomplete="off" oninput="_maBuscar()" aria-label="Buscar solicitudes"
+            style="flex:1;min-width:200px;font-size:13px">
+    </div>
+    <div id="ma-groups" style="display:grid;gap:12px"></div>
+   </div>
  </div>
 
  <!-- ─── RADAR DEL DRAGÓN ─── -->

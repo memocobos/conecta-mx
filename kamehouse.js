@@ -88,7 +88,10 @@ const PERMISOS_TABS = {
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
-  bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube'],
+  // [MAS-ALLA-1 · 26-oct] `waitlist` (hoy EL MÁS ALLÁ) entra para bulma y
+  // milk — firmado por Memo: ellas atienden las solicitudes de agotados (la
+  // misma gente de la bandeja de requisiciones).
+  bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist'],
   // [GZ-TOURS-1 · 14-oct] `tours`: su tour asignado con lista de viajeros y
   // rooming. Al coordinador `equipo` le queda SOLO para su Mi Perfil (sin
   // botón en el menú — ver NAV_SIN_BOTON): «no es necesario que vean la
@@ -99,7 +102,7 @@ const PERMISOS_TABS = {
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube']
+  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist']
 };
 
 // [GZ-TOURS-1] Pantallas que el rol PUEDE abrir pero que no llevan botón en el
@@ -11636,7 +11639,7 @@ async function _inicioMB(cont) {
   // En paralelo y cada una fails-soft POR TARJETA: si la Nube tose, la
   // cobranza igual se pinta — un inicio que se cae entero por una tarjeta es
   // peor que una tarjeta que confiesa.
-  const [nube, deud, evs, reqs] = await Promise.all([
+  const [nube, deud, evs, reqs, masAlla] = await Promise.all([
     khAdminFetch('/.netlify/functions/admin-nube', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
       .then((r) => r.json()).catch((e) => ({ _err: e.message })),
     khViajeros._call({ accion: 'deudores_migrados' }).catch((e) => ({ _err: e.message })),
@@ -11645,6 +11648,10 @@ async function _inicioMB(cont) {
     // pendiente nuevo de Bulma/Milk: una reservación esperando es un cliente
     // esperando. Fails-soft como las demás tarjetas.
     khAdminFetch('/.netlify/functions/admin-requisiciones', { method: 'POST', body: JSON.stringify({ accion: 'listar', estado: 'pendiente' }) })
+      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
+    // [MAS-ALLA-1] Las solicitudes de agotados pendientes — demanda esperando
+    // que alguien vaya a buscar boletos. Fails-soft como las demás.
+    khAdminFetch('/.netlify/functions/admin-mas-alla', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
       .then((r) => r.json()).catch((e) => ({ _err: e.message })),
   ]);
 
@@ -11702,6 +11709,21 @@ async function _inicioMB(cont) {
     cobHtml = _iniCard('💰 Cobranza', `<div style="color:var(--ts);font-size:12px">No se pudo leer: ${_iniEsc(deud._err || '')}</div>`, `<button class="btn btn-ghost btn-sm" onclick="showPage('pagos')">Abrir Pagos →</button>`);
   }
 
+  // ②b EL MÁS ALLÁ — solicitudes de agotados PENDIENTES. Se CALLA en cero
+  // (la ley de NUBE: un «todo bien» permanente se vuelve mueble) y también se
+  // calla si no se pudo leer — a diferencia de las tarjetas-encargo (Nube,
+  // cobranza), ésta es demanda extra: su error ya se dice en su pantalla.
+  let maHtml = '';
+  if (masAlla && masAlla.ok) {
+    const pend = (masAlla.solicitudes || []).filter((s) => s.estado === 'pendiente');
+    if (pend.length) {
+      const filas = pend.slice(0, 5).map((s) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(s.nombre)}<i style="color:var(--ts)"> · ${_iniEsc(s.ev_nombre || s.evento_nombre || s.evento_id)}</i></span><b>${Number(s.cantidad) || 1} 🎟</b></div>`).join('');
+      maHtml = _iniCard(`👻 El Más Allá · ${pend.length} buscando boletos`,
+        filas + (pend.length > 5 ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">…y ${pend.length - 5} más</div>` : ''),
+        `<button class="btn btn-primary btn-sm" onclick="maAbrirAgotados()">Ver solicitudes →</button>`);
+    }
+  }
+
   // ③ EVENTOS PRÓXIMOS (7 días) — del catálogo servido, el mismo que ve el sitio.
   const prox = (evs || []).filter((e) => e && e.ds && e.ds >= hoy && _iniDias(hoy, e.ds) <= 7)
     .sort((a, b) => a.ds.localeCompare(b.ds));
@@ -11710,7 +11732,7 @@ async function _inicioMB(cont) {
       : '<div style="color:var(--ts);font-size:12px">Ninguno esta semana.</div>',
     `<button class="btn btn-ghost btn-sm" onclick="showPage('capsule')">Ver viajeros →</button>`);
 
-  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${maHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando · [MAS-ALLA-1] el Más Allá enseguida
 }
 
 // ── La cara de GUERREROS Z ──────────────────────────────────────────────────

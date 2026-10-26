@@ -455,3 +455,232 @@ function wlAbrirModalNotif(eventoId, totalRegs, pendientes) {
     modal.classList.add('open');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [MAS-ALLA-1 · 26-oct-2026] 👻 SOLICITUDES DE AGOTADOS — la segunda vista de
+// EL MÁS ALLÁ. Lo que la gente pidió por el wizard del index cuando el evento
+// ya no vende (tabla `mas_alla_solicitudes`, endpoint admin-mas-alla, roles
+// maestro_roshi/bulma/milk — firmado por Memo).
+// Regla MONO respetada: SOLO funciones; el estado vive lazy en window.__masAlla
+// (cero código de nivel superior en este archivo).
+// ═══════════════════════════════════════════════════════════════════════════
+
+function _maSt() {
+  if (!window.__masAlla) window.__masAlla = { data: null, estado: 'pendiente', evento: '', q: '', cargando: false };
+  return window.__masAlla;
+}
+
+// El cambio de vista dentro de EL MÁS ALLÁ. Lazy: la vista de agotados carga
+// la primera vez que se abre, no al entrar a la pantalla.
+function maVista(cual, btn) {
+  document.getElementById('mav-avisame').classList.toggle('active', cual === 'avisame');
+  document.getElementById('mav-agotados').classList.toggle('active', cual === 'agotados');
+  document.getElementById('wl-vista-avisame').style.display = cual === 'avisame' ? '' : 'none';
+  document.getElementById('ma-vista-agotados').style.display = cual === 'agotados' ? '' : 'none';
+  if (cual === 'agotados' && !_maSt().data && !_maSt().cargando) loadMasAlla();
+}
+
+// El camino desde la tarjeta del INICIO de Bulma/Milk: abre EL MÁS ALLÁ ya
+// parado en la vista de agotados (abrir la pantalla en la otra vista sería
+// mandar a buscar el tab — la ley de «se vuelve con el dato que fue a buscar»).
+function maAbrirAgotados() {
+  showHerramienta('waitlist');
+  maVista('agotados', document.getElementById('mav-agotados'));
+}
+
+// El ↻ del hero refresca LA VISTA ACTIVA — un refrescar que recarga la otra
+// pantalla se lee como botón roto.
+function maRefrescar() {
+  const ag = document.getElementById('ma-vista-agotados');
+  if (ag && ag.style.display !== 'none') loadMasAlla();
+  else loadWaitlist();
+}
+
+async function loadMasAlla() {
+  const st = _maSt();
+  st.cargando = true;
+  const sum = document.getElementById('ma-summary');
+  if (sum) sum.textContent = 'Cargando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-mas-alla', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      if (sum) sum.textContent = '⚠ No se pudieron leer las solicitudes: ' + (d.error || r.status);
+      return;
+    }
+    st.data = d.solicitudes || [];
+    st.catalogoOk = d.catalogo_ok !== false;
+    _maPintar();
+  } catch (e) {
+    if (sum) sum.textContent = '⚠ Error de red leyendo las solicitudes';
+  } finally {
+    st.cargando = false;
+  }
+}
+
+function maFiltroEstado(v, btn) {
+  _maSt().estado = v;
+  ['maf-pendiente', 'maf-vendido', 'maf-no_vendido', 'maf-todos'].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', b === btn);
+  });
+  _maPintar();
+}
+function maFiltroEvento(v) { _maSt().evento = v || ''; _maPintar(); }
+function _maBuscar() {
+  const i = document.getElementById('ma-buscar');
+  _maSt().q = (i && i.value ? i.value : '').trim().toLowerCase();
+  _maPintar();
+}
+function _maCoincide(s, q) {
+  if (!q) return true;
+  return [s.nombre, s.celular, s.correo, s.ev_nombre, s.evento_nombre, s.evento_id]
+    .some((x) => String(x || '').toLowerCase().includes(q));
+}
+
+// El mensaje de WhatsApp, DERIVADO del dato de la solicitud — «hola, tenemos
+// boletos disponibles en la zona que buscas» (palabra de Memo), con el evento,
+// la cantidad y las zonas que la persona pidió.
+function _maMsgWa(s) {
+  const nom = String(s.nombre || '').split(' ')[0] || '';
+  const ev = s.ev_nombre || s.evento_nombre || s.evento_id;
+  const n = Number(s.cantidad) || 1;
+  const zonas = Array.isArray(s.zonas) && s.zonas.length ? s.zonas.join(' / ') : '';
+  return 'Hola ' + nom + '! Somos Conecta Reynosa 🤘 Nos pediste ' + n + ' boleto' + (n > 1 ? 's' : '')
+    + ' para ' + ev + (zonas ? (' en ' + zonas) : '')
+    + '. ¡Tenemos lugares disponibles' + (zonas ? ' en la zona que buscas' : '') + '! ¿Sigues interesad@?';
+}
+function maWhatsApp(id) {
+  const s = (_maSt().data || []).find((x) => x.id === id);
+  if (!s || !s.celular) return;
+  // El `52` no es decorativo: celular va a 10 dígitos y un wa.me sin lada abre
+  // un chat con NADIE (la lección del giveaway).
+  window.open('https://wa.me/52' + s.celular + '?text=' + encodeURIComponent(_maMsgWa(s)), '_blank');
+}
+
+async function maMarcar(id, estado, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-mas-alla', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar', id, estado }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      if (typeof showToast === 'function') showToast('No se pudo marcar: ' + (d.error || r.status), 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    // La fila local se actualiza con LO QUE CONTESTÓ el servidor, no con lo
+    // que se mandó: el servidor es quien selló atendido_por/atendido_at.
+    const st = _maSt();
+    const i = (st.data || []).findIndex((x) => x.id === id);
+    if (i >= 0) st.data[i] = { ...st.data[i], ...d.solicitud };
+    _maPintar();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Error de red al marcar', 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _maBadge(estado) {
+  if (estado === 'vendido') return '<span style="font-size:10px;font-weight:900;letter-spacing:.06em;padding:3px 8px;border-radius:999px;background:rgba(136,234,78,.16);color:var(--green,#88ea4e)">VENDIDO ✓</span>';
+  if (estado === 'no_vendido') return '<span style="font-size:10px;font-weight:900;letter-spacing:.06em;padding:3px 8px;border-radius:999px;background:rgba(255,40,59,.14);color:var(--red,#ff283b)">NO SE PUDO</span>';
+  return '<span style="font-size:10px;font-weight:900;letter-spacing:.06em;padding:3px 8px;border-radius:999px;background:rgba(232,255,76,.14);color:var(--gold,#e8ff4c)">PENDIENTE</span>';
+}
+
+function _maPintar() {
+  const st = _maSt();
+  const cont = document.getElementById('ma-groups');
+  const sum = document.getElementById('ma-summary');
+  if (!cont) return;
+  const data = st.data || [];
+
+  // El resumen cuenta el UNIVERSO, no lo filtrado: «3 pendientes · 5 vendidos»
+  // es la foto del negocio; el filtro es solo qué se enseña.
+  const nPend = data.filter((s) => s.estado === 'pendiente').length;
+  const nVend = data.filter((s) => s.estado === 'vendido').length;
+  const nNo = data.filter((s) => s.estado === 'no_vendido').length;
+  if (sum) {
+    sum.textContent = data.length
+      ? (nPend + ' pendientes · ' + nVend + ' vendidos · ' + nNo + ' no se pudo' + (st.catalogoOk === false ? ' · ⚠ catálogo ilegible: sin fechas de evento' : ''))
+      : 'Sin solicitudes todavía — aparecen cuando alguien pide boletos de un evento agotado.';
+  }
+  // El badge del tab: PENDIENTES, y se calla en cero.
+  const badge = document.getElementById('mav-agotados-n');
+  if (badge) badge.textContent = nPend > 0 ? (' · ' + nPend) : '';
+
+  // El selector de eventos se DERIVA de los datos (con su conteo), conservando
+  // la elección actual.
+  const sel = document.getElementById('ma-f-evento');
+  if (sel) {
+    const porEv = new Map();
+    data.forEach((s) => {
+      const k = s.evento_id;
+      if (!porEv.has(k)) porEv.set(k, { nombre: s.ev_nombre || s.evento_nombre || k, n: 0 });
+      porEv.get(k).n++;
+    });
+    const actual = st.evento;
+    sel.innerHTML = '<option value="">Todos los eventos</option>'
+      + [...porEv.entries()].map(([k, v]) => '<option value="' + _wlEsc(k) + '"' + (k === actual ? ' selected' : '') + '>' + _wlEsc(v.nombre) + ' (' + v.n + ')</option>').join('');
+  }
+
+  // Filtro + orden: grupos POR EVENTO ordenados por CERCANÍA (ev_ds asc, los
+  // sin fecha al final), dentro de cada grupo lo más nuevo arriba.
+  let filas = data;
+  if (st.estado !== 'todos') filas = filas.filter((s) => s.estado === st.estado);
+  if (st.evento) filas = filas.filter((s) => s.evento_id === st.evento);
+  if (st.q) filas = filas.filter((s) => _maCoincide(s, st.q));
+
+  if (!filas.length) {
+    cont.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:20px;text-align:center">'
+      + (data.length ? 'Nada con este filtro.' : 'Sin solicitudes todavía.') + '</div>';
+    return;
+  }
+
+  const grupos = new Map();
+  filas.forEach((s) => {
+    if (!grupos.has(s.evento_id)) grupos.set(s.evento_id, []);
+    grupos.get(s.evento_id).push(s);
+  });
+  const orden = [...grupos.entries()].sort((a, b) => {
+    const da = a[1][0].ev_ds || '9999-12-31', db = b[1][0].ev_ds || '9999-12-31';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+
+  cont.innerHTML = orden.map(([evId, lista]) => {
+    const cab = lista[0];
+    const fechaEv = cab.ev_fecha ? (' · ' + _wlEsc(cab.ev_fecha)) : '';
+    const filasH = lista.map((s) => {
+      const chips = []
+        .concat((Number(s.cantidad) || 1) + ' 🎟')
+        .concat(Array.isArray(s.paquetes) ? s.paquetes : [])
+        .concat(Array.isArray(s.zonas) ? s.zonas : [])
+        .map((t) => '<span style="font-size:10px;padding:2px 7px;border:1px solid var(--line,#333);border-radius:999px;color:var(--ts)">' + _wlEsc(t) + '</span>')
+        .join(' ');
+      const acc = s.estado === 'pendiente'
+        ? '<button class="btn btn-sm" style="background:var(--green,#88ea4e);color:#000;font-weight:900" onclick="maMarcar(\'' + s.id + '\',\'vendido\',this)">✓ Vendido</button>'
+          + '<button class="btn btn-ghost btn-sm" onclick="maMarcar(\'' + s.id + '\',\'no_vendido\',this)">✖ No se pudo</button>'
+        : '<button class="btn btn-ghost btn-sm" title="Regresarla a pendientes" onclick="maMarcar(\'' + s.id + '\',\'pendiente\',this)">↺ Pendiente</button>';
+      const atendido = s.atendido_por ? '<div style="font-size:10px;color:var(--ts)">' + _wlEsc(s.estado === 'vendido' ? 'vendido' : 'marcado') + ' por ' + _wlEsc(s.atendido_por) + ' · ' + _wlFmtDate(s.atendido_at) + '</div>' : '';
+      return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line,#2a2a2a);border-radius:10px">'
+        + '<div style="min-width:220px;flex:1">'
+        +   '<div style="font-weight:800">' + _wlEsc(s.nombre) + ' ' + _maBadge(s.estado) + '</div>'
+        +   '<div style="font-size:11px;color:var(--ts);margin-top:2px">'
+        +     '<a href="javascript:void(0)" onclick="maWhatsApp(\'' + s.id + '\')" style="color:var(--gold,#e8ff4c);font-weight:800;text-decoration:none" title="Abrir WhatsApp con el mensaje listo">📱 ' + _wlEsc(s.celular) + '</a>'
+        +     (s.correo ? ' · ' + _wlEsc(s.correo) : '') + ' · pidió ' + _wlFmtDate(s.created_at)
+        +   '</div>'
+        +   '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">' + chips + '</div>'
+        +   atendido
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + acc + '</div>'
+        + '</div>';
+    }).join('');
+    return '<div style="border:1px solid var(--line,#2a2a2a);border-radius:12px;padding:14px">'
+      + '<div style="font-weight:900;letter-spacing:.04em;margin-bottom:10px">👻 ' + _wlEsc(cab.ev_nombre || cab.evento_nombre || evId) + fechaEv
+      + ' <span style="color:var(--ts);font-weight:600;font-size:12px">· ' + lista.length + ' solicitud' + (lista.length > 1 ? 'es' : '') + '</span></div>'
+      + '<div style="display:grid;gap:8px">' + filasH + '</div>'
+      + '</div>';
+  }).join('');
+}

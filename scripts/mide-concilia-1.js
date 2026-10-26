@@ -162,21 +162,42 @@ const P_URL = 'https://muvvrstnkxsxfpkhbntq.supabase.co';
 // entiende, TRUENA en vez de contestar de más. Una red falsa permisiva deja
 // pasar un filtro roto y el careo se lee como verde.
 let CAIDA = null;       // 'kh' | 'portal' | null — para el cero que es afirmación
+// [CONCILIA-LOTE-1] Falla UNA tanda: { tabla, n } tumba el n-ésimo GET a esa
+// tabla — para afirmar que media lista jamás sale como careo.
+let FALLA_TANDA = null;
+let _tandaCont = {};
 let PEDIDOS = [];
 function armarRed() {
   PEDIDOS = [];
+  _tandaCont = {};
   global.fetch = async (url, opts) => {
     const u = String(url), met = (opts && opts.method) || 'GET';
     const esKH = u.startsWith(KH_URL), esP = u.startsWith(P_URL);
     if (!esKH && !esP) throw new Error('la red falsa no conoce ese destino: ' + u);
     PEDIDOS.push({ met, url: u.replace(/^.*rest\/v1\//, '') });
     if (met !== 'GET') throw new Error('🔴 LA FASE 1 ESCRIBIÓ: ' + met + ' ' + u);
+    // [CONCILIA-LOTE-1] EL TOPE DEL GATEWAY, imitado del real: el 25-oct se
+    // MIDIÓ en el navegador que 653 uuids encerados (URL 25.6 KB) rebotan con
+    // **400 «Bad Request» en texto plano** —ni llegan a PostgREST— y 500 pasan.
+    // Sin este tope, el control positivo del defecto no puede existir: la red
+    // permisiva dejaría pasar la URL kilométrica y BASE saldría «verde».
+    if (u.length > 25000) {
+      return { ok: false, status: 400, text: async () => 'Bad Request', json: async () => ({}) };
+    }
     if ((CAIDA === 'kh' && esKH) || (CAIDA === 'portal' && esP)) {
       return { ok: false, status: 503, text: async () => 'la base tose', json: async () => ({}) };
     }
     const base = esKH ? KH : PORTAL;
     const uu = new URL(u);
     const tabla = uu.pathname.replace('/rest/v1/', '');
+    // [CONCILIA-LOTE-1] La tanda que falla: una base puede toser en el GET 2
+    // de 5 — y media lista casada contra una lista completa INVENTA descuadres.
+    if (FALLA_TANDA && FALLA_TANDA.tabla === tabla) {
+      _tandaCont[tabla] = (_tandaCont[tabla] || 0) + 1;
+      if (_tandaCont[tabla] === FALLA_TANDA.n) {
+        return { ok: false, status: 503, text: async () => 'la base tosió a media tanda', json: async () => ({}) };
+      }
+    }
     let filas = (base[tabla] || []).slice();
     for (const [campo, expr] of uu.searchParams.entries()) {
       if (['select', 'limit', 'order'].includes(campo)) continue;
@@ -536,6 +557,100 @@ function limpiar(dir) {
   af(cD.style.display === 'none',
      'con 403 el renglón tiene que CALLARSE: el rol que no ve dinero no tiene que ver este aviso, y '
      + 'alarmarlo por algo que no le toca es la ley de ses-1 (el 403 nunca es la sesión)');
+
+  // ── [L] CONCILIA-LOTE-1 · el mes que engordó revienta la URL ──────────
+  // 🔴 EL DEFECTO REAL (25-oct-2026, reportado por Memo): octubre trae 653
+  // viajeros únicos con abono y el `id=in.(...)` arma una URL de 25.6 KB — el
+  // gateway de Supabase la rechaza con 400 «Bad Request» ANTES de PostgREST
+  // (medido en navegador real; el acumulado cruzó el tope ~643 el 22-23 oct).
+  // El careo entero contestaba «No se pudo leer el lado CONTRATOS: Supabase
+  // rechazó la consulta de viajeros_evento».
+  // 🔒 El control positivo corre contra BASE_LOTES = el merge de CONCILIA-1
+  // (24c9d42, donde el in-list iba de una pieza): el default BASE (5e1c501) no
+  // sirve de control aquí porque no trae la conciliación EN ABSOLUTO — «no
+  // reproduce el defecto» saldría verde en vacío (la lección de CAREO-ZONA-1b).
+  console.log('\n[L] CONCILIA-LOTE-1 · 700 viajeros no caben en una URL');
+  const BASE_LOTES = process.env.BASE_LOTES || '24c9d42';
+  const bL = sacar(BASE_LOTES, 'cc-lote-base');
+  // El padrón GRANDE: ids con el LARGO real (uuid de 36 chars) — con ids
+  // cortos la URL no alcanza el tope y el caso no mide nada.
+  const N_LOTE = 700;
+  const uuidN = (n) => '00000000-0000-4000-9000-' + String(n).padStart(12, '0');
+  const vSembrados = [], aSembrados = [];
+  for (let n = 1; n <= N_LOTE; n++) {
+    vSembrados.push({ id: uuidN(n), nombre: 'Lote Persona ' + n, evento_id: 'palnorte',
+                      total_contrato: 300, abonado_previo: 0, tipo_paquete: 'CHEAP' });
+    // Montos únicos y grandes: no casan con NADA de caja → van a solo_contratos.
+    aSembrados.push({ id: 'la' + n, viajero_id: uuidN(n), monto: 10000 + n, fecha: dia(-3),
+                      nota: 'Careo Excel Lote ' + dia(-3), capturado_por: 'bulma@x', created_at: dia(-3) });
+  }
+  KH.viajeros_evento.push(...vSembrados);
+  KH.abonos_viajero.push(...aSembrados);
+  try {
+    // (a) CONTROL POSITIVO: el árbol del merge reproduce EXACTO el error de Memo.
+    const rViejo = await pedir({ accion: 'reporte', desde: DESDE, hasta: HASTA }, bL.dir);
+    console.log('    BASE_LOTES (' + bL.sha.slice(0, 7) + ') → ' + rViejo.res.statusCode
+      + ' motivo=' + ver(() => rViejo.d.motivo));
+    af(rViejo.res.statusCode === 502 && rViejo.d.se_pudo_carear === false,
+       () => '🔴 CONTROL POSITIVO: el árbol del merge tenía que REPRODUCIR el defecto (502, no se pudo '
+       + 'carear) con 700 viajeros — si no lo reproduce, el verde de HEAD no dice nada. Salió '
+       + rViejo.res.statusCode + ' ' + ver(() => rViejo.d.se_pudo_carear));
+    af(typeof rViejo.d.motivo === 'string' && /rechazó la consulta de viajeros_evento/.test(rViejo.d.motivo),
+       () => 'el motivo de BASE no es el que Memo pegó («Supabase rechazó la consulta de viajeros_evento»): '
+       + ver(() => rViejo.d.motivo));
+    af(rViejo.d.diferencia === null,
+       () => 'BASE con el lado caído tenía que dar diferencia null, no un cero: ' + ver(() => rViejo.d.diferencia));
+    const urlGorda = rViejo.pedidos.find((p) => /^viajeros_evento/.test(p.url) && p.url.length > 25000);
+    af(!!urlGorda,
+       () => 'la premisa del control: BASE tenía que armar UNA URL de viajeros_evento > 25 KB. Largos: '
+       + ver(() => rViejo.pedidos.filter((p) => /^viajeros_evento/.test(p.url)).map((p) => p.url.length)));
+
+    // (b) HEAD: tandas — contesta, completo, y ninguna URL se acerca al tope.
+    const rNuevo = await pedir({ accion: 'reporte', desde: DESDE, hasta: HASTA });
+    const urlsViaj = rNuevo.pedidos.filter((p) => /^viajeros_evento/.test(p.url));
+    const maxLargo = Math.max(...rNuevo.pedidos.map((p) => p.url.length));
+    console.log('    HEAD → ' + rNuevo.res.statusCode + ' · GETs a viajeros_evento: ' + urlsViaj.length
+      + ' · URL más larga de todas: ' + maxLargo + ' chars');
+    af(rNuevo.res.statusCode === 200 && rNuevo.d.ok === true,
+       () => '🔴 HEAD no contestó con los 700: ' + rNuevo.res.body.slice(0, 200));
+    // 🔒 Cardinalidad en los DOS sentidos: hubo TANDAS (≥5 GETs — sin esto,
+    // «todas las URLs cortas» pasaría en vacío si nadie consultó) y el careo
+    // juntó TODO (los 700 presentes, el último incluido: una tanda perdida en
+    // silencio es exactamente el descuadre inventado que este careo no tolera).
+    af(urlsViaj.length >= 5,
+       () => 'con 705 ids (700 sembrados + los 5 del fixture chico) tenían que salir ≥5 tandas de '
+       + 'viajeros_evento: ' + urlsViaj.length);
+    af(maxLargo < 7000,
+       () => '🔴 una URL de HEAD mide ' + maxLargo + ' chars: el lote dejó de acotar (el tope real anda '
+       + 'en ~25 KB y el margen es el punto)');
+    const lotes = (rNuevo.d.solo_contratos || []).filter((x) => /^Lote Persona /.test(x.nombre));
+    af(lotes.length === N_LOTE,
+       () => '🔴 el careo juntó ' + lotes.length + ' de ' + N_LOTE + ': una tanda se perdió en silencio '
+       + '— media lista casada contra una lista completa inventa descuadres');
+    af(lotes.some((x) => x.nombre === 'Lote Persona ' + N_LOTE),
+       'el ÚLTIMO sembrado no salió: la última tanda (la chiquita del residuo) se perdió');
+    // Y Laura sigue saliendo con su saldo del DUEÑO: las tandas no rompieron AUD-1.
+    const lauraL = (rNuevo.d.solo_contratos || []).find((x) => /Laura/.test(x.nombre));
+    af(lauraL && lauraL.abonado_total === 7000,
+       () => 'con el padrón gordo Laura perdió su saldo del dueño (7,000): ' + ver(() => lauraL && lauraL.abonado_total));
+
+    // (c) UNA TANDA CAÍDA TIRA EL LADO ENTERO — jamás media lista.
+    FALLA_TANDA = { tabla: 'viajeros_evento', n: 2 };
+    const rMedia = await pedir({ accion: 'reporte', desde: DESDE, hasta: HASTA });
+    FALLA_TANDA = null;
+    console.log('    tanda 2 caída → ' + rMedia.res.statusCode + ' se_pudo=' + ver(() => rMedia.d.se_pudo_carear));
+    af(rMedia.res.statusCode === 502 && rMedia.d.se_pudo_carear === false && rMedia.d.diferencia === null,
+       () => '🔴 con la tanda 2 caída el careo tenía que RENDIRSE entero (502, diferencia null): media '
+       + 'lista se lee como «estos 150 no están en caja», que es un descuadre INVENTADO. Salió '
+       + rMedia.res.statusCode + ' dif=' + ver(() => rMedia.d.diferencia));
+  } finally {
+    KH.viajeros_evento = KH.viajeros_evento.filter((v) => !/^Lote Persona /.test(v.nombre));
+    KH.abonos_viajero = KH.abonos_viajero.filter((a) => !/^la\d+$/.test(String(a.id)));
+  }
+  // 🔒 El padrón quedó RESTAURADO — sin esta aserción el finally podría no
+  // servir de nada y nadie se enteraría (la ley de NUBE4-ARNES-1 [Z]).
+  af(KH.viajeros_evento.length === 4 && KH.abonos_viajero.length === 6,
+     () => 'el padrón no quedó restaurado tras [L]: ' + ver(() => [KH.viajeros_evento.length, KH.abonos_viajero.length]));
 
   // ── [B] CONTROL POSITIVO · en BASE esto NO EXISTÍA ────────────────────
   console.log('\n[B] control positivo · BASE');

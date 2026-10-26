@@ -58,6 +58,36 @@ function hacerLeer(_fetch, url, key) {
   };
 }
 
+// ── LOS `in.(...)` VAN POR TANDAS, PORQUE LA URL TIENE TOPE ──────────────────
+// [CONCILIA-LOTE-1 · 25-oct-2026] El filtro `id=in.(...)` viaja en la URL de un
+// GET y el gateway de Supabase rechaza la petición cuando URL+headers cruzan
+// ~25.5 KB — MEDIDO en el navegador real: 653 uuids entrecomillados (25.6 KB)
+// contestan **400 «Bad Request» en texto plano** (ni llega a PostgREST) y 500
+// pasan. Cada uuid encerado son ~39 chars, así que el tope son ~643 ids — y el
+// mes de octubre cruzó esa raya el 22-23 (639→643 viajeros únicos con abono):
+// el careo funcionó todo el mes y murió esa semana con «Supabase rechazó la
+// consulta de viajeros_evento». Un in-list sobre ids SIN TOPE PROPIO crece con
+// el negocio hasta reventar el tope del transporte.
+// La forma: tandas de LOTE_IN ids (~6 KB de URL, 4× de margen) que se JUNTAN.
+// N GETs con el mismo select son N fotos de la misma tabla — esta lib solo lee,
+// así que juntar tandas no cambia el significado de nada.
+// 🔒 UNA TANDA CAÍDA TIRA EL LADO ENTERO: media lista casada contra una lista
+// completa INVENTARÍA descuadres — el error sube tal cual, jamás se junta a
+// medias. (Es la misma ley del módulo: la mitad de un careo es peor que ningún
+// careo, porque se lee como «no hay diferencia».)
+// ⚠️ Los `ids` llegan YA en su forma final (encerados con comillas para KH,
+// pelones para el Portal): este helper trocea y junta, no re-escapa.
+const LOTE_IN = 150;
+async function leerEnLotes(leer, tabla, campo, ids, resto) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += LOTE_IN) {
+    const r = await leer(tabla, `${campo}=in.(${ids.slice(i, i + LOTE_IN).join(',')})&${resto}`);
+    if (r.error) return r;
+    out.push(...r.data);
+  }
+  return { data: out };
+}
+
 // ── LA FUENTE, DERIVADA DE LA NOTA ───────────────────────────────────────────
 // ⚠️ Es un PARCHE con fecha de caducidad, y va dicho: la nota la escribe el
 // careo (`Careo Excel <pestaña> <fecha>`) y mañana alguien la cambia sin saber
@@ -142,9 +172,11 @@ async function ladoContratos(leerKH, desde, hasta) {
   let porId = new Map();
   if (ids.length) {
     const enc = (s) => '"' + String(s).replace(/"/g, '') + '"';
-    const rv = await leerKH('viajeros_evento',
-      `id=in.(${ids.map(enc).join(',')})`
-      + '&select=id,nombre,evento_id,total_contrato,abonado_previo&limit=20000');
+    // [CONCILIA-LOTE-1] Por tandas: 653 ids de octubre armaban una URL de
+    // 25.6 KB y el gateway la rechazaba — el careo entero contestaba «no se
+    // pudo mirar» justo cuando el mes engordó.
+    const rv = await leerEnLotes(leerKH, 'viajeros_evento', 'id', ids.map(enc),
+      'select=id,nombre,evento_id,total_contrato,abonado_previo&limit=20000');
     if (rv.error) return { ok: false, error: rv.error, detail: rv.detail };
     porId = new Map(rv.data.map((v) => [v.id, v]));
   }
@@ -155,8 +187,8 @@ async function ladoContratos(leerKH, desde, hasta) {
   let abonosDe = new Map();
   if (ids.length) {
     const enc = (s) => '"' + String(s).replace(/"/g, '') + '"';
-    const rt = await leerKH('abonos_viajero',
-      `viajero_id=in.(${ids.map(enc).join(',')})&select=viajero_id,monto&limit=20000`);
+    const rt = await leerEnLotes(leerKH, 'abonos_viajero', 'viajero_id', ids.map(enc),
+      'select=viajero_id,monto&limit=20000');
     if (rt.error) return { ok: false, error: rt.error, detail: rt.detail };
     for (const a of rt.data) {
       if (!a || !a.viajero_id) continue;
@@ -214,8 +246,8 @@ async function ladoCaja(leerP, desde, hasta) {
   const solIds = [...new Set(rp.data.map((p) => p.solicitud_id).filter(Boolean))];
   const solMap = new Map();
   if (solIds.length) {
-    const rs = await leerP('solicitudes_tour',
-      `id=in.(${solIds.join(',')})&select=id,evento_nombre,cliente_id&limit=5000`);
+    const rs = await leerEnLotes(leerP, 'solicitudes_tour', 'id', solIds,
+      'select=id,evento_nombre,cliente_id&limit=5000');
     if (rs.error) return { ok: false, error: rs.error, detail: rs.detail };
     for (const s of rs.data) solMap.set(s.id, s);
   }
@@ -226,8 +258,8 @@ async function ladoCaja(leerP, desde, hasta) {
   ].filter(Boolean))];
   const cliMap = new Map();
   if (cliIds.length) {
-    const rc = await leerP('clientes',
-      `id=in.(${cliIds.join(',')})&select=id,nombre_completo&limit=5000`);
+    const rc = await leerEnLotes(leerP, 'clientes', 'id', cliIds,
+      'select=id,nombre_completo&limit=5000');
     if (rc.error) return { ok: false, error: rc.error, detail: rc.detail };
     for (const c of rc.data) cliMap.set(c.id, c.nombre_completo || '');
   }

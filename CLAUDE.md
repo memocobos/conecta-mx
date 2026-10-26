@@ -188,6 +188,67 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔥⏳ **NSQK-PREVENTA-1 (26-oct-2026, en main local): nsqkmty entra a la
+  PREVENTA A CIEGAS $300 — el circuito de PN27, replicado.** Palabra de Memo,
+  citada: *«que tal si nsqkmty lo activamos como Pal Norte con preventa de
+  $300 … ya tengo que anunciar nsqk ya me andan preguntando»*; eligió
+  **preventa a ciegas** sobre lista de espera (pregunta firmada, 26-oct).
+  `npm run mide:preventa-pn27` **51 → 62** (bloque [N]).
+  - **La ficha (YA ESCRITA en la base, acta `migraciones/NSQK-PREVENTA-1.sql`,
+    valores esperados en el WHERE, 1 fila):** proximamente → **VIVO cheapOnly
+    con UNA zona «Preventa a ciegas» $300** (molde byte a byte de palnorte);
+    sep/sepCheap ya estaban en 300. **La fecha ES pública (9-abr-2027): sin
+    f_texto, no hay nada que tapar** — más simple que palnorte. ⚠️ El copy de
+    `inc`/`nota` es adaptación conservadora (sin la gorra/gafete, que eran de
+    Pa'l Norte): **Memo lo puede afinar en Esferas antes del publish.**
+  - **El index:** `_esPreventaCiegas` ganó la lista `['palnorte','nsqkmty']`
+    (arrastra solo: banco BBVA, datos de viaje, paquete único) ·
+    **`_pvPkgNombre(ev)` DERIVA el nombre del evento** — el literal tecleado
+    «Pa'l Norte 2027» mentía con el segundo evento; los 3 llamadores pasan
+    `cur` · `REQUISICION_EVENTOS` ganó nsqkmty · `_redirects`: **/nsqk →
+    /nsqkmty 301** (la URL del anuncio) · `EVENTOS_CORREO` ganó nsqkmty (el
+    correo único al aprobar).
+  - **Verificado:** `compilarEV` con la ficha REAL de la base emite el objeto
+    exacto (vivo, zona $300, portada por `foto` — MEDIA-GUARD callado, 123
+    eventos); el careo corre `_esPreventaCiegas`/`_pvPkgNombre` reales en vm
+    con controles en los dos sentidos (karolg con la forma NO entra).
+  - **Los correos, como quedó con palnorte:** al PUBLICAR, el aviso WL-1 sale
+    solo a su waitlist (**1 anotado hoy**); cuando se publiquen fases/costos
+    reales, el aviso a los de la preventa va por **Genkidama** (ensayo en seco
+    + visto de Memo + tandas con su palabra, candado CONSUELO-VERDAD).
+  - 🔒⏳ **ORDEN DEL ENCENDIDO (la regla de PN27): push de Memo PRIMERO →
+    publish de Esferas DESPUÉS → verificación en navegador contra producción
+    (/nsqk abre la ficha con el paquete único $300) → y SOLO ENTONCES el
+    anuncio.** Publicar antes del push sacaría a nsqkmty como CHEAP normal
+    sin requisición — el error PN27-PAQ-1 repetido.
+
+- 🔮 **BABA-UX-2 (26-oct-2026, en main local): los tours del código se eligen
+  en un DESPLEGABLE con palomitas — murió el select de Cmd+clic.** Palabra de
+  Memo, citada: *«la parte de seleccionar los tours que quiero que aplique el
+  codigo esta bien dificil de entender, y si quiero quitar algunos eventos
+  del codigo y meter otros y dejar unos no tengo opciones»*. **La causa: el
+  `<select multiple>` NATIVO — un clic normal BORRA el resto de la selección**
+  (había que saber el Cmd/Ctrl+clic). `npm run mide:baba-ux-2` (**19**, sin
+  ancla — árbol; controles por construcción).
+  - **El patrón del Más Allá (MAS-ALLA-1c), con dos piezas más por el tamaño
+    del catálogo (~120):** botón-resumen → panel con **BUSCADOR** + lista con
+    palomitas (tocar mete, volver a tocar QUITA, lo demás no se mueve) +
+    **fichas de lo elegido con ✕** para quitar sin abrir el panel.
+  - 🔒 **La verdad vive en un Set** (lazy `window.__babaEv`, regla MONO), no
+    en el DOM: el buscador re-pinta la lista **sin perder la selección**, y el
+    toggle actualiza quirúrgico (rótulo+fichas+palomitas) para no robarle el
+    foco al buscador en plena ráfaga.
+  - 🔒 **Un id elegido que YA NO está en el catálogo NO se tira**: el select
+    viejo lo PERDÍA en silencio al editar (su `<option>` no existía y guardar
+    le quitaba ese evento al código). Hoy sale como ficha rotulada «(ya no
+    está en el catálogo)» y viaja intacto salvo ✕ de Memo.
+  - «Vale en TODOS» apaga el desplegable y **CONSERVA** la selección
+    (destildar la recupera); el guardado ya mandaba `only_events: []` con
+    todos prendido. El prefill del oráculo entra por el Set. Verificado
+    visual sobre el CSS servido del Palacio (palomitas moradas, fichas, ✕).
+  - ⏳ Prueba humana de Memo tras el push: abrir Baba → editar un código →
+    quitar/meter/dejar y guardar.
+
 - 👻 **MAS-ALLA-1 (26-oct-2026, en main local): EL MÁS ALLÁ — el deep-link
   aprende los estados y el agotado se SOLICITA.** Reporte de Memo, citado:
   *«cuando ponemos los eventos en agotado, si la gente tiene el link directo

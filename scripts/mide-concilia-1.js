@@ -67,7 +67,11 @@ function sacar(ref, etiqueta) {
   return { sha, dir };
 }
 const BASE = process.env.BASE || '5e1c501';      // el merge de NUBE4-ARNES-1
-const HEAD_SHA = process.env.HEAD_SHA || '24c9d42'; // el commit del MERGE de CONCILIA-1
+// [CONCILIA-LOTE-1 · 25-oct-2026] Re-anclado: medir exige commitear y
+// commitear exige RE-ANCLAR (la ley de GANADOR-PODA-1). El merge viejo
+// (24c9d42) sobrevive como BASE_LOTES del bloque [L]: es el árbol que
+// reproduce el defecto de la URL kilométrica.
+const HEAD_SHA = process.env.HEAD_SHA || '89f0c2e'; // CONCILIA-LOTE-1
 
 // ══ EL GUARDIÁN DE LA TRAMPA QUE ESTA CASA PAGA UNA Y OTRA VEZ ═══════════
 // 🔴 El arnés mide ÁRBOLES ARCHIVADOS (`git archive`), así que mide el **COMMIT**

@@ -1057,8 +1057,15 @@ async function guardarTourPasado(userId) {
     });
     cerrarModal('add-tour');
     cerrarModal('ver-perfil');
-    if (currentUser && userId === currentUser.id) renderMiPerfil(false);
-    else abrirPerfil(userId);
+    // [GZ-HIST-1] Este modal ahora también lo abre el COORDINADOR desde su
+    // pestaña Tours (GZ). Ahí las pantallas de Equipo no existen: el refresh
+    // de Equipo va en try (sus contenedores pueden no estar) y la pestaña GZ
+    // se refresca si está abierta.
+    try {
+      if (currentUser && userId === currentUser.id) renderMiPerfil(false);
+      else abrirPerfil(userId);
+    } catch (e) { /* pantalla de Equipo no abierta (p. ej. un coordi) */ }
+    if (typeof loadGzTours === 'function' && document.getElementById('gzt-lista')) loadGzTours();
   } catch(e) { alert(e.message); }
 }
 async function eliminarTourPasado(tourId, userId) {

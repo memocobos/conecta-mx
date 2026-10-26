@@ -403,9 +403,14 @@ async function loadGzTours() {
   if (!cont) return;
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando tus tours…</div>';
   try {
-    const [panel, evs] = await Promise.all([
+    // [GZ-HIST-1] uid de quien se mira: el propio, o el «ver como» del admin.
+    const _histUid = (typeof _gzVerComoId === 'function' && _gzVerComoId()) || (currentUser && currentUser.id);
+    const [panel, evs, histTours] = await Promise.all([
       _gzCall({ accion: 'panel' }),
       (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+      // Historial fuera del sistema (tours_pasados): el backend ya deja a cada
+      // quien crear/borrar LOS SUYOS; fallar aquí no tumba la pestaña.
+      khTours.listar({ usuario_id: _histUid }).catch(() => null),
     ]);
     const evMap = {}; (evs || []).forEach((e) => { if (e && e.id) evMap[e.id] = e; });
     window._gzEvMap = evMap;
@@ -433,14 +438,47 @@ async function loadGzTours() {
         <div id="gzt-det-${_iniEsc(String(a.evento_id).replace(/[^A-Za-z0-9_-]/g, '_'))}"></div>
       </div>`;
     };
+    // [GZ-HIST-1] «Fuera del sistema»: tours que la persona coordinó antes de
+    // que existieran las asignaciones. Los captura ella misma (el backend ya lo
+    // permitía — faltaba ESTA puerta). 🔒 Solo los del año en curso suman
+    // puntos al ranking (regla de Memo, 25-oct); los anteriores quedan como
+    // historial — y eso ya lo hace calcularPuntosAnio por construcción.
+    const anioHoy = new Date().getFullYear();
+    const hist = Array.isArray(histTours) ? histTours : null;
+    const filaHist = (t) => `<div style="border:1px solid var(--border);border-left:3px solid var(--gold,#ffb703);border-radius:10px;padding:10px 14px;background:var(--panel);margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div><div style="font-weight:700;font-size:14px">${_iniEsc(t.artista || '—')}</div>
+        <div style="font-size:11px;color:var(--ts)">${_iniEsc([t.ciudad, t.fecha_aprox, t.rol_en_tour].filter(Boolean).join(' · ') || 'sin detalle')}${t.fecha_aprox && new Date(t.fecha_aprox).getFullYear() !== anioHoy ? ' · <i>solo historial (no suma puntos este año)</i>' : ''}</div></div>
+        ${soloVer ? '' : `<button class="btn btn-ghost btn-sm" style="font-size:11px;color:#ff6666" onclick="gzHistEliminar('${_attrJs(t.id)}')">🗑</button>`}
+      </div>`;
+    const histHtml = hist === null
+      ? '<div style="color:var(--ts);font-size:12px">No se pudo cargar tu historial.</div>'
+      : (hist.length ? hist.map(filaHist).join('') : '<div style="color:var(--ts);font-size:12px">Nada capturado todavía.</div>');
     cont.innerHTML = `${soloVer ? '<div style="margin-bottom:12px;font-size:12px;color:var(--gold,#ffb703)">👁 Modo «Ver como»: solo lectura.</div>' : ''}
       <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin:4px 0 8px">Próximos y activos · ${prox.length}</div>
       ${prox.length ? prox.map((a) => card(a, false)).join('') : '<div style="color:var(--ts);font-size:13px;margin-bottom:14px">Sin tours próximos asignados.</div>'}
       <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);margin:18px 0 8px">Pasados · ${pas.length}</div>
-      ${pas.length ? pas.map((a) => card(a, true)).join('') : '<div style="color:var(--ts);font-size:13px">Todavía no tienes tours pasados.</div>'}`;
+      ${pas.length ? pas.map((a) => card(a, true)).join('') : '<div style="color:var(--ts);font-size:13px">Todavía no tienes tours pasados.</div>'}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px;flex-wrap:wrap">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">Fuera del sistema · ${hist ? hist.length : '?'}</div>
+        ${soloVer ? '' : `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="abrirAgregarTour('${_attrJs(_histUid)}')">+ Agregar tour pasado</button>`}
+      </div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tours que coordinaste antes de que existiera el sistema. Solo los de ${anioHoy} suman puntos al ranking; los anteriores quedan en tu historial.</div>
+      ${histHtml}`;
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">No se pudieron cargar tus tours: ${_iniEsc(e.message)}</div>`;
   }
+}
+
+// [GZ-HIST-1] Borrar un tour del historial propio. El backend ya tiene el
+// candado: solo el dueño (o admin) puede borrarlo — aquí no se re-implementa.
+async function gzHistEliminar(tourId) {
+  if (_gzVerComoId()) return;
+  if (!confirm('¿Quitar este tour de tu historial?')) return;
+  try {
+    await khTours.eliminar(tourId); // [sec-tours]
+    showToast('Tour quitado del historial', 'success');
+    loadGzTours();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function gzTourResponder(asigId, decision) {

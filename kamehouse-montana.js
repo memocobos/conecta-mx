@@ -265,7 +265,7 @@ function mtVerDetalleReporte(id) {
       <div class="table-wrap">
         <table>
           <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
-          <tbody>${gastos.map(g=>`<tr><td>${_esfEsc(g.concepto||'—')}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
+          <tbody>${gastos.map(g=>`<tr><td>${_esfEsc(g.concepto||'—')}${g.ticket_path ? ` <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="repTicketAbrir('${_esfEsc(g.ticket_path)}')">🧾 Ticket</button>` : ''}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
           <tr style="border-top:2px solid var(--border)"><td style="font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-family:'Zen Dots',sans-serif">${formatMXN(r.total_gastado||0)}</td></tr>
           </tbody>
         </table>

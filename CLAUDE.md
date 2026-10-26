@@ -188,6 +188,47 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✅ **REP-TICKET-1 + GZ-HIST-1 (25-oct-2026, en main local): los dos reportes
+  de los coordinadores.** Palabra de Memo: «a la hora de enviar sus reportes no
+  tienen cómo subir los tickets de los gastos» y «en su perfil no pueden subir
+  sus tours pasados». `npm run mide:gz-rep-1` (**27**, sin ancla — árbol);
+  `mide:req-b1` re-corrido **52** (la mudanza de la magia no movió el dinero).
+  - **REP-TICKET-1 · el ticket de cada gasto, OPCIONAL (palabra de Memo):**
+    cada renglón de gasto del reporte post-evento gana 📎 — la foto va por
+    FileReader→canvas ≤1600px→JPEG (jamás blob: — REQ-FOTO-1), sube AL MOMENTO
+    por `admin-reportes` (`ticket_subir`: magia de bytes jpg/png/webp, tope
+    4 MB DICHO) al bucket **PRIVADO `reportes-tickets`** (acta `migraciones/
+    REP-TICKET-1.sql`, YA CORRIDA; sin policies a propósito — solo service_role
+    tiene camino) y el path viaja DENTRO de `gastos_detalle` (jsonb que ya
+    existía) como `ticket_path` — **cero columnas nuevas**. 🔒 **El path LO
+    ARMA EL SERVIDOR bajo el id del JWT** (el cliente no elige dónde cae) y
+    `ticket_ver` firma URLs de 10 min donde **un coordinador SOLO puede firmar
+    paths bajo su propio id** (403 a los ajenos; admin/milk ven todos —
+    moderan). El 🧾 se pinta en el detalle del coordi Y en Montaña Pai.
+    🔒 La magia de imagen ganó UN dueño: **`_lib/imagen-magia`** (nació local
+    en requisicion-crear; al volverse 2 lectores se mudó — la forma de
+    audio-magia). requisicion-crear la PIDE (ahí el PDF sí entra; un ticket es
+    foto y no).
+  - **GZ-HIST-1 · los tours pasados se capturan desde el perfil:** el backend
+    (`admin-tours`) YA dejaba a cada quien crear/borrar LOS SUYOS — **lo que
+    faltaba era la puerta**: la pestaña Tours del GZ gana la sección «Fuera
+    del sistema» con «+ Agregar tour pasado» que **REUSA el modal de Equipo**
+    (`abrirAgregarTour` — cero segundo formulario: el catálogo de tipos/puntos
+    tiene un dueño) y 🗑 de lo propio (el candado de propiedad vive en el
+    servidor). 🔒 **Regla de Memo (25-oct, citada): «siempre y cuando sea del
+    año que va corriendo cuentan los puntos; si es de un año pasado no vale,
+    solo se registra»** — y eso YA lo hace `calcularPuntosAnio` por
+    construcción (solo suma `fecha_aprox` del año del ranking); la pantalla lo
+    ROTULA («solo historial — no suma puntos este año») con el año DERIVADO
+    del reloj, no tecleado. 🔒 **El SELLO lo pone el SERVIDOR**: toda fila
+    capturada por un no-admin lleva «[capturado por la persona desde su
+    perfil]» ANEXADO a sus notas — el admin lo ve en Equipo y el front no lo
+    puede quitar. `guardarTourPasado` refresca la pestaña GZ y sus refresh de
+    Equipo quedaron en try (para el coordi esas pantallas no existen).
+  - ⏳ **La prueba humana es de los coordis**: subir un ticket real desde un
+    celular y capturar un tour pasado — el careo midió los handlers y los
+    cables; el bucket vivo lo estrena el primer ticket.
+
 - 📻⏳ **SERIE RADIO-V2 · KAIO-SAMA SE VUELVE ESTACIÓN (24-oct-2026).** Palabra
   de Memo: *«quiero empezar a transmitir programas en vivo, tener cartelera,
   entrevistas… rediseño de funciones, estética, experiencia»*. Decisiones

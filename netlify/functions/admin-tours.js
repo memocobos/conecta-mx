@@ -151,6 +151,16 @@ exports.handler = async (event) => {
           fila[k] = (typeof v === 'string') ? (v.trim() ? v.trim().slice(0, 500) : null) : v;
         }
       }
+      // [GZ-HIST-1 · 25-oct-2026] Cuando quien captura NO es admin (un coordi
+      // agregando su propio historial desde su perfil), el SELLO lo pone el
+      // servidor — auditabilidad: el admin ve en el perfil de Equipo qué tours
+      // los capturó la propia persona. Los puntos no necesitan candado extra:
+      // calcularPuntosAnio solo suma los del año del ranking (regla de Memo,
+      // 25-oct: «si es de un año pasado no vale, solo se registra»).
+      if (!esAdmin) {
+        const sello = '[capturado por la persona desde su perfil]';
+        fila.notas = fila.notas ? (String(fila.notas).slice(0, 460) + ' · ' + sello) : sello;
+      }
 
       const r = await fetch(base, {
         method: 'POST',

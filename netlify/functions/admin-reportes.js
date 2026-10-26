@@ -105,6 +105,12 @@ exports.handler = async (event) => {
     // Lo que NO puede es aprobarse a sí mismo — ese candado vive en aprobar_popo.
     guardar_mio: ['coordinador', 'mister_popo'],
     enviar_mio: ['coordinador', 'mister_popo'],
+    // [REP-TICKET-1 · 25-oct-2026] El ticket (foto) de cada gasto, OPCIONAL
+    // (palabra de Memo). Sube quien llena el reporte; lo VEN los mismos roles
+    // que leen reportes — pero un coordinador solo puede firmar paths bajo SU
+    // propio id (candado abajo).
+    ticket_subir: ['coordinador', 'mister_popo'],
+    ticket_ver: ROLES_READ,
     aprobar_popo: ROLES_MOD,
     // [KARIN-GZ-1 → GZ-INICIO-3 · 14-oct] Memo primero pidió que fuera solo
     // suyo y el mismo día corrigió: «bulma y milk también deben de poder
@@ -137,6 +143,67 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
   const base = `${env.KH_SB_URL}/rest/v1/reportes_evento`;
+
+  // ── [REP-TICKET-1] ticket_subir: la foto del ticket de UN gasto ───────────
+  // Opcional por gasto (palabra de Memo, 25-oct). Bucket PRIVADO
+  // `reportes-tickets`; el PATH LO ARMA EL SERVIDOR bajo el id del JWT — el
+  // cliente no elige dónde cae. El path devuelto viaja DENTRO de
+  // gastos_detalle (jsonb) como `ticket_path`: cero columnas nuevas.
+  if (accion === 'ticket_subir') {
+    const { tipoImagen } = require('./_lib/imagen-magia');
+    const b64 = typeof body.archivo === 'string' ? body.archivo : '';
+    if (!b64) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta el archivo (base64)' }) };
+    // 4 MB dicho: el front reescala a ~1600px (sale mucho menor); base64 infla
+    // 4/3 y el request de la function topa ~6 MB — un tope mayor sería inalcanzable.
+    if (b64.length > 4 * 1024 * 1024 * 4 / 3) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'La foto pasa de 4 MB. Toma la foto de nuevo o recórtala.' }) };
+    }
+    let buf;
+    try { buf = Buffer.from(b64, 'base64'); }
+    catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'base64 inválido' }) }; }
+    const tipo = tipoImagen(buf);   // jpg/png/webp — un ticket es FOTO, sin pdf
+    if (!tipo) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'El archivo no es una imagen (jpg/png/webp) por sus bytes' }) };
+    }
+    const path = `${jwtUserId}/${Date.now()}-${require('crypto').randomBytes(4).toString('hex')}.${tipo.ext}`;
+    const up = await fetch(`${env.KH_SB_URL}/storage/v1/object/reportes-tickets/${path}`, {
+      method: 'POST',
+      headers: { apikey: env.KH_SB_SERVICE, Authorization: 'Bearer ' + env.KH_SB_SERVICE, 'Content-Type': tipo.mime },
+      body: buf,
+    });
+    if (!up.ok) {
+      const detail = await up.text();
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo subir el ticket', detail: String(detail).slice(0, 300) }) };
+    }
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, path }) };
+  }
+
+  // ── [REP-TICKET-1] ticket_ver: URL firmada (10 min) para abrir un ticket ──
+  // 🔒 Un coordinador (o Popo) SOLO puede firmar paths bajo SU propio id —
+  // sin este candado, cualquier coordi vería los tickets de los demás pidiendo
+  // el path a mano. Los admin (roshi/bulma/milk) ven cualquiera: moderan.
+  if (accion === 'ticket_ver') {
+    const path = String(body.path || '').trim();
+    if (!/^[0-9a-fA-F-]{36}\/[A-Za-z0-9._-]{1,120}$/.test(path)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'path inválido' }) };
+    }
+    const esAdminVer = ROLES_ADMIN_MILK.includes(jwtRol);
+    if (!esAdminVer && !path.startsWith(jwtUserId + '/')) {
+      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo puedes ver tus propios tickets' }) };
+    }
+    const sg = await fetch(`${env.KH_SB_URL}/storage/v1/object/sign/reportes-tickets/${path}`, {
+      method: 'POST',
+      headers: sbHeaders,
+      body: JSON.stringify({ expiresIn: 600 }),
+    });
+    if (!sg.ok) {
+      const detail = await sg.text();
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo firmar el ticket', detail: String(detail).slice(0, 300) }) };
+    }
+    const j = await sg.json().catch(() => ({}));
+    if (!j.signedURL) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Firma sin URL' }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, url: `${env.KH_SB_URL}/storage/v1${j.signedURL}` }) };
+  }
 
   // Helper: lee el coordi_id real de un reporte por id (para anti-escalación).
   async function fetchReporteOwner(id) {

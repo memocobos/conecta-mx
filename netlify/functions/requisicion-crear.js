@@ -55,14 +55,10 @@ function folioNuevo() {
 }
 
 // El tipo se lee de los BYTES. La extensión del cliente es una opinión.
-function tipoPorMagia(buf) {
-  if (!buf || buf.length < 12) return null;
-  if (buf[0] === 0xff && buf[1] === 0xd8) return { mime: 'image/jpeg', ext: 'jpg' };
-  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return { mime: 'image/png', ext: 'png' };
-  if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
-  if (buf.slice(0, 5).toString('ascii') === '%PDF-') return { mime: 'application/pdf', ext: 'pdf' };
-  return null;
-}
+// [REP-TICKET-1] La magia se mudó a _lib/imagen-magia (UN dueño: el comprobante
+// de aquí + los tickets de gastos de admin-reportes). Aquí el PDF SÍ se acepta.
+const { tipoImagen } = require('./_lib/imagen-magia');
+function tipoPorMagia(buf) { return tipoImagen(buf, { pdf: true }); }
 
 function json(status, headers, body) {
   return { statusCode: status, headers, body: JSON.stringify(body) };

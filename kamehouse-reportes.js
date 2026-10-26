@@ -403,9 +403,13 @@ async function abrirModalReporte(reporteId) {
     </div>`;
   }
   function gastoRow(g, idx) {
-    return `<div class="gasto-row" style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px">
+    // [REP-TICKET-1] 📎 ticket OPCIONAL por gasto (palabra de Memo, 25-oct).
+    // El path vive en data-ticket del row y viaja dentro de gastos_detalle.
+    const conTicket = !!(g && g.ticket_path);
+    return `<div class="gasto-row" data-ticket="${_esfEsc((g && g.ticket_path) || '')}" style="display:grid;grid-template-columns:1fr 110px 34px 28px;gap:8px;align-items:center;margin-bottom:8px">
       <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" value="${_esfEsc(g.concepto||'')}" style="font-size:12px;padding:7px 10px">
       <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" value="${g.monto||''}" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
+      <button class="gasto-ticket-btn" title="${conTicket ? 'Ticket subido — clic para verlo' : 'Subir foto del ticket (opcional)'}" onclick="repTicketClick(this)" style="background:none;border:1px solid ${conTicket ? 'var(--green)' : 'var(--border)'};border-radius:6px;color:${conTicket ? 'var(--green)' : 'var(--ts)'};cursor:pointer;font-size:13px;padding:4px 0">${conTicket ? '🧾' : '📎'}</button>
       <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
     </div>`;
   }
@@ -576,9 +580,87 @@ function leerGastosForm() {
   rows.forEach(row => {
     const concepto = row.querySelector('.gasto-concepto')?.value.trim();
     const monto    = parseFloat(row.querySelector('.gasto-monto')?.value) || 0;
-    if (concepto || monto) result.push({ concepto: concepto || '—', monto });
+    const ticket   = (row.dataset && row.dataset.ticket) || '';   // [REP-TICKET-1]
+    if (concepto || monto || ticket) {
+      const g = { concepto: concepto || '—', monto };
+      if (ticket) g.ticket_path = ticket;
+      result.push(g);
+    }
   });
   return result;
+}
+
+// ── [REP-TICKET-1] El ticket de un gasto: subir al adjuntar, ver firmado ─────
+// La foto se lee por FileReader→canvas ≤1600px→JPEG (jamás blob: — la lección
+// REQ-FOTO-1: el CSP no trae blob: en img-src) y sube AL MOMENTO por
+// admin-reportes (ticket_subir); el servidor arma el path bajo el id del JWT.
+function repTicketClick(btn) {
+  const row = btn.closest('.gasto-row');
+  if (!row) return;
+  if (row.dataset.ticket) {
+    // Ya trae ticket: verlo, con opción de reemplazar.
+    repTicketAbrir(row.dataset.ticket);
+    return;
+  }
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    btn.textContent = '⏳'; btn.disabled = true;
+    try {
+      const b64 = await _repFotoB64(f);
+      const r = await khAdminFetch('/.netlify/functions/admin-reportes', {
+        method: 'POST', body: JSON.stringify({ accion: 'ticket_subir', archivo: b64 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.ok === false || !j.path) throw new Error(j.error || ('Error ' + r.status));
+      row.dataset.ticket = j.path;
+      btn.textContent = '🧾';
+      btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)';
+      btn.title = 'Ticket subido — clic para verlo';
+      showToast('Ticket subido ✓ (se guarda con el reporte)', 'success');
+    } catch (e) {
+      btn.textContent = '📎';
+      showToast('No se pudo subir el ticket: ' + e.message, 'error');
+    } finally { btn.disabled = false; }
+  };
+  inp.click();
+}
+// FileReader→data: (permitido por el CSP) → canvas ≤1600px → JPEG. Un ticket de
+// tienda en 4000px pesa MB; a 1600 se lee igual y viaja en un parpadeo.
+function _repFotoB64(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('No se pudo leer la foto'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Esa imagen no se pudo abrir'));
+      img.onload = () => {
+        try {
+          const MAX = 1600;
+          const esc = Math.min(1, MAX / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * esc); c.height = Math.round(img.height * esc);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+        } catch (e) { reject(e); }
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+async function repTicketAbrir(path) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reportes', {
+      method: 'POST', body: JSON.stringify({ accion: 'ticket_ver', path }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.url) throw new Error(j.error || ('Error ' + r.status));
+    window.open(j.url, '_blank', 'noopener');
+  } catch (e) { showToast('No se pudo abrir el ticket: ' + e.message, 'error'); }
 }
 function repEventoCheck(eventoId) {
   // CAMBIO 1: si el coordi ya tiene fila para este evento, reusarla en vez de crear (evita 23505).
@@ -753,7 +835,7 @@ function verDetalleReporte(id) {
   ).join('') : '<tr><td colspan="4" style="color:var(--ts)">Sin kits registrados</td></tr>';
 
   const gastosHtml = gastos.length ? gastos.map(g =>
-    `<tr><td>${_esfEsc(g.concepto)}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
+    `<tr><td>${_esfEsc(g.concepto)}${g.ticket_path ? ` <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px" onclick="repTicketAbrir('${_esfEsc(g.ticket_path)}')">🧾 Ticket</button>` : ''}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
   ).join('') : '<tr><td colspan="2" style="color:var(--ts)">Sin gastos</td></tr>';
 
   document.getElementById('modal-reporte').innerHTML = `

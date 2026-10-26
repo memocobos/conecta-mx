@@ -99,6 +99,7 @@
     "mide:kaio-cabina-1": "node scripts/mide-kaio-cabina-1.js",
     "mide:kaio-v3": "node scripts/mide-kaio-v3.js",
     "mide:gz-rep-1": "node scripts/mide-gz-rep-1.js",
-    "mide:mas-alla-1": "node scripts/mide-mas-alla-1.js"
+    "mide:mas-alla-1": "node scripts/mide-mas-alla-1.js",
+    "mide:baba-ux-2": "node scripts/mide-baba-ux-2.js"
   }
 }

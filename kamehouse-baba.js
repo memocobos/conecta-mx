@@ -62,10 +62,141 @@ function _babaAvanzadoResumen(c) {
   if (!partes.length) return '';
   return ` <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ts)">· ${_escCtr(partes.join(' · '))}</span>`;
 }
+// ═══ [BABA-UX-2] EL DESPLEGABLE DE EVENTOS (26-oct-2026) ════════════════════
+// Palabra de Memo, citada: «la parte de seleccionar los tours que quiero que
+// aplique el codigo de descuento esta bien dificil de entender, y luego si
+// quiero quitar algunos eventos del codigo y meter otros y dejar unos no tengo
+// opciones». La causa era el <select multiple> NATIVO: agregar con clic normal
+// BORRA todo lo demás (había que saber el Cmd/Ctrl + clic). Hoy es el patrón
+// del Más Allá (MAS-ALLA-1c): desplegable con palomitas — tocar mete, volver a
+// tocar QUITA, lo demás no se mueve — con buscador (el catálogo trae ~120
+// eventos) y fichas de lo elegido con ✕ para quitar sin abrir el panel.
+// 🔒 LA VERDAD VIVE EN UN Set (lazy en window, regla MONO: cero estado
+// top-level en módulos de pantalla), no en el DOM: el buscador re-pinta la
+// lista sin perder la selección — un filtro que borrara lo elegido sería el
+// defecto viejo con otra cara.
+// 🔒 UN ID ELEGIDO QUE YA NO ESTÁ EN EL CATÁLOGO NO SE TIRA: el select viejo
+// lo PERDÍA en silencio al editar (su <option> no existía, así que guardar le
+// quitaba ese evento al código sin decirlo). Hoy sale como ficha rotulada y
+// viaja intacto, salvo que Memo lo quite con su ✕.
+function _babaEvSt() {
+  if (!window.__babaEv) window.__babaEv = { sel: new Set(), evs: [], q: '' };
+  return window.__babaEv;
+}
+function _babaEvInit(evs, c) {
+  const st = _babaEvSt();
+  st.evs = (evs || []).filter(e => e && e.id);
+  st.sel = new Set(c ? (c.only_events || []) : []);
+  st.q = '';
+  _babaEvPintar();
+}
+function _babaEvNombre(id) {
+  const e = _babaEvSt().evs.find(x => x.id === id);
+  return e ? (e.a || e.id) : id + ' (ya no está en el catálogo)';
+}
+function babaEvToggle(id) {
+  const st = _babaEvSt();
+  if (st.sel.has(id)) st.sel.delete(id); else st.sel.add(id);
+  // Quirúrgico a propósito: solo rótulo + fichas + palomitas. Reconstruir el
+  // panel entero le quitaría el FOCO al buscador en plena ráfaga de elegir.
+  _babaEvRotular();
+  _babaEvPintarLista();
+}
+function babaEvAbrir() {
+  const dd = document.getElementById('baba-evdd');
+  if (!dd) return;
+  dd.classList.toggle('abierto');
+  if (dd.classList.contains('abierto')) {
+    const b = document.getElementById('baba-ev-buscar');
+    if (b) setTimeout(() => b.focus(), 60);
+  }
+}
+function _babaEvRotular() {
+  const st = _babaEvSt();
+  const btn = document.getElementById('baba-evdd-btn');
+  if (btn) {
+    const deshab = !!(document.getElementById('baba-todos') || {}).checked;
+    const nombres = [...st.sel].map(_babaEvNombre);
+    btn.textContent = deshab ? 'Vale en todos — no hace falta elegir'
+      : !nombres.length ? 'Toca para elegir eventos'
+      : nombres.length <= 2 ? nombres.join(', ')
+      : nombres.length + ' eventos elegidos';
+    const fl = document.createElement('span');
+    fl.className = 'baba-evdd-fl'; fl.textContent = '▾';
+    btn.appendChild(fl);
+  }
+  const chips = document.getElementById('baba-ev-chips');
+  if (chips) {
+    chips.innerHTML = '';
+    [...st.sel].forEach(id => {
+      const ch = document.createElement('span');
+      ch.className = 'baba-evchip';
+      ch.appendChild(document.createTextNode(_babaEvNombre(id)));
+      const x = document.createElement('button');
+      x.type = 'button'; x.textContent = '✕'; x.title = 'Quitar este evento del código';
+      x.onclick = () => babaEvToggle(id);
+      ch.appendChild(x);
+      chips.appendChild(ch);
+    });
+  }
+}
+function _babaEvPintarLista() {
+  const st = _babaEvSt();
+  const cont = document.getElementById('baba-ev-lista');
+  if (!cont) return;
+  cont.innerHTML = '';
+  const q = st.q;
+  const visibles = st.evs.filter(e => !q || String(e.a || e.id).toLowerCase().includes(q) || String(e.id).toLowerCase().includes(q));
+  visibles.forEach(e => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'baba-evopt' + (st.sel.has(e.id) ? ' on' : '');
+    b.textContent = e.a || e.id;
+    b.onclick = () => babaEvToggle(e.id);
+    cont.appendChild(b);
+  });
+  if (!visibles.length) {
+    const d = document.createElement('div');
+    d.style.cssText = 'padding:10px;font-size:12px;color:var(--ts)';
+    d.textContent = 'Nada casa con lo que buscas.';
+    cont.appendChild(d);
+  }
+}
+function _babaEvPintar() {
+  const st = _babaEvSt();
+  const dd = document.getElementById('baba-evdd');
+  if (!dd) return;
+  const deshab = !!(document.getElementById('baba-todos') || {}).checked;
+  dd.innerHTML = '';
+  dd.classList.remove('abierto');
+  dd.classList.toggle('deshab', deshab);
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.id = 'baba-evdd-btn'; btn.className = 'baba-evdd-btn';
+  btn.disabled = deshab;
+  btn.onclick = babaEvAbrir;
+  dd.appendChild(btn);
+  const panel = document.createElement('div');
+  panel.className = 'baba-evdd-panel';
+  const caja = document.createElement('div');
+  caja.style.cssText = 'padding:8px 8px 0';
+  const busca = document.createElement('input');
+  busca.id = 'baba-ev-buscar'; busca.type = 'search'; busca.placeholder = 'Busca un evento…';
+  busca.value = st.q;
+  busca.oninput = function () { st.q = String(this.value || '').toLowerCase(); _babaEvPintarLista(); };
+  caja.appendChild(busca);
+  panel.appendChild(caja);
+  const lista = document.createElement('div');
+  lista.id = 'baba-ev-lista'; lista.className = 'baba-evdd-lista';
+  panel.appendChild(lista);
+  dd.appendChild(panel);
+  const chips = document.createElement('div');
+  chips.id = 'baba-ev-chips'; chips.className = 'baba-evchips';
+  dd.appendChild(chips);
+  _babaEvRotular();
+  _babaEvPintarLista();
+}
 function _babaEventosElegidos() {
-  const sel = document.getElementById('baba-evento');
-  if (!sel) return [];
-  return [...sel.selectedOptions].map(o => o.value).filter(Boolean);
+  return [..._babaEvSt().sel];
 }
 function _babaLocalAInstante(txt) {
   if (!txt) return null;
@@ -320,12 +451,9 @@ function babaFichaAbrir(codigo) {
     <div class="form-row" style="margin-top:6px">
      <div class="form-group">
       <label>Eventos <span style="color:var(--ts);font-weight:400">— uno o varios</span></label>
-      <select id="baba-evento" multiple size="6" ${c && c.all_events ? 'disabled' : ''} style="height:auto">
-        ${(evs || []).filter(e => e && e.id).map(e =>
-          `<option value="${_escCtr(e.id)}"${c && (c.only_events || []).includes(e.id) ? ' selected' : ''}>${_escCtr(e.a || e.id)}</option>`).join('')}
-      </select>
+      <div class="baba-evdd" id="baba-evdd"></div>
       <div style="font-size:11px;color:var(--ts);margin-top:5px">
-        ${evs ? 'Nace vacío a propósito: el evento se elige, no se hereda del orden de la lista. Para varios, Cmd/Ctrl + clic — la base siempre guardó una LISTA, y hasta hoy la pantalla solo dejaba meter uno.' : '⚠️ No pude leer el catálogo — abre y cierra la pestaña.'}
+        ${evs ? 'Toca el campo, busca y palomea los que quieras. Tocar uno elegido lo QUITA — sin Cmd ni Ctrl. Lo elegido queda abajo como fichas con ✕.' : '⚠️ No pude leer el catálogo — abre y cierra la pestaña.'}
       </div>
      </div>
      <div class="form-group" style="align-self:end">
@@ -379,6 +507,7 @@ function babaFichaAbrir(codigo) {
    </div></div>`;
 
   if (_babaUnidad) babaUnidad(_babaUnidad);
+  _babaEvInit(evs, c);   // [BABA-UX-2] el desplegable de eventos, con lo del código
   // Y con freno: si tras traer el catálogo sigue vacío, se pinta el aviso y se
   // para. Un reintento sin condición de salida es el bucle de arriba otra vez.
   if (!evs && !_babaReintento) {
@@ -405,10 +534,10 @@ function babaUnidad(cual) {
   }
 }
 function babaTodosEventos() {
-  const on = document.getElementById('baba-todos').checked;
-  const sel = document.getElementById('baba-evento');
-  sel.disabled = on;
-  if (on) sel.value = '';
+  // [BABA-UX-2] «Todos» apaga el desplegable pero CONSERVA la selección: se
+  // puede destildar y recuperar lo elegido. El guardado ya manda only_events
+  // vacío cuando all_events va prendido — el Set no viaja de contrabando.
+  _babaEvPintar();
 }
 function babaSinVence() {
   const on = document.getElementById('baba-sinvence').checked;
@@ -666,8 +795,9 @@ function babaPreparar(id) {
     if (p.unidad === 'pct') set('baba-pct', p.pct);
     if (p.unidad === 'pesos') set('baba-monto', p.monto);
     set('baba-desc', p.desc);
-    const sel = document.getElementById('baba-evento');
-    if (sel) sel.value = p.evento;
+    // [BABA-UX-2] El prefill del oráculo entra por el Set del desplegable.
+    _babaEvSt().sel = new Set([p.evento]);
+    _babaEvPintar();
     // El código y la fecha los pone Memo: son las dos decisiones que no se
     // adivinan, y un default ahí sería inventarle un dato.
     const inp = document.getElementById('baba-codigo');

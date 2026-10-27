@@ -150,11 +150,11 @@ async function _reqPaqAplicar(id) {
   say('Aplicando…', true);
   let aviso = [];
   try {
-    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id: c.viajero_id, tipo_paquete: c.paquete_pedido, zona_boleto: c.zona_pedida || '', total_contrato: total });
+    // contrato_sin_correo: el aviso al cliente es UNO, el de «paquete confirmado».
+    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id: c.viajero_id, tipo_paquete: c.paquete_pedido, zona_boleto: c.zona_pedida || '', total_contrato: total, contrato_sin_correo: true });
     [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean).forEach((a) => aviso.push(a));
     const k = (j && j.contrato) || {};
-    if (k.enviados && k.enviados.length) aviso.push('contrato enviado a ' + k.enviados.join(', '));
-    else if (k.aviso) aviso.push('contrato: ' + k.aviso);
+    if (k.aviso) aviso.push('contrato: ' + k.aviso);
   } catch (e) {
     // «ya no está en preventa» = alguien lo aplicó antes (p. ej. desde la lista):
     // la solicitud se puede cerrar igual. Cualquier otro error se DICE y no se cierra.
@@ -162,8 +162,17 @@ async function _reqPaqAplicar(id) {
     aviso.push('ya tenía paquete aplicado');
   }
   const j2 = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado: 'atendida', respuesta: `Paquete aplicado: ${String(c.paquete_pedido).toUpperCase()}${c.zona_pedida ? ' · ' + c.zona_pedida : ''} · total $${total}` }).catch((e) => ({ error: e.message }));
-  if (j2 && j2.ok) { showToast(_reqBdjEsc('Paquete aplicado' + (aviso.length ? ' · ' + aviso.join(' · ') : '')), aviso.length ? 'warning' : 'success'); loadCambiosPortal(); }
+  if (j2 && j2.ok) {
+    aviso.push(_reqCorreoTxt(j2.correo));
+    showToast(_reqBdjEsc('Paquete aplicado · ' + aviso.join(' · ')), (j2.correo && j2.correo.ok) && aviso.length === 1 ? 'success' : 'warning');
+    loadCambiosPortal();
+  }
   else say('El paquete SÍ se aplicó, pero no se pudo cerrar la solicitud: ' + ((j2 && j2.error) || 'sin respuesta') + '. Ciérrala con «No procede»/recarga.');
+}
+// [PREVENTA-PORTAL-2] Lo que pasó con el correo al cliente, dicho en el aviso.
+function _reqCorreoTxt(c) {
+  if (!c) return '';
+  return c.ok ? 'correo enviado a ' + c.enviado : 'el correo NO salió (' + (c.aviso || 'sin detalle') + '): avísale por WhatsApp';
 }
 // Cerrar un cambio: la nota/motivo se pide EN LÍNEA (antes era prompt()).
 function _reqCambioCerrar(id, estado) {
@@ -172,8 +181,9 @@ function _reqCambioCerrar(id, estado) {
   if (box.dataset.abierto === estado) { box.innerHTML = ''; box.dataset.abierto = ''; return; }
   box.dataset.abierto = estado;
   const no = estado === 'rechazada';
+  const esPaq = ((_reqCambiosRows || []).find((x) => x.id === id) || {}).tipo === 'paquete';
   box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
-    <label class="rq-field">${no ? '¿Por qué no procede? (el cliente lo va a preguntar) *' : 'Nota opcional: qué se cambió'}
+    <label class="rq-field">${no ? (esPaq ? '¿Por qué no procede? (le llega TAL CUAL por correo y en su Portal) *' : '¿Por qué no procede? (el cliente lo va a preguntar) *') : 'Nota opcional: qué se cambió'}
       <input type="text" id="rq-cambio-txt-${id}" maxlength="300" placeholder="${no ? 'Ej. ya no hay habitaciones dobles' : 'Ej. pasó a habitación doble'}"></label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="rq-btn ${no ? 'dan full' : 'pri'}" id="rq-cambio-go-${id}" onclick="_reqCambioCerrarGo('${id}','${estado}')">${no ? 'Cerrar como «no procede»' : 'Cerrar como atendida'}</button>
@@ -187,7 +197,7 @@ async function _reqCambioCerrarGo(id, estado) {
   if (estado === 'rechazada' && respuesta.length < 3) { if (msg) { msg.textContent = 'Escribe el motivo.'; msg.style.color = 'var(--red)'; } return; }
   const btn = document.getElementById('rq-cambio-go-' + id); if (btn) btn.disabled = true;
   const j = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado, respuesta }).catch((e) => ({ error: e.message }));
-  if (j && j.ok) loadCambiosPortal();
+  if (j && j.ok) { if (j.correo) showToast(_reqBdjEsc('Cerrada · ' + _reqCorreoTxt(j.correo)), j.correo.ok ? 'success' : 'warning'); loadCambiosPortal(); }
   else { if (msg) { msg.textContent = 'No se pudo cerrar: ' + ((j && j.error) || 'sin respuesta'); msg.style.color = 'var(--red)'; } if (btn) btn.disabled = false; }
 }
 

@@ -359,6 +359,19 @@ está caduco antes de escribirse.
     control de zona agotada); vecinos verdes.
   - ⏳ Push de Memo → probar con un viajero suyo → correo a los 5 (texto con su
     visto). El contrato al aplicar sale solo con CONTRATO_CLIENTE_VIVO encendido.
+  - ✉️ **PREVENTA-PORTAL-2 (27-oct, mismo día): la respuesta va por CORREO y al
+    Portal, NO por WhatsApp.** Palabra de Memo: «debería ser por correo y en el
+    portal». `_lib/correo-paquete` (`avisarPaquete`) sale desde `cambio_cerrar`
+    de la bandeja cuando el cambio es tipo `paquete`: **atendida** → «Tu paquete
+    quedó confirmado» con paquete/zona/habitación y total·pagado·falta contados
+    por `saldoMigrado` (sin dinero legible NO se manda) + botón al Portal (y, con
+    el contrato vivo, «ahí firmas tu contrato»); **rechazada** → el MOTIVO del
+    equipo tal cual + «elige otra opción en tu Portal». 🔒 UN aviso por decisión:
+    la bandeja pide `contrato_sin_correo` y `viajero_elegir_paquete` emite el
+    contrato con `enviar:false`. Jamás tumba el cierre: la bandeja DICE si el
+    correo salió. El Portal pinta la elección rechazada con su motivo encima de
+    las opciones (`opciones_paquete` devuelve `rechazada`); los cambios que NO
+    son de paquete siguen sin correo. `mide:preventa-portal-1` **33**.
 
 - 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
   sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:

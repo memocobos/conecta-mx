@@ -1368,7 +1368,10 @@ ${entregables}
       // Memo: el de la preventa a ciegas espera a este momento), con el anexo
       // de preventa. Jamás deshace el cambio de paquete.
       const { emitirContratos } = require('./_lib/contrato-cliente');
-      const contrato = await emitirContratos({ viajeroIds: [filas[0].id], preventa: true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+      // [PREVENTA-PORTAL-2] Desde la bandeja el aviso al cliente es UNO (el correo
+      // de «paquete confirmado», que ya dice que el contrato se firma en el Portal):
+      // la bandeja pide `contrato_sin_correo` y el contrato nace sin su propio correo.
+      const contrato = await emitirContratos({ viajeroIds: [filas[0].id], preventa: true, enviar: body.contrato_sin_correo !== true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
       return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso, contrato });
     }
 

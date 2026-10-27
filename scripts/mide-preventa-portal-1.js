@@ -37,8 +37,15 @@ global.fetch = async (url, init) => {
   init = init || {}; const m = (init.method || 'GET').toUpperCase(); const u = dec(String(url));
   if (u.includes('/index.html') || /conectareynosa\.mx\/?($|\?)/.test(u)) return resp(200, INDEX);
   if (u.includes('/auth/v1/user')) return USER ? resp(200, USER) : resp(401, {});
+  if (u.includes('api.resend.com')) { const b = JSON.parse(init.body); (DB.correos = DB.correos || []).push(b); return resp(200, { id: 'em_' + DB.correos.length }); }
+  if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u-roshi', activo: true, rol: 'maestro_roshi' }]);
+  if (u.includes('/rest/v1/abonos_viajero')) { const vid = eq(u, 'viajero_id'); return resp(200, (DB.abonos || []).filter((a) => !vid || a.viajero_id === vid)); }
   if (u.includes('/rest/v1/viajeros_evento')) { const id = eq(u, 'id'); return resp(200, DB.v.filter((v) => !id || v.id === id)); }
   if (u.includes('/rest/v1/cambios_viajero')) {
+    if (m === 'PATCH') {
+      const id = eq(u, 'id'), est = eq(u, 'estado'); const b = JSON.parse(init.body);
+      const f = DB.c.filter((c) => c.id === id && (!est || c.estado === est)); f.forEach((c) => Object.assign(c, b)); return resp(200, f);
+    }
     if (m === 'POST') {
       const b = JSON.parse(init.body);
       if (b.tipo === 'paquete' && DB.c.some((c) => c.viajero_id === b.viajero_id && c.tipo === 'paquete' && c.estado === 'pendiente')) return resp(409, { code: '23505' });
@@ -97,6 +104,40 @@ const llamar = async (b) => { const r = await H({ httpMethod: 'POST', headers: {
   af(r.s === 404 && DB.c.length === 1, 'viajero de otra cuenta → 404 sin escribir');
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(1), paquete: 'cheap', zona: 'General', hotel: 'x' });
   af(r.s === 409, 'la guarda de pendiente corre ANTES de validar (no hay segunda vía)');
+
+  console.log('\n[C] la respuesta va por CORREO y al Portal (PREVENTA-PORTAL-2)');
+  process.env.JWT_SECRET = 'secreto-de-arnes'; process.env.RESEND_API_KEY = 're_falso'; process.env.CORREOS_MODO = 'real';
+  const HR = require(path.join(RAIZ, 'netlify/functions/admin-requisiciones.js')).handler;
+  const { jwtSign } = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js'));
+  const tok = jwtSign({ id: 'u-roshi', rol: 'maestro_roshi', correo: 'memo@x.mx', nombre: 'Memo' }, process.env.JWT_SECRET, 3600);
+  const bandeja = async (b) => { const x = await HR({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + tok }, body: JSON.stringify(b) }); return { s: x.statusCode, j: JSON.parse(x.body) }; };
+  // Bulma ya aplicó el paquete (viajero_elegir_paquete): la fila quedó en STAY General, total 4800, y trae su abono de $300.
+  Object.assign(DB.v[0], { tipo_paquete: 'stay', zona_boleto: 'General', total_contrato: 4800, abonado_previo: 0 });
+  DB.abonos = [{ viajero_id: U(1), monto: 300 }];
+  DB.correos = [];
+  r = await bandeja({ accion: 'cambio_cerrar', id: DB.c[0].id, estado: 'atendida', respuesta: 'Paquete aplicado' });
+  const cOk = DB.correos[0] || {};
+  af(r.s === 200 && r.j.correo && r.j.correo.ok && DB.correos.length === 1, () => 'atendida → UN correo al cliente · ' + JSON.stringify(r.j.correo));
+  af(cOk.to && cOk.to[0] === 'ana@correo.mx' && /confirmado/i.test(cOk.subject), () => 'va a SU correo con «confirmado» en el asunto: ' + cOk.subject);
+  af(/\$4,800/.test(cOk.html) && /\$300/.test(cOk.html) && /\$4,500/.test(cOk.html), 'el correo dice total $4,800 · pagado $300 · te falta $4,500 (saldoMigrado, no tecleado)');
+  af(/conectareynosa\.mx\/portal/.test(cOk.html) && !/WhatsApp/i.test(cOk.html), 'el correo manda al Portal y no dice «por WhatsApp»');
+  // Rechazo de una segunda elección: el motivo viaja TAL CUAL por correo y el Portal lo pinta.
+  Object.assign(DB.v[2], { correo: 'otra@x.mx' });
+  DB.c.push({ id: U(950), viajero_id: U(3), evento_id: 'nsqkmty', correo: 'otra@x.mx', nombre: 'Otra', tipo: 'paquete', detalle: 'x', estado: 'pendiente', paquete_pedido: 'plus', zona_pedida: 'Platino' });
+  DB.correos = [];
+  r = await bandeja({ accion: 'cambio_cerrar', id: U(950), estado: 'rechazada', respuesta: 'Platino ya no tiene lugar, prueba Oro' });
+  const cNo = DB.correos[0] || {};
+  af(r.s === 200 && DB.correos.length === 1 && /Platino ya no tiene lugar, prueba Oro/.test(cNo.html) && cNo.to[0] === 'otra@x.mx', 'rechazada → correo con el motivo escrito por el equipo');
+  USER = { email: 'otra@x.mx', email_confirmed_at: 'x' };
+  r = await llamar({ accion: 'opciones_paquete', viajero_id: U(3) });
+  af(r.s === 200 && r.j.rechazada && /Platino ya no tiene lugar/.test(r.j.rechazada.respuesta) && r.j.paquetes.length, 'el Portal recibe la elección rechazada CON su motivo y vuelve a ofrecer opciones');
+  DB.correos = [];
+  DB.c.push({ id: U(951), viajero_id: U(3), evento_id: 'nsqkmty', correo: 'otra@x.mx', tipo: 'zona', detalle: 'cambio de zona', estado: 'pendiente' });
+  r = await bandeja({ accion: 'cambio_cerrar', id: U(951), estado: 'atendida' });
+  af(r.s === 200 && DB.correos.length === 0 && r.j.correo === null, 'un cambio que NO es de paquete se cierra sin correo (sin cambios a PORTAL-EDIT-1)');
+  const ac = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');
+  af(/enviar: body\.contrato_sin_correo !== true/.test(ac) && /contrato_sin_correo: true/.test(fs.readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8')), 'desde la bandeja el contrato nace SIN su propio correo: un aviso por decisión');
+  af(!/por WhatsApp/.test(fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').slice(fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').indexOf('function _migPaqHtml('), fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').indexOf('async function _paqEnviar('))), 'el wizard del Portal ya no promete WhatsApp');
 
   console.log('\n[B] bandeja y Portal');
   const kr = fs.readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8');

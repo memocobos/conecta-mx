@@ -108,7 +108,14 @@ exports.handler = async (event) => {
       if (pend) return json(200, headers, { ok: true, pendiente: pend });
       const o = await op.opcionesPaquete(v.evento_id);
       if (!o.ok) return json(200, headers, { ok: false, error: o.motivo });
-      return json(200, headers, { ok: true, evento: o.evento, paquetes: o.paquetes });
+      // [PREVENTA-PORTAL-2] Si su elección anterior no procedió, el Portal lo DICE
+      // con el motivo del equipo (el mismo que le llegó por correo).
+      let rechazada = null;
+      try {
+        const rr = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.paquete&estado=eq.rechazada&order=atendida_at.desc&limit=1&select=paquete_pedido,zona_pedida,respuesta,atendida_at`, { headers: hKH });
+        if (rr.ok) rechazada = (await rr.json())[0] || null;
+      } catch (_) { /* sin el aviso: las opciones siguen */ }
+      return json(200, headers, { ok: true, evento: o.evento, paquetes: o.paquetes, rechazada });
     }
 
     if (pend) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.', pendiente: pend });

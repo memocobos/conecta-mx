@@ -160,7 +160,14 @@ exports.handler = async (event) => {
     if (!r.ok) return j(502, headers, { error: 'No se pudo cerrar la solicitud', detail: (await r.text()).slice(0, 300) });
     const rows = await r.json();
     if (!rows.length) return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la cerró' });
-    return j(200, headers, { ok: true, cambio: rows[0] });
+    // [PREVENTA-PORTAL-2] La respuesta a «Elegir mi paquete» va por CORREO (palabra
+    // de Memo). Sale DESPUÉS de cerrar y jamás tumba el cierre: si falla, se DICE.
+    let correo = null;
+    if (rows[0].tipo === 'paquete') {
+      const { avisarPaquete } = require('./_lib/correo-paquete');
+      correo = await avisarPaquete({ cambio: rows[0], KH_URL: SB_URL, KH_KEY: SB_KEY });
+    }
+    return j(200, headers, { ok: true, cambio: rows[0], correo });
   }
 
   // Las tres restantes piden el id.

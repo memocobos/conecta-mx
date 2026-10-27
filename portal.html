@@ -3235,7 +3235,7 @@ function _migPaqHtml(t){
   const id = escapeHtml(t.viajero_id);
   return '<div data-paq-box style="margin-top:12px;padding:12px;border-radius:10px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.45)">'
     + '<div style="font-size:14px;font-weight:800;margin-bottom:4px">🎟 ¡Ya hay costos! Elige tu paquete</div>'
-    + '<div style="font-size:12px;opacity:.85;margin-bottom:8px">Tus <b>$300 de la preventa ya cuentan como pago</b>. Elige paquete, zona y habitación; el equipo revisa tu elección y te confirma por WhatsApp. Después firmas tu contrato aquí mismo.</div>'
+    + '<div style="font-size:12px;opacity:.85;margin-bottom:8px">Tus <b>$300 de la preventa ya cuentan como pago</b>. Elige paquete, zona y habitación; el equipo revisa tu elección y te confirma <b>por correo y aquí en tu Portal</b>.</div>'
     + '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="paq-abrir" data-mig-id="' + id + '">Elegir mi paquete</button>'
     + '<div data-mig-panel="paq" style="display:none;margin-top:10px"><div data-paq-body style="font-size:12px;opacity:.8">Cargando opciones…</div><div data-mig-msg style="font-size:12px;margin-top:6px"></div></div>'
     + '</div>';
@@ -3252,14 +3252,14 @@ async function _paqAbrir(id){
   const j = await _migPost({ accion: 'opciones_paquete', viajero_id: id }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
   if (j && j.ok && j.pendiente) { body.innerHTML = _paqPendHtml(j.pendiente); return; }
   if (!j || !j.ok) { body.textContent = (j && j.error) || 'No pudimos cargar las opciones'; return; }
-  _paqOps[id] = { paquetes: j.paquetes, elegido: null };
+  _paqOps[id] = { paquetes: j.paquetes, elegido: null, rechazada: j.rechazada || null };
   _paqPintar(id);
 }
 function _paqPendHtml(pe){
   return '<div style="padding:10px;border-radius:8px;background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.4);font-size:13px;opacity:1">✅ <b>Tu elección está en revisión</b><br>'
     + escapeHtml(String(pe.paquete_pedido || '').toUpperCase()) + (pe.zona_pedida ? ' · ' + escapeHtml(pe.zona_pedida) : '') + (pe.hotel_pedido ? ' · ' + escapeHtml(pe.hotel_pedido) : '')
     + (pe.precio_lista ? ' · ' + _paqMoney(pe.precio_lista) + ' por persona' : '')
-    + '<br><span style="font-size:12px;opacity:.8">El equipo te escribe por WhatsApp para confirmarlo.</span></div>';
+    + '<br><span style="font-size:12px;opacity:.8">Te confirmamos por correo y aquí mismo en tu Portal.</span></div>';
 }
 function _paqPintar(id){
   const c = _migCard(id); if (!c) return;
@@ -3267,7 +3267,13 @@ function _paqPintar(id){
   const o = _paqOps[id]; if (!o) return;
   const inp = 'width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:13px';
   const lbl = 'display:block;font-size:11px;opacity:.75;margin:0 0 3px';
-  let h = '<label style="' + lbl + '">1 · Paquete</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+  let h = '';
+  if (o.rechazada) {
+    h += '<div style="margin:0 0 10px;padding:10px;border-radius:8px;background:rgba(255,40,59,.1);border:1px solid rgba(255,40,59,.45);font-size:12px;opacity:1">Tu elección anterior ('
+      + escapeHtml(String(o.rechazada.paquete_pedido || '').toUpperCase()) + (o.rechazada.zona_pedida ? ' · ' + escapeHtml(o.rechazada.zona_pedida) : '')
+      + ') no se pudo aplicar: <b>' + escapeHtml(o.rechazada.respuesta || 'sin motivo') + '</b>. Elige otra opción.</div>';
+  }
+  h += '<label style="' + lbl + '">1 · Paquete</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
   o.paquetes.forEach((pq) => {
     const on = o.elegido === pq.paquete;
     h += '<button type="button" data-mig-act="paq-pq" data-mig-id="' + escapeHtml(id) + '" data-paq="' + escapeHtml(pq.paquete) + '" style="padding:8px 12px;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:1px solid ' + (on ? '#e8ff4c' : 'rgba(255,255,255,.25)') + ';background:' + (on ? '#e8ff4c' : 'transparent') + ';color:' + (on ? '#000' : 'inherit') + '">' + escapeHtml(pq.nombre) + '</button>';

@@ -237,6 +237,13 @@ está caduco antes de escribirse.
   zona. `npm run mide:ride-callejon-1` (**11**, con control positivo en BASE).
   ⏳ Espera push de Memo.
 
+- ✅ **RES-ACT-OCULTA-1 (27-oct-2026, en main local): en Montaña Pai, lo
+  guardado con «Actualizar → Sí, guardar» ya no reaparece.** Palabra de Memo:
+  «una vez que la guarde ya no quiero verla». El «listo» se queda a la vista al
+  momento (con ✕ Ocultar) y se borra solo al volver a entrar a Montaña Pai; una
+  VISTA PREVIA sin guardar sí se conserva (aún falta su clic).
+  `mide:res-act-oculta-1` **6**.
+
 - ✅ **RIDE-SIN-ZONA-1 (27-oct-2026, en main local): el alta manual de un
   viajero RIDE ya no exige zona.** Reporte de Milk: «en paquete RIDE no lleva
   boleto». La pantalla (`migGuardar`/`migZonas` de Capsule) Y el servidor

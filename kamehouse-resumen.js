@@ -1457,13 +1457,24 @@ function _resumenActualizarHtml(g, totalEventos, hecho) {
       </div>
     </details>` : ''}
 
-    ${hecho ? '' : `<button class="btn btn-primary" id="resumen-actualizar-ok" style="margin-top:12px" onclick="resumenActualizarConfirmar()">
+    ${hecho ? `<button class="btn" style="margin-top:12px" onclick="resumenActualizarOcultar(true)">✕ Ocultar</button>` : `<button class="btn btn-primary" id="resumen-actualizar-ok" style="margin-top:12px" onclick="resumenActualizarConfirmar()">
       Sí, guardar${g.lugares.length ? ` los ${g.lugares.length} lugar${g.lugares.length === 1 ? '' : 'es'}` : ''}${g.abonos.length ? ` y los ${g.abonos.length} abono${g.abonos.length === 1 ? '' : 's'}` : ''}${g.boletos.length ? ` · ${g.boletos.length} boleto${g.boletos.length === 1 ? '' : 's'}` : ''}
     </button>`}
   </div>`;
 }
 
 let _resumenActCorriendo = false;
+
+// [RES-ACT-OCULTA-1] Esconde el panel de «Actualizar» SOLO si ya se guardó. Una
+// vista previa sin guardar se queda (ahí todavía hay un botón por apretar).
+function resumenActualizarOcultar(forzar) {
+  const panel = document.getElementById('resumen-actualizar-panel');
+  if (!panel || _resumenActCorriendo) return;
+  if (!forzar && panel.dataset.hecho !== '1') return;
+  panel.innerHTML = '';
+  panel.style.display = 'none';
+  delete panel.dataset.hecho;
+}
 
 // [CAREO-RETRY-1] El bucle se MUDÓ a `khExcelRecorrer` (kamehouse.js) — un
 // solo dueño para las dos pantallas; los reintentos viven allá.
@@ -1476,7 +1487,7 @@ async function resumenActualizar() {
   const panel = document.getElementById('resumen-actualizar-panel');
   const btn = document.getElementById('resumen-actualizar-btn');
   _resumenActCorriendo = true;
-  if (panel) panel.style.display = '';
+  if (panel) { panel.style.display = ''; delete panel.dataset.hecho; }
   if (btn) { btn.disabled = true; btn.textContent = 'Revisando…'; }
   try {
     const acc = await _resumenActRecorrer(false, (n, t) => {
@@ -1503,7 +1514,13 @@ async function resumenActualizarConfirmar() {
       if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>
         Guardando… <b>${n}</b> de <b>${t || '?'}</b> eventos.</div>`;
     });
-    if (panel) panel.innerHTML = _resumenActualizarHtml(_resumenActualizarAgrupar(acc.eventos), acc.total, true);
+    if (panel) {
+      panel.innerHTML = _resumenActualizarHtml(_resumenActualizarAgrupar(acc.eventos), acc.total, true);
+      // [RES-ACT-OCULTA-1] Palabra de Memo: «una vez que la guarde ya no quiero
+      // verla». El «listo» se queda a la vista AHORA (para leer qué entró) y se
+      // va solo al volver a entrar a Montaña Pai — o con su ✕.
+      panel.dataset.hecho = '1';
+    }
     // El dinero de la pantalla ya es el pasado: se recarga.
     if (typeof loadResumen === 'function') loadResumen();
   } catch (e) {

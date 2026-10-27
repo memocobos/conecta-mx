@@ -2410,7 +2410,11 @@ function showPage(name) {
 function loadPage(name) {
  if (name === 'inicio') loadInicio();
  if (name === 'requisiciones') loadRequisiciones(); // [REQ-B1] la bandeja de FASE B
- if (name === 'resumen') loadResumen();
+ if (name === 'resumen') {
+  // [RES-ACT-OCULTA-1] al volver a Montaña Pai, lo ya guardado no se vuelve a pintar.
+  if (typeof resumenActualizarOcultar === 'function') resumenActualizarOcultar();
+  loadResumen();
+ }
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
  if (name === 'gastos') loadGastos();

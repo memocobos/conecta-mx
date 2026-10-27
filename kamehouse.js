@@ -2414,7 +2414,10 @@ function showPage(name) {
 // pinta: un CHEAP con la zona «Preventa a ciegas», o de un evento en preventa
 // (los acompañantes/traspasos pueden venir sin zona), se rotula PREVENTA A CIEGAS.
 // Espejo de `_esPreventaCiegas` del index: al agregar un evento allá, va aquí.
-const KH_PREVENTA_EVENTOS = ['palnorte', 'nsqkmty'];
+// [NSQK-VENTA-1, 27-oct] nsqkmty salió a la venta con costos reales: un CHEAP
+// nuevo de nsqk es CHEAP de verdad. Sus 5 de la preventa se siguen rotulando
+// por su ZONA («Preventa a ciegas») hasta que eligen paquete.
+const KH_PREVENTA_EVENTOS = ['palnorte'];
 function khEsPreventaCiegas(v) {
   if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
   if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;
@@ -6082,7 +6085,7 @@ async function _vj2Cargar() {
         <td><b>${_esfEsc(v.nombre || '—')}</b>
             <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}
             ${gCol ? `<div style="font-size:11px;margin-top:3px;color:${gCol}">👥 viaja con: ${compas.map(_esfEsc).join(', ')}${_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : ''}</div>` : ''}</td>
-        <td>${_esfEsc(v.tipo_paquete || '—')}</td>
+        <td>${_esfEsc(khPaqueteTexto(v) || '—')}</td>
         <td>${_esfEsc(v.zona_boleto || '—')}</td>
         <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
         <td>${contacto}${emerg ? `<div class="vj2-emerg">SOS ${_esfEsc(emerg)}</div>` : ''}</td>
@@ -6106,6 +6109,9 @@ async function _vj2Cargar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Ver los pagos de ${_esfEsc(v.nombre || '')} con sus comprobantes"
             onclick="_vjPagosVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📎 Pagos</button>
+          ${khEsPreventaCiegas(v) ? `<button class="btn btn-primary btn-sm" style="font-size:10px"
+            title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
+            onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
             onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
@@ -6214,6 +6220,92 @@ function _vjAbonoAbrir(id, nombre) {
     </div>`;
   const m = document.getElementById(`vja-m-${id}`);
   if (m) { try { m.focus(); } catch (_) {} }
+}
+
+// ═══ [PREVENTA-ELEGIR-1] EL DE LA PREVENTA ELIGE SU PAQUETE ═════════════════
+// Bulma/Milk pasan a quien separó en preventa a su paquete real. Las zonas salen
+// del CATÁLOGO servido (jamás tecleadas), el costo se SUGIERE con la regla de
+// precios del servidor y se puede ajustar (descuento de $300 al acompañante,
+// hotel), y el servidor valida zona + inventario + valor esperado.
+async function _vjElegirAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'elegir';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'elegir';
+  const e = _esfEsc(id);
+  tr.firstElementChild.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--blue);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);min-width:140px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>de PREVENTA a su paquete<br><i>sus pagos se quedan como abonos</i></div>
+      <label style="font-size:10px;color:var(--ts)">PAQUETE<br><select class="cot-input" id="vje-p-${e}" onchange="_vjElegirZonas('${_attrJs(id)}')">
+        <option value="">— elige —</option><option value="plus">PLUS</option><option value="stay">STAY</option><option value="cheap">CHEAP</option><option value="ride">RIDE</option></select></label>
+      <label style="font-size:10px;color:var(--ts)">ZONA<br><select class="cot-input" id="vje-z-${e}" onchange="_vjElegirSugerido('${_attrJs(id)}')"><option value="">— elige paquete primero —</option></select></label>
+      <label style="font-size:10px;color:var(--ts)">COSTO TOTAL<br><input class="cot-input" id="vje-t-${e}" type="number" min="0" step="1" placeholder="0" style="width:120px"></label>
+      <button class="btn btn-primary btn-sm" id="vje-b-${e}" onclick="_vjElegirGuardar('${_attrJs(id)}')">Guardar paquete</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjElegirAbrir('${_attrJs(id)}')">Cancelar</button>
+      <div id="vje-s-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)"></div>
+      <div id="vje-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
+    </div>`;
+  try {
+    const ev = await _fetchEVFromIndex();
+    const base = String(_ccEventoActual || '').split('#')[0];
+    window.__vjeEV = (ev || []).find((x) => x && x.id === base) || null;
+  } catch (_) { window.__vjeEV = null; }
+  if (!window.__vjeEV) { const er = document.getElementById(`vje-e-${id}`); if (er) er.textContent = 'No se pudo leer el catálogo del evento: recarga y vuelve a intentar.'; }
+}
+function _vjElegirZonas(id) {
+  const paq = (document.getElementById(`vje-p-${id}`) || {}).value || '';
+  const sel = document.getElementById(`vje-z-${id}`);
+  if (!sel) return;
+  const ev = window.__vjeEV;
+  if (!paq) sel.innerHTML = '<option value="">— elige paquete primero —</option>';
+  else if (paq === 'ride') sel.innerHTML = '<option value="">— RIDE no lleva boleto —</option>';
+  else {
+    const fuente = ((paq === 'cheap' ? ev && ev.cheapZonas : ev && ev.zonas) || [])
+      .filter((z) => z && z.n && !/^preventa a ciegas$/i.test(z.n));
+    sel.innerHTML = fuente.length
+      ? '<option value="">— elegir —</option>' + fuente.map((z) => `<option value="${_esfEsc(z.n)}">${_esfEsc(z.n)}${z.p ? ' · $' + Number(z.p).toLocaleString('es-MX') : ''}${z.ag ? ' (agotada)' : ''}</option>`).join('')
+      : '<option value="">— sin zonas para este paquete en la ficha —</option>';
+  }
+  _vjElegirSugerido(id);
+}
+async function _vjElegirSugerido(id) {
+  const paq = (document.getElementById(`vje-p-${id}`) || {}).value || '';
+  const zona = (document.getElementById(`vje-z-${id}`) || {}).value || '';
+  const sug = document.getElementById(`vje-s-${id}`);
+  const tot = document.getElementById(`vje-t-${id}`);
+  if (!paq || (paq !== 'ride' && !zona)) { if (sug) sug.textContent = ''; return; }
+  if (sug) sug.textContent = 'Calculando el costo…';
+  try {
+    const j = await khViajeros.precioSugerido({ evento_id: _ccEventoActual, tipo_paquete: paq, zona });
+    if (j && j.sugerido != null) {
+      if (tot && !tot.value) tot.value = j.total != null ? j.total : j.sugerido;
+      if (sug) sug.textContent = `Costo de la página: $${Number(j.total != null ? j.total : j.sugerido).toLocaleString('es-MX')} (habitación compartida). Ajústalo si cambia el cuarto o aplica el descuento.`;
+    } else if (sug) sug.textContent = `Sin costo sugerido (${(j && j.motivo) || 'no se pudo calcular'}): escríbelo a mano.`;
+  } catch (_) { if (sug) sug.textContent = 'Sin costo sugerido: escríbelo a mano.'; }
+}
+async function _vjElegirGuardar(id) {
+  const err = document.getElementById(`vje-e-${id}`);
+  const btn = document.getElementById(`vje-b-${id}`);
+  const paq = (document.getElementById(`vje-p-${id}`) || {}).value || '';
+  const zona = (document.getElementById(`vje-z-${id}`) || {}).value || '';
+  const total = Number((document.getElementById(`vje-t-${id}`) || {}).value);
+  if (err) err.textContent = '';
+  if (!paq) { if (err) err.textContent = 'Elige el paquete.'; return; }
+  if (paq !== 'ride' && !zona) { if (err) err.textContent = 'Elige la zona.'; return; }
+  if (!(total > 0)) { if (err) err.textContent = 'Escribe el costo total.'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id, tipo_paquete: paq, zona_boleto: zona, total_contrato: total });
+    const avisos = [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean);
+    showToast('Paquete guardado' + (avisos.length ? ' · ' + avisos.join(' · ') : ''), avisos.length ? 'warning' : 'success');
+    await _vj2Cargar();
+  } catch (e) {
+    if (err) err.textContent = (e && e.message) || 'No se pudo guardar.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar paquete'; }
+  }
 }
 
 async function _vjAbonoGuardar(id) {

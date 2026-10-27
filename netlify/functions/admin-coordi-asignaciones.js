@@ -98,6 +98,7 @@ const ACCIONES = {
   viajero_listar: null,
   viajero_eliminar: ROLES_ADMIN,
   viajero_editar: ROLES_EDITA_VIAJERO,
+  viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
   // [CREA-1b] Regalar un boleto es mover inventario: mismos roles que capturan
   // viajeros. Y la entrada VA AQUÍ o la acción no existe para el portero —
   // ésa fue RAD-FIX-CAMINO: tres RPC vivos y 'accion inválida' en pantalla.
@@ -1222,6 +1223,87 @@ ${entregables}
       // Se devuelve cuántas filas tocó: si algún día el filtro se aflojara, el
       // número lo grita en vez de esconderlo.
       return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
+    }
+
+    // ── [PREVENTA-ELEGIR-1] (27-oct-2026) EL DE LA PREVENTA ELIGE SU PAQUETE ──
+    // Palabra de Memo: «ya tengo los costos de nsqk para los que hicieron
+    // preventa». Hasta hoy KameHouse solo editaba contacto (viajero_editar):
+    // pasar de «CHEAP · Preventa a ciegas $300» a su paquete real no tenía
+    // puerta. Ésta es esa puerta, y SOLO esa:
+    //  · solo para filas EN PREVENTA (cheap + zona «Preventa a ciegas» o sin
+    //    zona) — no es un editor general de paquetes;
+    //  · la zona pasa por LA PUERTA de la ficha y por el inventario de Kamisama
+    //    (palabra de Memo: «lo único que puede pasar es que no haya la zona»);
+    //  · el total lo teclea quien captura (regla VJ-3: el sugerido es pista);
+    //  · el dinero NO se toca: sus $300 siguen siendo abono/previo y cuentan.
+    //  · PATCH con valor esperado: el 2º clic o una carrera escriben 0 filas → 409.
+    if (accion === 'viajero_elegir_paquete') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede cambiar el paquete' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const paquete = String(body.tipo_paquete || '').trim().toLowerCase();
+      if (!PAQUETES_MIGRAR.includes(paquete)) return bad(headers, `tipo_paquete inválido: se espera uno de ${PAQUETES_MIGRAR.join(', ')}`);
+      let zona = String(body.zona_boleto || '').trim();
+      const rideSinZona = paquete === 'ride' && !zona;
+      if (!zona && !rideSinZona) return bad(headers, 'la zona del boleto es obligatoria');
+      if (/^preventa a ciegas$/i.test(zona)) return bad(headers, 'elige la zona REAL, no «Preventa a ciegas»');
+      const total = _numDinero(body.total_contrato);
+      if (total === null || total <= 0) return bad(headers, 'el costo del paquete es obligatorio y debe ser mayor que cero');
+
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,tipo_paquete,zona_boleto,total_contrato,boletos,notas&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const v = (await pre.json())[0];
+      if (!v) return bad(headers, 'ese viajero no existe');
+      const zonaAct = String(v.zona_boleto || '').trim();
+      const enPreventa = String(v.tipo_paquete || '').toLowerCase() === 'cheap' && (!zonaAct || /^preventa a ciegas$/i.test(zonaAct));
+      if (!enPreventa) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Este viajero ya no está en preventa (ya tiene paquete y zona). Si hay que cambiarlo, es un cambio manual aparte.', ya: true }) };
+      }
+
+      let zonaAviso = null, stockAviso = null;
+      if (!rideSinZona) {
+        const vz = await puertaZona(v.evento_id, zona);
+        if (vz.estado === 'desconocida') {
+          const lista = (vz.canonicas || []).join(' · ');
+          return bad(headers, `La zona «${zona}» no existe en la ficha. ` + (lista ? `Las de la ficha: ${lista}.` : ''));
+        }
+        if (vz.estado === 'canonizada') { zonaAviso = `Zona corregida a «${vz.zona}»`; zona = vz.zona; }
+        else if (vz.estado === 'sin-catalogo' || vz.estado === 'sin-evento') zonaAviso = 'La zona se guardó sin validar contra la ficha (catálogo ilegible).';
+        // El inventario: si Kamisama ya tiene el pedido de esa zona y no alcanza,
+        // NO se vende (palabra de Memo). Si todavía no hay pedido cargado, pasa
+        // CON aviso: hoy es el día de la venta y el pedido puede cargarse después.
+        if (paquete !== 'ride' && env.PORTAL_SB_URL && env.PORTAL_SB_SERVICE) {
+          try {
+            const disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id: v.evento_id });
+            if (!disp.error) {
+              const ez = evaluarZona(disp, zona, Number(v.boletos) || 1);
+              if (ez.gestionada && ez.sinCupo) {
+                return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» ya no tiene lugar en Kamisama (quedan ${ez.restante}). Ofrécele otra zona.`, agotada: true, restante: ez.restante }) };
+              }
+              if (!ez.gestionada) stockAviso = `«${zona}» todavía no tiene pedido cargado en Kamisama: no se pudo confirmar que haya lugar.`;
+            }
+          } catch (_) { stockAviso = 'No se pudo medir el inventario; revisa la zona en Kamisama.'; }
+        }
+      }
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const sello = `[PREVENTA→PAQUETE ${hoy}] de PREVENTA A CIEGAS $${Number(v.total_contrato) || 0} a ${paquete.toUpperCase()}${zona ? ' · ' + zona : ''} · total $${total} · capturó ${quien}`;
+      const notas = v.notas ? `${v.notas} · ${sello}` : sello;
+      // Valor esperado: paquete, zona y total TAL COMO se leyeron.
+      const filtroZona = v.zona_boleto == null ? 'zona_boleto=is.null' : `zona_boleto=eq.${encodeURIComponent(v.zona_boleto)}`;
+      const filtroTot = v.total_contrato == null ? 'total_contrato=is.null' : `total_contrato=eq.${v.total_contrato}`;
+      const r = await fetch(`${baseVE}?id=eq.${id}&tipo_paquete=eq.${encodeURIComponent(v.tipo_paquete)}&${filtroZona}&${filtroTot}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ tipo_paquete: paquete, zona_boleto: zona || null, total_contrato: total, notas }),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien ya cambió a este viajero mientras tanto. Recarga la lista.', ya: true }) };
+      return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso });
     }
 
     // ── [MIG-1a] viajeros_evento: ALTA DE UN VIAJERO DEL EXCEL ─────────────

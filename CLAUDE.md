@@ -247,6 +247,29 @@ está caduco antes de escribirse.
   Capsule (lista, ficha, exportes), la Torre GZ, la bandeja y la cobranza.
   `mide:paq-preventa-1` **8**.
 
+- 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
+  sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:
+  «tengo que anunciar hoy mismo … hoy mismo tienen que elegir»; descuento de
+  la preventa = **$300** (2ª persona del mismo viaje u otro tour 2027).
+  - **La venta NO pide push:** el index deriva `_esPreventaCiegas` de la ficha
+    (cheapOnly + UNA zona vendible), así que al cargar en Esferas zonas
+    reales, apagar cheapOnly y borrar «Preventa a ciegas», nsqkmty vende
+    PLUS/STAY/CHEAP/RIDE normal. `REQUISICION_EVENTOS` y `EVENTOS_CORREO` ya
+    la traían.
+  - **KH:** `KH_PREVENTA_EVENTOS` quedó en `['palnorte']` — los CHEAP nuevos de
+    nsqk dicen CHEAP; los 5 de la preventa siguen rotulados POR SU ZONA. La
+    lista principal de viajeros también pide `khPaqueteTexto` (se había
+    escapado en PAQ-PREVENTA-1).
+  - **«🎟 Elegir paquete»** (solo a quien está en preventa) → acción
+    `viajero_elegir_paquete`: paquete + zona (puerta `puertaZona`; RIDE sin
+    zona; «Preventa a ciegas» como destino rebota) + total tecleado (prellenado
+    con `precio_sugerido`; el descuento de $300 se aplica tecleándolo). Con
+    pedido cargado y sin lugar → 409; sin pedido → pasa con `stock_aviso`.
+    PATCH con valor esperado (2º clic 409), nota anexada con quién y cuándo.
+    🔒 **El dinero NO se toca:** sus $300 siguen como abono.
+    `mide:preventa-elegir-1` **14**. ⚠️ Tras el publish, Bulma/Milk recargan
+    KameHouse (el catálogo se cachea en `_contratosEVCache`).
+
 - ✅ **RES-ACT-OCULTA-1 (27-oct-2026, en main local): en Montaña Pai, lo
   guardado con «Actualizar → Sí, guardar» ya no reaparece.** Palabra de Memo:
   «una vez que la guarde ya no quiero verla». El «listo» se queda a la vista al

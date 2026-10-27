@@ -237,6 +237,20 @@ está caduco antes de escribirse.
   zona. `npm run mide:ride-callejon-1` (**11**, con control positivo en BASE).
   ⏳ Espera push de Memo.
 
+- 🚪⏳ **REQ-2027-2 (27-oct-2026, en main local): la puerta 2027 ABIERTA en
+  MONTERREY, por nombre.** Palabra de Memo: «haremos solo los de Monterrey» →
+  «ábrelos». `REQUISICION_EVENTOS` del index ganó 9: fuerzaregida · juniorh ·
+  anagabriel · emmanuel · madero · interpol · anuelaa · oreja · scorpions. El
+  correo único dejó de abrirse por fecha a secas: `RESERVA_2027` en
+  `_lib/correo-confirmacion` (lista Y fecha 2027+, fail-closed) — un CDMX 2027
+  o un evento nuevo NO manda correo aunque alguien entre con `?req=1`. Fuera a
+  propósito: CDMX (u2, niall, edc27, vivelatino, warning, hilary, louist —
+  esperan la regla del vuelo), TXT y Bahidorá (próximamente). Paso 2 cerrado
+  antes: 5 requisiciones de prueba por la puerta del cliente en producción,
+  totales casados y rechazadas. `mide:req-2027-2` **21** (las dos listas
+  careadas); vecinos verdes (`preventa-pn27` 62 con su literal actualizado a la
+  verdad nueva). ⏳ Push de Memo → verificación en producción.
+
 - 🚪⏳ **REQ-2027-1 (26-oct-2026, en main local): la puerta 2027, mitad
   SERVIDOR — el index NO se tocó (orden de Memo: «no modifiques nada en index
   hasta que estemos seguros»; «este es el movimiento más difícil»).** Plan

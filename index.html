@@ -6791,7 +6791,11 @@ var REQUISICION_VIVA=false;
 // de interruptor — aquí el interruptor es la lista. Agregar un slug ENCIENDE la
 // sección del modal solo en ese evento; el resto del sitio sigue como siempre
 // (cuentas + Messenger). Vaciar la lista apaga todo salvo el override ?req=1.
-var REQUISICION_EVENTOS=['palnorte','nsqkmty'];
+// [REQ-2027-2] Palabra de Memo (26-oct-2026): la puerta 2027 abre SOLO
+// Monterrey, por NOMBRE. CDMX espera la regla del vuelo; un evento nuevo entra
+// cuando Memo lo diga. La misma lista vive en RESERVA_2027 del correo único
+// (_lib/correo-confirmacion) y mide:req-2027-2 las carea.
+var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabriel','emmanuel','madero','interpol','anuelaa','oreja','scorpions'];
 (function(){
   try{
     var v=new URLSearchParams(location.search).get('req');

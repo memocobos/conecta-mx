@@ -47,15 +47,26 @@ const EVENTOS_CORREO = ['palnorte', 'nsqkmty'];   // [NSQK-PREVENTA-1]
 // (su `ds`), no se teclea evento por evento.
 const CORREO_RESERVA_DESDE = '2027-01-01';
 
+// [REQ-2027-2] Palabra de Memo (26-oct-2026, «haremos solo los de Monterrey» →
+// «ábrelos»): la puerta 2027 se abre POR NOMBRE, no por fecha a secas. La
+// fecha sigue siendo candado (fail-closed), pero un evento 2027 que no esté
+// aquí —CDMX sin regla del vuelo, uno nuevo publicado mañana— NO manda correo
+// aunque alguien entre con ?req=1. Es la MISMA lista que REQUISICION_EVENTOS
+// del index (menos las preventas, que viven en EVENTOS_CORREO); el careo
+// mide:req-2027-2 las carea para que no diverjan.
+const RESERVA_2027 = ['fuerzaregida', 'juniorh', 'anagabriel', 'emmanuel', 'madero',
+  'interpol', 'anuelaa', 'oreja', 'scorpions'];
+
 function baseSlug(id) { return String(id || '').split('#')[0]; }
 function correoActivo(evento_id) { return EVENTOS_CORREO.includes(baseSlug(evento_id)); }
 function reservaPorFecha(ev) { return !!(ev && ev.ds && String(ev.ds).slice(0, 10) >= CORREO_RESERVA_DESDE); }
-// ¿Sale el correo? La lista manda para todo; la regla de fecha solo para
-// 'reserva'. Async porque la fecha vive en el catálogo — y se pregunta ANTES
-// del puente al Portal, que escribe.
+// ¿Sale el correo? La lista manda para todo; la reserva 2027 exige estar en
+// RESERVA_2027 Y fecha 2027+. Async porque la fecha vive en el catálogo — y se
+// pregunta ANTES del puente al Portal, que escribe.
 async function correoDebeSalir(evento_id, tipo) {
   if (correoActivo(evento_id)) return true;
   if (tipo !== 'reserva') return false;
+  if (!RESERVA_2027.includes(baseSlug(evento_id))) return false;
   try {
     const { fetchEventosRaw } = require('./catalogo-index');
     const EV = await fetchEventosRaw();
@@ -236,4 +247,4 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
   }
 }
 
-module.exports = { renderConfirmacion, enviarCorreoPago, correoActivo, correoDebeSalir, reservaPorFecha, CORREO_RESERVA_DESDE, EVENTOS_CORREO, PORTAL_URL };
+module.exports = { renderConfirmacion, enviarCorreoPago, correoActivo, correoDebeSalir, reservaPorFecha, CORREO_RESERVA_DESDE, EVENTOS_CORREO, RESERVA_2027, PORTAL_URL };

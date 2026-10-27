@@ -148,7 +148,10 @@ function extraerObj(contenido, id) {
   // [NSQK-PREVENTA-1] La aserción vieja exigía «SOLO palnorte» y caducó el
   // 26-oct con la palabra de Memo («nsqkmty lo activamos como Pal Norte»):
   // se actualiza a la verdad nueva, no se silencia.
-  af(INDEX.includes("var REQUISICION_EVENTOS=['palnorte','nsqkmty'];"), 'la lista por evento trae palnorte Y nsqkmty (NSQK-PREVENTA-1)');
+  // [REQ-2027-2] Y el 26-oct la lista creció con los 9 de Monterrey 2027
+  // (palabra de Memo, «ábrelos»): el literal exacto caducó otra vez. Lo que
+  // esta tuerca exige sigue siendo que las DOS preventas estén, y van primero.
+  af(/var REQUISICION_EVENTOS=\['palnorte','nsqkmty'[,\]]/.test(INDEX), 'la lista por evento trae palnorte Y nsqkmty (NSQK-PREVENTA-1; REQ-2027-2 agregó Monterrey detrás)');
 
   const iGate = INDEX.indexOf('var REQUISICION_VIVA=false;');
   const fnGate = rebanarFn(INDEX.slice(iGate), 'function _requisicionActiva()');

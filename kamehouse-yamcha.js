@@ -52,16 +52,79 @@ async function loadYamcha() {
       return;
     }
 
-    // Agrupar por evento_slug (conserva el orden creado_en.desc del backend).
-    const grupos = [];
-    const idx = {};
-    for (const f of filas) {
-      if (!(f.evento_slug in idx)) { idx[f.evento_slug] = grupos.length; grupos.push({ slug: f.evento_slug, nombre: f.evento_nombre, rows: [] }); }
-      grupos[idx[f.evento_slug]].rows.push(f);
-    }
+    _yamchaPintar();
+  } catch (e) {
+    lista.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+// [YAMCHA-UX-1] Estado de la pantalla (lazy, regla MONO: cero código de nivel
+// superior). Sobrevive a cada recarga de la lista dentro de la sesión, así que
+// marcar un transferido NO te reabre el evento que habías minimizado ni te
+// borra lo que buscabas.
+//   q        → texto del buscador
+//   cerrados → slugs minimizados A MANO
+//   abiertos → slugs abiertos A MANO (le gana al auto-minimizado de «todo
+//              reembolsado»: si lo abriste, se queda abierto)
+function _yamchaSt() {
+  if (!window.__yamcha) window.__yamcha = { q: '', cerrados: new Set(), abiertos: new Set() };
+  return window.__yamcha;
+}
+function _yamchaNorm(s) {
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+function yamchaBuscar(q) {
+  _yamchaSt().q = String(q || '');
+  _yamchaPintar();
+}
+function yamchaToggle(slug) {
+  const st = _yamchaSt();
+  const el = document.querySelector(`[data-yamcha-grupo="${CSS.escape(slug)}"]`);
+  const estabaAbierto = el ? el.dataset.abierto === '1' : true;
+  if (estabaAbierto) { st.cerrados.add(slug); st.abiertos.delete(slug); }
+  else { st.cerrados.delete(slug); st.abiertos.add(slug); }
+  _yamchaPintar();
+}
+function _yamchaPintar() {
+  const lista = document.getElementById('yamcha-lista');
+  if (!lista) return;
+  const st = _yamchaSt();
+  const filas = Array.isArray(window._yamchaRows) ? window._yamchaRows : [];
+  const q = _yamchaNorm(st.q).trim();
+  const casa = (rb) => !q || [rb.cliente_nombre, rb.cliente_correo, rb.datos_bancarios, rb.notas]
+    .some((v) => _yamchaNorm(v).includes(q));
 
-    lista.innerHTML = grupos.map(g => {
-      const filasHtml = g.rows.map(rb => {
+  // Agrupar por evento_slug (conserva el orden creado_en.desc del backend).
+  // Los números del encabezado se cuentan sobre TODO el evento, no sobre lo
+  // filtrado: el buscador esconde filas, no cambia cuánto se debe.
+  const grupos = [];
+  const idx = {};
+  for (const f of filas) {
+    if (!(f.evento_slug in idx)) { idx[f.evento_slug] = grupos.length; grupos.push({ slug: f.evento_slug, nombre: f.evento_nombre, rows: [], vis: [] }); }
+    const g = grupos[idx[f.evento_slug]];
+    g.rows.push(f);
+    if (casa(f)) g.vis.push(f);
+  }
+  const visibles = grupos.filter((g) => g.vis.length);
+  if (!visibles.length) {
+    lista.innerHTML = `<div class="card" style="text-align:center;color:var(--ts);font-size:13px">Nadie coincide con «${_esfEsc(st.q)}».</div>`;
+    return;
+  }
+
+  lista.innerHTML = visibles.map(g => {
+      const pend = g.rows.filter((r) => r.estado === 'pendiente');
+      const pendMonto = pend.reduce((s, r) => s + (Number(r.monto) || 0), 0);
+      const todoListo = pend.length === 0;
+      // Abierto: buscando, SIEMPRE (si no, un resultado se escondería dentro de
+      // un evento minimizado). Si no: lo que diga la mano; y sin mano, un
+      // evento ya reembolsado completo nace minimizado.
+      const abierto = q ? true
+        : st.cerrados.has(g.slug) ? false
+        : st.abiertos.has(g.slug) ? true
+        : !todoListo;
+      const resumen = todoListo
+        ? `<span style="color:#3DDC84;font-weight:700">✓ Todo reembolsado</span> · ${g.rows.length} cliente(s)`
+        : `<span style="color:var(--orange);font-weight:700">${pend.length} pendiente(s) · ${formatMXN(pendMonto)}</span> · ${g.rows.length - pend.length} de ${g.rows.length} transferidos`;
+      const filasHtml = g.vis.map(rb => {
         const esPend = rb.estado === 'pendiente';
         const badge = esPend
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
@@ -77,20 +140,25 @@ async function loadYamcha() {
           <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarDatosReembolso('${_esfEsc(rb.id)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Datos</button> ${accionEstado}</td>
         </tr>`;
       }).join('');
-      return `<div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
-          <div style="font-weight:700;font-size:15px">${_esfEsc(g.nombre || g.slug)}</div>
-          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</button>
+      const nota = (q && g.vis.length !== g.rows.length)
+        ? `<div style="font-size:11px;color:var(--ts);margin-bottom:6px">Mostrando ${g.vis.length} de ${g.rows.length} por la búsqueda.</div>` : '';
+      return `<div class="card" style="margin-bottom:16px" data-yamcha-grupo="${_esfEsc(g.slug)}" data-abierto="${abierto ? '1' : '0'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap${abierto ? ';margin-bottom:10px' : ''}">
+          <button type="button" onclick="yamchaToggle('${_esfEsc(g.slug)}')" title="${abierto ? 'Minimizar' : 'Abrir'}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:200px">
+            <span style="display:inline-block;width:14px;font-size:12px;color:var(--ts)">${abierto ? '▾' : '▸'}</span>
+            <span>
+              <span style="display:block;font-weight:700;font-size:15px">${_esfEsc(g.nombre || g.slug)}</span>
+              <span style="display:block;font-size:12px;color:var(--ts);margin-top:2px">${resumen}</span>
+            </span>
+          </button>
+          ${abierto && !todoListo ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</button>` : ''}
         </div>
-        <div class="table-wrap"><table>
+        ${abierto ? `${nota}<div class="table-wrap"><table>
           <thead><tr><th>Cliente</th><th>Monto</th><th>Datos bancarios</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>${filasHtml}</tbody>
-        </table></div>
+        </table></div>` : ''}
       </div>`;
     }).join('');
-  } catch (e) {
-    lista.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
-  }
 }
 async function avisarReembolsos(slug) {
   if (!confirm('¿Mandar el correo de cancelación + reembolso a los clientes con reembolso pendiente de este evento?')) return;

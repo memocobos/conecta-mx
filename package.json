@@ -106,6 +106,7 @@
     "mide:ride-callejon-1": "node scripts/mide-ride-callejon-1.js",
     "mide:req-2027-2": "node scripts/mide-req-2027-2.js",
     "mide:ride-sin-zona-1": "node scripts/mide-ride-sin-zona-1.js",
-    "mide:res-act-oculta-1": "node scripts/mide-res-act-oculta-1.js"
+    "mide:res-act-oculta-1": "node scripts/mide-res-act-oculta-1.js",
+    "mide:paq-preventa-1": "node scripts/mide-paq-preventa-1.js"
   }
 }

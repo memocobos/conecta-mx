@@ -322,7 +322,7 @@ async function migGuardar() {
     _migPendiente = d;
     _migEl('mig-parecido-list').innerHTML = parecidos.map(v =>
       `· <b>${_esfEsc(v.nombre)}</b>${v.correo ? ' · ' + _esfEsc(v.correo) : ''}` +
-      `${v.tipo_paquete ? ' · ' + _esfEsc(String(v.tipo_paquete).toUpperCase()) : ''}` +
+      `${v.tipo_paquete ? ' · ' + _esfEsc(khPaqueteTexto(v)) : ''}` +
       `${v.zona_boleto ? ' · ' + _esfEsc(v.zona_boleto) : ''}` +
       `${v.total_contrato != null ? ' · ' + _vj3Money(v.total_contrato) : ''}`
     ).join('<br>');
@@ -421,7 +421,7 @@ function _migPintarCapturados() {
     return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:11px">
       <span style="color:var(--green)">✓</span>
       <b style="min-width:150px">${_esfEsc(v.nombre)}</b>
-      <span style="color:var(--orange);font-family:'JetBrains Mono',monospace">${_esfEsc(String(v.tipo_paquete || '').toUpperCase())}</span>
+      <span style="color:var(--orange);font-family:'JetBrains Mono',monospace">${_esfEsc(khPaqueteTexto(v))}</span>
       <span style="color:var(--ts)">${_esfEsc(v.zona_boleto || '')}</span>
       <span style="margin-left:auto;color:var(--ts);font-family:'JetBrains Mono',monospace">${dinero}</span>
     </div>`;
@@ -913,7 +913,7 @@ async function exportarViajeros(formato) {
     const s = (typeof _vj3Saldo === 'function') ? _vj3Saldo(v, porViajero[v.id]) : null;
     return {
       nombre: v.nombre || '', cel: v.celular || '', correo: v.correo || '',
-      paq: (v.tipo_paquete || '').toUpperCase(), zona: v.zona_boleto || '',
+      paq: khPaqueteTexto(v), zona: v.zona_boleto || '',
       talla: v.talla_playera || '',
       total: s ? s.total : '', abonado: s ? s.abonado : '', resta: s ? s.resta : '',
       notas: v.notas || '',
@@ -1243,7 +1243,7 @@ async function descargarListaViajeros(eventoId) {
 
     const esc = _esfEsc;
     const tablaViajeros = (lista) => `<table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto de emergencia</th><th>Parentesco</th><th>Tel. emergencia</th></tr></thead>
-      <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${esc(v.nombre||'')}</strong>${(v.boletos||1)>1?` <span style="color:#888">(${v.boletos} lugares)</span>`:''}</td><td>${esc(String(v.tipo_paquete||'—').toUpperCase())}</td><td>${esc(v.zona_boleto||'—')}</td><td>${esc(v.talla_playera||'—')}</td><td>${esc(v.emergencia_nombre||'—')}</td><td>${esc(v.emergencia_parentesco||'—')}</td><td>${esc(v.num_emergencia||'—')}</td></tr>`).join('')}</tbody></table>`;
+      <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${esc(v.nombre||'')}</strong>${(v.boletos||1)>1?` <span style="color:#888">(${v.boletos} lugares)</span>`:''}</td><td>${esc(khPaqueteTexto(v)||'—')}</td><td>${esc(v.zona_boleto||'—')}</td><td>${esc(v.talla_playera||'—')}</td><td>${esc(v.emergencia_nombre||'—')}</td><td>${esc(v.emergencia_parentesco||'—')}</td><td>${esc(v.num_emergencia||'—')}</td></tr>`).join('')}</tbody></table>`;
     const VJ = { true: '✅ Viaja con el tour', false: '🎟 Solo concierto (no viaja)', null: '— por confirmar' };
     const ASIG = { aceptado: 'Aceptó', pendiente: 'Pendiente de aceptar', declinado: 'Declinó' };
     const tablaEquipo = (eq) => eq.length ? `<table><thead><tr><th>Nombre</th><th>Papel</th><th>Asignación</th><th>¿Viaja?</th><th>Zona</th><th>Talla</th></tr></thead>

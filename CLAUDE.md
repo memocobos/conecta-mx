@@ -237,6 +237,16 @@ está caduco antes de escribirse.
   zona. `npm run mide:ride-callejon-1` (**11**, con control positivo en BASE).
   ⏳ Espera push de Memo.
 
+- ✅ **PAQ-PREVENTA-1 (27-oct-2026, en main local): KameHouse rotula PREVENTA A
+  CIEGAS a los de palnorte/nsqkmty.** Palabra de Memo: «dicen cheap pero son
+  preventa a ciegas». 🔒 **Solo la ETIQUETA cambia; el dato sigue `cheap` a
+  propósito** (precio, stock, careo y correo viajan por el camino CHEAP).
+  `khPaqueteTexto(v)` en kamehouse.js es el dueño (CHEAP + zona «Preventa a
+  ciegas», o CHEAP de un evento en `KH_PREVENTA_EVENTOS` — espejo de
+  `_esPreventaCiegas` del index: al agregar un evento allá, va aquí); lo piden
+  Capsule (lista, ficha, exportes), la Torre GZ, la bandeja y la cobranza.
+  `mide:paq-preventa-1` **8**.
+
 - ✅ **RES-ACT-OCULTA-1 (27-oct-2026, en main local): en Montaña Pai, lo
   guardado con «Actualizar → Sí, guardar» ya no reaparece.** Palabra de Memo:
   «una vez que la guarde ya no quiero verla». El «listo» se queda a la vista al

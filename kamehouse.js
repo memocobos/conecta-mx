@@ -2407,6 +2407,24 @@ function showPage(name) {
  if (typeof _khNavSync === 'function') _khNavSync(name);
 }
 
+// [PAQ-PREVENTA-1] Palabra de Memo: «los de nsqk dicen paquete cheap pero no son
+// cheap, son preventa a ciegas». En la base SIGUEN siendo `cheap` a propósito —
+// por dentro la preventa viaja por el camino CHEAP (precio, stock, careo, correo);
+// cambiar el dato tocaría todas esas reglas. Lo que cambia es la ETIQUETA que se
+// pinta: un CHEAP con la zona «Preventa a ciegas», o de un evento en preventa
+// (los acompañantes/traspasos pueden venir sin zona), se rotula PREVENTA A CIEGAS.
+// Espejo de `_esPreventaCiegas` del index: al agregar un evento allá, va aquí.
+const KH_PREVENTA_EVENTOS = ['palnorte', 'nsqkmty'];
+function khEsPreventaCiegas(v) {
+  if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
+  if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;
+  return KH_PREVENTA_EVENTOS.includes(String(v.evento_id || '').split('#')[0]);
+}
+function khPaqueteTexto(v) {
+  if (!v || !v.tipo_paquete) return '';
+  return khEsPreventaCiegas(v) ? 'PREVENTA A CIEGAS' : String(v.tipo_paquete).toUpperCase();
+}
+
 function loadPage(name) {
  if (name === 'inicio') loadInicio();
  if (name === 'requisiciones') loadRequisiciones(); // [REQ-B1] la bandeja de FASE B
@@ -4099,7 +4117,7 @@ function _cobCajaPintar() {
         <div class="cob-caja-h">
           <div>
             <div class="cob-caja-n">${_esfEsc(d.nombre || 'sin nombre')}</div>
-            <div class="cob-caja-z">${_esfEsc(d.zona_boleto || 'sin zona')}${d.tipo_paquete ? ' · ' + _esfEsc(String(d.tipo_paquete).toUpperCase()) : ''}${d.abonos ? ` · ${d.abonos} abono${d.abonos === 1 ? '' : 's'}` : ''}</div>
+            <div class="cob-caja-z">${_esfEsc(d.zona_boleto || 'sin zona')}${d.tipo_paquete ? ' · ' + _esfEsc(khPaqueteTexto(d)) : ''}${d.abonos ? ` · ${d.abonos} abono${d.abonos === 1 ? '' : 's'}` : ''}</div>
           </div>
           <div class="cob-caja-m">
             <div class="cob-caja-resta ${neg ? 'cob-caja-favor' : ''}">${_spFmtMxn(Math.abs(Number(d.resta) || 0))}</div>

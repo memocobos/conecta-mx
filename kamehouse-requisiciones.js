@@ -160,7 +160,7 @@ function _reqBdjCard(r) {
       <div class="rq-meta"><span class="rq-pill ${cls}">${_reqBdjEsc(r.estado)}</span><br>${_reqBdjEsc(r.folio)} · ${_reqBdjFecha(r.creado_en)}</div>
     </div>
     <div class="rq-tags">
-      ${tag(String(r.paquete || '').toUpperCase(), 'pk')}${tag(r.zona)}${tag(np + (np > 1 ? ' personas' : ' persona'))}${tag(r.hotel)}${tag(r.transporte)}
+      ${tag(khPaqueteTexto({ tipo_paquete: r.paquete, zona_boleto: r.zona, evento_id: r.evento_id }), 'pk')}${tag(r.zona)}${tag(np + (np > 1 ? ' personas' : ' persona'))}${tag(r.hotel)}${tag(r.transporte)}
     </div>
     <div class="rq-nums">
       <div class="rq-num"><small>Separo</small><b>${_reqBdjMxn(r.separo_sistema)}</b></div>

@@ -474,7 +474,18 @@ exports.handler = async (event) => {
       enviado_por: auth.user && auth.user.correo, KH_URL: SB_URL, KH_KEY: SB_KEY,
     });
 
+    // 9 · [CONTRATO-CLIENTE-1] El contrato de cada viajero nacido, con su link
+    // de firma por correo (uno por dirección). La lib se salta la preventa a
+    // ciegas (su contrato nace al elegir paquete) y jamás lanza: nunca deshace
+    // la aprobación — si falla, la respuesta lo DICE.
+    const { emitirContratos } = require('./_lib/contrato-cliente');
+    const contrato = await emitirContratos({
+      viajeroIds: nacidos.map((v) => v.id), creado_por: auth.user && auth.user.correo,
+      KH_URL: SB_URL, KH_KEY: SB_KEY,
+    });
+
     return j(200, headers, {
+      contrato,
       ok: true,
       viajero_id: vNuevo.id,
       viajeros: nacidos.map((v, i) => ({ id: v.id, nombre: v.nombre, correo: v.correo, contrato: contratos[i] != null && N > 1 ? contratos[i] : total_contrato, abono: N > 1 ? montos[i] : monto })),

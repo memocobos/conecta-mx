@@ -108,6 +108,7 @@
     "mide:ride-sin-zona-1": "node scripts/mide-ride-sin-zona-1.js",
     "mide:res-act-oculta-1": "node scripts/mide-res-act-oculta-1.js",
     "mide:paq-preventa-1": "node scripts/mide-paq-preventa-1.js",
-    "mide:preventa-elegir-1": "node scripts/mide-preventa-elegir-1.js"
+    "mide:preventa-elegir-1": "node scripts/mide-preventa-elegir-1.js",
+    "mide:contrato-cliente-1": "node scripts/mide-contrato-cliente-1.js"
   }
 }

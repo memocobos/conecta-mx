@@ -99,6 +99,8 @@ const ACCIONES = {
   viajero_eliminar: ROLES_ADMIN,
   viajero_editar: ROLES_EDITA_VIAJERO,
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
+  contrato_cliente_estado: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
+  contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   // [CREA-1b] Regalar un boleto es mover inventario: mismos roles que capturan
   // viajeros. Y la entrada VA AQUÍ o la acción no existe para el portero —
   // ésa fue RAD-FIX-CAMINO: tres RPC vivos y 'accion inválida' en pantalla.
@@ -1237,6 +1239,31 @@ ${entregables}
     //  · el total lo teclea quien captura (regla VJ-3: el sugerido es pista);
     //  · el dinero NO se toca: sus $300 siguen siendo abono/previo y cuentan.
     //  · PATCH con valor esperado: el 2º clic o una carrera escriben 0 filas → 409.
+    // ── [CONTRATO-CLIENTE-1] El contrato del cliente desde KameHouse ───────
+    // estado: { viajero_id → {estado, firmado_at, envios, url} } de un evento
+    // (y sus fechas slug#N). enviar: crea si falta y MANDA (o reenvía) el
+    // correo con el link; sin correo devuelve el link para WhatsApp.
+    if (accion === 'contrato_cliente_estado') {
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || evento_id.length > 80) return bad(headers, 'evento_id inválido');
+      const base = evento_id.split('#')[0];
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?or=(evento_id.eq.${encodeURIComponent(base)},evento_id.like.${encodeURIComponent(base + '#*')})&estado=neq.anulado&select=viajero_id,estado,firmado_at,firmante_nombre,firmante_rol,envios,token&limit=5000`, { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const { SITIO } = require('./_lib/contrato-cliente');
+      const mapa = {};
+      (await r.json()).forEach((c) => {
+        mapa[c.viajero_id] = { estado: c.estado, firmado_at: c.firmado_at, firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol, envios: c.envios, url: `${SITIO}/contrato-cliente.html?t=${c.token}` };
+      });
+      return ok(headers, { contratos: mapa });
+    }
+    if (accion === 'contrato_cliente_enviar') {
+      const id = String(body.viajero_id || '').trim();
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return bad(headers, 'viajero_id inválido');
+      const { emitirContratos } = require('./_lib/contrato-cliente');
+      const contrato = await emitirContratos({ viajeroIds: [id], reenviar: true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+      return ok(headers, { contrato });
+    }
+
     if (accion === 'viajero_elegir_paquete') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede cambiar el paquete' }) };
@@ -1303,7 +1330,12 @@ ${entregables}
       if (!r.ok) return upstream(headers, await r.text(), 'update');
       const filas = await r.json();
       if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien ya cambió a este viajero mientras tanto. Recarga la lista.', ya: true }) };
-      return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso });
+      // [CONTRATO-CLIENTE-1] Con paquete REAL nace su contrato (decisión B de
+      // Memo: el de la preventa a ciegas espera a este momento), con el anexo
+      // de preventa. Jamás deshace el cambio de paquete.
+      const { emitirContratos } = require('./_lib/contrato-cliente');
+      const contrato = await emitirContratos({ viajeroIds: [filas[0].id], preventa: true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+      return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso, contrato });
     }
 
     // ── [MIG-1a] viajeros_evento: ALTA DE UN VIAJERO DEL EXCEL ─────────────
@@ -1518,7 +1550,17 @@ ${entregables}
         }
       } catch (_) { /* el aviso es best-effort: jamás tumba una alta que YA se guardó */ }
 
-      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig });
+      // [CONTRATO-CLIENTE-1] Alta manual de Bulma/Milk → el contrato del
+      // cliente con su link de firma (palabra de Memo: «que Bulma o Milk metan
+      // manualmente, el contrato ya es FUNDAMENTAL»). `contrato:false` lo apaga
+      // para una captura que no debe avisar. La lib jamás lanza: el alta YA se
+      // guardó y la respuesta DICE qué pasó con el contrato.
+      let contrato = null;
+      if (creado && body.contrato !== false) {
+        const { emitirContratos } = require('./_lib/contrato-cliente');
+        contrato = await emitirContratos({ viajeroIds: [creado.id], creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+      }
+      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig, contrato });
     }
 
     // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────

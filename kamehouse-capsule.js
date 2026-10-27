@@ -235,6 +235,8 @@ function _migLeer() {
     // no tiene columna propia, y añadir una migración de base por un renglón de
     // texto de transición es caro. Va con su rótulo, no suelto.
     notas: _migNotasConDescuento(g('mig-notas'), g('mig-desc')),
+    // [CONTRATO-CLIENTE-1] La casilla (prendida y anunciada) decide si sale.
+    contrato: !!(_migEl('mig-contrato') || { checked: true }).checked,
   };
 }
 // [CAP-MIG-FIX] El descuento no se pierde: si lo hay, se antepone a la nota con
@@ -356,6 +358,12 @@ async function _migEnviar(d) {
     // ahora se descuenta dos veces y el semáforo cierra zonas que sí tienen
     // boletos. Se dice con el número exacto y el ajuste lo confirma él.
     _migAvisoDoble(r && r.aviso_doble_descuento);
+    // [CONTRATO-CLIENTE-1] Lo que pasó con su contrato, dicho.
+    { const k = (r && r.contrato) || null;
+      if (k && (k.enviados || []).length) showToast('Contrato enviado a ' + _esfEsc(k.enviados.join(', ')), 'success');
+      else if (k && (k.sin_correo || []).length) showToast('Sin correo: manda su contrato con «📜 Contrato» en la lista de viajeros', 'warning');
+      else if (k && (k.saltados || []).length) showToast('Sin contrato: ' + _esfEsc(k.saltados[0].motivo), 'warning');
+      else if (k && (k.aviso || (k.errores || []).length)) showToast('Contrato: ' + _esfEsc(k.aviso || k.errores.map((e) => e.aviso).join(' · ')), 'error'); }
     // Uno tras otro: se limpia lo de la persona y se CONSERVA paquete y zona,
     // que en una tanda del Excel se repiten. El foco vuelve al nombre.
     ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-notas']

@@ -247,6 +247,40 @@ está caduco antes de escribirse.
   Capsule (lista, ficha, exportes), la Torre GZ, la bandeja y la cobranza.
   `mide:paq-preventa-1` **8**.
 
+- 📜⏳ **CONTRATO-CLIENTE-1 (27-oct-2026, en main local): EL CONTRATO DEL
+  CLIENTE NACE Y SE FIRMA POR LINK.** Palabra de Memo: «ya es FUNDAMENTAL»; texto
+  con PUNTO FINAL el mismo día (posposición = sin reembolso, solo traspaso ·
+  cláusula del viaje se queda · menores: firma mamá, papá o tutor · anexo de
+  preventa). ⚰️ Supera la «opción B solo PN27» del 20-oct: hoy nace en TODOS
+  los eventos, por los TRES caminos — aprobar requisición · alta manual
+  (casilla `mig-contrato`, prendida y ANUNCIADA, DEFAULTS-1 b) · «🎟 Elegir
+  paquete» (con anexo de preventa). La PREVENTA A CIEGAS sigue sin contrato
+  hasta elegir paquete (la decisión B sobrevive en esa parte).
+  - **Tabla `contratos_cliente` en KH** (acta `migraciones/CONTRATO-CLIENTE-1.sql`,
+    YA CORRIDA; RLS deny-all, GRANT service_role, anon/authenticated revocados;
+    3 CHECKs mordidos). 🔒 `viajero_id` SIN FK a propósito: un contrato firmado
+    es un documento y no se va con la fila. Un solo contrato VIVO por viajero
+    (índice único parcial); la foto de lo firmado vive en `datos`.
+  - **`_lib/contrato-cliente` es el dueño** del TEXTO (la página lo pide al
+    servidor — cero copia en el HTML), de la FOTO (dinero por `saldoMigrado`,
+    «incluye» con el MISMO filtro del sitio) y de la EMISIÓN: un correo por
+    DIRECCIÓN con todos sus links, sello DESPUÉS del envío, no reenvía solo,
+    sin correo devuelve el link para WhatsApp, y 🔒 un FIRMADO no se reescribe
+    (si el total cambió después, se DICE). Jamás lanza: el contrato es
+    consecuencia del dinero, nunca su condición.
+  - **`contrato-cliente` público** (ver/firmar por token de 48 hex) +
+    `contrato-cliente.html`: rol nace vacío (titular/madre/padre/tutor),
+    nombre con apellido, casilla de aceptar; firmar es PATCH con
+    `estado=eq.pendiente` (2º clic idempotente); IP y UA quedan.
+  - **KameHouse:** chip 📜 firmado / sin firmar / sin contrato / ? en la lista
+    de viajeros + botón «📜 Contrato» (enviar/reenviar; firmado → copia el
+    link) · la bandeja y el alta manual DICEN qué pasó con el contrato.
+  - `mide:contrato-cliente-1` **34** (handlers reales, Resend contado con
+    control positivo); vecinos verdes (req-b1 52 · acomp-1 67 · acomp-2 43 ·
+    confirma-1 28 · ride-sin-zona-1 9 — cazó un `document` en la pantalla).
+  - ⏳ Push de Memo → verificación en navegador contra producción (primer
+    contrato real).
+
 - 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
   sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:
   «tengo que anunciar hoy mismo … hoy mismo tienen que elegir»; descuento de

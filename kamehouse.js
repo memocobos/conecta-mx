@@ -5972,6 +5972,48 @@ function _vjPuedeEliminar() {
   return !!(currentUser && VJ_ROLES_ELIMINAR.includes(currentUser.rol));
 }
 
+// ── [CONTRATO-CLIENTE-1] El contrato del cliente en la lista de viajeros ──
+// Espejo de `motivoSinContrato` de _lib/contrato-cliente (el servidor es la
+// autoridad: si esto se desalinea, el botón contesta con el motivo).
+function _vjCtrPuede(v) {
+  if (!v) return false;
+  const tipo = String(v.tipo_viajero || '').toLowerCase();
+  if (tipo && tipo !== 'cliente') return false;
+  if (!(Number(v.total_contrato) > 0)) return false;
+  return String(v.zona_boleto || '').trim().toLowerCase() !== 'preventa a ciegas';
+}
+function _vjCtrChip(v, mapa) {
+  if (!_vjCtrPuede(v)) return '';
+  if (mapa === null) return '<span class="vj2-tag" title="No se pudo leer el estado del contrato">📜 ?</span>';
+  const c = (mapa || {})[v.id];
+  if (!c) return '<span class="vj2-tag" style="color:var(--ts)" title="Aún no tiene contrato: apriétale «📜 Contrato»">📜 sin contrato</span>';
+  if (c.estado === 'firmado') return `<span class="vj2-tag" style="color:var(--green);border-color:var(--green)" title="Firmó ${_esfEsc(c.firmante_nombre || '')}">📜 firmado</span>`;
+  return `<span class="vj2-tag" style="color:var(--yellow);border-color:var(--yellow)" title="${c.envios ? 'Enviado ' + c.envios + ' vez/veces' : 'Creado, sin enviar'}">📜 sin firmar</span>`;
+}
+async function _vjCtrEnviar(id, nombre) {
+  const c = (window.__vjCtr || {})[id];
+  if (c && c.estado === 'firmado') {
+    try { await navigator.clipboard.writeText(c.url); } catch (_) {}
+    showToast(`${_esfEsc(nombre)} ya firmó su contrato. Copié el link para que lo puedas ver.`, 'success');
+    return;
+  }
+  if (!confirm(`¿Mandar a ${nombre} su contrato por correo para firmar?${c && c.envios ? '\n(Ya se le mandó ' + c.envios + ' vez/veces: va de nuevo.)' : ''}`)) return;
+  try {
+    const r = await khViajeros._call({ accion: 'contrato_cliente_enviar', viajero_id: id });
+    const k = (r && r.contrato) || {};
+    const link = (k.links || [])[0];
+    if (k.enviados && k.enviados.length) showToast(`Contrato enviado a ${_esfEsc(k.enviados.join(', '))}`, 'success');
+    else if (k.sin_correo && k.sin_correo.length) {
+      try { await navigator.clipboard.writeText(k.sin_correo[0].url); } catch (_) {}
+      showToast(`${_esfEsc(nombre)} no tiene correo: copié el link del contrato para mandarlo por WhatsApp.`, 'success');
+    } else if (k.saltados && k.saltados.length) showToast(`Sin contrato: ${_esfEsc(k.saltados[0].motivo)}`, 'error');
+    else if (k.aviso) showToast(_esfEsc(k.aviso), 'error');
+    else if (link) { try { await navigator.clipboard.writeText(link.url); } catch (_) {} showToast('Link del contrato copiado.', 'success'); }
+    if (k.errores && k.errores.length) showToast(_esfEsc(k.errores.map((e) => e.aviso).join(' · ')), 'error');
+    _vj2Cargar();
+  } catch (e) { showToast('No se pudo mandar el contrato: ' + _esfEsc(e.message), 'error'); }
+}
+
 async function _vj2Cargar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
@@ -6006,6 +6048,16 @@ async function _vj2Cargar() {
       (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a);
     });
   } catch (_) { porViajero = {}; }
+
+  // [CONTRATO-CLIENTE-1] El estado del contrato de cada viajero, en UNA
+  // llamada. Fail-soft: si no se puede leer, la columna DICE «?» — un
+  // «sin contrato» falso mandaría a reenviar lo que ya se firmó.
+  let _ctrMapa = null;
+  if (_vjPuedeEliminar()) {
+    try { _ctrMapa = ((await khViajeros._call({ accion: 'contrato_cliente_estado', evento_id: _ccEventoActual })) || {}).contratos || {}; }
+    catch (_) { _ctrMapa = null; }
+  }
+  window.__vjCtr = _ctrMapa || {};
 
   const n = _vj2Filas.length;
   if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
@@ -6083,7 +6135,7 @@ async function _vj2Cargar() {
       return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
         <td><b>${_esfEsc(v.nombre || '—')}</b>
-            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}
+            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}
             ${gCol ? `<div style="font-size:11px;margin-top:3px;color:${gCol}">👥 viaja con: ${compas.map(_esfEsc).join(', ')}${_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : ''}</div>` : ''}</td>
         <td>${_esfEsc(khPaqueteTexto(v) || '—')}</td>
         <td>${_esfEsc(v.zona_boleto || '—')}</td>
@@ -6112,6 +6164,9 @@ async function _vj2Cargar() {
           ${khEsPreventaCiegas(v) ? `<button class="btn btn-primary btn-sm" style="font-size:10px"
             title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
             onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
+          ${_vjCtrPuede(v) ? `<button class="btn btn-ghost btn-sm" style="font-size:10px"
+            title="Mandar (o reenviar) a ${_esfEsc(v.nombre || '')} su contrato para firmar"
+            onclick="_vjCtrEnviar('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📜 Contrato</button>` : ''}
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
             onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
@@ -6300,7 +6355,13 @@ async function _vjElegirGuardar(id) {
   try {
     const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id, tipo_paquete: paq, zona_boleto: zona, total_contrato: total });
     const avisos = [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean);
-    showToast('Paquete guardado' + (avisos.length ? ' · ' + avisos.join(' · ') : ''), avisos.length ? 'warning' : 'success');
+    // [CONTRATO-CLIENTE-1] Lo que pasó con su contrato, dicho en el mismo aviso.
+    const k = (j && j.contrato) || {};
+    if (k.enviados && k.enviados.length) avisos.push('contrato enviado a ' + k.enviados.join(', '));
+    else if (k.sin_correo && k.sin_correo.length) avisos.push('no tiene correo: manda su contrato con «📜 Contrato»');
+    else if (k.aviso) avisos.push('contrato: ' + k.aviso);
+    (k.errores || []).forEach((e) => avisos.push('contrato: ' + e.aviso));
+    showToast(_esfEsc('Paquete guardado' + (avisos.length ? ' · ' + avisos.join(' · ') : '')), avisos.length && !(k.enviados && k.enviados.length && avisos.length === 1) ? 'warning' : 'success');
     await _vj2Cargar();
   } catch (e) {
     if (err) err.textContent = (e && e.message) || 'No se pudo guardar.';

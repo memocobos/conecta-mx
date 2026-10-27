@@ -323,8 +323,14 @@ async function _reqBdjAprobar(id) {
     // [CONFIRMA-1] el correo único: confirmación + invitación al Portal adentro.
     if (pt && (pt.enviados || []).length) txt += ' · Correo de confirmación enviado (' + pt.enviados.length + ')' + ((pt.invitados || []).length ? ', con invitación al Portal' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '') + (pt.aviso ? ' · ⚠️ ' + pt.aviso : '');
     else if (pt) txt += ' · ⚠️ El correo no salió: ' + (pt.aviso || ((pt.errores && pt.errores[0] && pt.errores[0].paso) || 'sin respuesta'));
+    // [CONTRATO-CLIENTE-1] El contrato para firmar — dicho, no supuesto.
+    const ct = j.contrato;
+    if (ct && (ct.enviados || []).length) txt += ' · Contrato enviado para firmar (' + ct.enviados.length + ')';
+    if (ct && (ct.sin_correo || []).length) txt += ' · ⚠️ ' + ct.sin_correo.length + ' sin correo: manda su contrato con «📜 Contrato» en la lista';
+    if (ct && ct.aviso) txt += ' · ⚠️ Contrato: ' + ct.aviso;
+    if (ct && (ct.errores || []).length) txt += ' · ⚠️ Contrato: ' + ct.errores.map((e) => e.aviso).join(' · ');
     if (msg) { msg.textContent = txt; msg.style.color = 'var(--green)'; }
-    setTimeout(() => loadRequisiciones(), pt ? 4000 : 900);
+    setTimeout(() => loadRequisiciones(), (pt || ct) ? 5000 : 900);
   } else {
     // El 207 trae instrucción exacta (viajero creado, abono no) — se enseña TAL CUAL.
     if (msg) { msg.textContent = (j && j.error) || 'No se pudo aprobar'; msg.style.color = 'var(--red)'; }

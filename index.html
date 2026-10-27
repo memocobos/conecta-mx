@@ -5889,6 +5889,19 @@ function selPaquete(btn,pkg){
   // calcular()); esto es la simetría que faltaba, la misma forma que
   // CALLEJON-CDMX-1 pero en espejo. Va DESPUÉS del reset de placeholder/result
   // para que calcular() pinte encima y no al revés. Caso real: nsqkparty.
+  // [RIDE-CALLEJON-1, 26-oct-2026] EL MISMO CALLEJÓN, CON HOTEL. Fuera de CDMX
+  // un RIDE no pide zona: `buildHotelButtons` pre-marca «Compartida» con un clic
+  // de verdad, `selHotel` llama a calcular()… y el reset de dos renglones arriba
+  // le ESCONDÍA el total. No quedaba ningún paso que contestar y el cliente veía
+  // «elige tus opciones» con todo elegido, hasta re-tocar la habitación que ya
+  // estaba marcada. Medido por la puerta del cliente contra producción: 37
+  // eventos vivos (todo RIDE no-CDMX sin fecha múltiple). Con zona o fecha
+  // pendientes no se toca nada: ahí el siguiente clic calcula. CDMX tampoco:
+  // allá falta el transporte, que ya quedó visible.
+  if(hasHotel&&!hasZona&&!hasFecha&&selH&&!isCDMX(cur)){
+    calcular();
+    setTimeout(scrollToTotal,200);
+  }
   if(!hasHotel&&!hasZona&&!hasFecha){
     selH={n:'Sin hospedaje',e:0};
     if(isCDMX(cur)&&pkg!=='cheap'){
@@ -6305,6 +6318,18 @@ function selFecha(btn,idx){
   }
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
+  // [RIDE-CALLEJON-1] La cara multifecha del callejón (fuerzaregida, karolg,
+  // morat…): elegir la FECHA reconstruye el hotel, lo pre-marca y el reset de
+  // arriba esconde el total. Si ya no queda zona por elegir, se calcula aquí.
+  var _zonaPend=selPkg==='plus'||selPkg==='stay'||selPkg==='cheap'||(selPkg==='ride'&&cur.forceZona);
+  if(!_zonaPend&&selPkg==='ride'&&cur.noHotel){
+    selH={n:'Sin hospedaje',e:0};
+    if(isCDMX(cur)){ buildTransporteButtons(); $$('w-transport-card').style.display='block';guiaPintar(); }
+  }
+  if(!_zonaPend&&selH&&!isCDMX(cur)){
+    calcular();
+    setTimeout(scrollToTotal,200);
+  }
 }
 
 function selZona(btn,p,n){

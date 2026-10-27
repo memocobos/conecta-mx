@@ -222,6 +222,21 @@ está caduco antes de escribirse.
     anuncio.** Publicar antes del push sacaría a nsqkmty como CHEAP normal
     sin requisición — el error PN27-PAQ-1 repetido.
 
+- 🔴✅ **RIDE-CALLEJON-1 (26-oct-2026, en main local): el RIDE no-CDMX se
+  atoraba en TODO el sitio.** Cazado en la prueba de la puerta 2027: tras elegir
+  RIDE la habitación salía marcada («Compartida») pero el total y «Reservar»
+  NO aparecían hasta re-tocar la habitación ya marcada. Causa: el auto-clic de
+  `buildHotelButtons` calculaba y el reset de placeholder/result de
+  `selPaquete` (y de `selFecha` en multifecha) lo volvía a esconder — la
+  familia de CALLEJON-CDMX-1 y NSQK-RIDE-2, en el camino que quedaba.
+  **Medido por la puerta del cliente contra producción: 39 eventos (37 a la
+  venta), CERO RIDE no-CDMX se salvaba**; instrumento validado (re-clic → los
+  39 destraban). Arreglo: tras el reset, si ya no queda zona/fecha pendiente y
+  no es CDMX, se calcula. Verificado por inyección en producción: 39/39 con
+  total, 17 CDMX siguen al transporte, 139 PLUS/STAY/CHEAP siguen pidiendo
+  zona. `npm run mide:ride-callejon-1` (**11**, con control positivo en BASE).
+  ⏳ Espera push de Memo.
+
 - 🚪⏳ **REQ-2027-1 (26-oct-2026, en main local): la puerta 2027, mitad
   SERVIDOR — el index NO se tocó (orden de Memo: «no modifiques nada en index
   hasta que estemos seguros»; «este es el movimiento más difícil»).** Plan

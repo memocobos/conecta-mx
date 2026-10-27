@@ -103,7 +103,54 @@ af(/Nadie coincide/.test(lista.innerHTML), 'sin resultados lo dice, no deja la p
 run("yamchaBuscar('')");
 af(abierto('natanael') === '0' && abierto('titodoble') === '0', 'al borrar la búsqueda vuelve lo que habías minimizado');
 
+console.log('\n[E] YAMCHA-UX-2 · pendientes arriba, transferidos abajo');
+ctx.window._yamchaRows = [
+  { id: 'a', evento_slug: 'x', evento_nombre: 'X', cliente_nombre: 'T1 transferido', monto: 1, estado: 'transferido', cliente_correo: 't1@x.com' },
+  { id: 'b', evento_slug: 'x', evento_nombre: 'X', cliente_nombre: 'P1 pendiente', monto: 1, estado: 'pendiente' },
+  { id: 'c', evento_slug: 'x', evento_nombre: 'X', cliente_nombre: 'T2 transferido', monto: 1, estado: 'transferido' },
+  { id: 'd', evento_slug: 'x', evento_nombre: 'X', cliente_nombre: 'P2 pendiente', monto: 1, estado: 'pendiente' },
+];
+run('_yamchaPintar()');
+const orden = [...lista.innerHTML.matchAll(/(P\d|T\d) (pendiente|transferido)<\/div>/g)].map((m) => m[1]);
+af(JSON.stringify(orden) === JSON.stringify(['P1', 'P2', 'T1', 'T2']),
+   'orden P1,P2,T1,T2 — pendientes arriba y el orden de llegada se conserva dentro de cada bloque: ' + JSON.stringify(orden));
+af((lista.innerHTML.match(/Reenviar aviso/g) || []).length === 1,
+   '«Reenviar aviso» solo en el transferido CON correo (T1), no en T2 sin correo ni en pendientes');
+
+(async () => {
+  console.log('\n[F] el handler real: reenviar_correo no toca dinero');
+  const Module = require('module');
+  const H = path.join(RAIZ, 'netlify/functions/admin-reembolsos.js');
+  const fila = { evento_slug: 'titodoble', evento_nombre: 'Tito', cliente_nombre: 'Ana', cliente_correo: 'ana@x.com', monto: 300, estado: 'transferido', datos_bancarios: 'BBVA 012180015059151298' };
+  const llamadas = [];
+  global.fetch = async (url, init = {}) => {
+    llamadas.push({ url: String(url), m: init.method || 'GET' });
+    if (/api\.resend\.com/.test(url)) return { ok: true, json: async () => ({ id: 'x' }), text: async () => '' };
+    return { ok: true, json: async () => [fila], text: async () => '' };
+  };
+  Object.assign(process.env, { SUPABASE_URL_KAMEHOUSE: 'https://kh', SUPABASE_SERVICE_KEY_KAMEHOUSE: 'k', PORTAL_SUPABASE_URL: 'https://po', PORTAL_SUPABASE_SERVICE_KEY: 'k', RESEND_KEY: 'r' });
+  const va = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin'));
+  va.verifyAdminAuthLive = async () => ({ valid: true });
+  va.corsCheck = () => 'https://conectareynosa.mx';
+  delete require.cache[H];
+  const { handler } = require(H);
+  const ev = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify(body) });
+  const ID = '11111111-1111-1111-1111-111111111111';
+  let res = await handler(ev({ accion: 'reenviar_correo', id: ID }));
+  af(res.statusCode === 200, 'transferido con correo → 200');
+  af(llamadas.filter((l) => /resend/.test(l.url)).length === 1, 'sale exactamente UN correo');
+  af(!llamadas.some((l) => l.m !== 'GET' && !/resend/.test(l.url)), '🔒 cero escrituras a la base (ni PATCH ni gasto) — solo el correo');
+  llamadas.length = 0; fila.estado = 'pendiente';
+  res = await handler(ev({ accion: 'reenviar_correo', id: ID }));
+  af(res.statusCode === 409 && !llamadas.some((l) => /resend/.test(l.url)), '🔒 un PENDIENTE se rechaza (409) y no sale correo: no se le dice «ya te transferimos» a quien no ha recibido nada');
+  fila.estado = 'transferido'; fila.cliente_correo = null; llamadas.length = 0;
+  res = await handler(ev({ accion: 'reenviar_correo', id: ID }));
+  af(res.statusCode === 400 && !llamadas.some((l) => /resend/.test(l.url)), 'sin correo → 400 y no sale nada');
+  fin();
+})();
+function fin() {
 console.log('\n══ RESULTADO ══');
 if (V === 0) { console.log('⚠️ NADA MEDIDO · esto NO es un verde'); process.exit(1); }
 console.log((R ? '🔴 ROJO' : '✅ VERDE') + ' · ' + V + ' en verde · ' + R + ' en rojo');
 process.exit(R ? 1 : 0);
+}

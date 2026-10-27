@@ -124,14 +124,20 @@ function _yamchaPintar() {
       const resumen = todoListo
         ? `<span style="color:#3DDC84;font-weight:700">✓ Todo reembolsado</span> · ${g.rows.length} cliente(s)`
         : `<span style="color:var(--orange);font-weight:700">${pend.length} pendiente(s) · ${formatMXN(pendMonto)}</span> · ${g.rows.length - pend.length} de ${g.rows.length} transferidos`;
-      const filasHtml = g.vis.map(rb => {
+      // [YAMCHA-UX-2] Palabra de Memo: pendientes ARRIBA, transferidos ABAJO,
+      // siempre. Orden ESTABLE: dentro de cada bloque se conserva el orden del
+      // backend (creado_en.desc), así nadie brinca de lugar al marcar a otro.
+      const peso = (r) => (r.estado === 'pendiente' ? 0 : 1);
+      const ordenadas = g.vis.map((r, i) => [r, i]).sort((a, b) => (peso(a[0]) - peso(b[0])) || (a[1] - b[1])).map((x) => x[0]);
+      const filasHtml = ordenadas.map(rb => {
         const esPend = rb.estado === 'pendiente';
         const badge = esPend
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
           : '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
         const accionEstado = esPend
           ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button>`
-          : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`;
+          : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`
+            + (rb.cliente_correo ? ` <button class="btn btn-ghost btn-sm" style="font-size:10px" title="Manda otra vez «Tu reembolso fue enviado». No toca el dinero." onclick="reenviarCorreoReembolso('${_esfEsc(rb.id)}')"><svg class="ic"><use href="#ic-correo"/></svg> Reenviar aviso</button>` : '');
         return `<tr>
           <td><div style="font-weight:600">${_esfEsc(rb.cliente_nombre || '—')}</div><div style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</div></td>
           <td style="font-weight:700">${formatMXN(rb.monto)}</td>
@@ -159,6 +165,21 @@ function _yamchaPintar() {
         </table></div>` : ''}
       </div>`;
     }).join('');
+}
+// [YAMCHA-UX-2] Reenviar «Tu reembolso fue enviado» a un transferido — solo
+// correo, el dinero no se toca (lo garantiza el servidor).
+async function reenviarCorreoReembolso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  if (!rb) { alert('No se encontró el reembolso. Recarga e intenta de nuevo.'); return; }
+  if (!confirm(`¿Mandar «Tu reembolso fue enviado» a ${rb.cliente_nombre || 'este cliente'} (${rb.cliente_correo}) por ${formatMXN(rb.monto)}?`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'reenviar_correo', id }),
+    });
+    const d = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) { showToast(d.error || 'No se pudo enviar', 'error'); return; }
+    showToast(`Aviso enviado a ${_esfEsc(d.para || rb.cliente_correo)} ✓`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
 async function avisarReembolsos(slug) {
   if (!confirm('¿Mandar el correo de cancelación + reembolso a los clientes con reembolso pendiente de este evento?')) return;

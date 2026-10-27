@@ -37,6 +37,7 @@ const ACCIONES = {
   guardar_datos: ROLES_PALACIO,
   marcar_transferido: ROLES_PALACIO,
   desmarcar: ROLES_PALACIO,
+  reenviar_correo: ROLES_PALACIO,
 };
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -184,6 +185,29 @@ exports.handler = async (event) => {
       // solo se reporta (correo_enviado:false), nunca revierte.
       const correo_enviado = await enviarCorreoTransferido(env, rb).catch(() => false);
       return ok(headers, { correo_enviado });
+    }
+
+    // ── reenviar_correo [YAMCHA-UX-2] ─────────────────────────────────────
+    // Manda OTRA VEZ «Tu reembolso fue enviado» a un reembolso YA transferido,
+    // SIN tocar dinero: ni gasto, ni estado, ni cuenta. Nació porque 5 de Tito
+    // se marcaron cuando su fila aún no tenía correo (se lo pusimos después,
+    // del Excel) y la única otra salida era desmarcar/re-marcar — que borra y
+    // re-crea el gasto. Un pendiente se rechaza: decirle «ya te transferimos»
+    // a quien no ha recibido nada sería mentirle.
+    if (accion === 'reenviar_correo') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const rGet = await fetch(`${base}?id=eq.${id}&select=evento_slug,evento_nombre,cliente_nombre,cliente_correo,monto,estado,datos_bancarios&limit=1`, { headers: sbHeaders });
+      if (!rGet.ok) return upstream(headers, await rGet.text(), 'consulta');
+      const rows = await rGet.json();
+      const rb = Array.isArray(rows) ? rows[0] : null;
+      if (!rb) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Reembolso no encontrado' }) };
+      if (rb.estado !== 'transferido') return { statusCode: 409, headers, body: JSON.stringify({ error: 'Solo se avisa de un reembolso YA transferido. Márcalo primero.' }) };
+      if (!rb.cliente_correo || !String(rb.cliente_correo).includes('@')) return bad(headers, 'Este reembolso no tiene correo. Avísale por WhatsApp.');
+      if (!env.RESEND_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Falta la llave de Resend en Netlify' }) };
+      const correo_enviado = await enviarCorreoTransferido(env, rb).catch(() => false);
+      if (!correo_enviado) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Resend no aceptó el correo; intenta de nuevo' }) };
+      return ok(headers, { correo_enviado: true, para: String(rb.cliente_correo).trim().toLowerCase() });
     }
 
     // ── desmarcar (vuelve a pendiente, borra la salida de gastos) ─────────

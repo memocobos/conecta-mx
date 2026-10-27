@@ -110,6 +110,7 @@
     "mide:paq-preventa-1": "node scripts/mide-paq-preventa-1.js",
     "mide:preventa-elegir-1": "node scripts/mide-preventa-elegir-1.js",
     "mide:contrato-cliente-1": "node scripts/mide-contrato-cliente-1.js",
-    "mide:contrato-cliente-2": "node scripts/mide-contrato-cliente-2.js"
+    "mide:contrato-cliente-2": "node scripts/mide-contrato-cliente-2.js",
+    "mide:preventa-portal-1": "node scripts/mide-preventa-portal-1.js"
   }
 }

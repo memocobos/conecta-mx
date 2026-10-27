@@ -330,6 +330,36 @@ está caduco antes de escribirse.
       kamehouse.js (y destapar la casilla `mig-contrato`). Antes: prueba en
       producción con un viajero de Memo (fecha → INE → firmar → verificar en KH).
 
+- 🎟⏳ **PREVENTA-PORTAL-1 (27-oct-2026, en main local): los de la preventa
+  ELIGEN su paquete en el Portal y cae a la bandeja.** Palabra de Memo: «que
+  ahí mismo en un wizard puedan solicitar su zona y llegue la requisición a
+  KameHouse y así acepten y se haga todo»; opciones firmadas: **wizard en el
+  Portal** · **solo eligen** (sus $300 ya cuentan como pago).
+  - **Portal:** la tarjeta de quien está en «Preventa a ciegas» trae «🎟 ¡Ya hay
+    costos! Elige tu paquete» → paquete (botones) → zona con precio → habitación
+    → «Enviar mi elección»; con una pendiente dice «en revisión». Delegación
+    `data-mig-act` (paq-abrir/paq-pq/paq-enviar).
+  - **Servidor:** `portal-viajero` gana `opciones_paquete` y `pedir_paquete`.
+    🔒 Las opciones y el precio salen del MOTOR (`_lib/opciones-paquete` →
+    `paqueteVendibleEnSitio` + `_zonaLista`/`_hotelLista` + `_calcularPrecio`,
+    exportadas de precio-zona sin copia): zona agotada/próx/sin precio no se
+    ofrece, el precio del cuerpo se IGNORA. Quien ya no está en preventa → 409;
+    ajeno → 404; una elección pendiente a la vez (409 + índice único).
+  - **Base** (acta `migraciones/PREVENTA-PORTAL-1.sql`, YA CORRIDA, candados
+    MORDIDOS): `cambios_viajero` gana tipo `paquete` + `paquete_pedido`/
+    `zona_pedida`/`hotel_pedido`/`precio_lista`. 🔴 El primer CHECK
+    (`paquete_pedido in (...)`) NO mordía: NULL en un IN da NULL y el CHECK
+    pasa — cazado con un insert de prueba; corregido con `is not null`.
+  - **Bandeja:** la solicitud sale arriba con «✓ Aplicar paquete» → total
+    prellenado con el precio de lista (el descuento de la preventa se resta ahí)
+    → llama al MISMO dueño `viajero_elegir_paquete` (puerta de zonas,
+    inventario, contrato) y DESPUÉS cierra la solicitud; si ya estaba aplicado
+    la cierra igual. La habitación pedida se avisa para asignarla en Rooming.
+  - `mide:preventa-portal-1` **24** (handler real + catálogo REAL del árbol con
+    control de zona agotada); vecinos verdes.
+  - ⏳ Push de Memo → probar con un viajero suyo → correo a los 5 (texto con su
+    visto). El contrato al aplicar sale solo con CONTRATO_CLIENTE_VIVO encendido.
+
 - 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
   sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:
   «tengo que anunciar hoy mismo … hoy mismo tienen que elegir»; descuento de

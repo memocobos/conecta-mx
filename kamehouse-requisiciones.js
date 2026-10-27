@@ -83,11 +83,30 @@ async function loadCambiosPortal() {
   if (!j || !j.ok) { box.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:10px">No se pudieron leer las solicitudes de cambio del Portal: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`; return; }
   const rows = j.cambios || [];
   if (!rows.length) { box.innerHTML = ''; return; }
-  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro' };
+  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro', paquete: '🎟 Elige su paquete (preventa)' };
+  _reqCambiosRows = rows;
   box.innerHTML = `<div class="rq-section">Cambios pedidos desde el Portal <span class="rq-pill pend">${rows.length}</span></div>`
     + rows.map((c) => {
       const v = c.viajero || {};
       const wa = String(v.celular || '').replace(/\D/g, '');
+      // [PREVENTA-PORTAL-1] La elección de paquete de la preventa se APLICA desde
+      // aquí: «Aplicar» llama a viajero_elegir_paquete (el mismo dueño que el
+      // botón 🎟 de la lista: puerta de zonas, inventario, contrato) y cierra.
+      if (c.tipo === 'paquete') {
+        return `<div class="rq-cambio" id="rq-cambio-${c.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
+          <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
+          <span class="rq-tag">${_reqBdjEsc(TIPO.paquete)}</span>
+        </div>
+        <div class="rq-ev">${_reqBdjEsc(c.evento_id)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        <div style="font-size:14px;margin:6px 0"><b>${_reqBdjEsc(String(c.paquete_pedido || '').toUpperCase())}</b>${c.zona_pedida ? ' · ' + _reqBdjEsc(c.zona_pedida) : ''}${c.hotel_pedido ? ' · ' + _reqBdjEsc(c.hotel_pedido) : ''}${c.precio_lista != null ? ' · lista $' + Number(c.precio_lista).toLocaleString('es-MX') : ''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+          <button class="rq-btn pri" onclick="_reqPaqAbrir('${c.id}')">✓ Aplicar paquete</button>
+          <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
+        </div>
+        <div id="rq-cambio-form-${c.id}"></div></div>`;
+      }
       return `<div class="rq-cambio" id="rq-cambio-${c.id}">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
           <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
@@ -102,6 +121,49 @@ async function loadCambiosPortal() {
         </div>
         <div id="rq-cambio-form-${c.id}"></div></div>`;
     }).join('');
+}
+// [PREVENTA-PORTAL-1] Aplicar la elección: el TOTAL lo confirma quien aplica
+// (nace con el precio de lista; si va el descuento de la preventa, se resta aquí).
+let _reqCambiosRows = [];
+function _reqPaqAbrir(id) {
+  const box = document.getElementById('rq-cambio-form-' + id);
+  const c = _reqCambiosRows.find((x) => x.id === id);
+  if (!box || !c) return;
+  if (box.dataset.abierto === 'paq') { box.innerHTML = ''; box.dataset.abierto = ''; return; }
+  box.dataset.abierto = 'paq';
+  box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
+    <label class="rq-field">Costo TOTAL del paquete para esta persona (sus $300 de preventa ya están abonados aparte) *
+      <input type="number" min="1" step="1" id="rq-paq-tot-${id}" value="${c.precio_lista != null ? Number(c.precio_lista) : ''}"></label>
+    <div style="font-size:11px;opacity:.75;margin-top:4px">Nace con el precio de lista. Si le toca el descuento de la preventa, réstalo aquí.${c.hotel_pedido ? ' Habitación pedida: <b>' + _reqBdjEsc(c.hotel_pedido) + '</b> — asígnala en Rooming.' : ''} Al aplicar nace su contrato.</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="rq-btn pri" id="rq-paq-go-${id}" onclick="_reqPaqAplicar('${id}')">Aplicar y cerrar</button>
+      <button class="rq-btn quiet" onclick="_reqPaqAbrir('${id}')">Cancelar</button>
+    </div><div class="rq-msg" id="rq-cambio-msg-${id}"></div></div>`;
+}
+async function _reqPaqAplicar(id) {
+  const c = _reqCambiosRows.find((x) => x.id === id); if (!c) return;
+  const msg = document.getElementById('rq-cambio-msg-' + id);
+  const say = (t, ok) => { if (msg) { msg.textContent = t; msg.style.color = ok ? 'var(--green, #88ea4e)' : 'var(--red)'; } };
+  const total = Number((document.getElementById('rq-paq-tot-' + id) || {}).value);
+  if (!(total > 0)) return say('Escribe el costo total.');
+  const btn = document.getElementById('rq-paq-go-' + id); if (btn) btn.disabled = true;
+  say('Aplicando…', true);
+  let aviso = [];
+  try {
+    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id: c.viajero_id, tipo_paquete: c.paquete_pedido, zona_boleto: c.zona_pedida || '', total_contrato: total });
+    [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean).forEach((a) => aviso.push(a));
+    const k = (j && j.contrato) || {};
+    if (k.enviados && k.enviados.length) aviso.push('contrato enviado a ' + k.enviados.join(', '));
+    else if (k.aviso) aviso.push('contrato: ' + k.aviso);
+  } catch (e) {
+    // «ya no está en preventa» = alguien lo aplicó antes (p. ej. desde la lista):
+    // la solicitud se puede cerrar igual. Cualquier otro error se DICE y no se cierra.
+    if (!/ya no est[aá] en preventa/i.test(String(e && e.message))) { say((e && e.message) || 'No se pudo aplicar'); if (btn) btn.disabled = false; return; }
+    aviso.push('ya tenía paquete aplicado');
+  }
+  const j2 = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado: 'atendida', respuesta: `Paquete aplicado: ${String(c.paquete_pedido).toUpperCase()}${c.zona_pedida ? ' · ' + c.zona_pedida : ''} · total $${total}` }).catch((e) => ({ error: e.message }));
+  if (j2 && j2.ok) { showToast(_reqBdjEsc('Paquete aplicado' + (aviso.length ? ' · ' + aviso.join(' · ') : '')), aviso.length ? 'warning' : 'success'); loadCambiosPortal(); }
+  else say('El paquete SÍ se aplicó, pero no se pudo cerrar la solicitud: ' + ((j2 && j2.error) || 'sin respuesta') + '. Ciérrala con «No procede»/recarga.');
 }
 // Cerrar un cambio: la nota/motivo se pide EN LÍNEA (antes era prompt()).
 function _reqCambioCerrar(id, estado) {

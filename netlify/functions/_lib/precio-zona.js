@@ -355,4 +355,6 @@ async function resolverPrecioVenta(opts) {
   });
 }
 
-module.exports = { SEPARO_CHEAP_DEFAULT, STAY_DESCUENTO, resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES };
+// [PREVENTA-PORTAL-1] _zonaLista y _hotelLista se exponen para que el wizard
+// del Portal ofrezca EXACTAMENTE las listas que esta lib cotiza (sin copia).
+module.exports = { SEPARO_CHEAP_DEFAULT, STAY_DESCUENTO, resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES, _zonaLista, _hotelLista };

@@ -59,7 +59,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (_) { return json(400, headers, { ok: false, error: 'Cuerpo inválido' }); }
   const accion = String(body.accion || '');
-  if (!['editar', 'solicitar_cambio', 'repartir'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
+  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
   const viajero_id = String(body.viajero_id || '');
   if (!UUID_RE.test(viajero_id)) return json(400, headers, { ok: false, error: 'Viajero inválido' });
 
@@ -77,7 +77,7 @@ exports.handler = async (event) => {
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   let v;
   try {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular&limit=1`, { headers: hKH });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto&limit=1`, { headers: hKH });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu viaje' });
     v = (await r.json())[0];
   } catch (e) { return json(502, headers, { ok: false, error: 'No pude leer tu viaje' }); }
@@ -85,6 +85,46 @@ exports.handler = async (event) => {
   // id existe si no es suyo.
   if (!v || String(v.correo == null ? '' : v.correo).trim().toLowerCase() !== correo) {
     return json(404, headers, { ok: false, error: 'No encontramos ese viajero en tu cuenta' });
+  }
+
+  // ── 3p · [PREVENTA-PORTAL-1] ELEGIR MI PAQUETE (los de la preventa) ──────
+  // Palabra de Memo (27-oct): «que ahí mismo en un wizard puedan solicitar su
+  // zona y llegue a KameHouse y así acepten». NO cambia nada: nace una fila
+  // `cambios_viajero` tipo 'paquete' con la elección ESTRUCTURADA y su precio de
+  // lista; Bulma/Milk la aplican desde la bandeja (ahí nace el contrato).
+  // Opción firmada: «solo eligen» — sus $300 ya cuentan como pago.
+  if (accion === 'opciones_paquete' || accion === 'pedir_paquete') {
+    const op = require('./_lib/opciones-paquete');
+    if (!op.enPreventa(v)) return json(409, headers, { ok: false, error: 'Tu lugar ya tiene paquete. Si quieres cambiarlo, usa «Pedir un cambio».', ya: true });
+    // ¿Ya eligió? Una elección pendiente a la vez (también lo cuida un índice único).
+    let pend = null;
+    try {
+      const p = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.paquete&estado=eq.pendiente&select=id,paquete_pedido,zona_pedida,hotel_pedido,precio_lista,creado_en&limit=1`, { headers: hKH });
+      if (!p.ok) return json(502, headers, { ok: false, error: 'No pude revisar tu elección' });
+      pend = (await p.json())[0] || null;
+    } catch (_) { return json(502, headers, { ok: false, error: 'No pude revisar tu elección' }); }
+
+    if (accion === 'opciones_paquete') {
+      if (pend) return json(200, headers, { ok: true, pendiente: pend });
+      const o = await op.opcionesPaquete(v.evento_id);
+      if (!o.ok) return json(200, headers, { ok: false, error: o.motivo });
+      return json(200, headers, { ok: true, evento: o.evento, paquetes: o.paquetes });
+    }
+
+    if (pend) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.', pendiente: pend });
+    const e = await op.validarEleccion(v.evento_id, { paquete: body.paquete, zona: body.zona, hotel: body.hotel });
+    if (!e.ok) return json(400, headers, { ok: false, error: e.motivo });
+    const detalle = `Elige ${e.nombre}${e.zona ? ' · zona ' + e.zona : ''}${e.hotel ? ' · ' + e.hotel : ''} · precio de lista $${e.precio.toLocaleString('es-MX')} por persona (sus $300 de preventa ya están abonados)`;
+    const fila = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'paquete', detalle,
+      paquete_pedido: e.paquete, zona_pedida: e.zona, hotel_pedido: e.hotel, precio_lista: e.precio };
+    const r = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
+      method: 'POST',
+      headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(fila),
+    });
+    if (r.status === 409) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.' });
+    if (!r.ok) return json(502, headers, { ok: false, error: 'No pude enviar tu elección. Inténtalo otra vez.' });
+    return json(200, headers, { ok: true, solicitud: 'pendiente', eleccion: { paquete: e.paquete, zona: e.zona, hotel: e.hotel, precio: e.precio } });
   }
 
   // ── 3r · [ACOMP-2] REPARTIR LUGARES A LOS ACOMPAÑANTES ─────────────────

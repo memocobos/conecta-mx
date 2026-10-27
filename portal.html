@@ -3100,7 +3100,7 @@ async function renderPlanMigrado(){
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migGrupoHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
+        + cuenta + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3225,6 +3225,103 @@ function _migDatosHtml(t){
     + '</div>'
     + '</div>';
 }
+// ── [PREVENTA-PORTAL-1] LOS DE LA PREVENTA ELIGEN SU PAQUETE AQUÍ ─────────
+// Palabra de Memo (27-oct): wizard en el Portal → cae a la bandeja de KameHouse
+// → Bulma/Milk aplican → nace el contrato. «Solo eligen»: sus $300 ya cuentan.
+// Las opciones y los precios los manda el SERVIDOR (el mismo motor que cotiza
+// el sitio): aquí no se calcula ni se inventa una lista.
+function _migPaqHtml(t){
+  if (!t || !t.viajero_id || t.zona !== 'Preventa a ciegas') return '';
+  const id = escapeHtml(t.viajero_id);
+  return '<div data-paq-box style="margin-top:12px;padding:12px;border-radius:10px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.45)">'
+    + '<div style="font-size:14px;font-weight:800;margin-bottom:4px">🎟 ¡Ya hay costos! Elige tu paquete</div>'
+    + '<div style="font-size:12px;opacity:.85;margin-bottom:8px">Tus <b>$300 de la preventa ya cuentan como pago</b>. Elige paquete, zona y habitación; el equipo revisa tu elección y te confirma por WhatsApp. Después firmas tu contrato aquí mismo.</div>'
+    + '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="paq-abrir" data-mig-id="' + id + '">Elegir mi paquete</button>'
+    + '<div data-mig-panel="paq" style="display:none;margin-top:10px"><div data-paq-body style="font-size:12px;opacity:.8">Cargando opciones…</div><div data-mig-msg style="font-size:12px;margin-top:6px"></div></div>'
+    + '</div>';
+}
+const _paqOps = {}; // viajero_id → { paquetes, elegido }
+const _paqMoney = (n) => '$' + Number(n || 0).toLocaleString('es-MX');
+async function _paqAbrir(id){
+  const c = _migCard(id); if (!c) return;
+  const p = c.querySelector('[data-mig-panel="paq"]'); if (!p) return;
+  const abrir = p.style.display === 'none';
+  p.style.display = abrir ? '' : 'none';
+  if (!abrir || _paqOps[id]) return;
+  const body = p.querySelector('[data-paq-body]');
+  const j = await _migPost({ accion: 'opciones_paquete', viajero_id: id }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (j && j.ok && j.pendiente) { body.innerHTML = _paqPendHtml(j.pendiente); return; }
+  if (!j || !j.ok) { body.textContent = (j && j.error) || 'No pudimos cargar las opciones'; return; }
+  _paqOps[id] = { paquetes: j.paquetes, elegido: null };
+  _paqPintar(id);
+}
+function _paqPendHtml(pe){
+  return '<div style="padding:10px;border-radius:8px;background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.4);font-size:13px;opacity:1">✅ <b>Tu elección está en revisión</b><br>'
+    + escapeHtml(String(pe.paquete_pedido || '').toUpperCase()) + (pe.zona_pedida ? ' · ' + escapeHtml(pe.zona_pedida) : '') + (pe.hotel_pedido ? ' · ' + escapeHtml(pe.hotel_pedido) : '')
+    + (pe.precio_lista ? ' · ' + _paqMoney(pe.precio_lista) + ' por persona' : '')
+    + '<br><span style="font-size:12px;opacity:.8">El equipo te escribe por WhatsApp para confirmarlo.</span></div>';
+}
+function _paqPintar(id){
+  const c = _migCard(id); if (!c) return;
+  const body = c.querySelector('[data-mig-panel="paq"] [data-paq-body]');
+  const o = _paqOps[id]; if (!o) return;
+  const inp = 'width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:13px';
+  const lbl = 'display:block;font-size:11px;opacity:.75;margin:0 0 3px';
+  let h = '<label style="' + lbl + '">1 · Paquete</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+  o.paquetes.forEach((pq) => {
+    const on = o.elegido === pq.paquete;
+    h += '<button type="button" data-mig-act="paq-pq" data-mig-id="' + escapeHtml(id) + '" data-paq="' + escapeHtml(pq.paquete) + '" style="padding:8px 12px;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:1px solid ' + (on ? '#e8ff4c' : 'rgba(255,255,255,.25)') + ';background:' + (on ? '#e8ff4c' : 'transparent') + ';color:' + (on ? '#000' : 'inherit') + '">' + escapeHtml(pq.nombre) + '</button>';
+  });
+  h += '</div>';
+  const pq = o.paquetes.find((x) => x.paquete === o.elegido);
+  if (pq) {
+    if (pq.zonas) {
+      h += '<label style="' + lbl + '">2 · Zona (precio por persona)</label><select data-paq-sel="zona" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '"><option value="">— elige tu zona —</option>'
+        + pq.zonas.map((z) => '<option value="' + escapeHtml(z.zona) + '">' + escapeHtml(z.zona) + ' · ' + _paqMoney(z.precio) + '</option>').join('') + '</select>';
+    }
+    if (pq.habitaciones.length) {
+      h += '<label style="' + lbl + '">' + (pq.zonas ? '3' : '2') + ' · Habitación</label><select data-paq-sel="hotel" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '">'
+        + pq.habitaciones.map((x, i) => '<option value="' + escapeHtml(x.nombre) + '"' + (i === 0 ? ' selected' : '') + '>' + escapeHtml(x.nombre) + (x.extra ? ' (+' + _paqMoney(x.extra) + ')' : '') + '</option>').join('') + '</select>'
+        + '<div style="font-size:11px;opacity:.7;margin:-4px 0 8px">¿Van en pareja o en trío y quieren cuarto doble o triple? Elige Compartida y pídelo después en «Pedir un cambio».</div>';
+    }
+    h += '<div data-paq-precio style="font-size:13px;margin:4px 0 10px"></div>'
+      + '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="paq-enviar" data-mig-id="' + escapeHtml(id) + '">Enviar mi elección</button>';
+  }
+  body.style.opacity = '1';
+  body.innerHTML = h;
+  _paqPrecio(id);
+}
+function _paqPrecio(id){
+  const c = _migCard(id); if (!c) return;
+  const o = _paqOps[id]; const pq = o && o.paquetes.find((x) => x.paquete === o.elegido);
+  const out = c.querySelector('[data-paq-precio]'); if (!out || !pq) return;
+  const zSel = c.querySelector('[data-paq-sel="zona"]'), hSel = c.querySelector('[data-paq-sel="hotel"]');
+  let base = pq.zonas ? ((pq.zonas.find((z) => z.zona === (zSel && zSel.value)) || {}).precio) : pq.precio;
+  if (base == null) { out.textContent = ''; return; }
+  const extra = hSel ? ((pq.habitaciones.find((x) => x.nombre === hSel.value) || {}).extra || 0) : 0;
+  out.innerHTML = 'Precio de lista: <b>' + _paqMoney(base + extra) + '</b> por persona · tus $300 ya están abonados';
+}
+async function _paqEnviar(id){
+  const c = _migCard(id); if (!c) return;
+  const p = c.querySelector('[data-mig-panel="paq"]');
+  const o = _paqOps[id]; if (!o || !o.elegido) return _migMsg(p, 'Elige un paquete');
+  const pq = o.paquetes.find((x) => x.paquete === o.elegido);
+  const zona = (c.querySelector('[data-paq-sel="zona"]') || {}).value || '';
+  const hotel = (c.querySelector('[data-paq-sel="hotel"]') || {}).value || '';
+  if (pq.zonas && !zona) return _migMsg(p, 'Elige tu zona');
+  const b = p.querySelector('[data-mig-act="paq-enviar"]'); if (b) b.disabled = true;
+  _migMsg(p, 'Enviando…', true);
+  const j = await _migPost({ accion: 'pedir_paquete', viajero_id: id, paquete: o.elegido, zona, hotel }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (j && j.ok) {
+    p.querySelector('[data-paq-body]').innerHTML = _paqPendHtml({ paquete_pedido: j.eleccion.paquete, zona_pedida: j.eleccion.zona, hotel_pedido: j.eleccion.hotel, precio_lista: j.eleccion.precio });
+    _migMsg(p, '✓ ¡Listo! Recibimos tu elección.', true);
+  } else { _migMsg(p, (j && j.error) || 'No se pudo enviar'); if (b) b.disabled = false; }
+}
+document.addEventListener('change', (ev) => {
+  const s = ev.target && ev.target.closest && ev.target.closest('[data-paq-sel]');
+  if (s) _paqPrecio(s.getAttribute('data-mig-id'));
+});
+
 // ── [CONTRATO-CLIENTE-2] EL CONTRATO SE FIRMA AQUÍ ─────────────────────────
 // Palabra de Memo: nadie elige quién firma. La FECHA DE NACIMIENTO del viajero
 // (se registra una vez y ya no se cambia aquí) decide: 18+ firma él mismo con
@@ -3347,6 +3444,9 @@ document.addEventListener('click', (ev) => {
   else if (act === 'ctr-abrir') _migAbrir(id, 'ctr');
   else if (act === 'ctr-fecha') _ctrFecha(id);
   else if (act === 'ctr-firmar') _ctrFirmar(id);
+  else if (act === 'paq-abrir') _paqAbrir(id);
+  else if (act === 'paq-pq') { if (_paqOps[id]) { _paqOps[id].elegido = b.getAttribute('data-paq'); _paqPintar(id); } }
+  else if (act === 'paq-enviar') _paqEnviar(id);
 });
 function _migCard(id){ return document.querySelector('[data-mig-viajero="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }
 function _migAbrir(id, cual){

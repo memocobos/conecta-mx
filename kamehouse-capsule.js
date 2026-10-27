@@ -183,6 +183,9 @@ function migZonas() {
   const sel = _migEl('mig-zona');
   if (!sel) return;
   if (!paq) { sel.innerHTML = '<option value="">— elige paquete primero —</option>'; _migCuenta(); return; }
+  // [RIDE-SIN-ZONA-1] RIDE = transporte + hotel, SIN boleto: no hay zona que
+  // elegir (y exigirla obligaba a inventar una). Se dice en el propio select.
+  if (paq === 'ride') { sel.innerHTML = '<option value="">— RIDE no lleva boleto —</option>'; _migCuenta(); return; }
   const fuente = (paq === 'cheap')
     ? ((_migEV && _migEV.cheapZonas) || [])
     : ((_migEV && _migEV.zonas) || []);
@@ -304,7 +307,8 @@ async function migGuardar() {
   if (!d.evento_id) return _migError('No hay evento abierto.');
   if (!d.nombre) return _migError('El nombre es obligatorio.');
   if (!d.tipo_paquete) return _migError('Elige el paquete.');
-  if (!d.zona_boleto) return _migError('Elige la zona del boleto.');
+  // [RIDE-SIN-ZONA-1] El RIDE no lleva boleto: la zona solo se exige a los demás.
+  if (!d.zona_boleto && d.tipo_paquete !== 'ride') return _migError('Elige la zona del boleto.');
   if (d.total_contrato === '') return _migError('Falta el costo del paquete.');
 
   // El deduplicado que Memo pidió proponer. NO cuelga del correo: muchos del

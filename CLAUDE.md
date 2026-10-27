@@ -237,6 +237,15 @@ está caduco antes de escribirse.
   zona. `npm run mide:ride-callejon-1` (**11**, con control positivo en BASE).
   ⏳ Espera push de Memo.
 
+- ✅ **RIDE-SIN-ZONA-1 (27-oct-2026, en main local): el alta manual de un
+  viajero RIDE ya no exige zona.** Reporte de Milk: «en paquete RIDE no lleva
+  boleto». La pantalla (`migGuardar`/`migZonas` de Capsule) Y el servidor
+  (`viajero_migrar`) exigían «la zona del boleto» a todo paquete; el RIDE no
+  consume boleto (`NO_CONSUMEN_BOLETO`) y la requisición aprobada ya lo hacía
+  bien. Hoy RIDE sin zona nace con `zona_boleto` NULL; si alguien SÍ escribe
+  una zona en un RIDE, pasa por la puerta como siempre. PLUS/STAY/CHEAP siguen
+  exigiéndola. `mide:ride-sin-zona-1` **9** (BASE da 3 rojos); vecinos verdes.
+
 - 🚪⏳ **REQ-2027-2 (27-oct-2026, en main local): la puerta 2027 ABIERTA en
   MONTERREY, por nombre.** Palabra de Memo: «haremos solo los de Monterrey» →
   «ábrelos». `REQUISICION_EVENTOS` del index ganó 9: fuerzaregida · juniorh ·

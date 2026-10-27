@@ -104,6 +104,7 @@
     "mide:yamcha-ux-1": "node scripts/mide-yamcha-ux-1.js",
     "mide:req-2027-1": "node scripts/mide-req-2027-1.js",
     "mide:ride-callejon-1": "node scripts/mide-ride-callejon-1.js",
-    "mide:req-2027-2": "node scripts/mide-req-2027-2.js"
+    "mide:req-2027-2": "node scripts/mide-req-2027-2.js",
+    "mide:ride-sin-zona-1": "node scripts/mide-ride-sin-zona-1.js"
   }
 }

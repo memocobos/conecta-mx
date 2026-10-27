@@ -1295,15 +1295,23 @@ ${entregables}
         return bad(headers, `tipo_paquete inválido: se espera uno de ${PAQUETES_MIGRAR.join(', ')}`);
       }
       let zona = String(body.zona_boleto || '').trim();
-      if (!zona) return bad(headers, 'la zona del boleto es obligatoria');
+      // [RIDE-SIN-ZONA-1, 27-oct-2026] Reporte de Milk: «en RIDE no lleva
+      // boleto». El RIDE no consume boleto (NO_CONSUMEN_BOLETO en
+      // _lib/paquete-viaje) ni descuenta stock, así que exigirle zona obligaba a
+      // INVENTAR una. Si viene sin zona nace con zona NULL — igual que la
+      // requisición aprobada (admin-requisiciones ya lo hacía). Si alguien SÍ
+      // la escribe (un RIDE con forceZona), pasa por la puerta como siempre.
+      const rideSinZona = paquete === 'ride' && !zona;
+      if (!zona && !rideSinZona) return bad(headers, 'la zona del boleto es obligatoria');
       if (zona.length > 120) return bad(headers, 'zona demasiado larga');
+      let zonaAvisoMig = null;
+      if (!rideSinZona) {
       // [DISPO-NORM-1] La puerta: desconocida se RECHAZA (una zona que la ficha
       // no tiene es hoyo de ficha y espera Esferas — el caso «Sección C» de
       // hilary); canonizada se guarda con la ortografía de la ficha; catálogo
       // ilegible o evento fuera de él pasa TAL CUAL con aviso en la respuesta
       // (fail-soft dicho: la migración no se detiene porque el CDN tosió).
       const vzMig = await puertaZona(eventoId, zona);
-      let zonaAvisoMig = null;
       if (vzMig.estado === 'desconocida') {
         const lista = (vzMig.canonicas || []).join(' · ');
         return bad(headers, `La zona «${zona}» no existe en la ficha de ${eventoId}. `
@@ -1315,6 +1323,7 @@ ${entregables}
         zona = vzMig.zona;
       } else if (vzMig.estado === 'sin-catalogo' || vzMig.estado === 'sin-evento') {
         zonaAvisoMig = 'La zona se guardó sin validar contra la ficha (catálogo ilegible o evento fuera de él).';
+      }
       }
 
       // El dinero. `total_contrato` es obligatorio: una fila sin él NO SUMA en
@@ -1345,7 +1354,7 @@ ${entregables}
         evento_id: eventoId,
         nombre,
         tipo_paquete: paquete,
-        zona_boleto: zona,
+        zona_boleto: zona || null,
         total_contrato: total,
         abonado_previo: abonado,
         tipo_viajero: 'cliente',

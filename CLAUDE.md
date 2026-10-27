@@ -222,6 +222,25 @@ está caduco antes de escribirse.
     anuncio.** Publicar antes del push sacaría a nsqkmty como CHEAP normal
     sin requisición — el error PN27-PAQ-1 repetido.
 
+- 🔁 **YAMCHA-UX-1/2 + YAMCHA-TRASPASO-1 (26-oct-2026, en main local): la
+  derrota de Yamcha se vuelve operable.** Buscador (nombre/correo/banco/nota,
+  sin acentos) · eventos minimizables (el «✓ Todo resuelto» nace minimizado) ·
+  pendientes ARRIBA y resueltos abajo (orden estable) · «📨 Reenviar aviso» en
+  transferidos con correo (acción `reenviar_correo`: SOLO correo, cero
+  escrituras; un pendiente → 409). Y **«🔁 Pasar a otro tour»** (palabra de
+  Memo, opción 2 + contrato A): el cliente de un evento cancelado que pasa su
+  dinero a otro tour se MUDA con su fila (precedente MUDANZA-KAROLG-1) — sus
+  abonos viajan solos, **la caja NO se mueve (cero gasto)**, el origen deja de
+  contarlo cobrado y el destino lo cuenta; contrato = lo COBRADO (saldo 0)
+  hasta elegir paquete con precio real. Reembolso queda en el TERCER estado
+  `traspasado` con `[TRASPASO→slug]` en su nota. Reclamo con valor esperado
+  (2º clic = 409) y si el viajero no se mueve el reclamo se REVIERTE. Destino
+  preventa (cheapOnly + 1 zona) entra solo; si no, paquete y zona nacen vacíos
+  (DEFAULTS-1) y se validan contra la ficha. `mide:yamcha-ux-1` **39**.
+  ⏳ Caso #1: Jorge Antonio Rivera y Leslie Cruz (titodoble → palnorte, $3,050
+  c/u). Los 24 correos de reembolsos se tomaron de las pestañas del Excel
+  (nota en cada fila; la lista NO se versiona — son datos de clientes).
+
 - 🔮 **BABA-UX-2 (26-oct-2026, en main local): los tours del código se eligen
   en un DESPLEGABLE con palomitas — murió el select de Cmd+clic.** Palabra de
   Memo, citada: *«la parte de seleccionar los tours que quiero que aplique el

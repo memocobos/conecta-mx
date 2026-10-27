@@ -76,7 +76,7 @@ console.log('\n[B] al abrir');
 run('_yamchaPintar()');
 af(abierto('natanael') === '1', 'un evento con pendientes nace ABIERTO');
 af(abierto('titodoble') === '0', 'un evento TODO reembolsado nace MINIMIZADO');
-af(/✓ Todo reembolsado/.test(lista.innerHTML), 'y lo dice: «✓ Todo reembolsado»');
+af(/✓ Todo resuelto/.test(lista.innerHTML), 'y lo dice: «✓ Todo resuelto» (YAMCHA-TRASPASO-1: resuelto = transferido O traspasado)');
 af(/1 pendiente\(s\) · \$5,000/.test(lista.innerHTML), 'el encabezado de natanael dice cuánto falta: 1 · $5,000');
 af(!/Daniela/.test(lista.innerHTML), 'minimizado = su tabla no se pinta');
 
@@ -146,6 +146,71 @@ af((lista.innerHTML.match(/Reenviar aviso/g) || []).length === 1,
   fila.estado = 'transferido'; fila.cliente_correo = null; llamadas.length = 0;
   res = await handler(ev({ accion: 'reenviar_correo', id: ID }));
   af(res.statusCode === 400 && !llamadas.some((l) => /resend/.test(l.url)), 'sin correo → 400 y no sale nada');
+
+  console.log('\n[G] YAMCHA-TRASPASO-1 · «Pasar a otro tour» por el handler real');
+  const CI = path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js');
+  require(CI).fetchEventosRaw = async () => [
+    { id: 'palnorte', a: "Tecate Pa'l Norte 2027", ds: '2027-03-26', cheapOnly: true, cheapZonas: [{ n: 'Preventa a ciegas', p: 300 }] },
+    { id: 'omar', a: 'Omar Courtz', ds: '2027-01-20', zonas: [{ n: 'General A', p: 3000 }], cheapZonas: [{ n: 'General A', p: 2000 }] },
+    { id: 'viejo', a: 'Ya pasó', ds: '2020-01-01' },
+  ];
+  delete require.cache[H];
+  const h2 = require(H).handler;
+  const VID = '22222222-2222-2222-2222-222222222222';
+  let rbRow, vRow, escrituras, fallaViajero;
+  const sembrar = () => {
+    rbRow = { id: ID, evento_slug: 'titodoble', evento_nombre: 'Tito', cliente_nombre: 'Jorge', monto: 3050, estado: 'pendiente', gasto_id: null, notas: 'CANCEL-1 · Viajero ' + VID };
+    vRow = { id: VID, evento_id: 'titodoble', nombre: 'Jorge', total_contrato: 5800, abonado_previo: 300, notas: null };
+    escrituras = []; fallaViajero = false;
+  };
+  global.fetch = async (url, init = {}) => {
+    const u = String(url), m = init.method || 'GET';
+    const j = (x) => ({ ok: true, json: async () => x, text: async () => '' });
+    if (m !== 'GET') escrituras.push({ u, m, b: init.body ? JSON.parse(init.body) : null });
+    if (/viajeros_evento/.test(u)) {
+      if (m === 'GET') return j([vRow]);
+      if (fallaViajero) return j([]);
+      if (!u.includes('evento_id=eq.' + vRow.evento_id)) return j([]);
+      Object.assign(vRow, JSON.parse(init.body)); return j([vRow]);
+    }
+    if (/abonos_viajero/.test(u)) return j([{ monto: 2750 }]);
+    if (/reembolsos/.test(u)) {
+      if (m === 'GET') return j([rbRow]);
+      const want = (u.match(/estado=eq\.(\w+)/) || [])[1];
+      if (want && rbRow.estado !== want) return j([]);
+      Object.assign(rbRow, JSON.parse(init.body)); return j([rbRow]);
+    }
+    return j([]);
+  };
+  sembrar();
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'palnorte' }));
+  const d = JSON.parse(res.body);
+  af(res.statusCode === 200, 'traspasar a palnorte → 200 · ' + res.body.slice(0, 120));
+  af(vRow.evento_id === 'palnorte' && vRow.tipo_paquete === 'CHEAP' && vRow.zona_boleto === 'Preventa a ciegas',
+     'el viajero se MUDÓ a palnorte como CHEAP · Preventa a ciegas (la zona única se pone sola)');
+  af(vRow.total_contrato === 3050 && d.cobrado === 3050, '🔒 contrato A: total = lo COBRADO (300 previo + 2,750 abonos = $3,050) → saldo 0');
+  af(rbRow.estado === 'traspasado' && /\[TRASPASO→palnorte\]/.test(rbRow.notas), 'el reembolso queda «traspasado» y su nota dice a dónde');
+  af(!escrituras.some((w) => /gastos/.test(w.u)) && !escrituras.some((w) => w.m === 'DELETE'), '🔒 CERO gasto y CERO DELETEs: la caja no se mueve');
+  af(escrituras.every((w) => !/abonos_viajero/.test(w.u)), '🔒 los abonos NO se tocan: viajan solos con el viajero');
+  af(vRow.habitacion_id === null && vRow.grupo_viaje === null, 'la habitación y el grupo del tour cancelado se sueltan');
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'palnorte' }));
+  af(res.statusCode === 409, '🔒 el segundo clic → 409 (ya no está pendiente): no se mueve dos veces');
+
+  sembrar();
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'omar' }));
+  af(res.statusCode === 400 && rbRow.estado === 'pendiente', 'un destino con varias zonas sin paquete/zona → 400 y nada se escribe');
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'omar', paquete: 'PLUS', zona: 'general a' }));
+  af(res.statusCode === 200 && vRow.zona_boleto === 'General A', 'con paquete+zona elegidos entra, con la ortografía de la FICHA');
+  sembrar();
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'viejo' }));
+  af(res.statusCode === 400 && rbRow.estado === 'pendiente', 'un tour que ya pasó se rechaza');
+  sembrar(); fallaViajero = true;
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'palnorte' }));
+  af(res.statusCode === 502 && rbRow.estado === 'pendiente' && vRow.evento_id === 'titodoble',
+     '🔒 si el viajero no se puede mover, el reembolso VUELVE a pendiente — nada a medias');
+  sembrar(); rbRow.estado = 'transferido';
+  res = await h2(ev({ accion: 'traspasar', id: ID, destino: 'palnorte' }));
+  af(res.statusCode === 409 && vRow.evento_id === 'titodoble', 'un reembolso YA transferido no se traspasa (el dinero ya salió)');
   fin();
 })();
 function fin() {

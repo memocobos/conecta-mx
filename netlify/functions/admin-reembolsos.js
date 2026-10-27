@@ -29,6 +29,9 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { fetchEventosRaw } = require('./_lib/catalogo-index');
+const { saldoMigrado } = require('./_lib/cuenta-evento');
+const { normalizarZona } = require('./_lib/normalizar-zona');
 
 const ROLES_PALACIO = ['maestro_roshi']; // el Palacio es solo de maestro_roshi
 
@@ -38,6 +41,7 @@ const ACCIONES = {
   marcar_transferido: ROLES_PALACIO,
   desmarcar: ROLES_PALACIO,
   reenviar_correo: ROLES_PALACIO,
+  traspasar: ROLES_PALACIO,
 };
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -109,11 +113,13 @@ exports.handler = async (event) => {
       const reembolsos = await r.json();
       const lista = Array.isArray(reembolsos) ? reembolsos : [];
 
-      const totales = { pendiente_monto: 0, transferido_monto: 0, pendiente_n: 0, transferido_n: 0 };
+      const totales = { pendiente_monto: 0, transferido_monto: 0, pendiente_n: 0, transferido_n: 0, traspasado_monto: 0, traspasado_n: 0 };
       for (const x of lista) {
         const monto = Number(x.monto) || 0;
         if (x.estado === 'pendiente') { totales.pendiente_monto += monto; totales.pendiente_n++; }
         else if (x.estado === 'transferido') { totales.transferido_monto += monto; totales.transferido_n++; }
+        // [YAMCHA-TRASPASO-1] Dinero que se QUEDÓ en la casa (pasó a otro tour).
+        else if (x.estado === 'traspasado') { totales.traspasado_monto += monto; totales.traspasado_n++; }
       }
       return ok(headers, { reembolsos: lista, totales });
     }
@@ -208,6 +214,116 @@ exports.handler = async (event) => {
       const correo_enviado = await enviarCorreoTransferido(env, rb).catch(() => false);
       if (!correo_enviado) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Resend no aceptó el correo; intenta de nuevo' }) };
       return ok(headers, { correo_enviado: true, para: String(rb.cliente_correo).trim().toLowerCase() });
+    }
+
+    // ── traspasar [YAMCHA-TRASPASO-1] ─────────────────────────────────────
+    // El cliente NO quiere su dinero de vuelta: lo pasa a otro tour. Palabra de
+    // Memo (26-oct-2026, «opción 2 + contrato A»): se MUEVE la fila del viajero
+    // al evento destino (el precedente MUDANZA-KAROLG-1) y sus abonos viajan
+    // solos (llavean por viajero_id). Por eso:
+    //   · la CAJA no se mueve — el dinero nunca salió del banco: NO hay gasto;
+    //   · el evento origen deja de contarlo cobrado y el destino lo empieza a
+    //     contar — cada utilidad dice la verdad;
+    //   · contrato A: total_contrato = lo COBRADO → saldo 0. Cuando el destino
+    //     publique su precio real y el cliente elija paquete, el contrato se
+    //     AJUSTA (el camino de la preventa); jamás se resta su dinero.
+    // Orden: se RECLAMA el reembolso (pendiente→traspasado, con el valor
+    // esperado en el filtro: doble clic = 409) y DESPUÉS se mueve al viajero;
+    // si el viajero no se mueve, el reclamo se REVIERTE. Cero DELETEs.
+    if (accion === 'traspasar') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const destino = String(body.destino || '').trim().toLowerCase();
+      if (!SLUG_RE.test(destino) || destino.length > 120) return bad(headers, 'Elige el tour de destino');
+
+      const rGet = await fetch(`${base}?id=eq.${id}&select=id,evento_slug,evento_nombre,cliente_nombre,monto,estado,gasto_id,notas&limit=1`, { headers: sbHeaders });
+      if (!rGet.ok) return upstream(headers, await rGet.text(), 'consulta');
+      const rb = (await rGet.json())[0];
+      if (!rb) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Reembolso no encontrado' }) };
+      if (rb.estado !== 'pendiente' || rb.gasto_id != null) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Solo se traspasa un reembolso PENDIENTE (este ya está ' + rb.estado + ').' }) };
+      }
+      const origen = String(rb.evento_slug || '');
+      if (destino === origen) return bad(headers, 'El destino es el mismo tour cancelado');
+      const vid = ((String(rb.notas || '').match(/Viajero ([0-9a-f-]{36})/i)) || [])[1];
+      if (!vid || !UUID_RE.test(vid)) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Este reembolso no dice qué viajero es (falta «Viajero <id>» en sus notas). Se mueve a mano.' }) };
+      }
+
+      // El destino, preguntado al catálogo SERVIDO (no a una lista a mano).
+      const evs = await fetchEventosRaw();
+      if (!evs) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo; intenta de nuevo' }) };
+      const ev = evs.find((e) => e && e.id === destino);
+      if (!ev) return bad(headers, 'Ese tour no está en el catálogo publicado');
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      if (ev.ds && String(ev.ds).slice(0, 10) < hoy) return bad(headers, 'Ese tour ya pasó');
+
+      // Paquete y zona en el destino.
+      const lista = (arr) => (Array.isArray(arr) ? arr : []).filter((z) => z && z.n).map((z) => String(z.n));
+      const multi = Array.isArray(ev.multifecha) ? ev.multifecha : [];
+      const zonasCheap = [...new Set([...lista(ev.cheapZonas), ...multi.flatMap((m) => lista(m.cheapZonas))])];
+      const zonasPlus = [...new Set([...lista(ev.zonas), ...multi.flatMap((m) => lista(m.zonas))])];
+      let paquete, zona;
+      if (ev.cheapOnly && zonasCheap.length === 1) {
+        paquete = 'CHEAP'; zona = zonasCheap[0];           // la preventa a ciegas: no hay nada que elegir
+      } else {
+        paquete = String(body.paquete || '').trim().toUpperCase();
+        if (!['PLUS', 'STAY', 'RIDE', 'CHEAP'].includes(paquete)) return bad(headers, 'Elige el paquete en el destino');
+        if (paquete === 'RIDE') { zona = null; }
+        else {
+          const universo = paquete === 'CHEAP' ? zonasCheap : zonasPlus;
+          const pedida = normalizarZona(body.zona);
+          zona = universo.find((z) => normalizarZona(z) === pedida) || null;
+          if (!zona) return bad(headers, 'Esa zona no existe en ' + (ev.a || destino) + '. Zonas: ' + universo.join(', '));
+        }
+      }
+
+      // El viajero y lo que trae cobrado (la regla de oro: saldoMigrado).
+      const rV = await fetch(`${env.KH_SB_URL}/rest/v1/viajeros_evento?id=eq.${vid}&select=id,evento_id,nombre,total_contrato,abonado_previo,notas&limit=1`, { headers: sbHeaders });
+      if (!rV.ok) return upstream(headers, await rV.text(), 'consulta');
+      const v = (await rV.json())[0];
+      if (!v) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El viajero de este reembolso ya no existe.' }) };
+      if (v.evento_id !== origen) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ese viajero ya no está en ' + origen + ' (está en ' + v.evento_id + '). Nada se movió.' }) };
+      const rA = await fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero?viajero_id=eq.${vid}&select=monto`, { headers: sbHeaders });
+      if (!rA.ok) return upstream(headers, await rA.text(), 'consulta');
+      const s = saldoMigrado({ ...v, total_contrato: v.total_contrato == null ? 0 : v.total_contrato }, await rA.json());
+      const cobrado = s ? s.abonado : 0;
+
+      const fecha = hoy;
+      const nombreDest = ev.a || destino;
+      // 1) Reclamar el reembolso (valor esperado en el filtro).
+      const notaRb = `[TRASPASO→${destino}] ${fecha}: no se reembolsa — el cliente pasó $${cobrado} a ${nombreDest}. Viajero movido con sus abonos; la caja no se mueve.`;
+      const rC = await fetch(`${base}?id=eq.${id}&estado=eq.pendiente`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ estado: 'traspasado', transferido_en: new Date().toISOString(), notas: (rb.notas ? rb.notas + ' · ' : '') + notaRb }),
+      });
+      if (!rC.ok) return upstream(headers, await rC.text(), 'update');
+      if (!(await rC.json()).length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien ya movió este reembolso. Recarga.' }) };
+
+      // 2) Mover al viajero (valor esperado: sigue en el origen). La habitación,
+      //    el grupo y el transporte eran del tour cancelado: se sueltan.
+      const notaV = `${fecha}: traspasado desde ${origen} (cancelado) — trae $${cobrado} cobrados; contrato = lo cobrado (saldo 0) hasta elegir paquete con precio real.`;
+      const rM = await fetch(`${env.KH_SB_URL}/rest/v1/viajeros_evento?id=eq.${vid}&evento_id=eq.${encodeURIComponent(origen)}`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({
+          evento_id: destino, tipo_paquete: paquete, zona_boleto: zona,
+          total_contrato: cobrado, habitacion_id: null, grupo_viaje: null, transporte_cdmx: null,
+          notas: (v.notas ? v.notas + ' · ' : '') + notaV,
+        }),
+      });
+      const movidas = rM.ok ? await rM.json() : [];
+      if (!rM.ok || !movidas.length) {
+        // Revertir el reclamo: nada a medias.
+        await fetch(`${base}?id=eq.${id}&estado=eq.traspasado`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: 'pendiente', transferido_en: null, notas: rb.notas }),
+        }).catch(() => {});
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo mover al viajero; el reembolso sigue pendiente', detail: rM.ok ? 'sin filas' : await rM.text() }) };
+      }
+      return ok(headers, {
+        destino, destino_nombre: nombreDest, paquete, zona, cobrado,
+        diferencia_vs_reembolso: cobrado - (Number(rb.monto) || 0),
+      });
     }
 
     // ── desmarcar (vuelve a pendiente, borra la salida de gastos) ─────────

@@ -43,6 +43,11 @@ async function loadYamcha() {
           <div class="metric-value" style="color:#3DDC84">${formatMXN(t.transferido_monto)}</div>
           <div style="font-size:11px;color:var(--ts)">${t.transferido_n} cliente(s)</div>
         </div>
+        ${t.traspasado_n ? `<div class="metric">
+          <div class="metric-label">🔁 Se quedó en casa (pasó a otro tour)</div>
+          <div class="metric-value" style="color:var(--baba2,#a78bfa)">${formatMXN(t.traspasado_monto)}</div>
+          <div style="font-size:11px;color:var(--ts)">${t.traspasado_n} cliente(s)</div>
+        </div>` : ''}
       </div>`;
 
     if (!filas.length) {
@@ -122,8 +127,8 @@ function _yamchaPintar() {
         : st.abiertos.has(g.slug) ? true
         : !todoListo;
       const resumen = todoListo
-        ? `<span style="color:#3DDC84;font-weight:700">✓ Todo reembolsado</span> · ${g.rows.length} cliente(s)`
-        : `<span style="color:var(--orange);font-weight:700">${pend.length} pendiente(s) · ${formatMXN(pendMonto)}</span> · ${g.rows.length - pend.length} de ${g.rows.length} transferidos`;
+        ? `<span style="color:#3DDC84;font-weight:700">✓ Todo resuelto</span> · ${g.rows.length} cliente(s)${g.rows.some((r) => r.estado === 'traspasado') ? ` · ${g.rows.filter((r) => r.estado === 'traspasado').length} pasaron a otro tour` : ''}`
+        : `<span style="color:var(--orange);font-weight:700">${pend.length} pendiente(s) · ${formatMXN(pendMonto)}</span> · ${g.rows.length - pend.length} de ${g.rows.length} resueltos`;
       // [YAMCHA-UX-2] Palabra de Memo: pendientes ARRIBA, transferidos ABAJO,
       // siempre. Orden ESTABLE: dentro de cada bloque se conserva el orden del
       // backend (creado_en.desc), así nadie brinca de lugar al marcar a otro.
@@ -131,11 +136,17 @@ function _yamchaPintar() {
       const ordenadas = g.vis.map((r, i) => [r, i]).sort((a, b) => (peso(a[0]) - peso(b[0])) || (a[1] - b[1])).map((x) => x[0]);
       const filasHtml = ordenadas.map(rb => {
         const esPend = rb.estado === 'pendiente';
+        // [YAMCHA-TRASPASO-1] Tercer estado: el dinero pasó a otro tour.
+        const esTrasp = rb.estado === 'traspasado';
+        const destTrasp = esTrasp ? ((String(rb.notas || '').match(/\[TRASPASO→([^\]]+)\]/) || [])[1] || '') : '';
         const badge = esPend
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
+          : esTrasp
+          ? `<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(167,139,250,.15);color:var(--baba2,#a78bfa);font-size:11px;font-weight:700" title="No se reembolsó: su dinero pasó a otro tour">🔁 traspasado${destTrasp ? ' → ' + _esfEsc(destTrasp) : ''}</span>`
           : '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
         const accionEstado = esPend
-          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button>`
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" title="El cliente no quiere su dinero: lo pasa a otro tour" onclick="traspasarReembolso('${_esfEsc(rb.id)}')">🔁 Pasar a otro tour</button>`
+          : esTrasp ? ''
           : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`
             + (rb.cliente_correo ? ` <button class="btn btn-ghost btn-sm" style="font-size:10px" title="Manda otra vez «Tu reembolso fue enviado». No toca el dinero." onclick="reenviarCorreoReembolso('${_esfEsc(rb.id)}')"><svg class="ic"><use href="#ic-correo"/></svg> Reenviar aviso</button>` : '');
         return `<tr>
@@ -165,6 +176,117 @@ function _yamchaPintar() {
         </table></div>` : ''}
       </div>`;
     }).join('');
+}
+// [YAMCHA-TRASPASO-1] «🔁 Pasar a otro tour»: el cliente no quiere su dinero,
+// lo pasa a otro evento. Se mueve su FILA con sus abonos (la caja no se mueve)
+// y su contrato queda en lo cobrado (saldo 0) hasta que elija paquete con
+// precio real. El servidor revalida TODO; esta pantalla solo pregunta.
+function _yamchaZonasDe(ev) {
+  const l = (a) => (Array.isArray(a) ? a : []).filter((z) => z && z.n).map((z) => String(z.n));
+  const mf = Array.isArray(ev && ev.multifecha) ? ev.multifecha : [];
+  return {
+    cheap: [...new Set([...l(ev && ev.cheapZonas), ...mf.flatMap((m) => l(m.cheapZonas))])],
+    plus: [...new Set([...l(ev && ev.zonas), ...mf.flatMap((m) => l(m.zonas))])],
+  };
+}
+function _yamchaEsUnico(ev) { return !!(ev && ev.cheapOnly && _yamchaZonasDe(ev).cheap.length === 1); }
+async function traspasarReembolso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  if (!rb) { alert('No se encontró el reembolso. Recarga e intenta de nuevo.'); return; }
+  const cont = document.getElementById('modal-yamcha-transferir');
+  cont.innerHTML = '<div class="modal" style="max-width:460px"><div class="modal-body"><div class="loading-state"><div class="spinner"></div>Cargando tours…</div></div></div>';
+  openModal('modal-yamcha-transferir');
+  const evs = await _fetchEVFromIndex();
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+  const vivos = (evs || []).filter((e) => e && e.id && e.a && e.id !== rb.evento_slug && (!e.ds || String(e.ds).slice(0, 10) >= hoy))
+    .sort((a, b) => (a.ds || '9999').localeCompare(b.ds || '9999'));
+  window.__yamchaEvs = vivos;
+  if (!vivos.length) {
+    cont.innerHTML = `<div class="modal" style="max-width:460px"><div class="modal-body"><div class="alert alert-error">No se pudo leer el catálogo de tours. Recarga e intenta de nuevo.</div></div><div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-yamcha-transferir')">Cerrar</button></div></div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">🔁 Pasar a otro tour</div>
+        <button class="modal-close" onclick="closeModal('modal-yamcha-transferir')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px"><b>${_esfEsc(rb.cliente_nombre || 'cliente')}</b> · ${formatMXN(rb.monto)} en <b>${_esfEsc(rb.evento_nombre || rb.evento_slug)}</b> (cancelado)</div>
+        <div class="form-group">
+          <label>¿A qué tour pasa su dinero?</label>
+          <select class="cot-input" id="ya-tp-dest" style="width:100%" onchange="_yamchaTpDestino()">
+            <option value="">— elige el tour —</option>
+            ${vivos.map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a)}${e.f ? ' · ' + _esfEsc(e.f) : ''}</option>`).join('')}
+          </select>
+        </div>
+        <div id="ya-tp-extra"></div>
+        <div style="font-size:11px;color:var(--ts);line-height:1.55;margin:8px 0">Se mueve al viajero con TODOS sus pagos. No sale dinero del banco ni se crea gasto. Su contrato queda igual a lo que ya pagó (saldo $0) hasta que elija paquete con el precio real.</div>
+        <div id="ya-tp-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-yamcha-transferir')">Cancelar</button>
+        <button class="btn btn-primary" id="ya-tp-btn" onclick="confirmarTraspaso('${_esfEsc(id)}')">Pasar</button>
+      </div>
+    </div>`;
+}
+function _yamchaTpDestino() {
+  const slug = document.getElementById('ya-tp-dest').value;
+  const extra = document.getElementById('ya-tp-extra');
+  const ev = (window.__yamchaEvs || []).find((e) => e.id === slug);
+  if (!ev) { extra.innerHTML = ''; return; }
+  if (_yamchaEsUnico(ev)) {
+    extra.innerHTML = `<div style="font-size:12px;margin-bottom:8px">Entra como <b>CHEAP · ${_esfEsc(_yamchaZonasDe(ev).cheap[0])}</b> (es el único lugar que vende este tour).</div>`;
+    return;
+  }
+  // Paquete y zona nacen VACÍOS (DEFAULTS-1: es una atribución).
+  extra.innerHTML = `
+    <div class="form-group"><label>Paquete en el destino</label>
+      <select class="cot-input" id="ya-tp-paq" style="width:100%" onchange="_yamchaTpZonas()">
+        <option value="">— elige paquete —</option>
+        ${['PLUS', 'STAY', 'RIDE', 'CHEAP'].map((p) => `<option>${p}</option>`).join('')}
+      </select></div>
+    <div class="form-group" id="ya-tp-zona-wrap"></div>`;
+}
+function _yamchaTpZonas() {
+  const ev = (window.__yamchaEvs || []).find((e) => e.id === document.getElementById('ya-tp-dest').value);
+  const paq = document.getElementById('ya-tp-paq').value;
+  const wrap = document.getElementById('ya-tp-zona-wrap');
+  if (!ev || !paq || paq === 'RIDE') { wrap.innerHTML = ''; return; }
+  const zs = paq === 'CHEAP' ? _yamchaZonasDe(ev).cheap : _yamchaZonasDe(ev).plus;
+  wrap.innerHTML = `<label>Zona</label><select class="cot-input" id="ya-tp-zona" style="width:100%"><option value="">— elige zona —</option>${zs.map((z) => `<option>${_esfEsc(z)}</option>`).join('')}</select>`;
+}
+async function confirmarTraspaso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  const alertEl = document.getElementById('ya-tp-alert');
+  const btn = document.getElementById('ya-tp-btn');
+  const destino = document.getElementById('ya-tp-dest').value;
+  const ev = (window.__yamchaEvs || []).find((e) => e.id === destino);
+  if (!ev) { alertEl.innerHTML = '<div class="alert alert-error">Elige el tour de destino</div>'; return; }
+  const body = { accion: 'traspasar', id, destino };
+  if (!_yamchaEsUnico(ev)) {
+    body.paquete = (document.getElementById('ya-tp-paq') || {}).value || '';
+    body.zona = (document.getElementById('ya-tp-zona') || {}).value || '';
+    if (!body.paquete) { alertEl.innerHTML = '<div class="alert alert-error">Elige el paquete</div>'; return; }
+    if (body.paquete !== 'RIDE' && !body.zona) { alertEl.innerHTML = '<div class="alert alert-error">Elige la zona</div>'; return; }
+  }
+  if (!confirm(`¿Pasar a ${rb ? rb.cliente_nombre : 'este cliente'} con ${rb ? formatMXN(rb.monto) : 'su dinero'} a ${ev.a}?\n\nNo sale dinero del banco. Ya no se le reembolsa.`)) return;
+  btn.disabled = true; btn.textContent = 'Pasando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', { method: 'POST', body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) {
+      alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo pasar')}</div>`;
+      btn.disabled = false; btn.textContent = 'Pasar';
+      return;
+    }
+    closeModal('modal-yamcha-transferir');
+    showToast(`🔁 ${_esfEsc(rb ? rb.cliente_nombre : 'Cliente')} pasó a ${_esfEsc(d.destino_nombre)} con ${formatMXN(d.cobrado)}${d.diferencia_vs_reembolso ? ' (ojo: difiere ' + formatMXN(d.diferencia_vs_reembolso) + ' del reembolso)' : ''}`, 'success');
+    loadYamcha();
+  } catch (e) {
+    alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+    btn.disabled = false; btn.textContent = 'Pasar';
+  }
 }
 // [YAMCHA-UX-2] Reenviar «Tu reembolso fue enviado» a un transferido — solo
 // correo, el dinero no se toca (lo garantiza el servidor).

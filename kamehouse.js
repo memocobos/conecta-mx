@@ -5990,31 +5990,56 @@ function _vjCtrChip(v, mapa) {
   if (mapa === null) return '<span class="vj2-tag" title="No se pudo leer el estado del contrato">📜 ?</span>';
   const c = (mapa || {})[v.id];
   if (!c) return '<span class="vj2-tag" style="color:var(--ts)" title="Aún no tiene contrato: apriétale «📜 Contrato»">📜 sin contrato</span>';
-  if (c.estado === 'firmado') return `<span class="vj2-tag" style="color:var(--green);border-color:var(--green)" title="Firmó ${_esfEsc(c.firmante_nombre || '')}">📜 firmado</span>`;
+  // [CONTRATO-CLIENTE-2] Firmado se parte en dos: la INE ya revisada por un
+  // humano, o firmado con la INE POR REVISAR (eso es lo que cierra la puerta a
+  // un «soy su mamá» falso: la edad decide quién firma y aquí se confirma).
+  if (c.estado === 'firmado' && c.ine_verificada) return `<span class="vj2-tag" style="color:var(--green);border-color:var(--green)" title="Firmó ${_esfEsc(c.firmante_nombre || '')} · INE revisada">📜 firmado ✓</span>`;
+  if (c.estado === 'firmado') return `<span class="vj2-tag" style="color:var(--yellow);border-color:var(--yellow)" title="Firmó ${_esfEsc(c.firmante_nombre || '')} (${_esfEsc(c.firmante_rol || '')}) — falta revisar su INE">📜 firmado · INE por revisar</span>`;
   return `<span class="vj2-tag" style="color:var(--yellow);border-color:var(--yellow)" title="${c.envios ? 'Enviado ' + c.envios + ' vez/veces' : 'Creado, sin enviar'}">📜 sin firmar</span>`;
 }
 async function _vjCtrEnviar(id, nombre) {
   const c = (window.__vjCtr || {})[id];
-  if (c && c.estado === 'firmado') {
-    try { await navigator.clipboard.writeText(c.url); } catch (_) {}
-    showToast(`${_esfEsc(nombre)} ya firmó su contrato. Copié el link para que lo puedas ver.`, 'success');
-    return;
-  }
-  if (!confirm(`¿Mandar a ${nombre} su contrato por correo para firmar?${c && c.envios ? '\n(Ya se le mandó ' + c.envios + ' vez/veces: va de nuevo.)' : ''}`)) return;
+  if (c && c.estado === 'firmado') return _vjCtrIne(id, c.id, nombre);
+  if (!confirm(`¿Mandar a ${nombre} el correo para firmar su contrato en el Portal?${c && c.envios ? '\n(Ya se le mandó ' + c.envios + ' vez/veces: va de nuevo.)' : ''}`)) return;
   try {
     const r = await khViajeros._call({ accion: 'contrato_cliente_enviar', viajero_id: id });
     const k = (r && r.contrato) || {};
-    const link = (k.links || [])[0];
-    if (k.enviados && k.enviados.length) showToast(`Contrato enviado a ${_esfEsc(k.enviados.join(', '))}`, 'success');
-    else if (k.sin_correo && k.sin_correo.length) {
-      try { await navigator.clipboard.writeText(k.sin_correo[0].url); } catch (_) {}
-      showToast(`${_esfEsc(nombre)} no tiene correo: copié el link del contrato para mandarlo por WhatsApp.`, 'success');
-    } else if (k.saltados && k.saltados.length) showToast(`Sin contrato: ${_esfEsc(k.saltados[0].motivo)}`, 'error');
+    if (k.apagado) showToast('Los contratos de cliente están apagados por ahora.', 'warning');
+    else if (k.enviados && k.enviados.length) showToast(`Correo para firmar enviado a ${_esfEsc(k.enviados.join(', '))}`, 'success');
+    else if (k.sin_correo && k.sin_correo.length) showToast(`${_esfEsc(nombre)} no tiene correo: sin correo no puede entrar al Portal a firmar. Captura su correo primero.`, 'warning');
+    else if (k.saltados && k.saltados.length) showToast(`Sin contrato: ${_esfEsc(k.saltados[0].motivo)}`, 'error');
     else if (k.aviso) showToast(_esfEsc(k.aviso), 'error');
-    else if (link) { try { await navigator.clipboard.writeText(link.url); } catch (_) {} showToast('Link del contrato copiado.', 'success'); }
     if (k.errores && k.errores.length) showToast(_esfEsc(k.errores.map((e) => e.aviso).join(' · ')), 'error');
     _vj2Cargar();
   } catch (e) { showToast('No se pudo mandar el contrato: ' + _esfEsc(e.message), 'error'); }
+}
+// [CONTRATO-CLIENTE-2] La INE del que firmó, en el renglón de abajo (como el
+// panel de abonos), con «✓ La INE coincide» para Bulma/Milk.
+async function _vjCtrIne(viajeroId, contratoId, nombre) {
+  const fila = document.getElementById(`vj-ab-${viajeroId}`);
+  if (!fila) return;
+  const td = fila.querySelector('td');
+  if (fila.style.display !== 'none' && fila.dataset.modo === 'ine') { fila.style.display = 'none'; return; }
+  fila.dataset.modo = 'ine'; fila.style.display = '';
+  td.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando la INE…</div>';
+  try {
+    const r = await khViajeros._call({ accion: 'contrato_cliente_ine', contrato_id: contratoId });
+    const rol = { titular: 'el propio viajero', madre: 'su mamá', padre: 'su papá', tutor: 'su tutor' }[r.firmante_rol] || r.firmante_rol;
+    const img = (u, t) => u ? `<a href="${_esfEsc(u)}" target="_blank" rel="noopener"><img src="${_esfEsc(u)}" alt="${t}" style="max-width:260px;max-height:180px;border:1px solid var(--border);border-radius:6px"></a>` : `<span class="vj2-vacio">sin ${t}</span>`;
+    td.innerHTML = `<div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
+      <div><b>Firmó:</b> ${_esfEsc(r.firmante_nombre || '—')} (${_esfEsc(rol)}) · <b>Edad del viajero al firmar:</b> ${_esfEsc(String(r.edad_al_firmar))} · <b>Nació:</b> ${_esfEsc(r.fecha_nacimiento || '—')} · <b>Cuenta:</b> ${_esfEsc(r.firmado_por_correo || '—')}</div>
+      <div style="color:var(--ts)">Revisa que el nombre de la INE sea el de quien firmó${r.firmante_rol === 'titular' ? ' y que su fecha de nacimiento coincida' : ' (el tutor)'}.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${img(r.frente, 'frente')}${img(r.reverso, 'reverso')}</div>
+      <div>${r.verificada_at ? `<span style="color:var(--green)">✓ Revisada por ${_esfEsc(r.verificada_por || '')}</span>` : `<button class="btn btn-primary btn-sm" onclick="_vjCtrVerificar('${_attrJs(viajeroId)}','${_attrJs(contratoId)}')">✓ La INE coincide</button> <span style="color:var(--ts)">Si NO coincide, escríbele al cliente por WhatsApp.</span>`}</div>
+    </div>`;
+  } catch (e) { td.innerHTML = `<div class="alert alert-error">No se pudo abrir la INE: ${_esfEsc(e.message)}</div>`; }
+}
+async function _vjCtrVerificar(viajeroId, contratoId) {
+  try {
+    await khViajeros._call({ accion: 'contrato_cliente_verificar', contrato_id: contratoId });
+    showToast('INE marcada como revisada', 'success');
+    _vj2Cargar();
+  } catch (e) { showToast('No se pudo marcar: ' + _esfEsc(e.message), 'error'); }
 }
 
 async function _vj2Cargar() {
@@ -6168,7 +6193,7 @@ async function _vj2Cargar() {
             title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
             onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
           ${_vjCtrPuede(v) ? `<button class="btn btn-ghost btn-sm" style="font-size:10px"
-            title="Mandar (o reenviar) a ${_esfEsc(v.nombre || '')} su contrato para firmar"
+            title="Contrato de ${_esfEsc(v.nombre || '')}: mandar el correo para firmar en el Portal, o ver su INE si ya firmó"
             onclick="_vjCtrEnviar('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📜 Contrato</button>` : ''}
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"

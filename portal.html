@@ -1345,6 +1345,13 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 @keyframes bootPulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.62;transform:scale(.97)}}
 .boot .b-txt{margin-top:2px}
 </style>
+<style>/* [CONTRATO-CLIENTE-2] El contrato del cliente (texto del servidor) */
+.ctr-doc{background:#fff;color:#1a1a1a;border-radius:10px;padding:16px 16px 8px;margin:10px 0;max-height:420px;overflow:auto;font-size:13px;line-height:1.6}
+.ctr-doc .doc-meta{background:#fafafa;border-left:5px solid #e8ff4c;padding:10px 12px;margin-bottom:12px}
+.ctr-doc .meta-row{margin:2px 0}.ctr-doc .meta-row .lbl{font-weight:800;color:#ff283b;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
+.ctr-doc .clausula h2{font-size:15px;margin:14px 0 6px;border-bottom:2px solid #000;padding-bottom:3px;color:#000}
+.ctr-doc .clausula h2 .num{color:#ff283b;margin-right:8px}.ctr-doc .clausula p{margin:0 0 7px}
+</style>
 <style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>
 </head>
 <body>
@@ -3064,6 +3071,17 @@ async function renderPlanMigrado(){
     if (!r.ok) return;
     const j = await r.json();
     if (!j || j.ok !== true || !Array.isArray(j.tours) || !j.tours.length) return;
+    // [CONTRATO-CLIENTE-2] Sus contratos (fail-soft: sin respuesta, no se pinta el bloque).
+    window.__migCtr = {};
+    try {
+      const rc = await fetch('/.netlify/functions/portal-contrato', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({ accion: 'listar' }),
+      });
+      const jc = rc.ok ? await rc.json() : null;
+      if (jc && jc.ok && Array.isArray(jc.contratos)) jc.contratos.forEach((c) => { window.__migCtr[c.viajero_id] = c; });
+    } catch (_) { /* sin contratos visibles: no tumba el plan */ }
 
     const money = (n) => '$' + Number(n || 0).toLocaleString('es-MX');
     const filas = j.tours.map((t) => {
@@ -3082,7 +3100,7 @@ async function renderPlanMigrado(){
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migGrupoHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
+        + cuenta + _migGrupoHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3207,6 +3225,116 @@ function _migDatosHtml(t){
     + '</div>'
     + '</div>';
 }
+// ── [CONTRATO-CLIENTE-2] EL CONTRATO SE FIRMA AQUÍ ─────────────────────────
+// Palabra de Memo: nadie elige quién firma. La FECHA DE NACIMIENTO del viajero
+// (se registra una vez y ya no se cambia aquí) decide: 18+ firma él mismo con
+// su INE; menor firma su mamá, papá o tutor con la INE del tutor.
+function _migCtrHtml(t){
+  const c = (window.__migCtr || {})[t && t.viajero_id];
+  if (!c) return '';
+  const id = escapeHtml(t.viajero_id);
+  const box = 'margin-top:12px;padding:12px;border-radius:10px;';
+  if (c.estado === 'firmado') {
+    const f = c.firmado_at ? new Date(c.firmado_at).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return '<div style="' + box + 'background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.45);font-size:13px">✅ <b>Contrato firmado</b>' + (f ? ' el ' + escapeHtml(f) : '') + (c.firmante_nombre ? ' por ' + escapeHtml(c.firmante_nombre) : '') + '</div>';
+  }
+  const inp = 'width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:13px';
+  const lbl = 'display:block;font-size:11px;opacity:.75;margin:0 0 3px';
+  let cuerpo;
+  if (!c.fecha_nacimiento) {
+    cuerpo = '<div style="font-size:12px;opacity:.85;margin-bottom:8px">Para firmar, primero registra la <b>fecha de nacimiento de ' + escapeHtml(c.nombre || 'el viajero') + '</b>. Con ella sabemos si firma él mismo o su mamá, papá o tutor. <b>Una vez guardada ya no se puede cambiar aquí.</b></div>'
+      + '<input data-ctr="fecha" type="date" style="' + inp + '">'
+      + '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="ctr-fecha" data-mig-id="' + id + '">Guardar fecha de nacimiento</button>';
+  } else {
+    const menor = c.firma === 'tutor';
+    const quien = menor
+      ? '<div style="font-size:12px;margin-bottom:8px;color:#e8ff4c">' + escapeHtml(c.nombre) + ' es <b>menor de edad</b>: firma su mamá, papá o tutor, con <b>su propia INE</b>.</div>'
+        + '<label style="' + lbl + '">¿Quién firma?</label><select data-ctr="parentesco" style="' + inp + '"><option value="">— elige —</option><option value="madre">Su mamá</option><option value="padre">Su papá</option><option value="tutor">Su tutor</option></select>'
+        + '<label style="' + lbl + '">Nombre completo de quien firma</label><input data-ctr="tutor" maxlength="120" style="' + inp + '">'
+      : '<div style="font-size:12px;margin-bottom:8px">Firma <b>' + escapeHtml(c.nombre) + '</b>, con su INE.</div>';
+    cuerpo = '<button type="button" class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:12px" data-mig-act="ctr-abrir" data-mig-id="' + id + '">Leer y firmar mi contrato</button>'
+      + '<div data-mig-panel="ctr" style="display:none;margin-top:10px">'
+      +   '<div class="ctr-doc">' + (c.html || '') + '</div>'
+      +   quien
+      +   '<label style="' + lbl + '">INE de quien firma — frente</label><input data-ctr="ine-frente" type="file" accept="image/*" style="' + inp + '">'
+      +   '<label style="' + lbl + '">INE de quien firma — reverso</label><input data-ctr="ine-reverso" type="file" accept="image/*" style="' + inp + '">'
+      +   '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin:4px 0 10px"><input data-ctr="acepto" type="checkbox" style="margin-top:2px"> Leí todo el contrato y acepto sus cláusulas.</label>'
+      +   '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="ctr-firmar" data-mig-id="' + id + '">Firmar contrato</button>'
+      + '</div>';
+  }
+  return '<div data-ctr-box style="' + box + 'background:rgba(255,40,59,.08);border:1px solid rgba(255,40,59,.4)">'
+    + '<div style="font-size:13px;font-weight:800;margin-bottom:6px">📜 Tu contrato de viaje está pendiente de firma</div>'
+    + cuerpo + '<div data-mig-msg style="font-size:12px;margin-top:6px"></div></div>';
+}
+// La foto se lee como data: (el CSP no permite blob: — REQ-FOTO-1) y se baja a
+// 1600px JPEG: una INE legible pesa ~300 KB así.
+function _ctrFoto(file){
+  return new Promise((res, rej) => {
+    if (!file) return rej(new Error('Falta una foto de la INE'));
+    if (file.type && !/^image\//.test(file.type)) return rej(new Error('La INE tiene que ser una foto'));
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error('No se pudo leer la foto'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX = 1600, w = img.naturalWidth, h = img.naturalHeight, e = Math.min(1, MAX / Math.max(w, h));
+          const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w * e)); cv.height = Math.max(1, Math.round(h * e));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          res(cv.toDataURL('image/jpeg', 0.85));
+        } catch (_) { rej(new Error('No se pudo procesar la foto')); }
+      };
+      img.onerror = () => rej(new Error('Esa foto no se pudo abrir. Toma una captura y súbela.'));
+      img.src = String(fr.result || '');
+    };
+    fr.readAsDataURL(file);
+  });
+}
+async function _ctrPost(body){
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session || !session.access_token) return { ok: false, error: 'Tu sesión venció: entra otra vez' };
+  const r = await fetch('/.netlify/functions/portal-contrato', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify(body),
+  });
+  return r.json().catch(() => ({ ok: false, error: 'Sin respuesta' }));
+}
+async function _ctrFecha(id){
+  const card = _migCard(id); if (!card) return;
+  const box = card.querySelector('[data-ctr-box]');
+  const f = (box.querySelector('[data-ctr="fecha"]') || {}).value || '';
+  if (!f) return _migMsg(box, 'Elige la fecha de nacimiento');
+  if (!confirm('¿La fecha de nacimiento es ' + f.split('-').reverse().join('/') + '? Ya no se podrá cambiar aquí.')) return;
+  _migMsg(box, 'Guardando…', true);
+  const j = await _ctrPost({ accion: 'fecha', viajero_id: id, fecha: f }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (j && j.ok) { _migMsg(box, '✓ Guardada.', true); setTimeout(renderPlanMigrado, 800); }
+  else _migMsg(box, (j && j.error) || 'No se pudo guardar');
+}
+async function _ctrFirmar(id){
+  const card = _migCard(id); if (!card) return;
+  const box = card.querySelector('[data-ctr-box]');
+  const c = (window.__migCtr || {})[id]; if (!c) return;
+  const g = (k) => box.querySelector('[data-ctr="' + k + '"]');
+  if (!g('acepto').checked) return _migMsg(box, 'Marca la casilla de que leíste y aceptas el contrato');
+  const body = { accion: 'firmar', contrato_id: c.contrato_id, acepto: true };
+  if (c.firma === 'tutor') {
+    body.parentesco = g('parentesco').value;
+    body.tutor_nombre = g('tutor').value.trim();
+    if (!body.parentesco) return _migMsg(box, 'Elige quién firma: mamá, papá o tutor');
+    if (body.tutor_nombre.split(/\s+/).length < 2) return _migMsg(box, 'Escribe el nombre completo de quien firma');
+  }
+  const b = box.querySelector('[data-mig-act="ctr-firmar"]'); if (b) b.disabled = true;
+  _migMsg(box, 'Preparando tu INE…', true);
+  try {
+    body.ine_frente = await _ctrFoto(g('ine-frente').files[0]);
+    body.ine_reverso = await _ctrFoto(g('ine-reverso').files[0]);
+  } catch (e) { if (b) b.disabled = false; return _migMsg(box, e.message); }
+  _migMsg(box, 'Firmando…', true);
+  const j = await _ctrPost(body).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (j && j.ok) { _migMsg(box, '✓ ¡Contrato firmado! El equipo revisará tu INE.', true); setTimeout(renderPlanMigrado, 1500); }
+  else { _migMsg(box, (j && j.error) || 'No se pudo firmar'); if (b) b.disabled = false; }
+}
+
 // Delegación (el script del Portal es MÓDULO: un onclick no vería estas funciones).
 document.addEventListener('click', (ev) => {
   const b = ev.target && ev.target.closest && ev.target.closest('[data-mig-act]');
@@ -3216,6 +3344,9 @@ document.addEventListener('click', (ev) => {
   else if (act === 'repartir') _migRepartir(id);
   else if (act === 'guardar') _migGuardar(id);
   else if (act === 'pedir') _migPedir(id);
+  else if (act === 'ctr-abrir') _migAbrir(id, 'ctr');
+  else if (act === 'ctr-fecha') _ctrFecha(id);
+  else if (act === 'ctr-firmar') _ctrFirmar(id);
 });
 function _migCard(id){ return document.querySelector('[data-mig-viajero="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }
 function _migAbrir(id, cual){

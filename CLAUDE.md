@@ -290,6 +290,45 @@ está caduco antes de escribirse.
     casilla del alta oculta. **Medido al apagar: 0 filas en
     `contratos_cliente` — no salió ninguno.** `mide:contrato-cliente-1`
     **37** (bloque [I]: apagado no nace nada, firmar 409). ⏳ CONTRATO-CLIENTE-2.
+  - 📜🔒⏳ **CONTRATO-CLIENTE-2 (27-oct, en main local, SIGUE APAGADO): LA
+    FIRMA VIVE EN EL PORTAL Y NADIE ELIGE QUIÉN FIRMA.** ⚰️ La firma pública
+    por token MURIÓ (`contrato-cliente.html` + su function, borrados): el
+    correo ya no trae link de firma, manda al Portal («Entrar a mi Portal y
+    firmar →»).
+    - **Acta `migraciones/CONTRATO-CLIENTE-2.sql` (YA CORRIDA, CHECKs mordidos
+      3/3):** `viajeros_evento.fecha_nacimiento` · `contratos_cliente` gana INE
+      frente/reverso, fecha usada, edad al firmar, correo VERIFICADO que firmó y
+      la verificación humana (`ine_verificada_at/por`) · CHECK
+      `contratos_cliente_firma_completa`: firmado exige todo eso **y que el rol
+      case con la edad** (≥18 → titular; <18 → madre/padre/tutor) — la base
+      misma rechaza un adulto firmado como «madre» · bucket PRIVADO
+      `contratos-cliente-ine`.
+    - **`portal-contrato`** (JWT del Portal, correo verificado, «suyo» = ilike +
+      comparación exacta; ajeno e inexistente → 404 igual): `listar` · `fecha`
+      (UNA vez — PATCH con `fecha_nacimiento=is.null`, el 2º intento 409; solo
+      Bulma/Milk la corrigen) · `firmar`: 🔒 **el rol lo DERIVA la edad**
+      (`edadEn` de `_lib/contrato-cliente`, hoy en America/Matamoros) — adulto
+      firma con el nombre de SU FICHA aunque el cuerpo diga otra cosa; menor
+      exige parentesco (nace vacío, DEFAULTS-1) + nombre completo del tutor ·
+      INE de los DOS lados por magia de bytes (`_lib/imagen-magia`, 4 MB) ·
+      PATCH con `estado=eq.pendiente` (2º clic idempotente).
+    - **Portal:** cada viaje pinta su contrato — sin fecha pide la fecha (con
+      aviso de que no se cambia) · con fecha abre «Leer y firmar» (texto del
+      servidor, INE frente/reverso por FileReader→canvas, jamás `blob:`) ·
+      firmado en verde. Botones por delegación `data-mig-act` (script MÓDULO).
+    - **KameHouse:** chip «firmado · INE por revisar» → «📜 Contrato» abre el
+      panel con las dos fotos (URLs firmadas 10 min) y «✓ La INE coincide»
+      (`contrato_cliente_ine` / `contrato_cliente_verificar`, roshi/bulma/milk).
+    - `mide:contrato-cliente-2` **19** (handler real: apagado 409 sin subir
+      fotos · fecha una vez · adulto con cuerpo «madre» firma como titular ·
+      bytes de texto rebotan · menor sin parentesco rebota · ajeno 404 · sin
+      correo verificado 403) · `mide:contrato-cliente-1` **29** · vecinos
+      verdes (preventa-elegir-1 14 · req-b1 52 · ride-sin-zona-1 9 · acomp-1 67 ·
+      acomp-2 43 · confirma-1 28 · portal-edit-1 28 · paq-preventa-1 8).
+    - 🔒⏳ **ENCENDER = palabra de Memo**, y son DOS renglones juntos:
+      `CONTRATO_CLIENTE_VIVO` en el lib + `KH_CONTRATO_CLIENTE_VIVO` en
+      kamehouse.js (y destapar la casilla `mig-contrato`). Antes: prueba en
+      producción con un viajero de Memo (fecha → INE → firmar → verificar en KH).
 
 - 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
   sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:

@@ -101,6 +101,8 @@ const ACCIONES = {
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
   contrato_cliente_estado: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
+  contrato_cliente_ine: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] ver la INE (URLs firmadas)
+  contrato_cliente_verificar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] la INE coincide
   // [CREA-1b] Regalar un boleto es mover inventario: mismos roles que capturan
   // viajeros. Y la entrada VA AQUÍ o la acción no existe para el portero —
   // ésa fue RAD-FIX-CAMINO: tres RPC vivos y 'accion inválida' en pantalla.
@@ -1247,14 +1249,46 @@ ${entregables}
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || evento_id.length > 80) return bad(headers, 'evento_id inválido');
       const base = evento_id.split('#')[0];
-      const r = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?or=(evento_id.eq.${encodeURIComponent(base)},evento_id.like.${encodeURIComponent(base + '#*')})&estado=neq.anulado&select=viajero_id,estado,firmado_at,firmante_nombre,firmante_rol,envios,token&limit=5000`, { headers: sbHeaders });
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?or=(evento_id.eq.${encodeURIComponent(base)},evento_id.like.${encodeURIComponent(base + '#*')})&estado=neq.anulado&select=id,viajero_id,estado,firmado_at,firmante_nombre,firmante_rol,edad_al_firmar,envios,ine_verificada_at&limit=5000`, { headers: sbHeaders });
       if (!r.ok) return upstream(headers, await r.text(), 'consulta');
-      const { SITIO } = require('./_lib/contrato-cliente');
       const mapa = {};
       (await r.json()).forEach((c) => {
-        mapa[c.viajero_id] = { estado: c.estado, firmado_at: c.firmado_at, firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol, envios: c.envios, url: `${SITIO}/contrato-cliente.html?t=${c.token}` };
+        mapa[c.viajero_id] = { id: c.id, estado: c.estado, firmado_at: c.firmado_at, firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol, edad_al_firmar: c.edad_al_firmar, envios: c.envios, ine_verificada: !!c.ine_verificada_at };
       });
       return ok(headers, { contratos: mapa });
+    }
+    // [CONTRATO-CLIENTE-2] La INE de un contrato FIRMADO, con URLs firmadas de
+    // 10 min (bucket privado), y la marca humana de «la INE coincide».
+    if (accion === 'contrato_cliente_ine' || accion === 'contrato_cliente_verificar') {
+      const cid = String(body.contrato_id || '').trim();
+      if (!/^[0-9a-f-]{36}$/i.test(cid)) return bad(headers, 'contrato_id inválido');
+      const rq = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?id=eq.${cid}&select=id,estado,ine_frente_path,ine_reverso_path,firmante_nombre,firmante_rol,edad_al_firmar,fecha_nacimiento_usada,firmado_por_correo,ine_verificada_at,ine_verificada_por&limit=1`, { headers: sbHeaders });
+      if (!rq.ok) return upstream(headers, await rq.text(), 'consulta');
+      const c = (await rq.json())[0];
+      if (!c || c.estado !== 'firmado') return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese contrato no está firmado' }) };
+      if (accion === 'contrato_cliente_verificar') {
+        const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId;
+        const pv = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?id=eq.${cid}&estado=eq.firmado&ine_verificada_at=is.null`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ ine_verificada_at: new Date().toISOString(), ine_verificada_por: quien }) });
+        if (!pv.ok) return upstream(headers, await pv.text(), 'update');
+        const fv = await pv.json();
+        return ok(headers, { verificada: true, ya: !fv.length });
+      }
+      const firmar = async (path) => {
+        if (!path) return null;
+        const sg = await fetch(`${env.KH_SB_URL}/storage/v1/object/sign/contratos-cliente-ine/${path}`, {
+          method: 'POST', headers: { ...sbHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
+        if (!sg.ok) return null;
+        const j = await sg.json().catch(() => ({}));
+        return j.signedURL ? `${env.KH_SB_URL}/storage/v1${j.signedURL}` : null;
+      };
+      return ok(headers, {
+        frente: await firmar(c.ine_frente_path), reverso: await firmar(c.ine_reverso_path),
+        firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol, edad_al_firmar: c.edad_al_firmar,
+        fecha_nacimiento: c.fecha_nacimiento_usada, firmado_por_correo: c.firmado_por_correo,
+        verificada_at: c.ine_verificada_at, verificada_por: c.ine_verificada_por,
+      });
     }
     if (accion === 'contrato_cliente_enviar') {
       const id = String(body.viajero_id || '').trim();

@@ -82,10 +82,9 @@ const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
     DB = semilla(); RESEND = []; const l0 = L();
     const r0 = await l0.emitirContratos(Object.assign({ viajeroIds: [U(1), U(2), U(3)] }, KH));
     af(r0.apagado === true && DB.c.length === 0 && RESEND.length === 0, 'apagado: no nace NINGÚN contrato ni sale correo');
-    DB.c.push({ id: U(990), viajero_id: U(1), token: 'a'.repeat(48), estado: 'pendiente', datos: { nombre: 'X', evento: 'NSQK' }, envios: 0 });
-    const H0 = require(path.join(RAIZ, 'netlify/functions/contrato-cliente.js')).handler;
-    const x0 = await H0({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx' }, body: JSON.stringify({ accion: 'firmar', token: 'a'.repeat(48), nombre: 'Ana Pérez', rol: 'titular', acepto: true }) });
-    af(x0.statusCode === 409 && DB.c[0].estado === 'pendiente', 'apagado: firmar por link público → 409, nada se escribe');
+    // ⚰️ La firma pública (contrato-cliente.js) se RETIRÓ en CONTRATO-CLIENTE-2:
+    // se firma en el Portal; su careo vive en mide:contrato-cliente-2.
+    af(!fs.existsSync(path.join(RAIZ, 'netlify/functions/contrato-cliente.js')) && !fs.existsSync(path.join(RAIZ, 'contrato-cliente.html')), 'la firma pública por token ya no existe (se firma en el Portal)');
     const kh = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
     af(/const KH_CONTRATO_CLIENTE_VIVO = false;/.test(kh), 'la pantalla también lo esconde (espejo apagado)');
   }
@@ -111,8 +110,8 @@ const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
   let r = await lib.emitirContratos(Object.assign({ viajeroIds: [U(1), U(2), U(3), U(4), U(5)], creado_por: 'bulma@x' }, KH));
   af(r.creados === 3, () => 'nacen 3 contratos (Ana, Beto, Caro) — salió ' + r.creados);
   af(RESEND.length === 1 && RESEND[0].to[0] === 'ana@correo.mx', () => 'UN correo para la dirección compartida (control positivo: el contador ve envíos) — ' + RESEND.length);
-  af(RESEND.length === 1 && (RESEND[0].html.match(/contrato-cliente\.html\?t=/g) || []).length === 2, 'ese correo trae los DOS links (Ana y Beto)');
-  af(r.sin_correo.length === 1 && /contrato-cliente\.html\?t=[a-f0-9]{48}$/.test(r.sin_correo[0].url), 'sin correo → devuelve el link para WhatsApp');
+  af(RESEND.length === 1 && /conectareynosa\.mx\/portal/.test(RESEND[0].html) && /Ana Pérez/.test(RESEND[0].html) && /Beto Pérez/.test(RESEND[0].html), 'ese correo lleva al PORTAL y nombra a los DOS (Ana y Beto)');
+  af(r.sin_correo.length === 1 && r.sin_correo[0].nombre === 'Caro Sin Correo', 'sin correo → se DICE (sin correo no hay Portal donde firmar)');
   af(r.saltados.length === 2 && r.saltados.some((s) => /preventa/.test(s.motivo)) && r.saltados.some((s) => /cliente/.test(s.motivo)), 'preventa a ciegas y staff: saltados CON motivo');
   const cAna = DB.c.find((c) => c.viajero_id === U(1));
   af(cAna && cAna.correo === 'ana@correo.mx' && cAna.datos.total === 5500 && cAna.datos.pagado === 300 && cAna.datos.saldo === 5200, 'la foto: correo en minúsculas, total/pagado/saldo por saldoMigrado');
@@ -133,27 +132,8 @@ const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
   global.fetch = real;
   af(!r.ok && r.creados === 1 && DB.c[0].envios === 0, 'Resend caído: contrato creado, NO sellado como enviado, y se dice');
 
-  console.log('\n[F] la firma (handler REAL)');
-  DB = semilla(); RESEND = []; lib = L();
-  await lib.emitirContratos(Object.assign({ viajeroIds: [U(1)] }, KH));
-  const H = require(path.join(RAIZ, 'netlify/functions/contrato-cliente.js')).handler;
-  const tok = DB.c[0].token;
-  const call = (b) => H({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', 'user-agent': 'ua', 'x-nf-client-connection-ip': '1.2.3.4' }, body: JSON.stringify(b) });
-  let x = await call({ accion: 'ver', token: tok }); let jb = JSON.parse(x.body);
-  af(x.statusCode === 200 && jb.estado === 'pendiente' && /NSQK/.test(jb.html) && /Cancelaciones y posposiciones/.test(jb.html), 'ver: el texto viene del servidor (un solo dueño)');
-  x = await call({ accion: 'ver', token: 'zz' }); af(x.statusCode === 400, 'token malo → 400');
-  x = await call({ accion: 'firmar', token: tok, nombre: 'Ana Pérez', acepto: true }); af(x.statusCode === 400 && DB.c[0].estado === 'pendiente', 'sin rol → 400 (nace vacío, DEFAULTS-1)');
-  x = await call({ accion: 'firmar', token: tok, nombre: 'Ana', rol: 'titular', acepto: true }); af(x.statusCode === 400, 'sin apellido → 400');
-  x = await call({ accion: 'firmar', token: tok, nombre: 'Ana Pérez', rol: 'titular' }); af(x.statusCode === 400, 'sin aceptar → 400');
-  x = await call({ accion: 'firmar', token: tok, nombre: 'Ana  Pérez ', rol: 'madre', acepto: true }); jb = JSON.parse(x.body);
-  af(x.statusCode === 200 && DB.c[0].estado === 'firmado' && DB.c[0].firmante_nombre === 'Ana Pérez' && DB.c[0].firmante_rol === 'madre' && DB.c[0].firma_ip === '1.2.3.4', 'firmar: estado, nombre limpio, rol e IP quedan');
-  const antes = DB.patchC.length;
-  x = await call({ accion: 'firmar', token: tok, nombre: 'Otra Persona', rol: 'titular', acepto: true }); jb = JSON.parse(x.body);
-  af(x.statusCode === 200 && jb.ya && DB.patchC.length === antes && DB.c[0].firmante_nombre === 'Ana Pérez', '2º clic: idempotente, cero escrituras, la firma no se pisa');
-  DB.c[0].estado = 'anulado';
-  x = await call({ accion: 'ver', token: tok }); af(x.statusCode === 410, 'anulado → 410');
-
   console.log('\n[H] los tres caminos');
+  let x, jb;
   const req = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-requisiciones.js'), 'utf8');
   const asg = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');
   af(/emitirContratos\(\{\s*viajeroIds: nacidos\.map/.test(req) && /return j\(200, headers, \{\s*contrato,/.test(req), 'aprobar requisición → emite y la respuesta trae `contrato`');

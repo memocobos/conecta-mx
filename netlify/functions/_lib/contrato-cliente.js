@@ -39,9 +39,12 @@ const crypto = require('crypto');
 // ⚠️ La variable CONTRATO_CLIENTE_ARNES existe SOLO para que el careo mida el
 // camino encendido; producción jamás la define (verlo en Netlify si hay duda).
 const CONTRATO_CLIENTE_VIVO = process.env.CONTRATO_CLIENTE_ARNES === '1';
-const VERSION_TEXTO = 'CC-1 · 27-oct-2026';
+const VERSION_TEXTO = 'CC-2 · 27-oct-2026';
 const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 const SITIO = 'https://conectareynosa.mx';
+// [CONTRATO-CLIENTE-2] La firma vive en el Portal: el link lleva ahí, no a una
+// página pública con token (esa se retiró — ver portal-contrato).
+const PORTAL_FIRMA = SITIO + '/portal';
 const ZONA_PREVENTA = 'preventa a ciegas';
 const PAQ_TXT = { plus: 'PLUS', stay: 'STAY', ride: 'RIDE', cheap: 'CHEAP' };
 
@@ -55,6 +58,17 @@ const llaveCorreo = (c) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(k) ? k : null;
 };
 const nuevoToken = () => crypto.randomBytes(24).toString('hex'); // 48 hex — el CHECK de la tabla
+
+// ── PURO: años cumplidos en `hoyISO` (fechas YYYY-MM-DD, sin husos: se
+// comparan como texto de calendario). null si no hay fecha.
+function edadEn(fechaNac, hoyISO) {
+  const m = String(fechaNac || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const n = String(hoyISO || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m || !n) return null;
+  let e = +n[1] - +m[1];
+  if (n[2] + n[3] < m[2] + m[3]) e--;
+  return e;
+}
 
 // ¿Esta fila puede tener contrato de cliente? (razón en texto si no)
 function motivoSinContrato(v) {
@@ -137,7 +151,7 @@ function clausulas(d) {
     'Si el evento se <b>pospone</b>, tu lugar y tus pagos se mueven a la fecha nueva <b>y no hay reembolso</b>. Si no puedes ir en la fecha nueva, tu única opción es <b>transferir tu lugar</b> a otra persona (cláusula de cambios). El único caso con reembolso es la cancelación oficial del evento.',
   ] });
   c.push({ t: 'Menores de edad', items: [
-    'Si el viajero es menor de edad, este contrato lo firma su <b>mamá, papá o tutor</b>, quien acepta todas sus cláusulas en nombre del menor.',
+    'Si el viajero es menor de edad, este contrato lo firma su <b>mamá, papá o tutor</b>, con su INE, y acepta todas sus cláusulas en nombre del menor. Quién firma lo determina la fecha de nacimiento del viajero.',
   ] });
   c.push({ t: 'Cambios y transferencias', items: [
     'No se puede cambiar de paquete ni de tour una vez reservado.',
@@ -192,18 +206,19 @@ function renderCorreo({ correo, ev, contratos }) {
   const artista = String(ev.a || ev.id);
   const primer = (String((contratos[0] && contratos[0].nombre) || '').trim().split(/\s+/)[0]) || 'Hola';
   const varios = contratos.length > 1;
-  const subject = `Tu contrato de viaje · ${artista}`;
-  const botones = contratos.map((c) => `<p style="margin:0 0 12px;text-align:center"><a href="${SITIO}/contrato-cliente.html?t=${c.token}" style="display:inline-block;background:#e8ff4c;color:#000000;font-weight:800;text-decoration:none;padding:14px 26px;border-radius:8px;font-size:15px">${varios ? 'Firmar el de ' + esc(c.nombre) : 'Leer y firmar mi contrato'} →</a></p>`).join('');
+  const subject = `Firma tu contrato de viaje · ${artista}`;
+  const quienes = varios ? `<p style="margin:0 0 14px;color:#ffffff">Contratos por firmar: <b>${contratos.map((c) => esc(c.nombre)).join(', ')}</b>.</p>` : '';
   const html = `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000000;color:#ffffff">
         <div style="background:#e8ff4c;color:#000000;padding:18px 22px;border-bottom:4px solid #ff283b">
           <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#000000">Conecta Reynosa · ${esc(artista)}</div>
-          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, tu contrato de viaje está listo</div>
+          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, firma tu contrato de viaje</div>
         </div>
         <div style="padding:22px;font-size:15px;line-height:1.6;color:#ffffff">
-          <p style="margin:0 0 14px;color:#ffffff">Aquí está el contrato de ${varios ? 'los lugares de tu grupo' : 'tu lugar'} para <b style="color:#e8ff4c">${esc(artista)}</b>${ev.f ? ' (' + esc(ev.f) + ')' : ''}. Léelo con calma: dice qué incluye tu paquete, cómo van los pagos y qué pasa si el evento se cancela o se pospone.</p>
-          <p style="margin:0 0 20px;color:#ffffff">Firmarlo toma un minuto: escribes tu nombre y aceptas.${varios ? ' Cada viajero tiene su propio contrato.' : ''} Si el viajero es menor de edad, lo firma su mamá, papá o tutor.</p>
-          ${botones}
+          <p style="margin:0 0 14px;color:#ffffff">Tu contrato para <b style="color:#e8ff4c">${esc(artista)}</b>${ev.f ? ' (' + esc(ev.f) + ')' : ''} ya está listo. Se firma dentro de tu <b>Portal</b>: entra (o regístrate) con <b>este mismo correo</b> (<span style="color:#e8ff4c">${esc(correo)}</span>).</p>
+          ${quienes}
+          <p style="margin:0 0 20px;color:#ffffff">Para firmar vas a necesitar la <b>fecha de nacimiento</b> del viajero y una foto de la <b>INE</b> (frente y reverso) de quien firma. Si el viajero es menor de edad, firma su mamá, papá o tutor con su propia INE.</p>
+          <p style="margin:0 0 12px;text-align:center"><a href="${PORTAL_FIRMA}" style="display:inline-block;background:#e8ff4c;color:#000000;font-weight:800;text-decoration:none;padding:14px 26px;border-radius:8px;font-size:15px">Entrar a mi Portal y firmar →</a></p>
           <p style="margin:18px 0 0;font-size:13px;color:#b3b3b3">¿Dudas? Escríbenos por WhatsApp al 81 1977 1072.</p>
         </div>
       </div>`;
@@ -254,7 +269,7 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
         if (Number(previo.datos && previo.datos.total) !== Number(datos.total)) {
           out.errores.push({ id: v.id, nombre: v.nombre, aviso: `ya FIRMÓ con total ${mxn(previo.datos.total)} y hoy el total es ${mxn(datos.total)}: un contrato firmado no se reescribe — si el cambio es real, anula y emite uno nuevo` });
         }
-        out.links.push({ id: v.id, nombre: v.nombre, url: `${SITIO}/contrato-cliente.html?t=${previo.token}`, estado: 'firmado' });
+        out.links.push({ id: v.id, nombre: v.nombre, url: PORTAL_FIRMA, estado: 'firmado' });
         continue;
       } else if (previo) {
         const pR = await fetch(`${KH_URL}/rest/v1/contratos_cliente?id=eq.${previo.id}&estado=eq.pendiente`, {
@@ -270,7 +285,7 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
         if (!iR.ok || !ia.length) { out.errores.push({ id: v.id, nombre: v.nombre, aviso: 'no pude crear su contrato (' + iR.status + ')' }); continue; }
         fila = ia[0]; out.creados++;
       }
-      const url = `${SITIO}/contrato-cliente.html?t=${fila.token}`;
+      const url = PORTAL_FIRMA;
       out.links.push({ id: v.id, nombre: v.nombre, url, estado: 'pendiente' });
       const yaEnviado = Number(fila.envios || (previo && previo.envios) || 0) > 0;
       if (!enviar || (yaEnviado && !reenviar)) continue;
@@ -315,5 +330,5 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
 
 module.exports = {
   emitirContratos, armarDatos, clausulas, renderContratoHTML, renderCorreo, motivoSinContrato, incluyeDe,
-  VERSION_TEXTO, ZONA_PREVENTA, SITIO, CONTRATO_CLIENTE_VIVO, _esc: esc,
+  VERSION_TEXTO, ZONA_PREVENTA, SITIO, PORTAL_FIRMA, CONTRATO_CLIENTE_VIVO, edadEn, _esc: esc,
 };

@@ -37,8 +37,32 @@ const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 // solo esos por el momento»). Fuera de aquí la bandeja y la captura NO mandan.
 const EVENTOS_CORREO = ['palnorte', 'nsqkmty'];   // [NSQK-PREVENTA-1]
 
+// [REQ-2027-1] Palabra de Memo (26-oct-2026, «solo requisiciones»): en los
+// eventos de 2027 en adelante el correo único (confirmación + invitación al
+// Portal) sale cuando el cliente entra por la PUERTA del sitio — aprobar su
+// requisición, o repartir sus lugares desde el Portal (tipo 'reserva'). La
+// captura MANUAL de un pago (tipo 'pago') NO lo dispara fuera de la lista: los
+// clientes que vienen del Excel no reciben nada nuevo; a ellos se les invita
+// evento por evento con el botón. La fecha se le PREGUNTA al catálogo servido
+// (su `ds`), no se teclea evento por evento.
+const CORREO_RESERVA_DESDE = '2027-01-01';
+
 function baseSlug(id) { return String(id || '').split('#')[0]; }
 function correoActivo(evento_id) { return EVENTOS_CORREO.includes(baseSlug(evento_id)); }
+function reservaPorFecha(ev) { return !!(ev && ev.ds && String(ev.ds).slice(0, 10) >= CORREO_RESERVA_DESDE); }
+// ¿Sale el correo? La lista manda para todo; la regla de fecha solo para
+// 'reserva'. Async porque la fecha vive en el catálogo — y se pregunta ANTES
+// del puente al Portal, que escribe.
+async function correoDebeSalir(evento_id, tipo) {
+  if (correoActivo(evento_id)) return true;
+  if (tipo !== 'reserva') return false;
+  try {
+    const { fetchEventosRaw } = require('./catalogo-index');
+    const EV = await fetchEventosRaw();
+    const ev = (Array.isArray(EV) ? EV : []).find((e) => e && e.id === baseSlug(evento_id)) || null;
+    return reservaPorFecha(ev);
+  } catch (_) { return false; }
+}
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -108,7 +132,7 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
   const PT_URL = process.env.PORTAL_SUPABASE_URL;
   const PT_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
   const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
-  if (!correoActivo(evento_id)) return null; // fuera de los eventos con correo: no se manda nada
+  if (!(await correoDebeSalir(evento_id, tipo))) return null; // fuera de los eventos con correo: no se manda nada
   if (!RESEND_KEY) return { ok: false, aviso: 'Falta RESEND_API_KEY: no se mandó el correo de confirmación.' };
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   const evBase = baseSlug(evento_id);
@@ -212,4 +236,4 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
   }
 }
 
-module.exports = { renderConfirmacion, enviarCorreoPago, correoActivo, EVENTOS_CORREO, PORTAL_URL };
+module.exports = { renderConfirmacion, enviarCorreoPago, correoActivo, correoDebeSalir, reservaPorFecha, CORREO_RESERVA_DESDE, EVENTOS_CORREO, PORTAL_URL };

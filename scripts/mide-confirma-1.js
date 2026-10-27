@@ -106,7 +106,9 @@ const ev = (b, t) => ({ httpMethod: 'POST', headers: { origin: 'https://conectar
     '[D1] Resend caído → el abono QUEDA, el correo dice que falló, y NO se asienta invitación');
 
   console.log('[E] la lib');
-  af(H.lib.EVENTOS_CORREO.length === 1 && H.lib.EVENTOS_CORREO[0] === 'palnorte', '[E1] eventos con correo: solo palnorte (palabra de Memo)');
+  // [REQ-2027-1] La lista creció con NSQK-PREVENTA-1 (26-oct) y este renglón se
+  // quedó diciendo «solo palnorte» — rojo pre-existente, actualizado a la verdad.
+  af(JSON.stringify(H.lib.EVENTOS_CORREO) === JSON.stringify(['palnorte', 'nsqkmty']), '[E1] eventos con correo en TODO momento: palnorte y nsqkmty (palabra de Memo)');
   const rr = H.lib.renderConfirmacion({ tipo: 'reserva', correo: 'a@b.mx', ev: null, nombres: ['A'], recibido: 1 });
   af(!!rr.error, '[E2] sin catálogo no hay correo (no se manda «tu viaje» sin decir cuál)');
   af(!st.log.some((l) => l.startsWith('DELETE')), '[E3] cero DELETEs');

@@ -101,6 +101,7 @@
     "mide:gz-rep-1": "node scripts/mide-gz-rep-1.js",
     "mide:mas-alla-1": "node scripts/mide-mas-alla-1.js",
     "mide:baba-ux-2": "node scripts/mide-baba-ux-2.js",
-    "mide:yamcha-ux-1": "node scripts/mide-yamcha-ux-1.js"
+    "mide:yamcha-ux-1": "node scripts/mide-yamcha-ux-1.js",
+    "mide:req-2027-1": "node scripts/mide-req-2027-1.js"
   }
 }

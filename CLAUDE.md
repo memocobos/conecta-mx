@@ -222,6 +222,29 @@ está caduco antes de escribirse.
     anuncio.** Publicar antes del push sacaría a nsqkmty como CHEAP normal
     sin requisición — el error PN27-PAQ-1 repetido.
 
+- 🚪⏳ **REQ-2027-1 (26-oct-2026, en main local): la puerta 2027, mitad
+  SERVIDOR — el index NO se tocó (orden de Memo: «no modifiques nada en index
+  hasta que estemos seguros»; «este es el movimiento más difícil»).** Plan
+  firmado en tres pasos: (1) servidor ✅ · (2) pruebas con `?req=1` en
+  producción, una por paquete y una multifecha, rechazadas en bandeja ⏳ ·
+  (3) el index cambia la lista por la regla 2027 — MTY primero, CDMX cuando
+  Bulma/Milk tengan la regla del vuelo ⏳. Lo de hoy:
+  - **Candado de paquetes SOLO en la puerta pública** (`_lib/paquete-sitio`,
+    espejo de los botones del cotizador: rideOnly · cheapOnly · STAY no en
+    CDMX —por VENUE, como `isCDMX`— ni noStay · CHEAP no con noCheap/
+    cheapSoon). Palabra de Memo: el MOTOR compartido sigue cotizando todo
+    (cortesías y capturas internas no se rompen — careado).
+  - **El correo único se abre a 2027+ SOLO al aprobar requisiciones**
+    (`correoDebeSalir`, `CORREO_RESERVA_DESDE='2027-01-01'` contra el `ds` del
+    catálogo servido; palabra de Memo «solo requisiciones»): la captura MANUAL
+    de un pago fuera de palnorte/nsqkmty NO manda nada — los 168 de juniorh
+    del Excel no reciben correo nuevo. Catálogo caído → no sale (se pregunta
+    ANTES del puente, que escribe al Portal).
+  - Medido antes: el motor cotiza OK los 4 paquetes en los 14 eventos 2027
+    con zonas; Memo corrigió en Esferas **Emmanuel RIDE $31→$2,700** y
+    **Hilary separos** (verificado servido). `mide:req-2027-1` **22**; vecinos
+    verdes (acomp-1 y confirma-1 actualizados a la verdad nueva con su razón).
+
 - 🔁 **YAMCHA-UX-1/2 + YAMCHA-TRASPASO-1 (26-oct-2026, en main local): la
   derrota de Yamcha se vuelve operable.** Buscador (nombre/correo/banco/nota,
   sin acentos) · eventos minimizables (el «✓ Todo resuelto» nace minimizado) ·

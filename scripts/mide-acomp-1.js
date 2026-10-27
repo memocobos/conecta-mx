@@ -214,7 +214,12 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   // PREMISA 1: un evento vendible que NO sea de PORTAL_AL_APROBAR (el reparto sin Portal).
   let vendible = null;
   for (const e of EV) {
+    // [REQ-2027-1] Desde el 26-oct el correo único también sale al aprobar en
+    // CUALQUIER evento de 2027+ (palabra de Memo). La premisa «evento SIN
+    // correo» pide entonces un evento ANTERIOR a 2027 — antes bastaba con no
+    // ser palnorte y el primero del EV (fuerzaregida, ene-2027) caía aquí.
     if (!e || e.id === 'palnorte' || !Array.isArray(e.zonas)) continue;
+    if (!e.ds || String(e.ds) >= '2027-01-01') continue;
     for (const z of e.zonas) {
       if (!z || !z.n) continue;
       const r = await H.resolver({ evento_id: e.id, paquete: 'plus', zona: z.n, num_personas: 3, transporte_cost: 0 }).catch(() => null);

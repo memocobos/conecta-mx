@@ -37,6 +37,7 @@
 
 const { corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
+const { paqueteVendibleEnSitio } = require('./_lib/paquete-sitio');   // [REQ-2027-1]
 const { tallaNormalizada } = require('./_lib/correo-forma');
 
 const BUCKET = 'abonos-viajeros'; // el de los abonos, a propósito — ver encabezado
@@ -212,6 +213,20 @@ exports.handler = async (event) => {
   const hotel = body.hotel == null ? null : String(body.hotel).trim().slice(0, 60) || null;
   const transporte = body.transporte == null ? null : String(body.transporte).trim().slice(0, 120) || null;
   const cotizacion_texto = String(body.cotizacion_texto || '').slice(0, 4000) || null;
+
+  // ── [REQ-2027-1] ¿El sitio VENDE ese paquete en ese evento? El motor de
+  // precios cotiza cualquiera (cortesías y capturas internas lo necesitan);
+  // la puerta pública solo deja nacer lo que el cotizador ofrece. Sin catálogo
+  // no se decide aquí: el motor de abajo ya contesta 502 en ese caso. ────────
+  try {
+    const { fetchEventosRaw } = require('./_lib/catalogo-index');
+    const EVp = await fetchEventosRaw();
+    const evp = Array.isArray(EVp) ? EVp.find((x) => x && x.id === evento_id.split('#')[0]) : null;
+    if (evp) {
+      const v = paqueteVendibleEnSitio(evp, paquete);
+      if (!v.ok) return json(409, headers, { ok: false, error: 'Ese paquete no está disponible: ' + v.motivo + '. Vuelve a cotizar o escríbenos por WhatsApp.' });
+    }
+  } catch (_) { /* sin catálogo decide el motor (502) */ }
 
   // ── La AUTORIDAD del precio. Rehúsa lo no vendible — y esa negativa es la
   // puerta: una requisición de algo que no se vende no debe nacer. ──────────

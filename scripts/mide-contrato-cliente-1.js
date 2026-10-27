@@ -76,7 +76,21 @@ const L = () => { for (const k of Object.keys(require.cache)) if (k.includes('/n
 const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
 
 (async () => {
-  console.log('══ mide:contrato-cliente-1 ══\n[T] el texto');
+  console.log('══ mide:contrato-cliente-1 ══\n[I] el interruptor APAGADO (CONTRATO-CLIENTE-1b)');
+  {
+    delete process.env.CONTRATO_CLIENTE_ARNES;
+    DB = semilla(); RESEND = []; const l0 = L();
+    const r0 = await l0.emitirContratos(Object.assign({ viajeroIds: [U(1), U(2), U(3)] }, KH));
+    af(r0.apagado === true && DB.c.length === 0 && RESEND.length === 0, 'apagado: no nace NINGÚN contrato ni sale correo');
+    DB.c.push({ id: U(990), viajero_id: U(1), token: 'a'.repeat(48), estado: 'pendiente', datos: { nombre: 'X', evento: 'NSQK' }, envios: 0 });
+    const H0 = require(path.join(RAIZ, 'netlify/functions/contrato-cliente.js')).handler;
+    const x0 = await H0({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx' }, body: JSON.stringify({ accion: 'firmar', token: 'a'.repeat(48), nombre: 'Ana Pérez', rol: 'titular', acepto: true }) });
+    af(x0.statusCode === 409 && DB.c[0].estado === 'pendiente', 'apagado: firmar por link público → 409, nada se escribe');
+    const kh = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
+    af(/const KH_CONTRATO_CLIENTE_VIVO = false;/.test(kh), 'la pantalla también lo esconde (espejo apagado)');
+  }
+  process.env.CONTRATO_CLIENTE_ARNES = '1';
+  console.log('\n[T] el texto (de aquí en adelante, camino ENCENDIDO solo para el arnés)');
   let lib = L();
   const base = { nombre: 'Ana', paquete: 'plus', paquete_txt: 'PLUS', incluye: ['Boleto'], con_transporte: true, total: 5500, pagado: 300, saldo: 5200, evento: 'NSQK', folio: 'X' };
   const txt = (d) => lib.clausulas(d).map((c) => c.t + ' ' + c.items.join(' ')).join(' ');

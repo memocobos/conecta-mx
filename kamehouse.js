@@ -5975,8 +5975,11 @@ function _vjPuedeEliminar() {
 // ── [CONTRATO-CLIENTE-1] El contrato del cliente en la lista de viajeros ──
 // Espejo de `motivoSinContrato` de _lib/contrato-cliente (el servidor es la
 // autoridad: si esto se desalinea, el botón contesta con el motivo).
+// [CONTRATO-CLIENTE-1b] Espejo del interruptor del servidor: apagado, no se
+// pinta ni el chip ni el botón (la firma se muda al Portal).
+const KH_CONTRATO_CLIENTE_VIVO = false;
 function _vjCtrPuede(v) {
-  if (!v) return false;
+  if (!KH_CONTRATO_CLIENTE_VIVO || !v) return false;
   const tipo = String(v.tipo_viajero || '').toLowerCase();
   if (tipo && tipo !== 'cliente') return false;
   if (!(Number(v.total_contrato) > 0)) return false;

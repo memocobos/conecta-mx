@@ -30,6 +30,15 @@
 
 const crypto = require('crypto');
 
+// 🔒 [CONTRATO-CLIENTE-1b] INTERRUPTOR — APAGADO (27-oct-2026). Palabra de
+// Memo: con un selector «¿quién firma?» cualquiera dice «soy su mamá» y nos
+// falsifican. La firma se muda al PORTAL: edad del perfil (fecha de nacimiento
+// obligatoria) decide titular vs tutor, con INE obligatoria. Mientras eso no
+// exista, NO nace ni sale ningún contrato. Medido al apagar: 0 filas en
+// contratos_cliente (ninguno salió).
+// ⚠️ La variable CONTRATO_CLIENTE_ARNES existe SOLO para que el careo mida el
+// camino encendido; producción jamás la define (verlo en Netlify si hay duda).
+const CONTRATO_CLIENTE_VIVO = process.env.CONTRATO_CLIENTE_ARNES === '1';
 const VERSION_TEXTO = 'CC-1 · 27-oct-2026';
 const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 const SITIO = 'https://conectareynosa.mx';
@@ -208,6 +217,7 @@ function renderCorreo({ correo, ev, contratos }) {
 // sin_correo, saltados:[{id,motivo}], links:[{id,nombre,url}], errores, aviso }.
 async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true, reenviar = false, KH_URL, KH_KEY }) {
   const out = { ok: true, creados: 0, refrescados: 0, ya_firmados: 0, enviados: [], sin_correo: [], saltados: [], links: [], errores: [], aviso: null };
+  if (!CONTRATO_CLIENTE_VIVO) return Object.assign(out, { apagado: true });
   try {
     const ids = (viajeroIds || []).filter((x) => /^[0-9a-f-]{36}$/i.test(String(x)));
     if (!ids.length) return Object.assign(out, { ok: false, aviso: 'sin viajeros' });
@@ -305,5 +315,5 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
 
 module.exports = {
   emitirContratos, armarDatos, clausulas, renderContratoHTML, renderCorreo, motivoSinContrato, incluyeDe,
-  VERSION_TEXTO, ZONA_PREVENTA, SITIO, _esc: esc,
+  VERSION_TEXTO, ZONA_PREVENTA, SITIO, CONTRATO_CLIENTE_VIVO, _esc: esc,
 };

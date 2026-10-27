@@ -278,8 +278,18 @@ está caduco antes de escribirse.
   - `mide:contrato-cliente-1` **34** (handlers reales, Resend contado con
     control positivo); vecinos verdes (req-b1 52 · acomp-1 67 · acomp-2 43 ·
     confirma-1 28 · ride-sin-zona-1 9 — cazó un `document` en la pantalla).
-  - ⏳ Push de Memo → verificación en navegador contra producción (primer
-    contrato real).
+  - 🔴🔒 **CONTRATO-CLIENTE-1b (27-oct, MISMO DÍA): APAGADO tras su push.**
+    Palabra de Memo: «si les das la opción de elegir quién firma pueden
+    empezar a falsificarnos» — el selector de rol era un candado de papel.
+    Decisión firmada: **la firma se MUDA AL PORTAL** (registro con fecha de
+    nacimiento obligatoria — ya existe; la edad del perfil decide sola
+    titular vs mamá/papá/tutor; INE del que firma obligatoria; acompañantes
+    con el mismo correo: el titular captura su fecha en el Portal).
+    Interruptor `CONTRATO_CLIENTE_VIVO` en el lib (solo lo prende la variable
+    del arnés) + espejo `KH_CONTRATO_CLIENTE_VIVO=false` en kamehouse.js +
+    casilla del alta oculta. **Medido al apagar: 0 filas en
+    `contratos_cliente` — no salió ninguno.** `mide:contrato-cliente-1`
+    **37** (bloque [I]: apagado no nace nada, firmar 409). ⏳ CONTRATO-CLIENTE-2.
 
 - 🎟⏳ **NSQK-VENTA-1 + PREVENTA-ELEGIR-1 (27-oct-2026, en main local): nsqk
   sale a la venta y los de la preventa ELIGEN su paquete.** Palabra de Memo:

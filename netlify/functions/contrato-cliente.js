@@ -71,6 +71,10 @@ exports.handler = async (event) => {
     }
 
     if (accion === 'firmar') {
+      // [CONTRATO-CLIENTE-1b] Firmar por link público está APAGADO: la firma
+      // se muda al Portal (edad del perfil + INE). Ver _lib/contrato-cliente.
+      const { CONTRATO_CLIENTE_VIVO } = require('./_lib/contrato-cliente');
+      if (!CONTRATO_CLIENTE_VIVO) return json(409, headers, { ok: false, error: 'La firma de contratos se está actualizando. Te avisaremos por correo cuando esté lista.' });
       if (b.acepto !== true) return json(400, headers, { ok: false, error: 'Marca la casilla de que leíste y aceptas el contrato.' });
       const nombre = String(b.nombre || '').replace(/\s+/g, ' ').trim();
       if (nombre.length < 5 || nombre.split(' ').length < 2) return json(400, headers, { ok: false, error: 'Escribe tu nombre completo (nombre y apellido).' });

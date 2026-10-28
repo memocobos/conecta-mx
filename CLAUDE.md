@@ -426,6 +426,17 @@ está caduco antes de escribirse.
   no los enseña y no cuentan para el cierre — cero escrituras a la base.
   `mide:portal-solo-1` **65→73** ([H], BASE da 6 rojos).
 
+- ✅ **CTR-FECHA-1 (27-oct-2026, en main local): el contrato de giveaway de
+  Caifanes decía evento «12-ene-2026»; el concierto es el 12-DIC** (lo cazó
+  Memo). Error de captura (día y mes al revés) en un contrato YA FIRMADO cuyo
+  propio desglose dice «Caifanes 12 de Diciembre». Corregido en la base con valor
+  esperado (`evento_fecha=eq.2026-01-12` y `estado=firmado`, 1 fila) y el rastro
+  en `datos.correcciones` (antes/después/quién/motivo) — no se borra lo que hubo.
+  Barrido: 0 contratos más con evento antes de su fecha de contrato. Candado en
+  `_validateCtrForm`: un evento ANTES de la fecha del contrato se rechaza diciendo
+  «¿se invirtieron día y mes?» (coordinador/laboral exentos: copian la fecha del
+  contrato a propósito).
+
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de
   nacimiento se quedaba en «dd/mm/aaaa» sin teclado ni calendario, y «la foto

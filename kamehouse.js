@@ -10341,6 +10341,13 @@ function _validateCtrForm(d) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.creador_email)) return 'Email inválido';
   if (!d.evento_nombre) return 'Falta el evento';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.evento_fecha)) return 'Fecha del evento requerida';
+  // [CTR-FECHA-1] Caso real (27-oct): un giveaway de Caifanes se firmó con
+  // evento «2026-01-12» cuando el concierto es el 12-DIC — día y mes al revés.
+  // Un evento que ocurre ANTES del contrato no tiene sentido en las plantillas
+  // por evento (coordinador/laboral copian la fecha del contrato a propósito).
+  if (!['coordinador', 'auxiliar_admin'].includes(d.plantilla) && d.contrato_fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.contrato_fecha) && d.evento_fecha < d.contrato_fecha) {
+    return 'La fecha del evento quedó ANTES de la fecha del contrato. Revisa día y mes (¿se invirtieron?)';
+  }
   if (d.plantilla === 'creadora') {
     if (!d.ofrecimiento.length) return 'Agrega al menos un ítem en "Ofrece la agencia"';
     if (!d.expectativas.length) return 'Agrega al menos un ítem en "Se espera del creador"';

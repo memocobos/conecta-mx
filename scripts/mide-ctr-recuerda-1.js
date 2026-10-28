@@ -199,6 +199,37 @@ const llamarAdmin = async (b) => {
   af(j.ok && a === 'ana@x.mx,gabo@x.mx', () => 'encendidos: le llega a Ana/Beto (un correo) y a Gabo; no a Caro (5 h), Dani (pasó), Eli (firmó), Fer (tope) — ' + a);
   af(DB.c[5].envios === 5 && DB.c[3].envios === 1, 'Fer y Dani quedan intactos');
 
+  // [CTR-VER-1] Ver el contrato y la INE desde la pestaña Clientes.
+  console.log('\n[V] ver contrato e INE');
+  DB = semilla(); RESEND = []; CC = cargar(false);
+  const DATOS = { zona: null, fecha: '2 sep 2027', folio: 'D5AC26B1', saldo: 2700, total: 2700, venue: 'Auditorio', correo: 'eli@x.mx', evento: 'Evento Futuro', nombre: 'Eli Cinco', pagado: 0, boletos: 1, celular: null, incluye: ['Kit Conecta'], paquete: 'ride', preventa: false, paquete_txt: 'RIDE', con_transporte: true };
+  DB.c.forEach((x) => { x.datos = Object.assign({}, DATOS, { nombre: x.datos.nombre }); });
+  Object.assign(DB.c[4], { ine_frente_path: U(105) + '/frente-1.jpg', ine_reverso_path: U(105) + '/reverso-1.jpg', firmante_nombre: 'Eli Cinco', firmante_rol: 'titular', edad_al_firmar: 30, firmado_at: haceH(2), ine_verificada_at: null });
+  const fOrig = global.fetch;
+  global.fetch = async (url, init) => /\/storage\/v1\/object\/sign\//.test(String(url)) ? resp(200, { signedURL: '/object/sign/x?token=t' }) : fOrig(url, init);
+  r = await llamarAdmin({ accion: 'contrato_cliente_ine', contrato_id: U(101) });
+  af(r.s === 200 && /Evento Futuro/.test(r.j.html || '') && r.j.estado === 'pendiente' && !r.j.frente, () => 'un contrato SIN firmar se puede VER (su texto), sin fotos — ' + r.s + ' ' + JSON.stringify(r.j).slice(0, 100));
+  r = await llamarAdmin({ accion: 'contrato_cliente_ine', contrato_id: U(105) });
+  af(r.s === 200 && r.j.estado === 'firmado' && /Ana Uno|Eli Cinco/.test(r.j.html || '') && r.j.frente && r.j.reverso && r.j.firmante_rol === 'titular', 'un FIRMADO trae texto + las dos URLs firmadas de la INE + quién firmó');
+  const nEsc = DB.escrituras.length;
+  r = await llamarAdmin({ accion: 'contrato_cliente_verificar', contrato_id: U(101) });
+  af(r.s === 404 && DB.escrituras.length === nEsc, '«La INE coincide» sobre uno SIN firmar → 404, cero escrituras');
+  r = await llamarAdmin({ accion: 'contrato_cliente_verificar', contrato_id: U(105) });
+  af(r.s === 200 && DB.c[4].ine_verificada_at && DB.c[4].ine_verificada_por === 'Memo', 'sobre el firmado sí sella quién y cuándo');
+  global.fetch = fOrig;
+  af(RESEND.length === 0, 'ver y verificar no mandan correos');
+  // La pantalla: el renderer único y el chip «Firmados» incluye los de INE por revisar.
+  const fDet = kh.match(/function _ctrDetalleHtml\(r, viajeroId, contratoId\) \{[\s\S]*?\n\}\n/);
+  af(!!fDet, 'existe el dueño único del detalle (_ctrDetalleHtml)');
+  const vm = require('vm'); const sb = { _esfEsc: (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])), _attrJs: (s) => String(s), _tsToDate: (s) => new Date(s) };
+  vm.createContext(sb); vm.runInContext(fDet[0], sb);
+  const hF = sb._ctrDetalleHtml({ estado: 'firmado', html: '<p>TEXTO</p>', frente: 'https://f', reverso: 'https://r', firmante_nombre: 'Eli', firmante_rol: 'titular', edad_al_firmar: 30, firmado_at: haceH(1) }, 'v', 'c');
+  af(/TEXTO/.test(hF) && /https:\/\/f/.test(hF) && /https:\/\/r/.test(hF) && /La INE coincide/.test(hF), 'firmado: pinta el contrato, las dos fotos y el botón «La INE coincide»');
+  const hP = sb._ctrDetalleHtml({ estado: 'pendiente', html: '<p>TEXTO</p>' }, 'v', 'c');
+  af(/TEXTO/.test(hP) && !/La INE coincide/.test(hP) && /Todavía no lo firma/.test(hP), 'sin firmar: pinta el contrato y dice que falta la firma (sin botón de INE)');
+  af(/_ctrCliFiltro === 'firmado' \? c\.estado === 'firmado'/.test(kh) && /chip\('firmado', 'Firmados', cuenta\.firmado \+ cuenta\.ine\)/.test(kh), '«Firmados» cuenta y enseña TODOS los firmados (incluye INE por revisar)');
+  af(/onclick="ctrCliVer\(/.test(kh) && /async function ctrCliVer\(contratoId, viajeroId\)/.test(kh), 'cada renglón de la pestaña Clientes tiene su botón «Ver» con su función');
+
   console.log('\n══ RESULTADO ══');
   if (V === 0) { console.log('⚠️ NADA MEDIDO · esto NO es un verde'); process.exit(1); }
   console.log((R ? '🔴 ROJO' : '✅ VERDE') + ' · ' + V + ' en verde · ' + R + ' en rojo');

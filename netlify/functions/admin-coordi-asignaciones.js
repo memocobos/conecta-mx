@@ -1264,10 +1264,15 @@ ${entregables}
     if (accion === 'contrato_cliente_ine' || accion === 'contrato_cliente_verificar') {
       const cid = String(body.contrato_id || '').trim();
       if (!/^[0-9a-f-]{36}$/i.test(cid)) return bad(headers, 'contrato_id inválido');
-      const rq = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?id=eq.${cid}&select=id,estado,ine_frente_path,ine_reverso_path,firmante_nombre,firmante_rol,edad_al_firmar,fecha_nacimiento_usada,firmado_por_correo,ine_verificada_at,ine_verificada_por&limit=1`, { headers: sbHeaders });
+      const rq = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?id=eq.${cid}&select=id,estado,datos,version_texto,firmado_at,firma_ip,ine_frente_path,ine_reverso_path,firmante_nombre,firmante_rol,edad_al_firmar,fecha_nacimiento_usada,firmado_por_correo,ine_verificada_at,ine_verificada_por&limit=1`, { headers: sbHeaders });
       if (!rq.ok) return upstream(headers, await rq.text(), 'consulta');
       const c = (await rq.json())[0];
-      if (!c || c.estado !== 'firmado') return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese contrato no está firmado' }) };
+      if (!c) return { statusCode: 404, headers, body: JSON.stringify({ error: 'No encontré ese contrato' }) };
+      // [CTR-VER-1] El texto se VE aunque no esté firmado (es la foto guardada en
+      // `datos`, la misma que lee el cliente); verificar la INE sí exige firma.
+      if (c.estado !== 'firmado' && accion === 'contrato_cliente_verificar') return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese contrato no está firmado' }) };
+      let html = null;
+      try { html = c.datos ? require('./_lib/contrato-cliente').renderContratoHTML(c.datos) : null; } catch (_) { html = null; }
       if (accion === 'contrato_cliente_verificar') {
         const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId;
         const pv = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?id=eq.${cid}&estado=eq.firmado&ine_verificada_at=is.null`, {
@@ -1286,6 +1291,7 @@ ${entregables}
         return j.signedURL ? `${env.KH_SB_URL}/storage/v1${j.signedURL}` : null;
       };
       return ok(headers, {
+        estado: c.estado, html, version_texto: c.version_texto, firmado_at: c.firmado_at, firma_ip: c.firma_ip,
         frente: await firmar(c.ine_frente_path), reverso: await firmar(c.ine_reverso_path),
         firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol, edad_al_firmar: c.edad_al_firmar,
         fecha_nacimiento: c.fecha_nacimiento_usada, firmado_por_correo: c.firmado_por_correo,

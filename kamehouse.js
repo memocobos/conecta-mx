@@ -6028,21 +6028,39 @@ async function _vjCtrIne(viajeroId, contratoId, nombre) {
   td.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando la INE…</div>';
   try {
     const r = await khViajeros._call({ accion: 'contrato_cliente_ine', contrato_id: contratoId });
-    const rol = { titular: 'el propio viajero', madre: 'su mamá', padre: 'su papá', tutor: 'su tutor' }[r.firmante_rol] || r.firmante_rol;
-    const img = (u, t) => u ? `<a href="${_esfEsc(u)}" target="_blank" rel="noopener"><img src="${_esfEsc(u)}" alt="${t}" style="max-width:260px;max-height:180px;border:1px solid var(--border);border-radius:6px"></a>` : `<span class="vj2-vacio">sin ${t}</span>`;
-    td.innerHTML = `<div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">
-      <div><b>Firmó:</b> ${_esfEsc(r.firmante_nombre || '—')} (${_esfEsc(rol)}) · <b>Edad del viajero al firmar:</b> ${_esfEsc(String(r.edad_al_firmar))} · <b>Nació:</b> ${_esfEsc(r.fecha_nacimiento || '—')} · <b>Cuenta:</b> ${_esfEsc(r.firmado_por_correo || '—')}</div>
-      <div style="color:var(--ts)">Revisa que el nombre de la INE sea el de quien firmó${r.firmante_rol === 'titular' ? ' y que su fecha de nacimiento coincida' : ' (el tutor)'}.</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">${img(r.frente, 'frente')}${img(r.reverso, 'reverso')}</div>
-      <div>${r.verificada_at ? `<span style="color:var(--green)">✓ Revisada por ${_esfEsc(r.verificada_por || '')}</span>` : `<button class="btn btn-primary btn-sm" onclick="_vjCtrVerificar('${_attrJs(viajeroId)}','${_attrJs(contratoId)}')">✓ La INE coincide</button> <span style="color:var(--ts)">Si NO coincide, escríbele al cliente por WhatsApp.</span>`}</div>
-    </div>`;
+    td.innerHTML = _ctrDetalleHtml(r, viajeroId, contratoId);
   } catch (e) { td.innerHTML = `<div class="alert alert-error">No se pudo abrir la INE: ${_esfEsc(e.message)}</div>`; }
+}
+// [CTR-VER-1] UN dueño del detalle de un contrato de viajero: el texto tal cual
+// lo leyó el cliente (la foto guardada) + quién firmó + las dos fotos de la INE
+// + «✓ La INE coincide». Lo piden la lista de viajeros y la pestaña Clientes.
+function _ctrDetalleHtml(r, viajeroId, contratoId) {
+  const esc = _esfEsc;
+  const firmado = r.estado === 'firmado';
+  const rol = { titular: 'el propio viajero', madre: 'su mamá', padre: 'su papá', tutor: 'su tutor' }[r.firmante_rol] || r.firmante_rol || '—';
+  const img = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener" title="Abrir en grande"><img src="${esc(u)}" alt="INE ${t}" style="max-width:320px;max-height:210px;border:1px solid var(--border);border-radius:6px;display:block"></a><div style="font-size:10px;color:var(--ts);margin-top:2px">INE · ${t} (clic para verla grande)</div>` : `<span class="vj2-vacio">sin foto del ${t}</span>`;
+  const f = r.firmado_at ? _tsToDate(r.firmado_at).toLocaleString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const doc = r.html
+    ? `<details${firmado ? '' : ' open'} style="margin-top:2px"><summary style="cursor:pointer;color:#e8ff4c;font-weight:700">📜 ${firmado ? 'Ver el contrato que firmó' : 'Ver el contrato (aún sin firmar)'}${r.version_texto ? ' · ' + esc(r.version_texto) : ''}</summary>
+        <div class="ctrv-doc">${r.html}</div></details>`
+    : '<span class="vj2-vacio">El texto de este contrato no se pudo armar.</span>';
+  const firma = firmado
+    ? `<div><b>Firmó:</b> ${esc(r.firmante_nombre || '—')} (${esc(rol)}) · <b>Cuándo:</b> ${esc(f)} · <b>Edad del viajero al firmar:</b> ${esc(String(r.edad_al_firmar))} · <b>Nació:</b> ${esc(r.fecha_nacimiento || '—')} · <b>Cuenta:</b> ${esc(r.firmado_por_correo || '—')}${r.firma_ip ? ' · <b>IP:</b> ' + esc(r.firma_ip) : ''}</div>
+       <div style="color:var(--ts)">Revisa que el nombre de la INE sea el de quien firmó${r.firmante_rol === 'titular' ? ' y que su fecha de nacimiento coincida' : ' (el tutor)'}.</div>
+       <div style="display:flex;gap:14px;flex-wrap:wrap">${img(r.frente, 'frente')}${img(r.reverso, 'reverso')}</div>
+       <div>${r.verificada_at ? `<span style="color:var(--green)">✓ INE revisada por ${esc(r.verificada_por || '')}</span>` : `<button class="btn btn-primary btn-sm" onclick="_vjCtrVerificar('${_attrJs(viajeroId)}','${_attrJs(contratoId)}')">✓ La INE coincide</button> <span style="color:var(--ts)">Si NO coincide, escríbele al cliente por WhatsApp.</span>`}</div>`
+    : '<div style="color:#ffb020">Todavía no lo firma: aquí saldrán su firma y su INE cuando lo haga en el Portal.</div>';
+  return `<style>.ctrv-doc{background:#fff;color:#1a1a1a;border-radius:8px;padding:14px 18px;margin-top:8px;max-height:420px;overflow:auto;font-size:12px;line-height:1.55}
+    .ctrv-doc .doc-meta{border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:8px}.ctrv-doc .meta-row{display:flex;gap:8px}.ctrv-doc .lbl{min-width:70px;color:#666}
+    .ctrv-doc h2{font-size:13px;margin:12px 0 4px;color:#000}.ctrv-doc .num{display:inline-block;min-width:20px;color:#c00}.ctrv-doc p{margin:0 0 6px}</style>
+    <div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px">${firma}${doc}</div>`;
 }
 async function _vjCtrVerificar(viajeroId, contratoId) {
   try {
     await khViajeros._call({ accion: 'contrato_cliente_verificar', contrato_id: contratoId });
     showToast('INE marcada como revisada', 'success');
-    _vj2Cargar();
+    if (document.getElementById('cc-kh-list')) _vj2Cargar();
+    if (_ctrCli !== null && document.getElementById('ctr-cli-viaj')) ctrCliCargar();
   } catch (e) { showToast('No se pudo marcar: ' + _esfEsc(e.message), 'error'); }
 }
 
@@ -11013,6 +11031,19 @@ async function ctrCliCargar() {
   _ctrCliPintar();
 }
 function ctrCliFiltrar(f) { _ctrCliFiltro = f; _ctrCliPintar(); }
+// [CTR-VER-1] Abre/cierra el detalle del contrato debajo de su renglón.
+async function ctrCliVer(contratoId, viajeroId) {
+  const fila = document.getElementById(`ctrcli-det-${contratoId}`);
+  if (!fila) return;
+  if (fila.style.display !== 'none') { fila.style.display = 'none'; return; }
+  const td = fila.querySelector('td');
+  fila.style.display = '';
+  td.innerHTML = '<div class="loading-state"><div class="spinner"></div>Abriendo el contrato…</div>';
+  try {
+    const r = await khViajeros._call({ accion: 'contrato_cliente_ine', contrato_id: contratoId });
+    td.innerHTML = _ctrDetalleHtml(r, viajeroId, contratoId);
+  } catch (e) { td.innerHTML = `<div class="alert alert-error">No se pudo abrir el contrato: ${_esfEsc(e.message)}</div>`; }
+}
 function _ctrCliPintar() {
   const box = document.getElementById('ctr-cli-viaj');
   if (!box || _ctrCli === null) return;
@@ -11027,7 +11058,7 @@ function _ctrCliPintar() {
   todos.forEach((c) => { cuenta[_ctrCliClase(c)]++; });
   const estado = _ctrCli.vivo
     ? `<span style="color:var(--green)">● encendido</span>`
-    : `<span style="color:#ffb020">● APAGADO</span> <span style="color:var(--ts)">— no nace ni se manda ningún contrato hasta que Memo lo encienda.</span>`;
+    : `<span style="color:#ffb020">● APAGADO</span> <span style="color:var(--ts)">— no nace ni se manda ningún contrato hasta que Memo lo encienda.${_ctrCli.modo_prueba ? ' <b>Modo prueba:</b> solo vive para el correo de Memo.' : ''}</span>`;
   const auto = _ctrCli.auto_vivo
     ? `Recordatorio automático: <b>encendido</b>, cada ${_ctrCli.cada_dias} días, máximo ${_ctrCli.tope} avisos, nunca después del evento.`
     : `Recordatorio automático: <b>apagado</b> (propuesta: cada ${_ctrCli.cada_dias} días, máximo ${_ctrCli.tope} avisos, nunca después del evento).`;
@@ -11036,7 +11067,10 @@ function _ctrCliPintar() {
   if (!todos.length) {
     cuerpo = `<div style="color:var(--ts);font-size:12px;line-height:1.8;padding:8px 0">Todavía no hay ningún contrato de viajero${_ctrCli.vivo ? '' : ': el contrato está apagado, así que hoy no nace ninguno'}. Cuando se encienda, nacen al aprobar una requisición, al dar de alta un viajero a mano y al elegir paquete; aquí vas a ver quién falta por firmar y recordarle.</div>`;
   } else {
-    const vis = todos.filter((c) => _ctrCliFiltro === 'todos' || _ctrCliClase(c) === _ctrCliFiltro);
+    // [CTR-VER-1] «Firmados» son TODOS los firmados (la INE por revisar es un
+    // pedazo de ellos, no otra cosa): antes un firmado sin revisar no salía aquí.
+    const vis = todos.filter((c) => _ctrCliFiltro === 'todos'
+      || (_ctrCliFiltro === 'firmado' ? c.estado === 'firmado' : _ctrCliClase(c) === _ctrCliFiltro));
     // Agrupados por evento, el más cercano primero; los pasados al final.
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
     const grupos = new Map();
@@ -11067,10 +11101,13 @@ function _ctrCliPintar() {
               ? `<span style="font-size:11px;color:var(--ts)">${esc(c.no_recordar)}</span>`
               : `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" onclick="ctrCliRecordar(['${_attrJs(c.viajero_id)}'])">📨 Recordar</button>`)
             : `<span style="font-size:11px;color:var(--ts)">firmó ${esc(c.firmante_nombre || '')}${c.firmante_rol && c.firmante_rol !== 'titular' ? ' (' + esc(c.firmante_rol) + ')' : ''} · ${fmt(c.firmado_at)}</span>`;
+          // [CTR-VER-1] Ver el contrato (y su INE si ya firmó) sin salir de aquí.
+          const ver = `<button class="btn ${cl === 'ine' ? 'btn-primary' : 'btn-ghost'}" style="padding:4px 10px;font-size:11px" onclick="ctrCliVer('${_attrJs(c.id)}','${_attrJs(c.viajero_id)}')">${cl === 'ine' ? '🪪 Revisar INE y contrato' : cl === 'firmado' ? '👁 Ver contrato e INE' : '👁 Ver contrato'}</button>`;
           return `<tr><td><b>${esc(c.nombre || '—')}</b><br><span style="color:var(--ts);font-size:11px">${esc(c.correo || 'sin correo')}</span></td>
             <td style="font-size:12px">${esc(c.paquete || '')}${c.zona ? ' · ' + esc(c.zona) : ''}<br><span style="color:var(--ts);font-size:11px">${mxn(c.total)}</span></td>
             <td style="font-size:12px">${avisos}</td><td style="font-size:12px">${badge}</td>
-            <td style="text-align:right;white-space:nowrap">${accion}</td></tr>`;
+            <td style="text-align:right;white-space:nowrap;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap">${accion}${ver}</td></tr>
+            <tr id="ctrcli-det-${esc(c.id)}" style="display:none"><td colspan="5"></td></tr>`;
         }).join('');
         const masivo = recordables.length > 1
           ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" onclick='ctrCliRecordar(${JSON.stringify(recordables)})'>📨 Recordar a los ${recordables.length}</button>` : '';
@@ -11085,7 +11122,7 @@ function _ctrCliPintar() {
       <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="ctrCliRecordar([])">👁 Ver el correo del recordatorio</button>
     </div>
     <div style="font-size:11.5px;line-height:1.7;margin:6px 0 10px">${estado}<br><span style="color:var(--ts)">${auto}</span>${_ctrCli.catalogo_ok === false ? '<br><span style="color:#ffb020">No se pudo leer el catálogo: las fechas de los eventos no salen y no se sabe quién ya viajó.</span>' : ''}</div>
-    <div class="kh-subnav" style="margin-bottom:4px">${chip('sin_firmar', 'Sin firmar', cuenta.sin_firmar)}${chip('ine', 'INE por revisar', cuenta.ine)}${chip('firmado', 'Firmados', cuenta.firmado)}${chip('todos', 'Todos', todos.length)}</div>
+    <div class="kh-subnav" style="margin-bottom:4px">${chip('sin_firmar', 'Sin firmar', cuenta.sin_firmar)}${chip('ine', 'INE por revisar', cuenta.ine)}${chip('firmado', 'Firmados', cuenta.firmado + cuenta.ine)}${chip('todos', 'Todos', todos.length)}</div>
     <div id="ctr-cli-prev"></div>
     ${cuerpo}`);
 }

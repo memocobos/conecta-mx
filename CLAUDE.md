@@ -483,6 +483,24 @@ está caduco antes de escribirse.
     de verdad deja de importar. Medido antes: **ninguno de los 5 de la preventa
     nsqk ha elegido paquete** — no se les debía contrato todavía.
     `mide:ctr-recuerda-1` **39** ([MP]); vecinos verdes.
+    ✅ **Prueba de punta a punta HECHA (27-oct, en producción):** fecha →
+    INE (dos fotos sintéticas «PRUEBA») → firmar en el Portal con la cuenta de
+    Memo → `firmado`, rol `titular` derivado de la edad (41), INE en el bucket,
+    IP/UA. ⚠️ El primer intento rebotó porque CTR-PRUEBA-1 aún no estaba
+    pusheado — el servidor contestaba «todavía no está abierta».
+  - 👁 **CTR-VER-1 (27-oct, mismo día): en la pestaña Clientes SE VE el contrato
+    y la INE.** Reporte de Memo con captura: «no me deja ver el ine, en
+    Firmados no sale el que está firmado, no hay previsualización». Tres cosas:
+    (1) «Firmados» contaba solo los de INE ya revisada — hoy cuenta y enseña
+    TODOS los firmados (la INE por revisar es un pedazo de ellos); (2) cada
+    renglón trae «👁 Ver contrato» / «🪪 Revisar INE y contrato» que abre debajo
+    el texto TAL CUAL lo leyó el cliente (la foto en `datos` →
+    `renderContratoHTML`), quién y cuándo firmó, IP, las dos fotos (URLs
+    firmadas 10 min) y «✓ La INE coincide»; (3) `contrato_cliente_ine` ya deja
+    VER un contrato sin firmar (su texto, sin fotos) — verificar sigue exigiendo
+    firma (404). 🔒 `_ctrDetalleHtml` es el dueño único del detalle: lo piden la
+    pestaña Clientes y el «📜 Contrato» de la lista de viajeros.
+    `mide:ctr-recuerda-1` **49** ([V]).
 
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de

@@ -45,6 +45,9 @@ const CAMPOS_INSERT = [
   'precio_total', 'monto_separo', 'notas_cliente', 'comprobante_separo_url',
 ];
 
+// [PORTAL-SOLO-1] Apagado a propósito. Encender = palabra de Memo.
+const SOLICITUDES_PORTAL_VIVAS = false;
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -56,6 +59,16 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+  }
+  // 🔒 [PORTAL-SOLO-1 · 27-oct-2026] EL PORTAL YA NO VENDE. Palabra de Memo:
+  // «ya no ocupan hacer solicitudes desde el portal … ya todo en el index,
+  // kamehouse acepta y aparece en portal». Medido antes de cerrar: la tabla
+  // `solicitudes_tour` tenía UNA fila, y era una clienta que ya era viajera por
+  // requisición (pidió su viaje dos veces y la segunda quedó en un lugar que
+  // nadie revisa). Esconder el botón no basta (COB-MIG-1): la puerta se cierra
+  // AQUÍ. Comprar = index → requisición → bandeja de KameHouse.
+  if (!SOLICITUDES_PORTAL_VIVAS) {
+    return { statusCode: 410, headers, body: JSON.stringify({ error: 'Las reservas ya no se hacen desde el Portal: aparta tu lugar en conectareynosa.mx (elige tu evento y «Reservar»).', cerrado: true }) };
   }
 
   const SB_URL     = process.env.PORTAL_SUPABASE_URL;

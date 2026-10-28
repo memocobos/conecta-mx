@@ -111,15 +111,40 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
     // vuelve inofensivo cualquier comodín del patrón.
-    const viajeros = (Array.isArray(crudos) ? crudos : [])
+    const suyas = (Array.isArray(crudos) ? crudos : [])
       .filter((v) => String(v && v.correo != null ? v.correo : '').trim().toLowerCase() === correo);
+
+    // ═══ [PORTAL-SOLO-1] SOLO SE ENSEÑA LO QUE ALGUIEN REVISÓ ═══════════════
+    // Palabra de Memo: «antes que se registrara bulma milk o yo podamos revisar
+    // su caso … que tal que tiene menos pagos o pagos de más… eso haría al
+    // cliente desconfiar». Una fila SIN sello no viaja: ni su dinero ni su
+    // paquete. Lo que viaja es que EXISTE algo en revisión (el evento), para que
+    // el Portal diga «estamos revisando tu viaje» en vez de «no tienes nada».
+    // Y su llegada ABRE la revisión en la bandeja de KameHouse (una por correo).
+    const PR = require('./_lib/portal-revision');
+    const viajeros = suyas.filter(PR.revisada);
+    const sinSello = suyas.filter((v) => !PR.revisada(v));
+    let revisionError = null;
+    if (sinSello.length) {
+      try { await PR.pedirRevision({ correo, filas: suyas, KH_URL, KH_KEY }); }
+      catch (e) { revisionError = e.message; }
+    }
+    // Las solicitudes del cliente (revisar / ligar), pendientes o rechazadas
+    // recientes, para que el Portal las pinte con su motivo.
+    let solicitudes = [];
+    try {
+      const rs = await fetch(`${KH_URL}/rest/v1/portal_revisiones?correo=eq.${encodeURIComponent(correo)}&tipo=in.(revisar,ligar)&estado=in.(pendiente,rechazada)&creado_en=gte.${new Date(Date.now() - 60 * 864e5).toISOString()}&select=id,tipo,estado,evento_id,nombre_dado,motivo,creado_en,atendida_at&order=creado_en.desc&limit=20`, { headers: hKH });
+      if (rs.ok) solicitudes = await rs.json();
+    } catch (_) { /* no tumba el plan */ }
+    const en_revision = [...new Set(sinSello.map((v) => v.evento_id))];
+
     if (!viajeros.length) {
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours: [] }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours: [], en_revision, solicitudes, revision_error: revisionError }) };
     }
 
     // Los abonos de ESOS viajeros. Se filtra en el servidor por sus ids.
@@ -165,7 +190,7 @@ exports.handler = async (event) => {
       };
     });
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours, fuente: 'kamehouse/viajeros_evento' }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours, en_revision, solicitudes, revision_error: revisionError, fuente: 'kamehouse/viajeros_evento' }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error leyendo tu plan', detail: e.message }) };
   }

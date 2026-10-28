@@ -59,9 +59,10 @@ global.fetch = async (url, init) => {
 };
 const semilla = () => ({ escrituras: [], subidas: [],
   v: [
-    { id: U(1), evento_id: 'nsqkmty', nombre: 'Ana Pérez López', correo: 'Ana@Correo.mx', fecha_nacimiento: null },
-    { id: U(2), evento_id: 'nsqkmty', nombre: 'Beto Pérez', correo: 'ana@correo.mx', fecha_nacimiento: null },
-    { id: U(3), evento_id: 'nsqkmty', nombre: 'Otra Persona', correo: 'otra@x.mx', fecha_nacimiento: hace(30) },
+    // [PORTAL-SOLO-1] Las filas del fixture nacen SELLADAS: desde el 27-oct el Portal solo toca lo revisado (la fila sin sello es 404, medido en mide:portal-solo-1). El arnés se actualiza a la verdad nueva.
+    { id: U(1), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Ana Pérez López', correo: 'Ana@Correo.mx', fecha_nacimiento: null },
+    { id: U(2), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Beto Pérez', correo: 'ana@correo.mx', fecha_nacimiento: null },
+    { id: U(3), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Otra Persona', correo: 'otra@x.mx', fecha_nacimiento: hace(30) },
   ],
   c: [
     { id: U(11), viajero_id: U(1), estado: 'pendiente', datos: { nombre: 'Ana Pérez López', evento: 'NSQK', paquete_txt: 'PLUS', incluye: ['Boleto'], total: 5300, pagado: 300, saldo: 5000 } },

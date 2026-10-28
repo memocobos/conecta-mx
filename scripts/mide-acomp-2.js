@@ -25,13 +25,14 @@ let DB, LOG, FALLAR;
 function semilla() {
   DB = {
     viajeros_evento: [
-      { id: 'aaaaaaaa-0000-4000-8000-000000000001', evento_id: 'palnorte', nombre: 'Karina Ramírez', correo: 'karina@x.com', boletos: 3, total_contrato: 900, abonado_previo: 0, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', tipo_viajero: null, grupo_viaje: null, notas: 'Requisición R-RMZ5P' },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000002', evento_id: 'palnorte', nombre: 'Uno Solo', correo: 'solo@x.com', boletos: 1, total_contrato: 300, abonado_previo: 0, grupo_viaje: null },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000003', evento_id: 'karolg', nombre: 'Mixta', correo: 'mixta@x.com', boletos: 3, total_contrato: 10000, abonado_previo: 1000, tipo_paquete: 'plus', zona_boleto: 'General', grupo_viaje: null },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000010', evento_id: 'palnorte', nombre: 'Ana', correo: 'ana@x.com', boletos: 1, grupo_viaje: null },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000011', evento_id: 'palnorte', nombre: 'Bety', correo: 'bety@x.com', boletos: 1, grupo_viaje: 'ggggggg1-0000-4000-8000-000000000000' },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000012', evento_id: 'palnorte', nombre: 'Caro', correo: 'caro@x.com', boletos: 1, grupo_viaje: 'ggggggg1-0000-4000-8000-000000000000' },
-      { id: 'aaaaaaaa-0000-4000-8000-000000000013', evento_id: 'karolg', nombre: 'Otra', correo: 'o@x.com', boletos: 1, grupo_viaje: null },
+    // [PORTAL-SOLO-1] Las filas del fixture nacen SELLADAS: desde el 27-oct el Portal solo toca lo revisado (la fila sin sello es 404, medido en mide:portal-solo-1). El arnés se actualiza a la verdad nueva.
+      { id: 'aaaaaaaa-0000-4000-8000-000000000001', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Karina Ramírez', correo: 'karina@x.com', boletos: 3, total_contrato: 900, abonado_previo: 0, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', tipo_viajero: null, grupo_viaje: null, notas: 'Requisición R-RMZ5P' },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000002', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Uno Solo', correo: 'solo@x.com', boletos: 1, total_contrato: 300, abonado_previo: 0, grupo_viaje: null },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000003', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'karolg', nombre: 'Mixta', correo: 'mixta@x.com', boletos: 3, total_contrato: 10000, abonado_previo: 1000, tipo_paquete: 'plus', zona_boleto: 'General', grupo_viaje: null },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000010', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Ana', correo: 'ana@x.com', boletos: 1, grupo_viaje: null },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000011', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Bety', correo: 'bety@x.com', boletos: 1, grupo_viaje: 'ggggggg1-0000-4000-8000-000000000000' },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000012', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Caro', correo: 'caro@x.com', boletos: 1, grupo_viaje: 'ggggggg1-0000-4000-8000-000000000000' },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000013', portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'karolg', nombre: 'Otra', correo: 'o@x.com', boletos: 1, grupo_viaje: null },
     ],
     abonos_viajero: [
       { id: 'bbbbbbbb-0000-4000-8000-000000000001', viajero_id: 'aaaaaaaa-0000-4000-8000-000000000001', monto: 900, fecha: '2026-10-12', nota: 'Requisición R-RMZ5P', foto_path: 'req/k.jpg' },

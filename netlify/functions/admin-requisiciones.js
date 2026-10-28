@@ -397,7 +397,10 @@ exports.handler = async (event) => {
     // [GRUPO-VIAJE-1] Los que nacen de UNA requisición viajan juntos: misma
     // llave de grupo para que Bulma/Milk los vean como un solo grupo.
     const grupoViaje = personas ? require('crypto').randomUUID() : null;
-    const filasV = personas
+    // [PORTAL-SOLO-1] Aprobar ES revisar: alguien vio el comprobante y tecleó
+    // el monto. Las filas nacen SELLADAS para el Portal (sin doble trabajo).
+    const sello = { portal_revisado_at: new Date().toISOString(), portal_revisado_por: 'requisición ' + req.folio + ' · aprobó ' + quien };
+    const filasV = (personas
       ? personas.map((p, i) => ({
           grupo_viaje: grupoViaje,
           evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
@@ -411,7 +414,7 @@ exports.handler = async (event) => {
           talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: req.num_personas,
           total_contrato, abonado_previo: 0, notas: notaViajero,
-        }];
+        }]).map((f) => Object.assign(f, sello));
     const rV = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
       method: 'POST',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),

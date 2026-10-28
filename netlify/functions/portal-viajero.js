@@ -77,13 +77,19 @@ exports.handler = async (event) => {
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   let v;
   try {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto&limit=1`, { headers: hKH });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at&limit=1`, { headers: hKH });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu viaje' });
     v = (await r.json())[0];
   } catch (e) { return json(502, headers, { ok: false, error: 'No pude leer tu viaje' }); }
   // 🔒 Inexistente y ajena contestan LO MISMO: no se le confirma a nadie que un
   // id existe si no es suyo.
   if (!v || String(v.correo == null ? '' : v.correo).trim().toLowerCase() !== correo) {
+    return json(404, headers, { ok: false, error: 'No encontramos ese viajero en tu cuenta' });
+  }
+  // 🔒 [PORTAL-SOLO-1] Una fila SIN revisar no se toca desde el Portal (ni se
+  // edita, ni se reparte, ni elige paquete): el cliente ni siquiera la ve hasta
+  // que Bulma/Milk/Memo la revisan. Contesta IGUAL que ajena/inexistente.
+  if (!v.portal_revisado_at) {
     return json(404, headers, { ok: false, error: 'No encontramos ese viajero en tu cuenta' });
   }
 
@@ -316,6 +322,9 @@ async function repartir({ body, viajero_id, correo, KH_URL, KH_KEY, hKH }) {
     evento_id: t.evento_id, nombre: a.nombre, correo: a.correo, celular: a.celular,
     tipo_paquete: t.tipo_paquete, zona_boleto: t.zona_boleto, tipo_viajero: t.tipo_viajero || null,
     boletos: 1, total_contrato: parteT, abonado_previo: 0, grupo_viaje: grupo,
+    // [PORTAL-SOLO-1] Nace sellado: su dinero es la parte AL PESO del titular,
+    // que ya estaba revisado (sin sello, `repartir` ni siquiera corre).
+    portal_revisado_at: new Date().toISOString(), portal_revisado_por: 'heredado del titular (ACOMP-2)',
     notas: `Acompañante de ${titular} · su lugar se lo dio ${titular} desde el Portal ${hoy} (ACOMP-2)`,
   }));
   const rV = await fetch(VE, { method: 'POST', headers: H({ Prefer: 'return=representation' }), body: JSON.stringify(filas) });

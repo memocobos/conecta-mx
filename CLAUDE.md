@@ -330,6 +330,60 @@ está caduco antes de escribirse.
       kamehouse.js (y destapar la casilla `mig-contrato`). Antes: prueba en
       producción con un viajero de Memo (fecha → INE → firmar → verificar en KH).
 
+- 🪪⏳ **PORTAL-SOLO-1 (27-oct-2026, en main local): EL PORTAL YA NO VENDE Y
+  SOLO ENSEÑA LO QUE ALGUIEN REVISÓ.** Palabras de Memo, citadas: *«ya no ocupan
+  hacer solicitudes desde el portal … ya todo en el index, kamehouse acepta y
+  aparece en portal»* y *«antes que se registrara bulma milk o yo podamos revisar
+  su caso … que tal que tiene menos pagos o pagos de más … lo que se guarde en la
+  revisión manual tú la puedes utilizar para saber qué onda con esa persona»*.
+  `npm run mide:portal-solo-1` (**45**, sin ancla — árbol).
+  - **Medido antes:** `solicitudes_tour` tenía UNA fila y era un DUPLICADO (Ximena
+    ya era viajera por requisición; quedó en un lugar que nadie revisa — hoy
+    `cancelado` con nota, no borrada). De 1,078 viajeros de eventos que vienen,
+    **404 no tienen correo** (no se ven solos en el Portal).
+  - **La base** (acta `migraciones/PORTAL-SOLO-1.sql`, YA CORRIDA, candados
+    MORDIDOS 4/4): `viajeros_evento.portal_revisado_at/_por` = el SELLO ·
+    tabla `portal_revisiones` = bandeja Y bitácora (tipos `revisar`/`ligar`/
+    `adelanto`, ANTES y DESPUÉS + nota; RLS deny-all + GRANT service_role).
+    Backfill: las **48 filas nacidas de requisición** nacen selladas (aprobar ES
+    revisar).
+  - 🔒 **Sin sello no viaja NADA de esa fila** (ni dinero ni id):
+    `portal-mi-plan-migrado` solo sirve lo sellado, manda `en_revision` (el
+    evento, sin números) y ABRE una revisión por correo en la bandeja con la foto
+    ANTES (una pendiente a la vez; una rechazada no se reabre sola, solo una fila
+    NUEVA). `portal-viajero` y `portal-contrato` tratan la fila sin sello como
+    ajena (404 / fuera de la lista). `_lib/portal-revision` es el dueño.
+  - **El Portal:** `PORTAL_VENDE=false` — sin FAB, sin «Crea tu primer tour»,
+    sin wizard (abrirlo manda al index), «+ Nuevo» → «Reservar otro viaje →»
+    al index; `portal-nueva-solicitud` contesta **410** en el servidor. Pinta
+    «🔎 Estamos revisando tu viaje» / lo pedido / lo rechazado con su motivo, y
+    sin nada: **«Aún no vemos tu viaje»** (evento de la lista que viene, nombre
+    como reservó, WhatsApp) → `portal-revision` acción `ligar`.
+  - **KameHouse:** arriba de la bandeja, tarjetas 🪪 «Revisar antes del Portal»
+    (sus filas, abonos y «📊 Ver qué dice el Excel» — corre el careo del evento y
+    busca su nombre, solo LEE) y 🔗 «Ligar Portal» (candidatos del evento: mismo
+    WhatsApp primero, luego nombre; **un correo distinto NO se pisa sin
+    confirmar**) → «✓ Revisado, publicar» con nota (sella, guarda antes/después,
+    UN correo «ya puedes ver tu viaje» con total/pagado/falta de `saldoMigrado`;
+    2º clic 409) o «No procede» con motivo (le llega tal cual). Bitácora
+    plegable. Inicio MB: tarjeta «🪪 Portal · N esperando» (se calla en cero).
+    En «Viajeros del evento»: chip 🪪 Portal ✓ / sin revisar y botón «🪪
+    Revisados para el Portal» sobre las casillas (revisión por ADELANTADO, sin
+    correo). 🔒 El dinero se corrige con lo de siempre (➕ Abono, editar); aquí
+    se revisa y publica.
+  - Nacen sellados: aprobar requisición (`requisición FOLIO · aprobó X`) y los
+    acompañantes de ACOMP-2 (heredan del titular). Vecinos actualizados a la
+    verdad nueva (sus fixtures nacen sellados, con nota): preventa-portal-1 33 ·
+    portal-edit-1 28 · acomp-2 43 · contrato-cliente-2 19; verdes sin tocar:
+    contrato-cliente-1 29 · req-b1 52 · acomp-1 67 · confirma-1 28 ·
+    plan-case-1 18 · mig-1d-ii 46 · puente-portal 21 · crea-2 27.
+  - ⚠️ **4 cuentas que YA veían un viaje viejo sin sello** (vaiven, soad,
+    neighbourhood, coronacapital#5) pasan a «en revisión» al primer login tras
+    el push: caerán a la bandeja. Correcto, y dicho.
+  - ⏳ Push de Memo → prueba con su cuenta: registrarse con un correo sin viaje
+    («Aún no vemos tu viaje») y otro con viaje sin revisar → publicar en la
+    bandeja.
+
 - 🎟⏳ **PREVENTA-PORTAL-1 (27-oct-2026, en main local): los de la preventa
   ELIGEN su paquete en el Portal y cae a la bandeja.** Palabra de Memo: «que
   ahí mismo en un wizard puedan solicitar su zona y llegue la requisición a

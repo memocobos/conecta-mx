@@ -1602,7 +1602,8 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
     <div class="card">
       <div class="tours-head">
         <div class="eyebrow" style="margin:0">Tus tours</div>
-        <button type="button" class="btn-pill" data-action="new-tour">+ Nuevo</button>
+        <!-- [PORTAL-SOLO-1] El Portal ya no vende: reservar es en el index. -->
+        <a class="btn-pill" href="/" style="text-decoration:none">Reservar otro viaje →</a>
       </div>
       <!-- [F3a] Alerta de contratos pendientes de firma (visibles para el usuario). -->
       <div id="contrato-banner"></div>
@@ -1913,6 +1914,12 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// [PORTAL-SOLO-1 · 27-oct-2026] EL PORTAL YA NO VENDE. Palabra de Memo: «ya no
+// ocupan hacer solicitudes desde el portal … ya todo en el index, kamehouse
+// acepta y aparece en portal». Apagado: sin «+ Nuevo tour», sin wizard, sin
+// precarga de reservas (y el servidor contesta 410). Encender = su palabra.
+const PORTAL_VENDE = false;
+
 const SB_URL = window.PORTAL_SUPABASE_URL;
 const SB_ANON = window.PORTAL_SUPABASE_ANON_KEY;
 
@@ -1943,7 +1950,8 @@ function showView(name){
   if (v) v.classList.add('is-active');
   $('#boot').style.display = 'none';
   // FAB solo visible en dashboard
-  $('#fab-new-tour').classList.toggle('is-visible', name === 'dashboard');
+  // [PORTAL-SOLO-1] El Portal ya no vende: el FAB «+ Nuevo tour» no se enseña.
+  $('#fab-new-tour').classList.toggle('is-visible', PORTAL_VENDE && name === 'dashboard');
   // [PP-3] El footer es el mismo en las 5 vistas, pero en login va la versión
   // mínima: quien todavía no entra no necesita el directorio de teléfonos.
   // Y el player se recorre en dashboard, que es donde vive el FAB.
@@ -2377,6 +2385,7 @@ $('#btn-cancel-profile').addEventListener('click', () => {
 // Vista C — Dashboard
 // =====================================================================
 function renderDashboard(c){
+  window.__psCliente = c || null; // [PORTAL-SOLO-1] para prellenar «Aún no vemos tu viaje»
   const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
   $('#dash-nombre').textContent = primerNombre;
   // [PP-2b] El "Hola, {nombre}" vuelve a ser fijo —es la identidad, no el
@@ -2688,6 +2697,7 @@ function _limpiarReservaPendiente(){ try { localStorage.removeItem(RESERVA_KEY);
 
 // Con sesión + perfil listos: si hay reserva pendiente, precarga el wizard.
 async function _procesarReservaPendiente(){
+  if (!PORTAL_VENDE) { _limpiarReservaPendiente(); return; } // [PORTAL-SOLO-1]
   if (_reservaEnProceso) return;
   const p = _reservaPendiente();
   if (!p) return;
@@ -3041,7 +3051,9 @@ async function renderToursList(){
     return;
   }
 
-  _toursCache = data || [];
+  // [PORTAL-SOLO-1] Con el Portal sin ventas, una solicitud vieja CANCELADA no
+  // se pinta (archivada a propósito: era un duplicado de la venta real).
+  _toursCache = (data || []).filter((t) => PORTAL_VENDE || t.estado !== 'cancelado');
   _renderToursUI();
   _celebrarLiquidados();   // [PP-2] badge + confeti, una sola vez por tour
   cargarAvisos(_toursCache); // [avisos] deriva avisos del cliente (fails-soft, no bloquea)
@@ -3070,7 +3082,19 @@ async function renderPlanMigrado(){
     });
     if (!r.ok) return;
     const j = await r.json();
-    if (!j || j.ok !== true || !Array.isArray(j.tours) || !j.tours.length) return;
+    if (!j || j.ok !== true || !Array.isArray(j.tours)) return;
+    // [PORTAL-SOLO-1] Lo que está en revisión / lo pedido / lo rechazado, y el
+    // «aún no vemos tu viaje». Sin tours revisados, eso es TODO lo que se pinta.
+    const estadoPs = _psEstadoHtml(j);
+    if (!j.tours.length) {
+      cont.innerHTML = estadoPs;
+      cont.style.display = estadoPs ? '' : 'none';
+      if (!(_toursCache || []).length) {
+        const tl = document.getElementById('tours-list'); if (tl) tl.style.display = 'none';
+        const tb = document.getElementById('dash-tabs'); if (tb) tb.style.display = 'none';
+      }
+      return;
+    }
     // [CONTRATO-CLIENTE-2] Sus contratos (fail-soft: sin respuesta, no se pinta el bloque).
     window.__migCtr = {};
     try {
@@ -3104,7 +3128,7 @@ async function renderPlanMigrado(){
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
-      + 'Tus tours con nosotros</div>' + filas;
+      + 'Tus tours con nosotros</div>' + filas + estadoPs;
     cont.style.display = '';
     window.__migTours = j.tours;
     // Quien solo tiene tours de KameHouse no debe ver «Sin solicitudes todavía /
@@ -3114,6 +3138,96 @@ async function renderPlanMigrado(){
       const tb = document.getElementById('dash-tabs'); if (tb) tb.style.display = 'none';
     }
   } catch (e) { /* fail-soft: la sección se queda oculta */ }
+}
+
+// ── [PORTAL-SOLO-1] «ESTAMOS REVISANDO TU VIAJE» / «AÚN NO VEMOS TU VIAJE» ──
+// Palabra de Memo: «antes que se registrara bulma milk o yo podamos revisar su
+// caso para darle la información correcta». El servidor solo manda lo REVISADO;
+// aquí se dice lo que está en revisión (sin un solo número: no se ha revisado),
+// lo que el cliente pidió, lo que no procedió (con el motivo del equipo), y el
+// formulario para pedir que liguemos un viaje que no ve. Funciones DECLARADAS.
+function _psEvNombre(id){
+  const ev = (typeof EV !== 'undefined' && Array.isArray(EV)) ? EV.find((e) => e && e.id === String(id || '').split('#')[0]) : null;
+  return ev && ev.a ? ev.a : String(id || '');
+}
+function _psEstadoHtml(j){
+  const sols = Array.isArray(j.solicitudes) ? j.solicitudes : [];
+  const enRev = Array.isArray(j.en_revision) ? j.en_revision : [];
+  const pendLigar = sols.filter((x) => x.tipo === 'ligar' && x.estado === 'pendiente');
+  const caja = (borde, html) => '<div style="border:1px solid ' + borde + ';border-radius:12px;padding:14px 16px;margin:10px 0;font-size:14px;line-height:1.5">' + html + '</div>';
+  let out = '';
+  if (enRev.length) {
+    out += caja('rgba(232,255,76,.45)', '🔎 <b>Estamos revisando tu viaje</b> a ' + enRev.map((id) => '<b>' + escapeHtml(_psEvNombre(id)) + '</b>').join(', ')
+      + '. Nuestro equipo confirma que tus pagos y tu plan estén correctos antes de enseñártelos. <span style="opacity:.75">Te avisamos por correo en cuanto esté listo.</span>');
+  }
+  pendLigar.forEach((x) => {
+    out += caja('rgba(232,255,76,.45)', '🔎 Recibimos tu solicitud para <b>' + escapeHtml(_psEvNombre(x.evento_id)) + '</b> (a nombre de ' + escapeHtml(x.nombre_dado || '') + '). La estamos revisando y te avisamos por correo.');
+  });
+  // Lo que no procedió, solo si no hay otra cosa en curso del mismo evento.
+  sols.filter((x) => x.estado === 'rechazada').slice(0, 2).forEach((x) => {
+    if (x.tipo === 'ligar' && pendLigar.some((p) => p.evento_id === x.evento_id)) return;
+    out += caja('rgba(255,40,59,.5)', '<b>Revisamos tu solicitud' + (x.evento_id ? ' para ' + escapeHtml(_psEvNombre(x.evento_id)) : '') + ':</b> ' + escapeHtml(x.motivo || '')
+      + '<div style="opacity:.75;font-size:12px;margin-top:4px">Puedes volver a pedirlo con los datos correctos, o escribirnos por WhatsApp al 81 1977 1072.</div>');
+  });
+  const nada = !(j.tours || []).length && !enRev.length && !pendLigar.length;
+  const form = '<div id="ps-form" style="' + (nada ? '' : 'display:none;') + 'margin-top:8px">'
+    + '<div style="font-size:13px;opacity:.85;margin-bottom:10px">Dinos a qué evento vas y cómo diste tu nombre al reservar; nuestro equipo lo liga a tu cuenta y te avisa por correo.</div>'
+    + '<label style="display:block;font-size:12px;opacity:.7;margin-bottom:4px">Evento</label>'
+    + '<select id="ps-evento" style="width:100%;padding:10px;border-radius:10px;background:#111;color:#fff;border:1px solid #333;margin-bottom:10px"><option value="">— cargando eventos… —</option></select>'
+    + '<label style="display:block;font-size:12px;opacity:.7;margin-bottom:4px">Tu nombre como lo diste al reservar</label>'
+    + '<input id="ps-nombre" type="text" maxlength="120" style="width:100%;padding:10px;border-radius:10px;background:#111;color:#fff;border:1px solid #333;margin-bottom:10px" value="' + escapeHtml((window.__psCliente && window.__psCliente.nombre_completo) || '') + '">'
+    + '<label style="display:block;font-size:12px;opacity:.7;margin-bottom:4px">Tu WhatsApp (10 dígitos)</label>'
+    + '<input id="ps-celular" type="tel" inputmode="numeric" maxlength="14" style="width:100%;padding:10px;border-radius:10px;background:#111;color:#fff;border:1px solid #333;margin-bottom:10px" value="' + escapeHtml((window.__psCliente && (window.__psCliente.celular || window.__psCliente.telefono)) || '') + '">'
+    + '<label style="display:block;font-size:12px;opacity:.7;margin-bottom:4px">¿Algo que debamos saber? (opcional)</label>'
+    + '<input id="ps-nota" type="text" maxlength="300" placeholder="Ej.: reservé con el correo de mi mamá" style="width:100%;padding:10px;border-radius:10px;background:#111;color:#fff;border:1px solid #333;margin-bottom:12px">'
+    + '<button type="button" class="btn btn-primary" data-mig-act="ps-enviar" style="max-width:320px">Pedir que liguen mi viaje</button>'
+    + '<div id="ps-msg" style="font-size:13px;margin-top:8px"></div></div>';
+  if (nada) {
+    out += caja('rgba(255,255,255,.18)', '<b style="font-size:16px">Aún no vemos tu viaje</b>' + form);
+    setTimeout(_psCargarEventos, 0);
+  } else {
+    out += '<div style="margin:6px 0 0;font-size:13px"><a href="#" data-mig-act="ps-abrir" style="color:#e8ff4c">¿No ves uno de tus viajes? Pídelo aquí</a></div>' + form;
+  }
+  return out;
+}
+let _psEventosOk = false;
+async function _psCargarEventos(){
+  const sel = document.getElementById('ps-evento');
+  if (!sel || _psEventosOk) return;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/.netlify/functions/portal-revision', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((session && session.access_token) || '') },
+      body: JSON.stringify({ accion: 'eventos' }) });
+    const jj = await r.json();
+    if (!jj || !jj.ok) throw new Error((jj && jj.error) || 'sin respuesta');
+    sel.innerHTML = '<option value="">— elige tu evento —</option>' + (jj.eventos || []).map((e) => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.nombre + (e.fecha ? ' · ' + e.fecha : '')) + '</option>').join('');
+    _psEventosOk = true;
+  } catch (e) { sel.innerHTML = '<option value="">No pude cargar los eventos: recarga la página</option>'; }
+}
+function _psAbrir(){
+  const f = document.getElementById('ps-form'); if (!f) return;
+  f.style.display = f.style.display === 'none' ? '' : 'none';
+  if (f.style.display === '') _psCargarEventos();
+}
+async function _psEnviar(){
+  const msg = document.getElementById('ps-msg');
+  const val = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  const body = { accion: 'ligar', evento_id: val('ps-evento'), nombre: val('ps-nombre'), celular: val('ps-celular'), nota: val('ps-nota') };
+  const pinta = (t, bien) => { if (msg) { msg.textContent = t; msg.style.color = bien ? '#88ea4e' : '#ff6b7a'; } };
+  if (!body.evento_id) return pinta('Elige tu evento');
+  if (body.nombre.split(/\s+/).filter((w) => w.length >= 2).length < 2) return pinta('Escribe tu nombre con apellido');
+  if (body.celular.replace(/\D/g, '').length < 10) return pinta('Tu WhatsApp debe tener 10 dígitos');
+  pinta('Enviando…', true);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/.netlify/functions/portal-revision', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((session && session.access_token) || '') },
+      body: JSON.stringify(body) });
+    const jj = await r.json().catch(() => ({}));
+    if (jj && jj.ok) { pinta('✓ Listo. Lo revisamos y te avisamos por correo.', true); setTimeout(() => { try { renderPlanMigrado(); } catch (_) {} }, 1200); }
+    else pinta((jj && jj.error) || 'No se pudo enviar');
+  } catch (e) { pinta('No se pudo enviar. Revisa tu conexión.'); }
 }
 
 // ── [PORTAL-EDIT-1] DATOS DEL VIAJERO Y SOLICITUDES DE CAMBIO ─────────────
@@ -3453,6 +3567,8 @@ document.addEventListener('click', (ev) => {
   else if (act === 'paq-abrir') _paqAbrir(id);
   else if (act === 'paq-pq') { if (_paqOps[id]) { _paqOps[id].elegido = b.getAttribute('data-paq'); _paqPintar(id); } }
   else if (act === 'paq-enviar') _paqEnviar(id);
+  else if (act === 'ps-abrir') _psAbrir();
+  else if (act === 'ps-enviar') _psEnviar();
 });
 function _migCard(id){ return document.querySelector('[data-mig-viajero="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }
 function _migAbrir(id, cual){
@@ -3521,6 +3637,15 @@ function _renderToursUI(){
   setTxt('#tab-cnt-prox', prox.length ? '(' + prox.length + ')' : '');
   setTxt('#tab-cnt-pas', pas.length ? '(' + pas.length + ')' : '');
 
+  if (!_toursCache.length && !PORTAL_VENDE){
+    // [PORTAL-SOLO-1] Sin «Crea tu primer tour»: lo que el cliente tiene (o lo
+    // que está en revisión, o el «aún no vemos tu viaje») lo pinta el bloque
+    // del plan (#tours-migrados).
+    cont.innerHTML = '';
+    cont.style.display = 'none';
+    const tb = document.getElementById('dash-tabs'); if (tb) tb.style.display = 'none';
+    return;
+  }
   if (!_toursCache.length){
     cont.innerHTML = `
       <div class="tour-empty">
@@ -5311,6 +5436,10 @@ function _startHoldTimer(){
 }
 
 function openWizard(){
+  // [PORTAL-SOLO-1] Palabra de Memo: «ya no ocupan hacer solicitudes desde el
+  // portal … ya todo en el index». Cualquier puerta vieja al wizard manda al
+  // index (el servidor además contesta 410).
+  if (!PORTAL_VENDE) { _invToast('Para reservar un viaje entra a conectareynosa.mx y elige tu evento.', false); setTimeout(() => { location.href = '/'; }, 1600); return; }
   resetWizard();
   setWizStep(1);
   showView('wizard');

@@ -24,9 +24,10 @@ const VX = 'aaaaaaaa-0000-4000-8000-000000000003';   // de OTRA persona
 function red() {
   const st = {
     viajeros: [
-      { id: VK, evento_id: 'palnorte', nombre: 'Karina T', correo: 'Karina@Prueba.mx', celular: '8991112233', talla_playera: null, num_emergencia: null, emergencia_nombre: null, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
-      { id: VA, evento_id: 'palnorte', nombre: 'Ana', correo: 'karina@prueba.mx', celular: null, talla_playera: null, num_emergencia: null, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
-      { id: VX, evento_id: 'palnorte', nombre: 'Otro', correo: 'otro@x.mx', celular: '8990000000', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
+    // [PORTAL-SOLO-1] Las filas del fixture nacen SELLADAS: desde el 27-oct el Portal solo toca lo revisado (la fila sin sello es 404, medido en mide:portal-solo-1). El arnés se actualiza a la verdad nueva.
+      { id: VK, portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Karina T', correo: 'Karina@Prueba.mx', celular: '8991112233', talla_playera: null, num_emergencia: null, emergencia_nombre: null, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
+      { id: VA, portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Ana', correo: 'karina@prueba.mx', celular: null, talla_playera: null, num_emergencia: null, tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
+      { id: VX, portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'palnorte', nombre: 'Otro', correo: 'otro@x.mx', celular: '8990000000', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', total_contrato: 300, abonado_previo: 0 },
     ],
     cambios: [], log: [],
     usuarios: { 'jwt-karina': { id: 'u1', email: 'karina@prueba.mx', email_confirmed_at: '2026-10-13' },

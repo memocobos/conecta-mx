@@ -60,9 +60,10 @@ global.fetch = async (url, init) => {
   return resp(200, []);
 };
 const semilla = () => ({ c: [], v: [
-  { id: U(1), evento_id: 'nsqkmty', nombre: 'Ana Pérez', correo: 'ana@correo.mx', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' },
-  { id: U(2), evento_id: 'nsqkmty', nombre: 'Ya Eligió', correo: 'ana@correo.mx', tipo_paquete: 'plus', zona_boleto: 'Oro' },
-  { id: U(3), evento_id: 'nsqkmty', nombre: 'Otra', correo: 'otra@x.mx', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' },
+    // [PORTAL-SOLO-1] Las filas del fixture nacen SELLADAS: desde el 27-oct el Portal solo toca lo revisado (la fila sin sello es 404, medido en mide:portal-solo-1). El arnés se actualiza a la verdad nueva.
+  { id: U(1), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Ana Pérez', correo: 'ana@correo.mx', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' },
+  { id: U(2), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Ya Eligió', correo: 'ana@correo.mx', tipo_paquete: 'plus', zona_boleto: 'Oro' },
+  { id: U(3), portal_revisado_at: '2026-10-27T00:00:00Z', evento_id: 'nsqkmty', nombre: 'Otra', correo: 'otra@x.mx', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' },
 ] });
 const H = require(path.join(RAIZ, 'netlify/functions/portal-viajero.js')).handler;
 const llamar = async (b) => { const r = await H({ httpMethod: 'POST', headers: { authorization: 'Bearer jwt' }, body: JSON.stringify(b) }); return { s: r.statusCode, j: JSON.parse(r.body) }; };

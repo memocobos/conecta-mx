@@ -45,6 +45,8 @@ async function _reqBdjCall(body) {
 async function loadRequisiciones(filtro) {
   if (filtro) _reqBdjFiltro = filtro;
   try { loadCambiosPortal(); } catch (_) {}
+  // [PORTAL-SOLO-1] Arriba de todo: lo que el cliente espera ver en su Portal.
+  try { if (typeof loadRevisionesPortal === 'function') loadRevisionesPortal(); } catch (_) {}
   const cont = document.getElementById('req-bdj-lista');
   if (!cont) return;
   if (_reqBdjCargando) return;

@@ -6140,7 +6140,8 @@ async function _vj2Cargar() {
   const _nGrupos = Object.keys(_grpColor).length;
   const grupoBarra = _puedeAgrupar ? `<div class="vj-grp-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;font-size:12px">
       <button class="btn btn-ghost btn-sm" onclick="vjGrupoJuntar()" title="Marca con la casilla a quienes viajan juntos">👥 Juntar seleccionados</button>
-      <span style="color:var(--ts)">Marca la casilla de quienes viajan juntos y aprieta «Juntar».${_nGrupos ? ` · ${_nGrupos} grupo${_nGrupos === 1 ? '' : 's'} en este evento` : ''}</span>
+      <button class="btn btn-ghost btn-sm" onclick="vjPortalAdelanto()" title="[PORTAL-SOLO-1] Marca con la casilla a quienes ya revisaste: cuando entren al Portal verán su viaje sin esperar">🪪 Revisados para el Portal</button>
+      <span style="color:var(--ts)">Marca la casilla y aprieta «Juntar» (viajan juntos) o «Revisados para el Portal».${_nGrupos ? ` · ${_nGrupos} grupo${_nGrupos === 1 ? '' : 's'} en este evento` : ''}</span>
       <span id="vj-grp-msg" style="color:var(--red)"></span>
     </div>` : '';
 
@@ -6163,7 +6164,7 @@ async function _vj2Cargar() {
       return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
         <td><b>${_esfEsc(v.nombre || '—')}</b>
-            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}
+            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}
             ${gCol ? `<div style="font-size:11px;margin-top:3px;color:${gCol}">👥 viaja con: ${compas.map(_esfEsc).join(', ')}${_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : ''}</div>` : ''}</td>
         <td>${_esfEsc(khPaqueteTexto(v) || '—')}</td>
         <td>${_esfEsc(v.zona_boleto || '—')}</td>
@@ -11842,7 +11843,7 @@ async function _inicioMB(cont) {
   // En paralelo y cada una fails-soft POR TARJETA: si la Nube tose, la
   // cobranza igual se pinta — un inicio que se cae entero por una tarjeta es
   // peor que una tarjeta que confiesa.
-  const [nube, deud, evs, reqs, masAlla] = await Promise.all([
+  const [nube, deud, evs, reqs, masAlla, portalRev] = await Promise.all([
     khAdminFetch('/.netlify/functions/admin-nube', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
       .then((r) => r.json()).catch((e) => ({ _err: e.message })),
     khViajeros._call({ accion: 'deudores_migrados' }).catch((e) => ({ _err: e.message })),
@@ -11856,7 +11857,21 @@ async function _inicioMB(cont) {
     // que alguien vaya a buscar boletos. Fails-soft como las demás.
     khAdminFetch('/.netlify/functions/admin-mas-alla', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
       .then((r) => r.json()).catch((e) => ({ _err: e.message })),
+    // [PORTAL-SOLO-1] Clientes esperando que alguien revise su viaje para
+    // verlo en el Portal. Fails-soft; se calla en cero.
+    khAdminFetch('/.netlify/functions/admin-portal-revision', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) })
+      .then((r) => r.json()).catch((e) => ({ _err: e.message })),
   ]);
+
+  // ⓪b PORTAL — clientes que ya entraron y esperan ver su viaje revisado.
+  let prvHtml = '';
+  if (portalRev && portalRev.ok && (portalRev.pendientes || []).length) {
+    const lp = portalRev.pendientes;
+    const filasP = lp.slice(0, 5).map((r) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${_iniEsc(r.nombre_dado || (r.filas && r.filas[0] && r.filas[0].nombre) || r.correo)}</span><i style="color:var(--ts)">${r.tipo === 'ligar' ? '🔗 no ve su viaje' : '🪪 revisar'}</i></div>`).join('');
+    prvHtml = _iniCard(`🪪 Portal · ${lp.length} esperando su revisión`,
+      filasP + (lp.length > 5 ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">…y ${lp.length - 5} más</div>` : ''),
+      `<button class="btn btn-primary btn-sm" onclick="showPage('requisiciones')">Revisar en la bandeja →</button>`);
+  }
 
   // ⓪ REQUISICIONES — va PRIMERA: dinero de clientes esperando confirmación.
   let reqHtml;
@@ -11935,7 +11950,7 @@ async function _inicioMB(cont) {
       : '<div style="color:var(--ts);font-size:12px">Ninguno esta semana.</div>',
     `<button class="btn btn-ghost btn-sm" onclick="showPage('capsule')">Ver viajeros →</button>`);
 
-  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${maHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando · [MAS-ALLA-1] el Más Allá enseguida
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px">${reqHtml}${prvHtml}${maHtml}${nubeHtml}${cobHtml}${proxHtml}</div>`; // [REQ-B1] requisiciones primero: cliente esperando · [MAS-ALLA-1] el Más Allá enseguida
 }
 
 // ── La cara de GUERREROS Z ──────────────────────────────────────────────────

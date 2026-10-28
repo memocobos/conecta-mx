@@ -1154,7 +1154,7 @@ ${entregables}
         });
         return ok(headers, { viajeros, equipo, vista: 'coordi' });
       }
-      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo` : VE_READ_COLS;
+      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo,portal_revisado_at,portal_revisado_por` : VE_READ_COLS; // [PORTAL-SOLO-1] el sello del Portal viaja solo a quien ve dinero
       const sp = new URLSearchParams();
       sp.set('select', cols);
       sp.append('evento_id', `eq.${evento_id}`);

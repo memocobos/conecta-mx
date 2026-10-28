@@ -188,6 +188,93 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴✅ **CHATARRA-REGLA-1 (28-oct-2026, en main local): EL VIERNES DE CORONA
+  OFRECÍA 9 LUGARES QUE NO EXISTEN — la regla de zona nombra la FECHA, no la
+  zona.** Salió al medir el caso de Frida, no de un reporte.
+  - 🔴 **EL DAÑO, medido contra producción:** `coronacapital#0` tenía 9 boletos
+    vendidos-fuera bajo la llave **«General Viernes»** mientras la ficha de esa
+    fecha llama a su zona **«General»** a secas. El sitio **no los restaba**:
+    `19 comprados − 0 − 8 viajeros = 11 libres`, cuando la verdad es **2**. Y el
+    viernes SÍ está vendiendo ($3,900), a 23 días del evento.
+  - **LA CAUSA:** una pestaña COMPARTIDA entre fechas (la de Corona sirve a #0,
+    #1, #2 y #5) se parte con `excel_pestanas.regla_zona`, y el Excel escribe esa
+    regla en la columna Boleto. La chatarra llega nombrada «General Viernes» —
+    que **NO es variante ortográfica de «General»**, y `resolverZonaFicha` hace
+    BIEN en no fundirlas (en otros eventos «General» y «General A» son zonas
+    distintas de verdad). Se quedaba con el nombre del Excel y nacía la fantasma.
+  - 🔒 **POR QUÉ NO SE ARREGLÓ EN LA BASE, y es la mitad de la lección:**
+    `excel-aplicar` empareja por zona NORMALIZADA y escribe «la ortografía de la
+    fila que ya existe». Renombrar el ajuste a mano **sobrevive un día**: el
+    careo siguiente ve «General» con 9 y chatarra 0 → **la pone en CERO y vuelve
+    a crear la fantasma**. Es textual lo que el comentario de DISPO-NORM-1 ya
+    describía. El arreglo va en el careo, y el próximo reescribe la llave solo.
+  - **El arreglo:** `zonasDeFecha(ev, eventoId)` nuevo en `_lib/zona-ficha` (las
+    zonas de ESA fecha, no el universo del evento — son preguntas distintas y
+    `zonasCanonicasDe` contesta la otra) y, en `correrCareo`, la llave que la
+    ficha desconoce **pero que ES la `regla_zona` de la pestaña** se traduce a la
+    zona de la fecha. 🔒 **El candado es la UNICIDAD:** solo cuando esa fecha
+    tiene EXACTAMENTE UNA zona. Con dos o más viaja tal cual y **se NOMBRA**
+    (`chatarra_regla` en la respuesta) — adivinar metería boletos en la zona
+    equivocada, que es peor que dejarlos a la vista. Y se pregunta **DESPUÉS** de
+    la ficha: la regla es el último recurso, nunca el primero.
+  - **El barrido completo, para no arreglar uno y dejar la familia:** de **77
+    ajustes con vendidos_fuera > 0, 66 casan** con su ficha. Fantasma: **7**, y
+    solo éste nace de la regla. Los otros 6: 5 son la chatarra sin zona («-»,
+    7 boletos, residual conocido) y **karolg#1 «Club Seat» (17 boletos)**, que es
+    **otra cosa y se nombra sin tocar**: ahí compras, viajeros Y ajuste viven
+    TODOS en «Club Seat» y la ficha vende «Club Seat Poniente» y «Oriente» — esas
+    dos venden **a ciegas** (sin pedido propio), no de más; quedan 14 libres de
+    los 50. ⚠️ `natanael` y `titodoble` no casan porque están cancelados y fuera
+    del index: correcto, no es hueco.
+  - `mide:chatarra-regla-1` **26** (sin ancla — árbol; control positivo por
+    CONSTRUCCIÓN: se rebana la misma decisión sin la regla y **reproduce el 11
+    contra el 2**). Vecinos verdes: cuadre-aplicar 110 · cuadre-numerologia 89 ·
+    careo-zona-1 87 · dispo-norm-1 35 · zona-norm-1 35 · cuadre-6 46 ·
+    boletos 15 · excel-ag-pantalla 60 · concilia-1 83.
+  - ⏳ **Push de Memo → el próximo careo de Corona reescribe la llave.** Hasta el
+    deploy, el viernes sigue ofreciendo 9 lugares que no hay.
+
+- ✅ **MUDANZA-FRIDA-1 (28-oct-2026, APLICADA): su Corona pasa de Vie (#0) a
+  Vie+Sáb (#3).** Palabra de Memo: «Son 2 días (Vie+Sáb)». Acta
+  `migraciones/MUDANZA-FRIDA-1.sql`, candados de entrada y salida mordidos.
+  - **Nació de una tarjeta pegada en la bandeja:** Frida pidió por el Portal que
+    le revisáramos su «Corona Capital (Vie + Sáb · 2 días)» porque no lo veía, y
+    su fila decía 1 día. 🔑 **Su propia nota de migración lo confesaba desde el
+    28-ago: «⚠ fecha (viernes) por texto de zona»** — la fecha nunca salió del
+    Excel, la ADIVINÓ la migración. Lo que sí salió del Excel es su total,
+    sellado «Total de pestaña (careo 2026-09-20)».
+  - **Y el precio apuntaba al mismo lado:** el catálogo cobra $3,900 por 1 día y
+    **$6,300 por 2 días**; su total es **$5,985 = $6,300 − 5% exacto**. No es
+    prueba por sí solo —por eso se pidió la palabra de Memo— pero coincide.
+  - 🔒 **Dinero INTACTO:** total $5,985, previo $1,528 y sus 2 abonos ($336 del
+    28-sep, $337 del 5-oct) viajaron solos — `abonos_viajero` llavea por
+    `viajero_id`, no por evento (precedente MUDANZA-KAROLG-1). Medido antes:
+    `habitacion_id` NULL (sin rooming que soltar), `grupo_viaje` NULL, la zona
+    «General» existe en la ficha de #3 con esa ortografía, y **#3 está AGOTADA en
+    la ficha → la mudanza no abre ninguna venta**. Salida: #0 8→7 · #3 0→1 ·
+    #1 y #5 byte a byte.
+  - ⚠️ **LO QUE DEJA DICHO Y NO RESUELVE:** al salir del viernes, su lugar de ese
+    día deja de contarse en #0. Ella ocupa un lugar del viernes **y** uno del
+    sábado — el sitio vende combinaciones (#3, #4, #5) pero los boletos se compran
+    por día, y esa costura no la cierra nadie hoy. Es **1 boleto**, y queda
+    nombrado en su nota en vez de taparse con un `vendidos_fuera` que el careo
+    recalcula solo. ⏳ Y **`coronacapital#3` no tiene pedido cargado**, así que
+    queda ciego como los otros 60 de STOCK-CIEGO-1.
+
+- 🔴⏳ **DOS CAREOS VECINOS EN ROJO, PREEXISTENTES Y AJENOS (medido el 28-oct
+  con un worktree LIMPIO de HEAD: reproducen idénticos sin mis cambios).** No se
+  tocaron, y se nombran para que nadie los lea como daño de la tuerca de hoy:
+  - `mide:cuadre-todo` — «EL SEGUNDO CLIC GLOBAL ESCRIBIÓ 1 vez: stock_ajustes:
+    PATCH». Es la guarda vieja «el 2º clic escribe CERO» que CHATARRA-SELLO-1
+    actualizó en `mide:cuadre-aplicar` y nadie actualizó aquí (el sello de
+    solo-nota la tumba). Ya estaba nombrada en SALDOS-CAJA-1.
+  - 🔴 `mide:cuadre-total` — **SE CAE** con `_excelTestigoPreventaHtml is not
+    defined`. Es el **CUARTO sitio** de la familia que PREVENTA-DESCUENTO-1 cazó
+    en tres (`cuadre-aplicar` ×2 y `cuadre-numerologia`) y dio por barrida. Su
+    acta decía «el tercer sitio lo encontré buscando EL HECHO (`new Function(`)»
+    — y aun así quedó uno. ⚠️ **Eso significa que el careo de CUADRE-5/6 lleva
+    semanas sin correr**: sus 151 verdes son un verde caducado.
+
 - 📨⏳ **RECHAZO-AVISO-1 (28-oct-2026, en main local): RECHAZAR UNA SOLICITUD
   AHORA LE AVISA AL CLIENTE.** Pregunta de Memo, citada: *«¿está seguro que al
   rechazar solicitudes les está llegando un correo para cambiar la zona? porque

@@ -54,6 +54,41 @@ function zonasCanonicasDe(ev) {
   return out;
 }
 
+// [CHATARRA-REGLA-1] Las zonas de UNA fecha concreta, no del evento entero.
+// `zonasCanonicasDe` junta las de TODAS las fechas, y eso es lo correcto para
+// VALIDAR una captura: una zona que solo vive en la fecha 2 sigue siendo una
+// zona real del evento. Aquí hace falta lo contrario — qué zonas tiene ESTA
+// fecha — porque es lo único que permite decir «la chatarra de esta pestaña es
+// de esta zona» sin adivinar.
+// 🔒 Recibe el evento-fecha COMPLETO (`coronacapital#0`) y devuelve:
+//   · la lista de la fecha cuando el id trae `#N` y esa fecha existe;
+//   · la lista GLOBAL cuando el id no trae `#N` (evento de una sola fecha);
+//   · `[]` cuando el id pide una fecha que la ficha no tiene — un `#9` sobre un
+//     evento de 3 fechas es un hueco, y devolver las globales lo escondería.
+// ⚠️ Las globales se incluyen SIEMPRE que la fecha existe, porque el catálogo
+// permite que una fecha herede las zonas del evento (así vendía Omar Courtz
+// antes de tener `cheapZonas` propias — la cicatriz de ROL-HIST-PADRE).
+function zonasDeFecha(ev, eventoId) {
+  if (!ev) return [];
+  const m = /#(\d+)$/.exec(String(eventoId == null ? '' : eventoId));
+  const out = [];
+  const vistas = new Set();
+  const mete = (lista) => {
+    for (const z of (Array.isArray(lista) ? lista : [])) {
+      const n = z && z.n != null ? String(z.n).trim() : '';
+      if (!n || vistas.has(n)) continue;
+      vistas.add(n); out.push(n);
+    }
+  };
+  if (m) {
+    const mf = Array.isArray(ev.multifecha) ? ev.multifecha[Number(m[1])] : null;
+    if (!mf) return [];
+    mete(mf.zonas); mete(mf.cheapZonas);
+  }
+  mete(ev.zonas); mete(ev.cheapZonas);
+  return out;
+}
+
 // PURO: el veredicto sobre una zona capturada contra la lista canónica.
 //   'exacta'      → ya viene como la ficha; se guarda tal cual.
 //   'canonizada'  → normalizada ES una de la ficha; se guarda LA DE LA FICHA.
@@ -89,4 +124,4 @@ async function puertaZona(eventoId, capturada) {
   return r;
 }
 
-module.exports = { zonasCanonicasDe, resolverZonaFicha, puertaZona };
+module.exports = { zonasCanonicasDe, zonasDeFecha, resolverZonaFicha, puertaZona };

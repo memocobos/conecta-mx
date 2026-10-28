@@ -30,7 +30,7 @@ const { esCDMX, resolverPrecioVenta } = require('./precio-zona');
 const { normalizarZona } = require('./normalizar-zona');
 // [DISPO-NORM-1] La puerta de la chatarra: sus llaves se canonizan a la
 // ortografía de la ficha antes de que `planear` las compare con la base.
-const { zonasCanonicasDe, resolverZonaFicha } = require('./zona-ficha');
+const { zonasCanonicasDe, zonasDeFecha, resolverZonaFicha } = require('./zona-ficha');
 const DISPO = require('./excel-disponibilidad');
 
 // [CAREO-ZONA-1] Cuántas celdas rojas hacen una fila roja. ⚠️ DECLARADO Y
@@ -313,13 +313,51 @@ async function correrCareo(eventoId) {
   // volverse asíncrono ni pedirle el catálogo por su cuenta.
   // ⚠️ `null` significa «no se pudo leer el catálogo» y NO «ninguna zona»: con
   // null el plan NO propone cambios de zona y lo DICE.
+  // ── [CHATARRA-REGLA-1] LA REGLA DE ZONA NOMBRA LA FECHA, NO LA ZONA ───────
+  // 🔴 Medido en producción el 28-oct: `coronacapital#0` tenía 9 boletos
+  // vendidos-fuera bajo la llave «General Viernes» mientras su ficha llama a esa
+  // zona «General» a secas. El sitio NO los restaba: creía 11 libres del viernes
+  // cuando quedaban 2, a 23 días del evento.
+  // LA CAUSA: una pestaña COMPARTIDA entre fechas (Corona sirve a #0, #1, #2 y
+  // #5) se parte con `regla_zona`, y el Excel escribe esa regla en la columna
+  // Boleto. Así que la chatarra llega nombrada «General Viernes» — que NO es una
+  // variante ortográfica de «General» y `resolverZonaFicha` hace bien en no
+  // fundirlas (en otros eventos «General» y «General A» SÍ son zonas distintas).
+  // Se quedaba con el nombre del Excel y nacía la llave fantasma.
+  // 🔒 EL CANDADO ES LA UNICIDAD: la regla solo se traduce cuando ESA fecha
+  // tiene EXACTAMENTE UNA zona, que es el único caso sin ambigüedad. Con dos o
+  // más, la llave viaja tal cual y sale en el aviso — adivinar cuál de ellas es
+  // meter boletos en la zona equivocada, que es peor que dejarlos a la vista.
+  // ⚠️ Y se pregunta DESPUÉS de la puerta: si la llave ya casaba con una zona de
+  // la ficha, manda la ficha. La regla es el último recurso, no el primero.
+  const reglasNorm = new Set(
+    (Array.isArray(mapeos) ? mapeos : [])
+      .map((m) => (m && m.regla_zona != null ? String(m.regla_zona).trim() : ''))
+      .filter(Boolean).map((r) => normalizarZona(r)),
+  );
+  const chatarraReglaAvisos = [];
+
   const zonasCanonicas = evCat ? zonasCanonicasDe(evCat) : null;
   if (evCat) {
     const canonicas = zonasCanonicas;
+    const deEstaFecha = zonasDeFecha(evCat, eventoId);
     const canonizada = {};
     for (const zc in chatarraPorZona) {
       const v = resolverZonaFicha(canonicas, zc);
-      const llave = (v.estado === 'canonizada') ? v.zona : zc;
+      let llave = (v.estado === 'canonizada') ? v.zona : zc;
+      // La llave no es una zona de la ficha PERO sí es la regla de la pestaña:
+      // está nombrando el día, no el lugar.
+      if (v.estado === 'desconocida' && reglasNorm.has(normalizarZona(zc))) {
+        if (deEstaFecha.length === 1) {
+          llave = deEstaFecha[0];
+          chatarraReglaAvisos.push({ regla: zc, zona: llave, boletos: chatarraPorZona[zc] });
+        } else {
+          chatarraReglaAvisos.push({ regla: zc, zona: null, boletos: chatarraPorZona[zc],
+            motivo: deEstaFecha.length
+              ? `esa fecha tiene ${deEstaFecha.length} zonas y no se puede saber a cuál va`
+              : 'no se pudieron leer las zonas de esa fecha' });
+        }
+      }
       canonizada[llave] = (canonizada[llave] || 0) + chatarraPorZona[zc];
     }
     for (const k in chatarraPorZona) delete chatarraPorZona[k];
@@ -623,6 +661,10 @@ async function correrCareo(eventoId) {
 
   return { ok: true, pestanas: detallePestanas, personas: personasLado,
            viajeros: base.viajeros, montones, numerologia, zonasCanonicas, avisosFuente,
+           // [CHATARRA-REGLA-1] Qué llaves de chatarra nombraban la FECHA y no la
+           // zona. Viaja SIEMPRE (incluso vacío) para que la pantalla pueda
+           // distinguir «no hubo ninguna» de «este careo es viejo y no lo mide».
+           chatarra_regla: chatarraReglaAvisos,
            chatarraPorZona, staffReconocido, ajustes: Array.isArray(ajustes) ? ajustes : [],
            // [EXCEL-AG-2] `null` = la palomita de este evento-fecha está APAGADA.
            // No es lo mismo que «no había nada»: se distingue a propósito.

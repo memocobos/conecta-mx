@@ -81,7 +81,12 @@ function _prvFilaHtml(rev, v, i) {
       <div><b>${_prvEsc(v.nombre || '—')}</b> · ${_prvEsc(v.evento_nombre || v.evento_id)}${v.evento_fecha ? ' <span style="color:var(--ts)">(' + _prvEsc(v.evento_fecha) + ')</span>' : ''}</div>${sello}
     </div>
     <div style="font-size:13px;margin:4px 0">${_prvEsc([String(v.tipo_paquete || '').toUpperCase(), v.zona_boleto, Number(v.boletos) > 1 ? v.boletos + ' lugares' : ''].filter(Boolean).join(' · ') || '—')}</div>
-    <div style="font-size:13px">Total <b>${_prvMxn(c.total)}</b> · Pagado <b style="color:var(--green)">${_prvMxn(c.abonado)}</b> · Resta <b>${_prvMxn(c.resta)}</b>${Number(v.abonado_previo) ? ` <span style="color:var(--ts)">(incluye ${_prvMxn(v.abonado_previo)} de antes)</span>` : ''}</div>
+    ${c.total == null
+      // [PRV-SINTOTAL-1] Sin total de contrato saldoMigrado no cuenta (a
+      // propósito: un cero sería falso), y la tarjeta pintaba «—» en todo —
+      // tapando lo que SÍ pagó. Se DICE que falta el total y se enseña lo pagado.
+      ? `<div style="font-size:13px;color:var(--yellow)">⚠️ <b>Sin total de contrato capturado</b> — captúralo en Viajeros del evento antes de publicar. Pagado hasta hoy: <b style="color:var(--green)">${_prvMxn((Number(v.abonado_previo) || 0) + (v.abonos_lista || []).reduce((s, a) => s + (Number(a.monto) || 0), 0))}</b></div>`
+      : `<div style="font-size:13px">Total <b>${_prvMxn(c.total)}</b> · Pagado <b style="color:var(--green)">${_prvMxn(c.abonado)}</b> · Resta <b>${_prvMxn(c.resta)}</b>${Number(v.abonado_previo) ? ` <span style="color:var(--ts)">(incluye ${_prvMxn(v.abonado_previo)} de antes)</span>` : ''}</div>`}
     <details style="margin-top:6px;font-size:12px"><summary style="cursor:pointer;color:var(--ts)">Abonos (${(v.abonos_lista || []).length})</summary>${abonos}</details>
     <div style="margin-top:8px"><button class="rq-btn" onclick="_prvExcel('${rev.id}', ${i})">📊 Ver qué dice el Excel</button></div>
     <div id="prv-excel-${rev.id}-${i}" style="font-size:12px;margin-top:6px"></div>

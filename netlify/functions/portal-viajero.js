@@ -77,7 +77,7 @@ exports.handler = async (event) => {
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   let v;
   try {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at&limit=1`, { headers: hKH });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at,usuario_id,tipo_viajero&limit=1`, { headers: hKH });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu viaje' });
     v = (await r.json())[0];
   } catch (e) { return json(502, headers, { ok: false, error: 'No pude leer tu viaje' }); }
@@ -89,7 +89,7 @@ exports.handler = async (event) => {
   // 🔒 [PORTAL-SOLO-1] Una fila SIN revisar no se toca desde el Portal (ni se
   // edita, ni se reparte, ni elige paquete): el cliente ni siquiera la ve hasta
   // que Bulma/Milk/Memo la revisan. Contesta IGUAL que ajena/inexistente.
-  if (!v.portal_revisado_at) {
+  if (!v.portal_revisado_at || require('./_lib/portal-revision').esDelEquipo(v)) {
     return json(404, headers, { ok: false, error: 'No encontramos ese viajero en tu cuenta' });
   }
 

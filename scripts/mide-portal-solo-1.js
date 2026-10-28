@@ -141,7 +141,7 @@ const call = async (file, b, extraH) => {
   r = await call('portal-viajero.js', { accion: 'editar', viajero_id: U(2), celular: '8990000000' });
   af(() => r.s !== 404, () => 'control: la fila sellada sí se puede editar (' + r.s + ')');
   const pc = fs.readFileSync(path.join(RAIZ, 'netlify/functions/portal-contrato.js'), 'utf8');
-  af(() => /portal_revisado_at&limit=200/.test(pc) && /&& !!v\.portal_revisado_at\)/.test(pc), 'portal-contrato: sus viajeros = solo los REVISADOS (no se firma sobre números que nadie vio)');
+  af(() => /portal_revisado_at,usuario_id,tipo_viajero&limit=200/.test(pc) && /&& !!v\.portal_revisado_at && !require\('\.\/_lib\/portal-revision'\)\.esDelEquipo\(v\)\)/.test(pc), 'portal-contrato: sus viajeros = solo los REVISADOS y que no son tours de trabajo (PRV-EQUIPO-1 actualizó el literal)');
 
   console.log('\n[C] «Aún no vemos tu viaje» (portal-revision)');
   USER = { id: 'au-pedro', email: 'pedro.nuevo@x.mx', email_confirmed_at: 'x' };
@@ -284,6 +284,35 @@ const call = async (file, b, extraH) => {
   await call('portal-mi-plan-migrado.js', {});
   af(() => !DB.rev.some((x) => x.correo === 'ana@x.mx' && x.estado === 'pendiente'), 'la siguiente visita NO reabre revisión por el viaje que no procedió');
   af(() => !DB.escrituras.some((e) => e.startsWith('DELETE')), 'CERO DELETEs');
+
+  console.log('\n[H] PRV-EQUIPO-1 · los tours que trabaja una coordinadora no van al Portal');
+  DB = semilla();
+  DB.v.push(
+    { id: U(41), evento_id: 'juniorh', nombre: 'Coordi Que Compra', correo: 'coordi@x.mx', tipo_paquete: 'PLUS', zona_boleto: 'General', total_contrato: 7000, abonado_previo: 500, boletos: 1, tipo_viajero: 'cliente', portal_revisado_at: null },
+    { id: U(42), evento_id: 'alfredito', nombre: 'Coordi Que Compra', correo: 'coordi@x.mx', tipo_paquete: 'PLUS', total_contrato: null, abonado_previo: null, boletos: 1, tipo_viajero: 'coordinador', usuario_id: 'u-coordi', portal_revisado_at: null },
+    { id: U(43), evento_id: 'nsqkmty', nombre: 'Coordi Que Compra', correo: 'coordi@x.mx', tipo_paquete: 'PLUS', total_contrato: null, abonado_previo: null, boletos: 1, tipo_viajero: 'coordinador', usuario_id: 'u-coordi', portal_revisado_at: ahora },
+    { id: U(44), evento_id: 'juniorh', nombre: 'Creadora Invitada', correo: 'crea@x.mx', tipo_paquete: 'CHEAP', zona_boleto: 'General', total_contrato: 0, abonado_previo: 0, boletos: 1, tipo_viajero: 'creadora', portal_revisado_at: null });
+  USER = { id: 'au-coordi', email: 'coordi@x.mx', email_confirmed_at: 'x' };
+  r = await call('portal-mi-plan-migrado.js', {});
+  af(() => r.j.tours.length === 0 && JSON.stringify(r.j.en_revision) === JSON.stringify(['juniorh']), () => 'Portal: su tour de trabajo (aunque traiga sello) NO viaja y no sale «en revisión»; solo lo que compró · ' + JSON.stringify([r.j.tours.length, r.j.en_revision]));
+  const revC = DB.rev.find((x) => x.correo === 'coordi@x.mx') || {};
+  af(() => JSON.stringify(revC.viajero_ids) === JSON.stringify([U(41)]), () => 'la revisión nace SOLO con lo que compró · ' + JSON.stringify(revC.viajero_ids));
+  // control: una revisión vieja que ya traía el tour de trabajo (como la de Lesly)
+  revC.viajero_ids = [U(41), U(42)];
+  r = await adm({ accion: 'listar' });
+  const itC = (r.j.pendientes || []).find((x) => x.correo === 'coordi@x.mx') || {};
+  af(() => itC.filas && itC.filas.length === 1 && itC.filas[0].id === U(41) && itC.sin_revisar === 1, () => 'la bandeja ya no enseña sus tours de trabajo (revisiones viejas incluidas) · ' + JSON.stringify((itC.filas || []).map((f) => f.evento_id)));
+  r = await adm({ accion: 'fila_publicar', id: itC.id, viajero_id: U(42) });
+  af(() => r.s === 409 && !DB.v.find((v) => v.id === U(42)).portal_revisado_at, 'publicar un tour de trabajo → 409, nada se sella');
+  r = await adm({ accion: 'fila_publicar', id: itC.id, viajero_id: U(41) });
+  af(() => r.s === 200 && r.j.cierre && r.j.cierre.cerrada === true, () => 'con lo que compró publicado, la revisión se cierra (el tour de trabajo no cuenta como pendiente) · ' + JSON.stringify(r.j.cierre));
+  r = await call('portal-viajero.js', { accion: 'editar', viajero_id: U(43), celular: '8990000000' });
+  af(() => r.s === 404, () => 'portal-viajero: su tour de trabajo es ajeno (404) aunque tenga sello · ' + r.s);
+  r = await adm({ accion: 'adelanto', viajero_ids: [U(42)], nota: 'x' });
+  af(() => r.s === 200 && !DB.v.find((v) => v.id === U(42)).portal_revisado_at, 'adelanto: salta los tours de trabajo');
+  USER = { id: 'au-crea', email: 'crea@x.mx', email_confirmed_at: 'x' };
+  await call('portal-mi-plan-migrado.js', {});
+  af(() => DB.rev.some((x) => x.correo === 'crea@x.mx' && (x.viajero_ids || []).includes(U(44))), 'control: una CREADORA sí se revisa como clienta (su cortesía es su viaje)');
 
   console.log(`\n${R ? '🔴' : (V ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);

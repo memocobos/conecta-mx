@@ -111,13 +111,16 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
     // vuelve inofensivo cualquier comodín del patrón.
     const suyas = (Array.isArray(crudos) ? crudos : [])
-      .filter((v) => String(v && v.correo != null ? v.correo : '').trim().toLowerCase() === correo);
+      .filter((v) => String(v && v.correo != null ? v.correo : '').trim().toLowerCase() === correo)
+      // [PRV-EQUIPO-1] Los tours que trabaja (coordinador/staff) no son viajes
+      // suyos de cliente: viven en KameHouse, no en el Portal.
+      .filter((v) => !require('./_lib/portal-revision').esDelEquipo(v));
 
     // ═══ [PORTAL-SOLO-1] SOLO SE ENSEÑA LO QUE ALGUIEN REVISÓ ═══════════════
     // Palabra de Memo: «antes que se registrara bulma milk o yo podamos revisar

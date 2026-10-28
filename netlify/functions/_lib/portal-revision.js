@@ -26,7 +26,16 @@
 // =============================================================================
 const { saldoMigrado } = require('./cuenta-evento');
 
-const VSEL = 'id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,portal_revisado_por,notas';
+const VSEL = 'id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,portal_revisado_por,notas,usuario_id,tipo_viajero';
+
+// [PRV-EQUIPO-1] Palabra de Memo (27-oct, «sí así»): los tours que alguien del
+// EQUIPO trabaja (coordinador, staff) NO son viajes que compró: no entran a la
+// revisión ni al Portal — viven en KameHouse (su Inicio y su pestaña Tours).
+// Lo que compró como clienta SÍ se revisa normal. Las creadoras se quedan como
+// clientas (no tienen usuario de KameHouse; su cortesía es su viaje).
+// Medido: 44 filas de coordinador (15 personas), TODAS con usuario_id.
+const EQUIPO_TIPOS = ['coordinador', 'mister_popo', 'maestro_roshi', 'bulma', 'milk', 'cc'];
+const esDelEquipo = (v) => !!(v && (v.usuario_id || EQUIPO_TIPOS.includes(String(v.tipo_viajero || '').trim().toLowerCase())));
 const TABLA = 'portal_revisiones';
 
 const revisada = (v) => !!(v && v.portal_revisado_at);
@@ -36,12 +45,15 @@ async function filasDeCorreo(correo, { KH_URL, KH_KEY }, select) {
   const c = normCorreo(correo);
   if (!c) return [];
   const h = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
-  const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(c)}&select=${select || VSEL}&limit=200`, { headers: h });
+  // Las dos columnas que dicen «es del equipo» viajan SIEMPRE: sin ellas el
+  // filtro de abajo no podría ver a quién quitar.
+  const sel = select ? select + ',usuario_id,tipo_viajero' : VSEL;
+  const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(c)}&select=${sel}&limit=200`, { headers: h });
   if (!r.ok) throw new Error('no pude leer los viajeros (' + r.status + ')');
   const rows = await r.json();
   // 🔒 El `ilike` solo puede SOBRE-pescar (un `_` casa cualquier carácter); la
   // igualdad exacta es la autoridad.
-  return (Array.isArray(rows) ? rows : []).filter((v) => normCorreo(v.correo) === c);
+  return (Array.isArray(rows) ? rows : []).filter((v) => normCorreo(v.correo) === c && !esDelEquipo(v));
 }
 
 async function abonosDe(ids, { KH_URL, KH_KEY }) {
@@ -73,7 +85,7 @@ function foto(filas, abonos) {
 // vez que el cliente recarga; solo una fila NUEVA reabre la revisión.)
 async function pedirRevision({ correo, filas, KH_URL, KH_KEY }) {
   const c = normCorreo(correo);
-  const sinSello = (filas || []).filter((v) => !revisada(v));
+  const sinSello = (filas || []).filter((v) => !revisada(v) && !esDelEquipo(v));
   if (!c || !sinSello.length) return { ok: true, abierta: false, pendientes: 0 };
   const h = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   const r = await fetch(`${KH_URL}/rest/v1/${TABLA}?correo=eq.${encodeURIComponent(c)}&tipo=in.(revisar,ligar)&estado=in.(pendiente,rechazada)&select=id,tipo,estado,viajero_ids&limit=50`, { headers: h });
@@ -163,4 +175,4 @@ async function avisarRevision({ rev, viajes, nombre, noProceden }) {
   }
 }
 
-module.exports = { VSEL, TABLA, revisada, normCorreo, filasDeCorreo, abonosDe, foto, pedirRevision, nombreEvento, renderRevision, avisarRevision };
+module.exports = { VSEL, TABLA, EQUIPO_TIPOS, esDelEquipo, revisada, normCorreo, filasDeCorreo, abonosDe, foto, pedirRevision, nombreEvento, renderRevision, avisarRevision };

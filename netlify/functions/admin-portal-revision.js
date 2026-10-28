@@ -119,6 +119,7 @@ exports.handler = async (event) => {
     if (!r.ok) return { error: 'No pude leer esa fila', status: 502 };
     const v = (await r.json())[0];
     if (!v || PR.normCorreo(v.correo) !== rev.correo) return { error: 'Esa fila no es de esta persona (o cambió de correo): recarga', status: 409 };
+    if (PR.esDelEquipo(v)) return { error: 'Ese es un tour que trabaja (equipo): vive en KameHouse, no en el Portal', status: 409 };
     return { v };
   };
   // Cuando ya no queda ningún viaje sin decidir, la revisión se cierra SOLA y
@@ -183,7 +184,7 @@ exports.handler = async (event) => {
         if (rev.tipo === 'ligar' && rev.evento_id) {
           const base = rev.evento_id.split('#')[0];
           const rf = await fetch(`${VE}?evento_id=like.${encodeURIComponent(base)}*&select=${PR.VSEL}&limit=3000`, { headers: h });
-          const delEvento = rf.ok ? (await rf.json()).filter((v) => v.evento_id === base || v.evento_id.startsWith(base + '#')) : [];
+          const delEvento = rf.ok ? (await rf.json()).filter((v) => (v.evento_id === base || v.evento_id.startsWith(base + '#')) && !PR.esDelEquipo(v)) : [];
           const cands = candidatos(delEvento, rev.nombre_dado, rev.celular);
           const abC = await PR.abonosDe(cands.map((c) => c.v.id), KH);
           item.candidatos = cands.map((c) => Object.assign({}, c.v, evDe(EVx, c.v.evento_id), {
@@ -226,6 +227,7 @@ exports.handler = async (event) => {
       const v = rv.ok ? (await rv.json())[0] : null;
       const base = String(rev.evento_id || '').split('#')[0];
       if (!v || !(v.evento_id === base || String(v.evento_id).startsWith(base + '#'))) return j(400, headers, { error: 'Esa fila no es de ese evento' });
+      if (PR.esDelEquipo(v)) return j(409, headers, { error: 'Esa fila es de alguien del equipo (un tour que trabaja), no un viaje de cliente' });
       const actual = PR.normCorreo(v.correo);
       if (actual && actual !== rev.correo && body.reemplazar !== true) {
         return j(409, headers, { error: `Esa fila ya trae otro correo (${v.correo}). Si es la misma persona y cambió de correo, confirma para reemplazarlo.`, correo_actual: v.correo, pide_reemplazar: true });
@@ -416,7 +418,7 @@ exports.handler = async (event) => {
       const nota = String(body.nota || '').trim().slice(0, 1000) || null;
       const rv = await fetch(`${VE}?id=in.(${ids.join(',')})&select=${PR.VSEL}`, { headers: h });
       if (!rv.ok) return j(502, headers, { error: 'No pude leer esas filas' });
-      const filas = (await rv.json()).filter((v) => !PR.revisada(v));
+      const filas = (await rv.json()).filter((v) => !PR.revisada(v) && !PR.esDelEquipo(v));
       if (!filas.length) return j(200, headers, { ok: true, publicadas: 0, ya: true });
       const ab = await PR.abonosDe(filas.map((v) => v.id), KH);
       const rs = await fetch(`${VE}?id=in.(${filas.map((v) => v.id).join(',')})&portal_revisado_at=is.null`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }),

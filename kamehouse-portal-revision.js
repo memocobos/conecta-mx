@@ -334,6 +334,8 @@ async function _prvRechazarGo(revId) {
 // correo: todavía no se han registrado). Queda en la bitácora.
 function prvChip(v) {
   if (!v || !('portal_revisado_at' in v)) return '';
+  // [PRV-EQUIPO-1] Un tour que trabaja (coordinador/staff) no va al Portal: sin chip.
+  if (v.usuario_id || ['coordinador', 'mister_popo', 'maestro_roshi', 'bulma', 'milk', 'cc'].includes(String(v.tipo_viajero || '').toLowerCase())) return '';
   return v.portal_revisado_at
     ? `<span class="vj2-tag" style="color:var(--green);border-color:var(--green)" title="Revisado para el Portal · ${_prvEsc(v.portal_revisado_por || '')}">🪪 Portal ✓</span>`
     : '<span class="vj2-tag" style="color:var(--ts)" title="Aún nadie revisa sus números: si entra al Portal, verá «estamos revisando tu viaje»">🪪 sin revisar</span>';

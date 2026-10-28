@@ -411,6 +411,21 @@ está caduco antes de escribirse.
     decidido atenuado con su sello/motivo. `mide:portal-solo-1` **45→65**
     (bloque [G]); vecinos verdes.
 
+- 🪪⏳ **PRV-EQUIPO-1 (27-oct-2026, en main local): los tours que TRABAJA una
+  coordinadora no van a la revisión ni al Portal.** Pregunta de Memo con Lesly y
+  Xamel enfrente («varias de las que entraron así son coordinadoras y sus tours
+  asignados les aparecen en el portal») → «sí así». Medido: Lesly 14 filas = 8
+  compradas + 6 de coordinadora; Xamel 4 = 1 + 3; en toda la base **44 filas de
+  coordinador (15 personas), TODAS con `usuario_id`** y sin total — por eso salían
+  «sin total». 🔒 `esDelEquipo(v)` en `_lib/portal-revision` es el dueño
+  (`usuario_id` o `tipo_viajero` de staff); `filasDeCorreo` y `pedirRevision` lo
+  filtran, y también portal-mi-plan-migrado, portal-viajero (404 como ajena),
+  portal-contrato, candidatos de «ligar», `fila_*` (409) y adelanto. Sus tours
+  viven en KameHouse (Inicio/Tours). Las CREADORAS se quedan como clientas (no
+  tienen usuario; su cortesía es su viaje). Revisiones ya abiertas: la bandeja ya
+  no los enseña y no cuentan para el cierre — cero escrituras a la base.
+  `mide:portal-solo-1` **65→73** ([H], BASE da 6 rojos).
+
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de
   nacimiento se quedaba en «dd/mm/aaaa» sin teclado ni calendario, y «la foto

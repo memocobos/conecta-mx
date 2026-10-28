@@ -73,11 +73,11 @@ exports.handler = async (event) => {
   // Sus viajeros: `ilike` estrecha, la comparación exacta en minúsculas MANDA
   // (la forma de PLAN-CASE-1: el patrón solo puede sobre-pescar).
   const misViajeros = async () => {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}&select=id,evento_id,nombre,correo,fecha_nacimiento,portal_revisado_at&limit=200`, { headers: h });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}&select=id,evento_id,nombre,correo,fecha_nacimiento,portal_revisado_at,usuario_id,tipo_viajero&limit=200`, { headers: h });
     if (!r.ok) throw new Error('viajeros');
     // 🔒 [PORTAL-SOLO-1] Solo las filas REVISADAS: un contrato no se firma sobre
     // números que nadie del equipo ha visto.
-    return (await r.json()).filter((v) => String(v.correo || '').trim().toLowerCase() === correo && !!v.portal_revisado_at);
+    return (await r.json()).filter((v) => String(v.correo || '').trim().toLowerCase() === correo && !!v.portal_revisado_at && !require('./_lib/portal-revision').esDelEquipo(v));
   };
 
   try {

@@ -195,6 +195,15 @@ async function armarRechazo({ req, motivo_clave, motivo_texto }) {
 async function avisarRechazo({ req, motivo_clave, motivo_texto, KH_URL, KH_KEY }) {
   const armado = await armarRechazo({ req, motivo_clave, motivo_texto });
   if (!armado.avisa) return { avisado: false, razon: armado.razon };
+  // [RECHAZO-AVISO-1b] Si ya viaja, callarse es lo correcto: su lugar existe.
+  const ya = await yaViajaEnEvento({ req, KH_URL, KH_KEY });
+  if (ya.viaja) {
+    const f = ya.fila || {};
+    return { avisado: false, ya_viaja: true,
+      razon: `Esta persona YA viaja en ${f.evento_id || 'este evento'}`
+        + (f.zona_boleto ? ` (${f.zona_boleto}` + (f.tipo_paquete ? ` · ${String(f.tipo_paquete).toUpperCase()}` : '') + ')' : '')
+        + ' — no se le avisa de un rechazo que ya quedó resuelto.' };
+  }
   if (armado.error) {
     // Sin correo usable el aviso igual tiene que poder darse: se devuelve el
     // link de WhatsApp para que quien rechaza lo mande a mano.
@@ -227,6 +236,51 @@ async function avisarRechazo({ req, motivo_clave, motivo_texto, KH_URL, KH_KEY }
   return { avisado: true, to: armado.to, email_id, sello_ok, catalogo_ok: armado.catalogo_ok };
 }
 
+// ── [RECHAZO-AVISO-1b] ¿ESTA PERSONA YA VIAJA? ──────────────────────────────
+// 🔴 CAZADO EN VIVO EL 28-OCT, mandando los 4 avisos atrasados: Ana Patricia
+//    volvió a reservar para la OTRA fecha (19:06), Bulma se la aprobó (19:16) y
+//    el aviso del rechazo de la primera salió a las 19:23 — siete minutos
+//    después de que su lugar ya estuviera hecho. Le dijimos «no pudimos
+//    confirmar tu lugar» a alguien que SÍ lo tenía.
+//
+// 🔒 Y NO ES UN DEFECTO DEL ENVÍO RETROACTIVO, es del flujo normal: nada impide
+//    aprobar la segunda solicitud y rechazar la primera un minuto después. El
+//    mismo correo habría salido igual de mal sin que nadie lo moviera a mano.
+//
+// La persona se casa por CELULAR (10 dígitos, el dato que no cambia) o por
+// correo. ⚠️ Ana lo demostró: tecleó `patriciaturrubiates83@` la primera vez y
+// `patriciaturrubiates@` la segunda — con solo el correo no se habría cazado.
+// El evento se compara por su BASE (`fuerzaregida`), porque reubicar a alguien
+// de #0 a #1 es exactamente el caso que esto tiene que ver.
+//
+// 🔒 Fail-soft HACIA AVISAR, dicho: si el padrón no se puede leer, NO se sabe —
+//    y callarse es el defecto que esta tuerca vino a curar (4 personas
+//    esperando). Avisar de más se arregla con un correo; callarse pierde la
+//    venta y nadie se entera. Sale rotulado para que la bandeja lo diga.
+async function yaViajaEnEvento({ req, KH_URL, KH_KEY }) {
+  const cel = String(req && req.celular || '').replace(/\D/g, '');
+  const correo = llaveCorreo(req && req.correo);
+  if (!cel && !correo) return { viaja: false, comprobado: true };
+  const base = baseSlug(req.evento_id);
+  const o = [];
+  if (cel.length === 10) o.push(`celular.eq.${cel}`);
+  if (correo) o.push(`correo.ilike.${correo}`);
+  if (!o.length) return { viaja: false, comprobado: true };
+  try {
+    const u = `${KH_URL}/rest/v1/viajeros_evento`
+      + `?select=evento_id,nombre,zona_boleto,tipo_paquete,boletos`
+      + `&evento_id=like.${encodeURIComponent(base + '*')}`
+      + `&or=(${o.join(',')})&limit=5`;
+    const r = await fetch(u, { headers: { apikey: KH_KEY, Authorization: `Bearer ${KH_KEY}` } });
+    if (!r.ok) return { viaja: false, comprobado: false, razon: 'no se pudo leer el padrón' };
+    const filas = await r.json();
+    if (!Array.isArray(filas) || !filas.length) return { viaja: false, comprobado: true };
+    return { viaja: true, comprobado: true, fila: filas[0] };
+  } catch (e) {
+    return { viaja: false, comprobado: false, razon: String(e.message).slice(0, 120) };
+  }
+}
+
 // El link de WhatsApp para cuando el correo no se pudo (o no hay correo):
 // quien rechaza igual tiene por dónde avisarle, en un clic.
 function waDe(req) {
@@ -240,4 +294,4 @@ function waDe(req) {
   return `https://wa.me/52${cel}?text=${txt}`;
 }
 
-module.exports = { MOTIVOS, CLAVES, motivoDe, avisaCon, renderRechazo, armarRechazo, avisarRechazo, waDe, FROM, SITIO };
+module.exports = { MOTIVOS, CLAVES, motivoDe, avisaCon, renderRechazo, armarRechazo, avisarRechazo, yaViajaEnEvento, waDe, FROM, SITIO };

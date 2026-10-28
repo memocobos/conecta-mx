@@ -254,7 +254,9 @@ function _reqBdjCard(r) {
       ${/* [RECHAZO-AVISO-1] ¿se enteró el cliente? Un rechazo sin aviso se veía
             EXACTAMENTE igual que uno avisado — por eso cuatro personas que ya
             habían transferido quedaron esperando. Ahora se distinguen. */ ''}
-      ${r.estado === 'rechazada' ? (r.aviso_at
+      ${r.estado === 'rechazada' && r.motivo_clave === 'whatsapp' && !r.aviso_at
+        ? '<div style="font-size:11px;color:var(--ts)">💬 Cierre por WhatsApp — este motivo no lleva correo</div>'
+        : r.estado === 'rechazada' ? (r.aviso_at
         ? `<div style="font-size:11px;color:var(--green)">✓ Avisado por correo el ${_reqBdjEsc(_tsToDate(r.aviso_at).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}</div>`
         : `<div style="font-size:11px;color:#ffb020">⚠️ Sin avisar — este cliente no sabe que no se pudo${cel.length === 10 ? `. <a href="https://wa.me/52${cel}?text=${encodeURIComponent('Hola ' + (String(r.nombre || '').split(' ')[0]) + ', te escribimos de Conecta Reynosa por tu solicitud ' + r.folio + '. ' + (r.motivo_rechazo || 'No pudimos confirmar tu lugar.') + ' Tu pago queda a tu favor: dinos qué zona o fecha prefieres y lo aplicamos ahí.')}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avisarle por WhatsApp →</a>` : ''}</div>`) : ''}
       ${r.estado !== 'pendiente' && r.revisada_por ? `<div style="font-size:11px">Revisada por ${_reqBdjEsc(r.revisada_por)}${r.nota_staff ? ' · ' + _reqBdjEsc(r.nota_staff) : ''}</div>` : ''}
@@ -491,7 +493,17 @@ async function _reqBdjRchPintar(id, clave) {
         ${p.catalogo_ok === false ? '<div style="font-size:11px;color:#ffb020;margin-top:4px">No se pudo leer el catálogo: el correo sale sin la fecha ni el link del evento. Se manda igual.</div>' : ''}
       </details>`;
   }
-  const puedeAvisar = !!(p.avisa && !p.error);
+  // [RECHAZO-AVISO-1b] El aviso se calla si esta persona YA viaja: decirle «no
+  // pudimos confirmar tu lugar» a quien lo tiene es asustarla sin razón. Pasó
+  // con una clienta el 28-oct, y la causa NO fue el envío a mano: aprobar la
+  // segunda solicitud y rechazar la primera minutos después lo reproduce solo.
+  const ya = j.ya_viaja || {};
+  const avisoYaViaja = ya.viaja
+    ? `<div class="rq-note" style="border-left:3px solid var(--green)">✅ <b>Ya viaja:</b> ${_reqBdjEsc(ya.razon || '')} <b>No se le va a mandar correo.</b></div>`
+    : (ya.comprobado === false
+      ? `<div class="rq-note" style="border-left:3px solid #ffb020">⚠️ No se pudo revisar si ya viaja (${_reqBdjEsc(ya.razon || 'el padrón no respondió')}). El correo SÍ sale — revisa que no tenga ya su lugar en otra fecha.</div>`
+      : '');
+  const puedeAvisar = !!(p.avisa && !p.error && !ya.viaja);
   box.innerHTML = `
     <h4 style="color:var(--red)">Rechazar la solicitud</h4>
     <div style="font-size:11.5px;color:var(--ts);margin:0 0 8px">1 · Elige el motivo &nbsp;·&nbsp; 2 · Edítalo si quieres &nbsp;·&nbsp; 3 · Revisa el correo y manda</div>
@@ -499,8 +511,9 @@ async function _reqBdjRchPintar(id, clave) {
     <label class="rq-field">Lo que va a leer el cliente *
       <textarea id="req-rch-txt-${id}" maxlength="500" rows="2" placeholder="Toca un motivo arriba o escríbelo tú"
         oninput="_reqBdjRchRefrescar('${id}')" style="width:100%;box-sizing:border-box;resize:vertical">${_reqBdjEsc(texto)}</textarea></label>
-    ${j.pago ? '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>' : ''}
-    ${previa}
+    ${avisoYaViaja}
+    ${j.pago && !ya.viaja ? '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>' : ''}
+    ${ya.viaja ? '' : previa}
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="rq-btn dan full" id="req-rch-go-${id}" onclick="_reqBdjRechazarGo('${id}')">${puedeAvisar ? 'Rechazar y avisar' : 'Rechazar (sin correo)'}</button>
       <button class="rq-btn quiet" onclick="document.getElementById('req-rch-${id}').style.display='none'">Cancelar</button>

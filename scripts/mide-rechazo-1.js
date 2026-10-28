@@ -36,7 +36,7 @@ const U = (n) => '00000000-0000-4000-8000-' + String(n).padStart(12, '0');
 
 const INDEX = `<script>var EV=[{id:'fuerzaregida',a:'Fuerza Regida',f:'11 de diciembre',ds:'2026-12-11',v:'Arena Monterrey',st:'',inc:['Boleto'],sep:500,zonas:[{n:'Barrera',p:5500}],hotel:[]}];</script>`;
 
-let DB, RESEND, CATALOGO_CAIDO = false, RESEND_FALLA = false;
+let DB, RESEND, CATALOGO_CAIDO = false, RESEND_FALLA = false, VIAJEROS_CAEN = false;
 const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => (typeof b === 'string' ? JSON.parse(b) : b), text: async () => (typeof b === 'string' ? b : JSON.stringify(b)), headers: { get: () => null } });
 const eq = (q, campo) => { const m = q.match(new RegExp('[?&]' + campo + '=eq\\.([^&]*)')); return m ? decodeURIComponent(m[1]) : null; };
 
@@ -48,6 +48,21 @@ global.fetch = async (url, init) => {
   }
   if (u.includes('/index.html') || /conectareynosa\.mx\/?($|\?)/.test(u)) return CATALOGO_CAIDO ? resp(500, 'caído') : resp(200, INDEX);
   if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u', activo: true, rol: 'bulma' }]);
+  if (u.includes('/rest/v1/viajeros_evento')) {
+    if (VIAJEROS_CAEN) return resp(500, 'la base no contesta');
+    // La red falsa respeta el filtro como PostgREST: si no, el candado de
+    // «ya viaja» pasaría en vacío y su verde no diría nada.
+    const like = (u.match(/evento_id=like\.([^&]*)/) || [])[1] || '';
+    const base = decodeURIComponent(like).replace(/\*$/, '');
+    const orRaw = (u.match(/[?&]or=\(([^)]*)\)/) || [])[1] || '';
+    const cels = []; const mails = [];
+    orRaw.split(',').forEach((t) => {
+      let m = t.match(/celular\.eq\.(.+)/); if (m) cels.push(m[1]);
+      m = t.match(/correo\.ilike\.(.+)/); if (m) mails.push(decodeURIComponent(m[1]).toLowerCase());
+    });
+    return resp(200, DB.v.filter((x) => String(x.evento_id).startsWith(base)
+      && (cels.includes(String(x.celular || '')) || mails.includes(String(x.correo || '').toLowerCase()))));
+  }
   if (u.includes('/rest/v1/requisiciones')) {
     if (m === 'DELETE') throw new Error('DELETE prohibido');
     let f = DB.r.slice();
@@ -75,7 +90,7 @@ const fila = (n, extra) => Object.assign({
   comprobante_path: 'req/abc.jpg', estado: 'pendiente', motivo_rechazo: null, motivo_clave: null,
   separo_sistema: 600, total_sistema: 11000, aviso_at: null, aviso_email_id: null,
 }, extra || {});
-const semilla = () => ({ escrituras: [], r: [
+const semilla = () => ({ escrituras: [], v: [], r: [
   fila(1),                                   // pagó, con correo
   fila(2, { comprobante_path: null }),       // NO pagó
   fila(3, { correo: null }),                 // sin correo, con WhatsApp
@@ -205,6 +220,51 @@ const llamar = async (b) => {
   af(r.s === 200 && RESEND.length === 1 && DB.r[0].motivo_clave === null,
     'sin clave (una pantalla vieja en caché) sigue funcionando y SÍ avisa');
 
+  // ── [YV] el candado que nació del error del 28-oct ─────────────────────────
+  // Ana Patricia volvió a reservar para la OTRA fecha, se la aprobaron, y siete
+  // minutos después le salió el aviso del rechazo de la primera. El caso NO es
+  // exclusivo del envío a mano: aprobar la segunda y rechazar la primera lo
+  // reproduce solo. Por eso el candado vive en `avisarRechazo`, no en un script.
+  console.log('\n[YV] a quien YA viaja no se le avisa');
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'fuerzaregida#1', nombre: 'Jose M.', celular: '8112345678', correo: 'otro@x.mx', zona_boleto: 'Barrera', tipo_paquete: 'plus' }];
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Ya no hay lugar', motivo_clave: 'zona_agotada' });
+  af(r.s === 200 && DB.r[0].estado === 'rechazada', 'la solicitud se rechaza igual (el lugar de la #0 no existe)');
+  af(RESEND.length === 0 && r.j.aviso.ya_viaja === true, () => 'y NO sale correo: ya tiene su lugar — ' + RESEND.length);
+  af(/#1/.test(r.j.aviso.razon || '') && /Barrera/.test(r.j.aviso.razon || ''),
+    () => 'la razón DICE dónde viaja, para que se pueda comprobar — ' + r.j.aviso.razon);
+  af(!DB.r[0].aviso_at, 'y no se sella un aviso que no salió');
+  // 🔒 El correo CAMBIÓ entre una reserva y otra (Ana tecleó dos direcciones
+  //    distintas): con solo el correo este caso NO se caza. El celular manda.
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'fuerzaregida#1', nombre: 'Jose M.', celular: '8112345678', correo: null, zona_boleto: 'Barrera' }];
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Ya no hay lugar', motivo_clave: 'zona_agotada' });
+  af(RESEND.length === 0 && r.j.aviso.ya_viaja === true, 'casa por CELULAR aunque el correo sea otro (fue el caso real)');
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'fuerzaregida#1', nombre: 'Jose M.', celular: '9999999999', correo: 'jose@x.mx', zona_boleto: 'Barrera' }];
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Ya no hay lugar', motivo_clave: 'zona_agotada' });
+  af(RESEND.length === 0 && r.j.aviso.ya_viaja === true, 'y por CORREO aunque el celular sea otro');
+  // Control en el otro sentido: un viajero de OTRO evento no lo calla.
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'scorpions', nombre: 'Jose M.', celular: '8112345678', correo: 'jose@x.mx', zona_boleto: 'Oro' }];
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Ya no hay lugar', motivo_clave: 'zona_agotada' });
+  af(RESEND.length === 1 && !r.j.aviso.ya_viaja,
+    'viajar en OTRO evento NO lo calla: el lugar que perdió sigue perdido');
+  // 🔒 Fail-soft HACIA AVISAR: si el padrón no se puede leer, NO se sabe — y
+  //    callarse es el defecto original (4 personas esperando sin enterarse).
+  DB = semilla(); RESEND = []; VIAJEROS_CAEN = true;
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Ya no hay lugar', motivo_clave: 'zona_agotada' });
+  VIAJEROS_CAEN = false;
+  af(RESEND.length === 1 && !r.j.aviso.ya_viaja,
+    'padrón ilegible: el aviso SALE (callarse es el defecto que vinimos a curar)');
+  // Y la vista previa lo dice ANTES del clic, no después del correo.
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'fuerzaregida#1', nombre: 'Jose M.', celular: '8112345678', correo: 'jose@x.mx', zona_boleto: 'Barrera' }];
+  r = await llamar({ accion: 'rechazo_preview', id: U(1), motivo_clave: 'zona_agotada' });
+  af(r.s === 200 && r.j.ya_viaja && r.j.ya_viaja.viaja === true,
+    'la vista previa avisa que ya viaja ANTES de apretar');
+  af(RESEND.length === 0 && DB.escrituras.length === 0, 'y la vista previa sigue sin escribir ni mandar');
+
   console.log('\n[U] la pantalla');
   const ui = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8');
   af(/accion: 'rechazo_preview'/.test(ui), 'la bandeja pide la vista previa al servidor');
@@ -215,6 +275,8 @@ const llamar = async (b) => {
     'un rechazo SIN avisar ya no se ve igual que uno avisado (eso dejó a 4 personas esperando)');
   af(/a\.avisado/.test(ui) && /no se le avisó/.test(ui),
     'tras rechazar, la pantalla DICE si el cliente se enteró — el rechazo y el aviso son dos hechos distintos');
+  af(/ya_viaja/.test(ui) && /Ya viaja/.test(ui), 'la bandeja pinta el aviso de «ya viaja»');
+  af(/!ya\.viaja/.test(ui), 'y con eso APAGA el botón de avisar, no solo lo rotula');
 
   console.log('\n══ RESULTADO ══');
   if (V === 0) { console.log('⚠️ NADA MEDIDO · esto NO es un verde'); process.exit(1); }

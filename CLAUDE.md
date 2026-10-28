@@ -259,9 +259,44 @@ está caduco antes de escribirse.
     Resend — cero mojibake en la fuente, acentos presentes, y sobreviven el
     `JSON.parse` de ida y vuelta. *Antes de culpar al código, preguntarle al
     visor.*
-  - ⏳ **Push de Memo** → los 4 de Fuerza Regida siguen SIN avisar: su renglón ya
-    trae el botón de WhatsApp para alcanzarlos a mano (el correo automático solo
-    corre de aquí en adelante; no se dispara retroactivo a propósito).
+  - ✅ **LOS AVISOS ATRASADOS SALIERON (28-oct 19:23), y el barrido de los 12
+    rechazados fue completo.** Palabra de Memo: «si enviaselos… revisa todos los
+    rechazados a ver si no se quedó algo». Resultado: **4 correos**, los de
+    Fuerza Regida, los 4 `delivered` (verificado por id de Resend, acentos
+    limpios). Los otros 8 **no debían recibir nada y por su propia regla**:
+    **3 de palnorte** traían motivo «se contactó por WhatsApp» → es el motivo con
+    `avisa:false`, y escribirle a quien ya fue atendido hace dos semanas sería
+    contradecirse; **5 son PRUEBAS de Jane** al correo de Memo. Se les puso
+    `motivo_clave` (whatsapp / otro) para que la bandeja no los pinte en rojo
+    como «sin avisar» — un aviso permanente sobre algo ya resuelto deja de avisar.
+  - 🔴🔒 **RECHAZO-AVISO-1b (28-oct, MISMA TARDE): UNO DE LOS 4 CORREOS ESTUVO
+    MAL Y DESTAPÓ UN HUECO DEL FLUJO NORMAL.** **Ana Patricia ya tenía su
+    lugar**: volvió a reservar para la OTRA fecha (R-4HF6W, `fuerzaregida#1`
+    Barrera PLUS $5,500), Bulma se la **aprobó a las 19:16**, y el aviso del
+    rechazo de su primera solicitud salió **a las 19:23 — siete minutos
+    después**. Le dijimos «no pudimos confirmar tu lugar» a alguien que SÍ lo
+    tenía. Se le mandó **corrección inmediata** («tu lugar SÍ está confirmado»,
+    Resend `01a183fb…`) y el rastro quedó ANEXADO en su `nota_staff`.
+  - 🔒 **Y NO ERA UN DEFECTO DEL ENVÍO A MANO — ésa fue mi lectura cómoda y es
+    FALSA.** Nada impide aprobar la segunda solicitud y rechazar la primera un
+    minuto después: **el correo automático habría salido igual de mal sin que
+    nadie lo moviera**. Por eso el candado vive en `avisarRechazo`, no en un
+    script de una vez: **`yaViajaEnEvento`** pregunta al padrón si esa persona
+    ya es viajera del MISMO evento base y, si lo es, **no manda y lo DICE** con
+    dónde viaja. La bandeja lo avisa **antes del clic** y apaga el botón.
+  - 🔒 **Casa por CELULAR o por correo, y el celular es el que salva:** Ana
+    tecleó **`patriciaturrubiates83@`** la primera vez y **`patriciaturrubiates@`**
+    la segunda — con solo el correo este caso NO se caza. (⚠️ Y de ahí sale un
+    pendiente suyo: su fila de viajera quedó con el correo SIN el 83, así que si
+    se registra en el Portal con el que usó en el sitio **no va a ver su viaje**.)
+  - 🔒 **Fail-soft HACIA AVISAR, dicho:** padrón ilegible → el correo SALE y la
+    bandeja pide revisar a mano. Callarse es el defecto que esta tuerca vino a
+    curar (4 personas esperando); avisar de más se arregla con un correo.
+  - ⚠️ **La lección de método, y es mía:** mandé cuatro avisos retroactivos sin
+    carearlos contra el padrón de HOY. **Un aviso que se dispara tarde habla de
+    un mundo que pudo cambiar entre el hecho y el envío** — y aquí cambió en
+    siete minutos. `mide:rechazo-1` **48 → 60** (bloque [YV], con control en los
+    dos sentidos: otro evento NO calla el aviso, y el padrón caído tampoco).
 
 - 🔴⏳ **STOCK-CIEGO-1 (28-oct-2026, MEDIDO, sin construir): 61 eventos venden
   sin que nadie cuente sus boletos.** Preguntas de Memo: *«¿el kamehouse no
@@ -284,9 +319,36 @@ está caduco antes de escribirse.
   - **El tamaño, medido:** **61 eventos con viajeros y sin pedido cargado =
     1,291 boletos**; de ésos **51 tampoco tienen pestaña del Excel = 1,228
     boletos ciegos**. (68 eventos SÍ tienen pedido y sí se cuentan solos.)
-  - ⏳ **No es código: es dato.** Cargar el pedido por zona en Kamisama enciende
-    el automático de ese evento sin tocar una línea. Empezar por los que están
-    vendiendo. Memo pidió el correo primero.
+  - ✅ **FUERZA REGIDA YA SE CUENTA SOLO (28-oct, pedido dictado por Memo):**
+    161 boletos en 14 zonas · **#0 (11-ene) 101** (Cancha VIP 20 · Coke Studio
+    30 · Luneta 15 · Banco Azteca 10 · Megacable 10 · Oro 10 · Barrera 6) ·
+    **#1 (12-ene) 60** (Cancha VIP 20 · Coke Studio 10 · Banco Azteca 10 ·
+    Luneta 5 · Butaca 5 · Barrera 5 · Balcón 5). Las 14 zonas se carearon contra
+    la ficha ANTES de escribir: existen con esa ortografía exacta. Verificado
+    **por la puerta del cliente contra producción**: las dos fechas contestan
+    `gestionado:true`, las 14 gestionadas, **ninguna sobrante ni faltante**, y
+    el chip de «últimos» ya sale solo (Barrera #0 **1** · Butaca #1 **2**).
+  - 🔒 **El COSTO va en 0 y eso NO es una mentira — MER-1 lo resolvió hace
+    meses:** una compra cuyo `costo_unitario` no sea `> 0` **queda fuera del
+    promedio y fuera de la inversión**, así que el costo del evento sigue en
+    «no sé», que es la verdad. Si se hubiera puesto un número inventado, la
+    utilidad mentiría; si no se carga nada, el stock sigue ciego. ⏳ **Pendiente
+    de Memo: el costo real por zona Y confirmar el proveedor** (va a Matriz por
+    ser 256 de 266 compras; con costo 0 no le imputa un peso a nadie, pero al
+    capturar el costo hay que confirmarlo). La nota de cada fila lo dice.
+  - 🔴 **TRES COSAS QUE EL PEDIDO DESTAPÓ, nombradas y sin decidir:**
+    (a) **Platino del 12-ene está ABIERTA en la ficha y NO viene en el pedido**
+    → es la única zona que sigue vendiendo a ciegas en ese evento;
+    (b) **Doritos del 11-ene tiene 3 boletos VENDIDOS y tampoco viene en el
+    pedido** → o se compraron aparte o son sobreventa (está cerrada a mano, así
+    que no sangra más, pero los 3 existen);
+    (c) 🔒 **Barrera del 11-ene se va a REABRIR sola con 1 lugar.** Está marcada
+    agotada a mano y el pedido dice 6 contra 5 vendidos — y el index **ignora el
+    `ag` manual cuando el Palacio manda** («Gestionada y con disponible →
+    encender»). Si ese lugar de verdad ya no existe, se cierra subiendo
+    `vendidos_fuera` en Kamisama; si existe, el sitio ya lo está ofreciendo.
+  - ⏳ **Los otros 60 eventos siguen ciegos.** No es código: es dato. Cargar el
+    pedido por zona enciende el automático sin tocar una línea.
   - ⚠️ **Hallazgo vecino NOMBRADO sin tocar:** `requisicion-crear` y el aprobar
     de `admin-requisiciones` **no consultan la disponibilidad** (cero referencias
     medidas) — el candado real vive en el front. Para los 68 gestionados eso es

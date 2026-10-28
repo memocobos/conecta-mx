@@ -212,9 +212,11 @@ exports.handler = async (event) => {
       req, motivo_clave: body.motivo_clave,
       motivo_texto: String(body.motivo || '').trim().slice(0, 500),
     });
+    // [RECHAZO-AVISO-1b] Se lo DICE antes del clic, no después del correo.
+    const ya = await CR.yaViajaEnEvento({ req, KH_URL: SB_URL, KH_KEY: SB_KEY });
     return j(200, headers, {
       ok: true, motivos: CR.MOTIVOS, pago: !!req.comprobante_path,
-      wa: CR.waDe(req), tiene_correo: !!req.correo, preview: prev,
+      wa: CR.waDe(req), tiene_correo: !!req.correo, preview: prev, ya_viaja: ya,
     });
   }
 

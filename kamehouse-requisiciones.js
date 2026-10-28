@@ -251,6 +251,12 @@ function _reqBdjCard(r) {
       ${acomp}
       ${r.cotizacion_texto ? `<details><summary>Ver la cotización que el cliente vio</summary><pre>${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
       ${r.estado === 'rechazada' && r.motivo_rechazo ? `<div class="rq-note no">Motivo del rechazo: ${_reqBdjEsc(r.motivo_rechazo)}</div>` : ''}
+      ${/* [RECHAZO-AVISO-1] ¿se enteró el cliente? Un rechazo sin aviso se veía
+            EXACTAMENTE igual que uno avisado — por eso cuatro personas que ya
+            habían transferido quedaron esperando. Ahora se distinguen. */ ''}
+      ${r.estado === 'rechazada' ? (r.aviso_at
+        ? `<div style="font-size:11px;color:var(--green)">✓ Avisado por correo el ${_reqBdjEsc(_tsToDate(r.aviso_at).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}</div>`
+        : `<div style="font-size:11px;color:#ffb020">⚠️ Sin avisar — este cliente no sabe que no se pudo${cel.length === 10 ? `. <a href="https://wa.me/52${cel}?text=${encodeURIComponent('Hola ' + (String(r.nombre || '').split(' ')[0]) + ', te escribimos de Conecta Reynosa por tu solicitud ' + r.folio + '. ' + (r.motivo_rechazo || 'No pudimos confirmar tu lugar.') + ' Tu pago queda a tu favor: dinos qué zona o fecha prefieres y lo aplicamos ahí.')}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avisarle por WhatsApp →</a>` : ''}</div>`) : ''}
       ${r.estado !== 'pendiente' && r.revisada_por ? `<div style="font-size:11px">Revisada por ${_reqBdjEsc(r.revisada_por)}${r.nota_staff ? ' · ' + _reqBdjEsc(r.nota_staff) : ''}</div>` : ''}
     </div>
     <div class="rq-actions">
@@ -428,30 +434,109 @@ async function _reqBdjArchivarPrueba(id, folio, estado) {
   } else alert('No se pudo quitar: ' + ((j && j.error) || 'sin respuesta'));
 }
 
-// Rechazar: el motivo se pide EN LÍNEA con atajos (antes era prompt()).
-const _REQ_MOTIVOS = ['El comprobante no se lee', 'El monto no coincide', 'El pago no ha caído', 'Solicitud duplicada', 'Ya no hay lugares en esa zona'];
+// ── [RECHAZO-AVISO-1] RECHAZAR ES AVISAR ────────────────────────────────────
+// Antes: cinco atajos de texto y un PATCH mudo. El cliente nunca se enteraba —
+// medido: 4 personas que YA habían transferido quedaron rechazadas sin aviso.
+//
+// Hoy son TRES cosas en la misma caja, y en este orden a propósito:
+//   1. los 5 motivos de la casa (los mismos en todos los eventos),
+//   2. el texto que se llena solo y SE PUEDE EDITAR (palabra de Memo),
+//   3. la VISTA PREVIA del correo exacto que va a recibir.
+// Y el botón dice lo que hace: «Rechazar y avisar».
+//
+// 🔒 La lista NO se teclea aquí: la sirve el servidor desde _lib/correo-rechazo,
+//    que es su dueño. Dos listas acabarían diciendo cosas distintas, y ésta es
+//    la que el cliente lee.
+const _reqMotivos = {};   // id → [motivos]  (lo que contestó el servidor)
 function _reqBdjRechazar(id) {
   const box = document.getElementById('req-rch-' + id);
   if (!box) return;
   if (box.style.display !== 'none') { box.style.display = 'none'; return; }
   const apr = document.getElementById('req-apr-' + id); if (apr) apr.style.display = 'none';
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Abriendo…</div>';
+  box.style.display = 'block';
+  _reqBdjRchPintar(id, null);
+}
+async function _reqBdjRchPintar(id, clave) {
+  const box = document.getElementById('req-rch-' + id);
+  if (!box) return;
+  const txtPrevio = (document.getElementById('req-rch-txt-' + id) || {}).value;
+  const j = await _reqBdjCall({ accion: 'rechazo_preview', id, motivo_clave: clave, motivo: txtPrevio || '' })
+    .catch((e) => ({ error: e.message }));
+  if (!j || !j.ok) {
+    box.innerHTML = `<div class="alert alert-error">No se pudo abrir: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`;
+    return;
+  }
+  _reqMotivos[id] = j.motivos || [];
+  const sel = (j.motivos || []).find((m) => m.clave === clave) || null;
+  // Al elegir un motivo se PRELLENA su texto; si ya había algo escrito a mano
+  // se respeta. 🔒 Lo que viaja es el textarea, nunca la plantilla.
+  const texto = txtPrevio != null && txtPrevio !== '' && clave === null ? txtPrevio : (sel ? sel.texto : (txtPrevio || ''));
+  const chips = (j.motivos || []).map((m) => `<button type="button" class="rq-chip${m.clave === clave ? ' on' : ''}"`
+    + ` style="${m.clave === clave ? 'background:var(--red);color:#fff;border-color:var(--red)' : ''}"`
+    + ` onclick="_reqBdjRchElegir('${id}','${m.clave}')">${_reqBdjEsc(m.etiqueta)}</button>`).join('');
+  const p = j.preview || {};
+  let previa;
+  if (!p.avisa) {
+    previa = `<div class="rq-note" style="border-left:3px solid var(--ts)">💬 <b>Este motivo no manda correo.</b> ${_reqBdjEsc(p.razon || '')}</div>`;
+  } else if (p.error) {
+    previa = `<div class="rq-note no">⚠️ <b>No se le puede mandar correo:</b> ${_reqBdjEsc(p.razon)}.`
+      + (j.wa ? ` <a href="${_reqBdjEsc(j.wa)}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avísale por WhatsApp →</a>` : '')
+      + '</div>';
+  } else {
+    previa = `<details open style="margin-top:10px">
+        <summary style="cursor:pointer;color:#e8ff4c;font-weight:700;font-size:12px">👁 Así le va a llegar — para: ${_reqBdjEsc(p.to)}</summary>
+        <div style="font-size:11px;color:var(--ts);margin:6px 0 4px">Asunto: <b style="color:var(--text)">${_reqBdjEsc(p.subject)}</b></div>
+        <iframe srcdoc="${_reqBdjEsc(p.html)}" style="width:100%;height:380px;border:1px solid var(--border);border-radius:8px;background:#000"></iframe>
+        ${p.catalogo_ok === false ? '<div style="font-size:11px;color:#ffb020;margin-top:4px">No se pudo leer el catálogo: el correo sale sin la fecha ni el link del evento. Se manda igual.</div>' : ''}
+      </details>`;
+  }
+  const puedeAvisar = !!(p.avisa && !p.error);
   box.innerHTML = `
     <h4 style="color:var(--red)">Rechazar la solicitud</h4>
-    <div class="rq-chips">${_REQ_MOTIVOS.map((m) => `<button type="button" class="rq-chip" onclick="document.getElementById('req-rch-txt-${id}').value=this.textContent">${_reqBdjEsc(m)}</button>`).join('')}</div>
-    <label class="rq-field">Motivo (el cliente lo va a preguntar) *<input type="text" id="req-rch-txt-${id}" maxlength="300" placeholder="Toca un atajo o escríbelo"></label>
+    <div style="font-size:11.5px;color:var(--ts);margin:0 0 8px">1 · Elige el motivo &nbsp;·&nbsp; 2 · Edítalo si quieres &nbsp;·&nbsp; 3 · Revisa el correo y manda</div>
+    <div class="rq-chips">${chips}</div>
+    <label class="rq-field">Lo que va a leer el cliente *
+      <textarea id="req-rch-txt-${id}" maxlength="500" rows="2" placeholder="Toca un motivo arriba o escríbelo tú"
+        oninput="_reqBdjRchRefrescar('${id}')" style="width:100%;box-sizing:border-box;resize:vertical">${_reqBdjEsc(texto)}</textarea></label>
+    ${j.pago ? '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>' : ''}
+    ${previa}
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="rq-btn dan full" id="req-rch-go-${id}" onclick="_reqBdjRechazarGo('${id}')">Rechazar</button>
+      <button class="rq-btn dan full" id="req-rch-go-${id}" onclick="_reqBdjRechazarGo('${id}')">${puedeAvisar ? 'Rechazar y avisar' : 'Rechazar (sin correo)'}</button>
       <button class="rq-btn quiet" onclick="document.getElementById('req-rch-${id}').style.display='none'">Cancelar</button>
     </div>
     <div id="req-rch-msg-${id}" class="rq-msg"></div>`;
-  box.style.display = 'block';
+}
+function _reqBdjRchElegir(id, clave) {
+  const t = document.getElementById('req-rch-txt-' + id);
+  const m = (_reqMotivos[id] || []).find((x) => x.clave === clave);
+  if (t && m) t.value = m.texto;          // prellena; sigue siendo editable
+  _reqBdjRchPintar(id, clave);
+}
+// Mientras teclea no se le pide al servidor en cada letra: se espera a que pare.
+let _reqRchTimer = null;
+function _reqBdjRchRefrescar(id) {
+  clearTimeout(_reqRchTimer);
+  const clave = ((_reqMotivos[id] || []).find((m) => {
+    const b = document.querySelector('#req-rch-' + id + ' .rq-chip.on'); return b && b.textContent.trim() === m.etiqueta;
+  }) || {}).clave || null;
+  _reqRchTimer = setTimeout(() => _reqBdjRchPintar(id, clave), 700);
 }
 async function _reqBdjRechazarGo(id) {
   const motivo = ((document.getElementById('req-rch-txt-' + id) || {}).value || '').trim();
   const msg = document.getElementById('req-rch-msg-' + id);
-  if (motivo.length < 3) { if (msg) { msg.textContent = 'Escribe el motivo.'; msg.style.color = 'var(--red)'; } return; }
+  if (motivo.length < 3) { if (msg) { msg.textContent = 'Escribe qué va a leer el cliente.'; msg.style.color = 'var(--red)'; } return; }
+  const chipOn = document.querySelector('#req-rch-' + id + ' .rq-chip.on');
+  const clave = chipOn ? ((_reqMotivos[id] || []).find((m) => m.etiqueta === chipOn.textContent.trim()) || {}).clave || null : null;
   const btn = document.getElementById('req-rch-go-' + id); if (btn) { btn.disabled = true; btn.textContent = 'Rechazando…'; }
-  const j = await _reqBdjCall({ accion: 'rechazar', id, motivo }).catch((e) => ({ error: e.message }));
-  if (j && j.ok) loadRequisiciones();
-  else { if (msg) { msg.textContent = 'No se pudo rechazar: ' + ((j && j.error) || 'sin respuesta'); msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Rechazar'; } }
+  const j = await _reqBdjCall({ accion: 'rechazar', id, motivo, motivo_clave: clave }).catch((e) => ({ error: e.message }));
+  if (j && j.ok) {
+    // 🔒 El aviso se DICE: que el rechazo haya salido bien no significa que el
+    //    cliente se haya enterado, y confundirlos es el defecto original.
+    const a = j.aviso || {};
+    if (a.avisado) showToast('Rechazada · correo enviado a ' + (a.to || ''), 'success');
+    else if (a.razon && /cierre interno/i.test(a.razon)) showToast('Rechazada (ese motivo no manda correo)', 'success');
+    else showToast('Rechazada, PERO no se le avisó: ' + (a.razon || 'sin razón') + (a.wa ? ' — avísale por WhatsApp desde su renglón' : ''), 'warning');
+    loadRequisiciones();
+  } else { if (msg) { msg.textContent = 'No se pudo rechazar: ' + ((j && j.error) || 'sin respuesta'); msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Rechazar y avisar'; } }
 }

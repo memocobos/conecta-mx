@@ -40,6 +40,7 @@ const ACCIONES = {
   detalle: ROLES_BANDEJA,
   aprobar: ROLES_BANDEJA,
   rechazar: ROLES_BANDEJA,
+  rechazo_preview: ROLES_BANDEJA,   // [RECHAZO-AVISO-1] enseña el correo; CERO escrituras
   // [PORTAL-EDIT-1] las solicitudes de cambio que el cliente manda desde el Portal.
   cambios_listar: ROLES_BANDEJA,
   cambio_cerrar: ROLES_BANDEJA,
@@ -198,20 +199,54 @@ exports.handler = async (event) => {
     return j(200, headers, { ok: true, requisicion: req, signed_url });
   }
 
+  // ── [RECHAZO-AVISO-1] LA VISTA PREVIA ────────────────────────────────────
+  // Enseña el correo EXACTO que va a recibir el cliente, antes de rechazar.
+  // 🔒 CERO escrituras: ni un PATCH, ni un correo. Enseñar no es mandar.
+  if (accion === 'rechazo_preview') {
+    const CR = require('./_lib/correo-rechazo');
+    const rq = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
+    if (!rq.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
+    const req = (await rq.json())[0];
+    if (!req) return j(404, headers, { error: 'Esa solicitud ya no existe' });
+    const prev = await CR.armarRechazo({
+      req, motivo_clave: body.motivo_clave,
+      motivo_texto: String(body.motivo || '').trim().slice(0, 500),
+    });
+    return j(200, headers, {
+      ok: true, motivos: CR.MOTIVOS, pago: !!req.comprobante_path,
+      wa: CR.waDe(req), tiene_correo: !!req.correo, preview: prev,
+    });
+  }
+
   // ── rechazar: motivo OBLIGATORIO — un rechazo sin palabra no le sirve a
   // nadie: ni al cliente que pregunta ni al que lo revisa en un mes. ────────
+  //
+  // [RECHAZO-AVISO-1] Y DESDE HOY LE AVISA AL CLIENTE. Medido antes: esta
+  // acción solo hacía el PATCH, así que cuatro personas que YA habían
+  // transferido quedaron rechazadas sin enterarse. El correo sale SOLO (palabra
+  // de Memo) y la bandeja ya enseñó el texto exacto antes del clic.
+  // 🔒 El aviso JAMÁS tumba el rechazo: si el correo falla, la solicitud queda
+  //    rechazada igual y la respuesta DICE que no salió, con el link de
+  //    WhatsApp para avisarle a mano. Es la misma ley del correo único.
   if (accion === 'rechazar') {
+    const CR = require('./_lib/correo-rechazo');
     const motivo = String(body.motivo || '').trim().slice(0, 500);
     if (motivo.length < 3) return j(400, headers, { error: 'Di por qué se rechaza (el cliente lo va a preguntar)' });
+    const clave = body.motivo_clave == null ? null : String(body.motivo_clave);
+    if (clave !== null && !CR.CLAVES.includes(clave)) return j(400, headers, { error: 'Ese motivo no existe en la lista' });
     const r = await fetch(`${base}?id=eq.${id}&estado=eq.pendiente`, {
       method: 'PATCH',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify({ estado: 'rechazada', motivo_rechazo: motivo, revisada_por: quien, revisada_at: new Date().toISOString() }),
+      body: JSON.stringify({ estado: 'rechazada', motivo_rechazo: motivo, motivo_clave: clave, revisada_por: quien, revisada_at: new Date().toISOString() }),
     });
     if (!r.ok) return j(502, headers, { error: 'No se pudo rechazar', detail: (await r.text()).slice(0, 300) });
     const rows = await r.json();
     if (!rows.length) return j(409, headers, { error: 'Esa requisición ya no está pendiente — alguien más la revisó' });
-    return j(200, headers, { ok: true, requisicion: rows[0] });
+    let aviso = { avisado: false, razon: 'no se intentó' };
+    try {
+      aviso = await CR.avisarRechazo({ req: rows[0], motivo_clave: clave, motivo_texto: motivo, KH_URL: SB_URL, KH_KEY: SB_KEY });
+    } catch (e) { aviso = { avisado: false, razon: 'El aviso falló', detail: String(e.message).slice(0, 200), wa: CR.waDe(rows[0]) }; }
+    return j(200, headers, { ok: true, requisicion: rows[0], aviso });
   }
 
   // ── [PRUEBA-ARCHIVO-1] archivar_prueba: «quítala, fue de prueba» ─────────

@@ -188,6 +188,110 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📨⏳ **RECHAZO-AVISO-1 (28-oct-2026, en main local): RECHAZAR UNA SOLICITUD
+  AHORA LE AVISA AL CLIENTE.** Pregunta de Memo, citada: *«¿está seguro que al
+  rechazar solicitudes les está llegando un correo para cambiar la zona? porque
+  ya van varias que regresó porque ya tenemos agotado»*. **Tenía razón: NO
+  llegaba nada.**
+  - 🔴 **MEDIDO LEYENDO EL CAMINO:** la acción `rechazar` de
+    `admin-requisiciones` solo hacía un PATCH (estado, motivo, quién, cuándo).
+    **Cero correos, cero WhatsApp.** Los dos correos de ese archivo son al
+    APROBAR (`enviarCorreoPago`) y al cerrar un cambio de paquete
+    (`avisarPaquete`); ninguno en rechazar. Y el cliente tampoco lo veía en el
+    Portal: al rechazar **todavía no es viajero**, así que no tiene dónde entrar.
+    El motivo que escribía Bulma se guardaba en una columna que no lee nadie más.
+  - 🔴 **LO QUE COSTÓ, con nombres:** de 12 rechazadas, **4 traían comprobante**
+    — gente que YA transfirió (separos $300·$300·$600·$1,000), rechazada el 27 y
+    28-oct, **sin un aviso**. Y sus motivos estaban escritos para rescatar la
+    venta: «¿gustas cambiar de fecha?», «¿cambiamos a la del 12?». Las 4 con
+    correo **y** WhatsApp.
+  - **LAS TRES DECISIONES DE MEMO (28-oct), firmadas:**
+    (1) **el dinero QUEDA A FAVOR** — el correo no ofrece reembolso de entrada:
+    dice que su pago está apartado para la zona o fecha que elija, sin volver a
+    pagar, y que si prefiere que se lo regresen lo pida;
+    (2) **sale SOLO al rechazar** (no hay segundo botón que olvidar — que es
+    justo lo que pasó), pero la bandeja **enseña el correo exacto antes del
+    clic**: no se manda nada a ciegas;
+    (3) **5 motivos prellenados y EDITABLES** («dame las 5 opciones y con opción
+    a editar esos mismos manualmente»).
+  - **`_lib/correo-rechazo` es el dueño** del catálogo y del texto. 6 motivos:
+    zona agotada · fecha agotada · comprobante/monto · datos · **ya te
+    contactamos por WhatsApp** · otro. 🔒 **Ese quinto es el ÚNICO con
+    `avisa:false`**: es un cierre interno, y mandarle correo a alguien con quien
+    ya estás hablando es contradecirte solo. 🔒 Sin clave (fila vieja) el lado
+    seguro es **AVISAR**: callarse es el defecto que vinimos a curar.
+  - 🔒 **EL MONTO NO SE DICE, y es deliberado:** `separo_sistema` es lo que el
+    sitio COTIZÓ, no lo que la persona transfirió — eso solo lo sabe quien abre
+    el comprobante, y al rechazar nadie lo teclea. «Tu pago queda a tu favor» es
+    cierto siempre; «tus $600» puede no serlo, y un número equivocado en un
+    correo de dinero se cobra caro.
+  - 🔒 **EL AVISO JAMÁS TUMBA EL RECHAZO** (la ley del correo único): Resend
+    caído → la solicitud queda rechazada igual, la bandeja lo DICE y devuelve el
+    **link de WhatsApp con el mensaje ya escrito**. Y en ese caso **NO se sella**
+    `aviso_at`: sellar sin haber mandado deja a alguien marcado como avisado.
+  - 🔒 **Fail-soft CON el catálogo, y aquí sí corresponde** (a diferencia de
+    CONSUELO-VERDAD, donde el correo PROMETÍA un código y su vigencia): este no
+    promete nada derivado, y el nombre del evento ya viaja GUARDADO en la fila
+    (`evento_nombre`, desde REQ-B1). Sin catálogo sale igual, sin fecha ni link.
+  - **La base** (acta `migraciones/RECHAZO-AVISO-1.sql`, YA CORRIDA, candados
+    MORDIDOS): `motivo_clave` (con CHECK de las 6 — careado contra el lib, bloque
+    [M]) · `aviso_at` · `aviso_email_id`. 🔒 **Sin DEFAULT**: las 45 filas que ya
+    existen NO fueron avisadas y `aviso_at = NULL` es esa verdad; un default las
+    marcaría como avisadas.
+  - **La bandeja:** los 6 motivos como chips → el texto se llena solo y **se
+    puede editar** → **vista previa del correo en un iframe** → «Rechazar y
+    avisar». Y en los rechazados, un renglón nuevo: **«✓ Avisado por correo el
+    …» o «⚠️ Sin avisar — este cliente no sabe que no se pudo»** con su link de
+    WhatsApp. 🔒 Antes los dos estados se veían EXACTAMENTE igual: por eso cuatro
+    personas quedaron esperando.
+  - `mide:rechazo-1` **48** (sin ancla — árbol; handler real + red falsa que
+    muerde el CHECK como la base). ⚠️ **Dos rojos de la primera corrida y los dos
+    eran DEFECTOS MÍOS, no del arnés:** (a) usé `llaveCorreo` —que solo
+    normaliza— donde iba **`esCorreoUsable`**, el que valida y además caza el
+    «gmail.con»: un correo basura pasaba el render y el rebote llegaba hasta
+    Resend; (b) la vista previa del primer clic llegaba con el texto vacío y
+    contestaba «sin motivo no se manda» **sobre un motivo recién elegido** —
+    faltaba la caída a la plantilla. Vecinos verdes (req-b1 52 · acomp-1 67 ·
+    confirma-1 28 · prueba-archivo-1 9 · preventa-portal-1 33 · ctr-recuerda-1 49).
+  - ⚠️ **El render se verificó en pantalla y el primer vistazo salió con los
+    acentos rotos («quÃ©»).** Era **el archivo de vista previa sin
+    `<meta charset>`**, no el correo: medido en los bytes del payload que va a
+    Resend — cero mojibake en la fuente, acentos presentes, y sobreviven el
+    `JSON.parse` de ida y vuelta. *Antes de culpar al código, preguntarle al
+    visor.*
+  - ⏳ **Push de Memo** → los 4 de Fuerza Regida siguen SIN avisar: su renglón ya
+    trae el botón de WhatsApp para alcanzarlos a mano (el correo automático solo
+    corre de aquí en adelante; no se dispara retroactivo a propósito).
+
+- 🔴⏳ **STOCK-CIEGO-1 (28-oct-2026, MEDIDO, sin construir): 61 eventos venden
+  sin que nadie cuente sus boletos.** Preguntas de Memo: *«¿el kamehouse no
+  debería estar descontando los boletos y agotando las zonas en automático?
+  Fuerza Regida solo está contando lo del sistema ¿vdd? ¿ya no está valiendo el
+  Excel?»*.
+  - ✅ **SÍ lo hace solo, y ya está prendido — pero solo donde el pedido está
+    cargado.** Medido contra producción: `disponibilidad-evento` contesta
+    `gestionado:true` para **scorpions** (ve sus 2 zonas) y **`gestionado:false`
+    para `fuerzaregida#0`** (cero zonas). El index lo respeta y hasta **ignora
+    el `ag` manual** cuando el Palacio manda («Gestionada y con disponible →
+    encender»). La cuenta es `comprado − vendidos_fuera − vendidos`.
+  - 🔒 **Sin pedido cargado, `evaluarZona` devuelve `gestionada:false` →
+    `agotada:false` SIEMPRE.** No es un bug: es el sistema **callándose en vez de
+    inventar** un cero. Pero el efecto es que el evento queda fuera del
+    automático y lo único que frena una venta es que Bulma se acuerde.
+  - **Fuerza Regida:** 28 boletos vendidos (Cancha VIP 11 · Barrera 5 · Coke
+    Studio 4 · Butaca 3 · Doritos 3 · Oro 2), **0 compras · 0 pestaña del Excel ·
+    0 ajustes**. Ni el sistema ni el Excel lo cuentan. Los 5 rechazos salen de ahí.
+  - **El tamaño, medido:** **61 eventos con viajeros y sin pedido cargado =
+    1,291 boletos**; de ésos **51 tampoco tienen pestaña del Excel = 1,228
+    boletos ciegos**. (68 eventos SÍ tienen pedido y sí se cuentan solos.)
+  - ⏳ **No es código: es dato.** Cargar el pedido por zona en Kamisama enciende
+    el automático de ese evento sin tocar una línea. Empezar por los que están
+    vendiendo. Memo pidió el correo primero.
+  - ⚠️ **Hallazgo vecino NOMBRADO sin tocar:** `requisicion-crear` y el aprobar
+    de `admin-requisiciones` **no consultan la disponibilidad** (cero referencias
+    medidas) — el candado real vive en el front. Para los 68 gestionados eso es
+    defensa en profundidad que falta, no el hueco de hoy. Tuerca propia.
+
 - 🔥⏳ **NSQK-PREVENTA-1 (26-oct-2026, en main local): nsqkmty entra a la
   PREVENTA A CIEGAS $300 — el circuito de PN27, replicado.** Palabra de Memo,
   citada: *«que tal si nsqkmty lo activamos como Pal Norte con preventa de

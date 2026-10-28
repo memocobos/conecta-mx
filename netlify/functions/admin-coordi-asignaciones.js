@@ -1327,6 +1327,7 @@ ${entregables}
       });
       return ok(headers, {
         vivo: CC.CONTRATO_CLIENTE_VIVO, auto_vivo: CC.CONTRATO_CLIENTE_VIVO && CC.RECORDATORIO_AUTO_VIVO,
+        modo_prueba: !CC.CONTRATO_CLIENTE_VIVO && CC.CONTRATO_PRUEBA_CORREOS.length > 0, // [CTR-PRUEBA-1]
         cada_dias: CC.RECORDATORIO_CADA_DIAS, tope: CC.RECORDATORIO_TOPE,
         catalogo_ok, contratos,
       });
@@ -1370,12 +1371,13 @@ ${entregables}
         const ev = (m && evDe(m.evento_id)) || { a: 'Tu evento', f: '' };
         const render = CC.renderCorreo({ correo: (m && m.correo) || 'cliente@correo.com', ev, contratos: [{ nombre: (m && m.nombre) || 'Nombre' }], recordatorio: true });
         return ok(headers, {
-          seco: true, apagado: !CC.CONTRATO_CLIENTE_VIVO, ejemplo: !m,
+          seco: true, apagado: !(tocan.length && tocan.every((c) => CC.contratoVivoPara(c.correo))), ejemplo: !m,
           a_quien: tocan.map((c) => ({ viajero_id: c.viajero_id, nombre: c.nombre, correo: c.correo, envios: c.envios })),
           saltados, render: { subject: render.subject, html: render.html },
         });
       }
-      if (!CC.CONTRATO_CLIENTE_VIVO) {
+      // [CTR-PRUEBA-1] Apagado, solo pasan los correos de prueba (todos o nada).
+      if (!tocan.every((c) => CC.contratoVivoPara(c.correo))) {
         return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato del cliente sigue APAGADO: no sale ningún recordatorio hasta encenderlo.', apagado: true }) };
       }
       if (body.confirmar !== true) return bad(headers, 'falta confirmar:true para mandar');

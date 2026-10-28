@@ -472,6 +472,17 @@ está caduco antes de escribirse.
   - ⏳ ENCENDER = palabra de Memo: prueba con un viajero suyo → los dos renglones
     de CONTRATO-CLIENTE-2 → visto al correo del recordatorio → prender
     `RECORDATORIO_AUTO_VIVO`.
+  - 🧪 **CTR-PRUEBA-1 (27-oct, mismo día): MODO PRUEBA.** Palabra de Memo: «haz la
+    prueba tú mismo». Con el contrato APAGADO, vive SOLO para
+    `CONTRATO_PRUEBA_CORREOS = ['hcgcobos@gmail.com']` (lib) + su espejo
+    `KH_CONTRATO_PRUEBA_CORREOS` (kamehouse.js, careado que sean iguales).
+    `contratoVivoPara(correo)` es el dueño y lo preguntan la emisión (los demás
+    viajeros salen `apagado:true` sin escribir, igual que antes), la firma del
+    Portal, el botón «📜 Contrato» y el recordatorio (todos o nada: mezclado con un
+    cliente real → 409). Un correo de cliente jamás entra a la lista; al encender
+    de verdad deja de importar. Medido antes: **ninguno de los 5 de la preventa
+    nsqk ha elegido paquete** — no se les debía contrato todavía.
+    `mide:ctr-recuerda-1` **39** ([MP]); vecinos verdes.
 
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de

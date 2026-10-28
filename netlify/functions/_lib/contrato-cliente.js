@@ -39,6 +39,12 @@ const crypto = require('crypto');
 // ⚠️ La variable CONTRATO_CLIENTE_ARNES existe SOLO para que el careo mida el
 // camino encendido; producción jamás la define (verlo en Netlify si hay duda).
 const CONTRATO_CLIENTE_VIVO = process.env.CONTRATO_CLIENTE_ARNES === '1';
+// 🔒 [CTR-PRUEBA-1 · 27-oct-2026] MODO PRUEBA: con el contrato APAGADO, vive
+// SOLO para estos correos — la prueba en producción que pidió Memo («haz la
+// prueba tú mismo») sin que nazca ni salga nada a un cliente. Un correo de
+// cliente jamás entra aquí. Al encender de verdad, esta lista deja de importar.
+// Espejo en kamehouse.js (KH_CONTRATO_PRUEBA_CORREOS): tocar uno obliga al otro.
+const CONTRATO_PRUEBA_CORREOS = ['hcgcobos@gmail.com'];
 const VERSION_TEXTO = 'CC-2 · 27-oct-2026';
 const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 const SITIO = 'https://conectareynosa.mx';
@@ -57,6 +63,13 @@ const llaveCorreo = (c) => {
   const k = String(c || '').trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(k) ? k : null;
 };
+// ¿El contrato vive para ESTE correo? Encendido → para todos; apagado → solo
+// la lista de prueba. Un dueño: lo preguntan la emisión, la firma y el botón.
+function contratoVivoPara(correo) {
+  if (CONTRATO_CLIENTE_VIVO) return true;
+  const k = llaveCorreo(correo);
+  return !!k && CONTRATO_PRUEBA_CORREOS.includes(k);
+}
 const nuevoToken = () => crypto.randomBytes(24).toString('hex'); // 48 hex — el CHECK de la tabla
 
 // ── PURO: años cumplidos en `hoyISO` (fechas YYYY-MM-DD, sin husos: se
@@ -238,7 +251,7 @@ function renderCorreo({ correo, ev, contratos, recordatorio }) {
 // sin_correo, saltados:[{id,motivo}], links:[{id,nombre,url}], errores, aviso }.
 async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true, reenviar = false, recordatorio = false, KH_URL, KH_KEY }) {
   const out = { ok: true, creados: 0, refrescados: 0, ya_firmados: 0, enviados: [], sin_correo: [], saltados: [], links: [], errores: [], aviso: null };
-  if (!CONTRATO_CLIENTE_VIVO) return Object.assign(out, { apagado: true });
+  if (!CONTRATO_CLIENTE_VIVO && !CONTRATO_PRUEBA_CORREOS.length) return Object.assign(out, { apagado: true });
   try {
     const ids = (viajeroIds || []).filter((x) => /^[0-9a-f-]{36}$/i.test(String(x)));
     if (!ids.length) return Object.assign(out, { ok: false, aviso: 'sin viajeros' });
@@ -248,7 +261,11 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
     const lista = ids.map((x) => '"' + x + '"').join(',');
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(lista)})&select=id,evento_id,nombre,correo,celular,tipo_paquete,tipo_viajero,zona_boleto,boletos,total_contrato,abonado_previo`, { headers: h });
     if (!vR.ok) return Object.assign(out, { ok: false, aviso: 'no pude leer los viajeros: el contrato no se emitió' });
-    const vs = await vR.json();
+    const vsTodos = await vR.json();
+    // [CTR-PRUEBA-1] Apagado: solo pasan los correos de prueba. Si nadie pasa,
+    // la respuesta es la MISMA de siempre (apagado:true, cero escrituras).
+    const vs = vsTodos.filter((v) => contratoVivoPara(v.correo));
+    if (!vs.length) return Object.assign(out, { apagado: true });
     const aR = await fetch(`${KH_URL}/rest/v1/abonos_viajero?viajero_id=in.(${encodeURIComponent(lista)})&select=viajero_id,monto&limit=5000`, { headers: h });
     if (!aR.ok) return Object.assign(out, { ok: false, aviso: 'no pude leer los abonos: el contrato no se emitió' });
     const porV = {};
@@ -384,4 +401,5 @@ module.exports = {
   motivoNoRecordar, dsDeViajero, hoyReynosa,
   emitirContratos, armarDatos, clausulas, renderContratoHTML, renderCorreo, motivoSinContrato, incluyeDe,
   VERSION_TEXTO, ZONA_PREVENTA, SITIO, PORTAL_FIRMA, CONTRATO_CLIENTE_VIVO, edadEn, _esc: esc,
+  CONTRATO_PRUEBA_CORREOS, contratoVivoPara,
 };

@@ -84,7 +84,7 @@ exports.handler = async (event) => {
     // ── LISTAR ─────────────────────────────────────────────────────────────
     if (accion === 'listar') {
       const vs = await misViajeros();
-      if (!vs.length) return json(200, headers, { ok: true, contratos: [], vivo: cc.CONTRATO_CLIENTE_VIVO });
+      if (!vs.length) return json(200, headers, { ok: true, contratos: [], vivo: cc.contratoVivoPara(correo) });
       const ids = vs.map((v) => '"' + v.id + '"').join(',');
       const r = await fetch(`${KH_URL}/rest/v1/contratos_cliente?viajero_id=in.(${encodeURIComponent(ids)})&estado=neq.anulado&select=id,viajero_id,estado,datos,firmado_at,firmante_nombre,firmante_rol,edad_al_firmar&order=created_at.asc`, { headers: h });
       if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tus contratos' });
@@ -102,7 +102,7 @@ exports.handler = async (event) => {
           firmado_at: c.firmado_at, firmante_nombre: c.firmante_nombre, firmante_rol: c.firmante_rol,
         };
       });
-      return json(200, headers, { ok: true, contratos, vivo: cc.CONTRATO_CLIENTE_VIVO });
+      return json(200, headers, { ok: true, contratos, vivo: cc.contratoVivoPara(correo) });
     }
 
     // ── FECHA DE NACIMIENTO (una sola vez) ─────────────────────────────────
@@ -127,7 +127,7 @@ exports.handler = async (event) => {
     }
 
     // ── FIRMAR ─────────────────────────────────────────────────────────────
-    if (!cc.CONTRATO_CLIENTE_VIVO) return json(409, headers, { ok: false, error: 'La firma de contratos todavía no está abierta. Te avisaremos por correo.' });
+    if (!cc.contratoVivoPara(correo)) return json(409, headers, { ok: false, error: 'La firma de contratos todavía no está abierta. Te avisaremos por correo.' });
     const contrato_id = String(body.contrato_id || '');
     if (!UUID_RE.test(contrato_id)) return json(400, headers, { ok: false, error: 'Contrato inválido' });
     if (body.acepto !== true) return json(400, headers, { ok: false, error: 'Marca la casilla de que leíste y aceptas el contrato' });

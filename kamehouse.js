@@ -5978,8 +5978,12 @@ function _vjPuedeEliminar() {
 // [CONTRATO-CLIENTE-1b] Espejo del interruptor del servidor: apagado, no se
 // pinta ni el chip ni el botón (la firma se muda al Portal).
 const KH_CONTRATO_CLIENTE_VIVO = false;
+// [CTR-PRUEBA-1] Espejo de CONTRATO_PRUEBA_CORREOS del lib: apagado, el chip y
+// el botón existen SOLO para estos correos (la prueba en producción de Memo).
+const KH_CONTRATO_PRUEBA_CORREOS = ['hcgcobos@gmail.com'];
 function _vjCtrPuede(v) {
-  if (!KH_CONTRATO_CLIENTE_VIVO || !v) return false;
+  if (!v) return false;
+  if (!KH_CONTRATO_CLIENTE_VIVO && !KH_CONTRATO_PRUEBA_CORREOS.includes(String(v.correo || '').trim().toLowerCase())) return false;
   const tipo = String(v.tipo_viajero || '').toLowerCase();
   if (tipo && tipo !== 'cliente') return false;
   if (!(Number(v.total_contrato) > 0)) return false;

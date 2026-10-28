@@ -124,6 +124,11 @@ const llamarAdmin = async (b) => {
   const evM = { ds: dia(-10), multifecha: [{ ds: dia(-10) }, { ds: dia(20) }] };
   af(CC.dsDeViajero(evM, 'multi#1') === dia(20) && CC.dsDeViajero(evM, 'multi') === dia(-10) && CC.dsDeViajero(null, 'x') === null, 'la fecha es la de SU fecha (slug#N), no la del evento padre');
   af(CC.RECORDATORIO_AUTO_VIVO === false && CC.CONTRATO_CLIENTE_VIVO === false, 'los DOS interruptores nacen APAGADOS en el archivo');
+  // [CTR-PRUEBA-1] modo prueba: apagado, vive SOLO para el correo de Memo.
+  af(CC.contratoVivoPara('hcgcobos@gmail.com') && CC.contratoVivoPara(' HCGcobos@Gmail.com ') && !CC.contratoVivoPara('ana@x.mx') && !CC.contratoVivoPara(null), 'modo prueba: apagado vive solo para el correo de prueba (mayúsculas casan) y para nadie más');
+  const kh = require('fs').readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
+  const espejo = (kh.match(/KH_CONTRATO_PRUEBA_CORREOS = (\[[^\]]*\])/) || [])[1];
+  af(espejo && JSON.stringify(eval(espejo)) === JSON.stringify(CC.CONTRATO_PRUEBA_CORREOS), () => 'el espejo de KameHouse trae la MISMA lista de prueba que el lib — ' + espejo);
 
   console.log('\n[L] la lista');
   DB = semilla(); RESEND = []; CC = cargar(false);
@@ -156,6 +161,16 @@ const llamarAdmin = async (b) => {
   console.log('\n[A] apagado: mandar de verdad');
   r = await llamarAdmin({ accion: 'contrato_cliente_recordar', viajero_ids: [U(1)], seco: false, confirmar: true });
   af(r.s === 409 && r.j.apagado && RESEND.length === 0 && DB.escrituras.length === 0, 'apagado → 409, cero correos, cero escrituras');
+
+  console.log('\n[MP] modo prueba (apagado, correo de Memo)');
+  DB = semilla(); RESEND = []; CC = cargar(false);
+  DB.v[0].correo = 'hcgcobos@gmail.com'; DB.c[0].correo = 'hcgcobos@gmail.com';
+  r = await llamarAdmin({ accion: 'contrato_cliente_recordar', viajero_ids: [U(1)] });
+  af(r.s === 200 && r.j.apagado === false && r.j.a_quien.length === 1, 'seco con el correo de prueba: NO dice apagado');
+  r = await llamarAdmin({ accion: 'contrato_cliente_recordar', viajero_ids: [U(1), U(2)], seco: false, confirmar: true });
+  af(r.s === 409 && RESEND.length === 0, 'mezclado con un cliente real → 409, nada sale (todos o nada)');
+  r = await llamarAdmin({ accion: 'contrato_cliente_recordar', viajero_ids: [U(1)], seco: false, confirmar: true });
+  af(r.s === 200 && RESEND.length === 1 && RESEND[0].to[0] === 'hcgcobos@gmail.com', () => 'solo el de prueba → sale UN correo a Memo — ' + RESEND.length);
 
   console.log('\n[E] encendido');
   DB = semilla(); RESEND = []; CC = cargar(true);

@@ -10757,6 +10757,7 @@ function ctrTabSet(t, btn) {
   const el = btn || document.getElementById('ctrt-' + t);
   if (el) el.classList.add('active');
   _ctrPintarLista();
+  ctrCliMostrar();
 }
 // El ORDEN DE USO: primero los eventos por venir, el más cercano arriba (el de
 // HOY cuenta como por venir — es justo el que se está usando); luego los sin
@@ -10864,6 +10865,8 @@ async function loadContratosList() {
     // frenar la lista: cuando conteste, la alerta de Creadoras se repinta sola.
     _ctrMaterial = null;
     _ctrMaterialCargar();
+    _ctrCli = null;   // [CTR-RECUERDA-1] se re-pide al volver a la pestaña
+    ctrCliMostrar();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:30px;font-size:12px">Error: ${_escCtr(e.message)}</td></tr>`;
   }
@@ -10911,7 +10914,9 @@ function _ctrPintarLista() {
       // pestaña Clientes VACÍA dice POR QUÉ está vacía: los contratos de
       // cliente nacen con las fases reales (CONTRATO-CLIENTE-1, decisión B).
       if (_ctrTab === 'clientes' && !delTab.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;line-height:1.8">Todavía no hay contratos de clientes — nacen cuando se publiquen las <b>fases reales</b> y cada cliente elija su paquete (CONTRATO-CLIENTE-1).<br>Aquí van a vivir, con su firma y sus alertas.</td></tr>`;
+        // [CTR-RECUERDA-1] Esta tabla de abajo es la de los contratos de
+        // GIVEAWAY; los de los viajeros viven en el bloque de arriba.
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;line-height:1.8">Sin contratos de giveaway. Los contratos de los viajeros están en el bloque de arriba.</td></tr>`;
         return;
       }
       const etq = { vigente: 'vigente', pendiente: 'sin firmar', pasado: 'pasado', cancelado: 'dado de baja', todos: '' };
@@ -10965,6 +10970,158 @@ function _ctrPintarLista() {
       </tr>`;
     }).join('');
   }
+}
+
+// ═══ [CTR-RECUERDA-1 · 27-oct-2026] LOS CONTRATOS DE LOS VIAJEROS ═════════
+// Palabra de Memo: «en contratos porque no me aparecen los contratos de los
+// clientes y los que faltan por firmar para estarles recordando cada cierto
+// tiempo» → «así ármalo». Vive DENTRO de la pestaña Clientes, arriba de la
+// tabla de giveaway. Lee `contratos_cliente` (los que se firman en el Portal)
+// por contrato_cliente_lista; «¿le toca recordatorio?» lo decide el SERVIDOR
+// (_lib/contrato-cliente, el mismo dueño que el cron) y aquí solo se pinta.
+// 🔒 Recordar es SECO primero: enseña a quién y el correo tal cual; mandar
+//    pide un segundo clic, y con el contrato APAGADO el servidor dice que no.
+// Tres estados sin aplastar (la ley del cero falso): null = no se ha pedido ·
+// {datos} = contestó · {error} = no se pudo leer, y se DICE.
+let _ctrCli = null;
+let _ctrCliFiltro = 'sin_firmar';
+function _ctrCliClase(c) {
+  if (c.estado === 'firmado') return c.ine_verificada_at ? 'firmado' : 'ine';
+  return 'sin_firmar';
+}
+function ctrCliMostrar() {
+  const box = document.getElementById('ctr-cli-viaj');
+  if (!box) return;
+  if (_ctrTab !== 'clientes') { box.style.display = 'none'; return; }
+  box.style.display = '';
+  if (_ctrCli === null) { ctrCliCargar(); return; }
+  _ctrCliPintar();
+}
+async function ctrCliCargar() {
+  const box = document.getElementById('ctr-cli-viaj');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando contratos de viajeros…</div>';
+  try {
+    _ctrCli = await khViajeros._call({ accion: 'contrato_cliente_lista' });
+  } catch (e) {
+    _ctrCli = { error: e.message };
+  }
+  _ctrCliPintar();
+}
+function ctrCliFiltrar(f) { _ctrCliFiltro = f; _ctrCliPintar(); }
+function _ctrCliPintar() {
+  const box = document.getElementById('ctr-cli-viaj');
+  if (!box || _ctrCli === null) return;
+  const esc = _escCtr;
+  const caja = (inner) => `<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:var(--r-sm,8px);padding:16px 18px">${inner}</div>`;
+  if (_ctrCli.error) {
+    box.innerHTML = caja(`<div style="color:var(--red);font-size:12px">No se pudieron leer los contratos de los viajeros: ${esc(_ctrCli.error)} · <a href="#" onclick="ctrCliCargar();return false" style="color:#e8ff4c">reintentar</a></div>`);
+    return;
+  }
+  const todos = _ctrCli.contratos || [];
+  const cuenta = { sin_firmar: 0, ine: 0, firmado: 0 };
+  todos.forEach((c) => { cuenta[_ctrCliClase(c)]++; });
+  const estado = _ctrCli.vivo
+    ? `<span style="color:var(--green)">● encendido</span>`
+    : `<span style="color:#ffb020">● APAGADO</span> <span style="color:var(--ts)">— no nace ni se manda ningún contrato hasta que Memo lo encienda.</span>`;
+  const auto = _ctrCli.auto_vivo
+    ? `Recordatorio automático: <b>encendido</b>, cada ${_ctrCli.cada_dias} días, máximo ${_ctrCli.tope} avisos, nunca después del evento.`
+    : `Recordatorio automático: <b>apagado</b> (propuesta: cada ${_ctrCli.cada_dias} días, máximo ${_ctrCli.tope} avisos, nunca después del evento).`;
+  const chip = (f, txt, n) => `<button class="kh-subnav-btn${_ctrCliFiltro === f ? ' active' : ''}" onclick="ctrCliFiltrar('${f}')">${txt} (${n})</button>`;
+  let cuerpo;
+  if (!todos.length) {
+    cuerpo = `<div style="color:var(--ts);font-size:12px;line-height:1.8;padding:8px 0">Todavía no hay ningún contrato de viajero${_ctrCli.vivo ? '' : ': el contrato está apagado, así que hoy no nace ninguno'}. Cuando se encienda, nacen al aprobar una requisición, al dar de alta un viajero a mano y al elegir paquete; aquí vas a ver quién falta por firmar y recordarle.</div>`;
+  } else {
+    const vis = todos.filter((c) => _ctrCliFiltro === 'todos' || _ctrCliClase(c) === _ctrCliFiltro);
+    // Agrupados por evento, el más cercano primero; los pasados al final.
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+    const grupos = new Map();
+    vis.forEach((c) => {
+      const k = String(c.evento_id || '').split('#')[0] + '|' + (c.ds || '');
+      if (!grupos.has(k)) grupos.set(k, { evento: c.evento || c.evento_id, fecha: c.fecha || '', ds: c.ds, filas: [] });
+      grupos.get(k).filas.push(c);
+    });
+    const orden = [...grupos.values()].sort((a, b) => {
+      const ra = !a.ds ? 1 : (a.ds >= hoy ? 0 : 2), rb = !b.ds ? 1 : (b.ds >= hoy ? 0 : 2);
+      if (ra !== rb) return ra - rb;
+      return ra === 2 ? String(b.ds).localeCompare(String(a.ds)) : String(a.ds || '').localeCompare(String(b.ds || ''));
+    });
+    const fmt = (iso) => iso ? _tsToDate(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'America/Matamoros' }) : '—';
+    const mxn = (n) => n == null ? '—' : '$' + Math.round(n).toLocaleString('es-MX');
+    cuerpo = !vis.length
+      ? `<div style="color:var(--ts);font-size:12px;padding:8px 0">Nadie en este filtro — hay ${todos.length} contratos en total.</div>`
+      : orden.map((g) => {
+        const recordables = g.filas.filter((c) => !c.no_recordar).map((c) => c.viajero_id);
+        const filas = g.filas.map((c) => {
+          const cl = _ctrCliClase(c);
+          const badge = cl === 'firmado' ? `<span style="color:var(--green)">✓ firmado</span>`
+            : cl === 'ine' ? `<span style="color:var(--yellow)">firmado · INE por revisar</span>`
+            : `<span style="color:#ffb020">⏳ sin firmar</span>`;
+          const avisos = c.envios ? `${c.envios} aviso${c.envios === 1 ? '' : 's'} · último ${fmt(c.enviado_at)}` : 'sin enviar';
+          const accion = cl === 'sin_firmar'
+            ? (c.no_recordar
+              ? `<span style="font-size:11px;color:var(--ts)">${esc(c.no_recordar)}</span>`
+              : `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" onclick="ctrCliRecordar(['${_attrJs(c.viajero_id)}'])">📨 Recordar</button>`)
+            : `<span style="font-size:11px;color:var(--ts)">firmó ${esc(c.firmante_nombre || '')}${c.firmante_rol && c.firmante_rol !== 'titular' ? ' (' + esc(c.firmante_rol) + ')' : ''} · ${fmt(c.firmado_at)}</span>`;
+          return `<tr><td><b>${esc(c.nombre || '—')}</b><br><span style="color:var(--ts);font-size:11px">${esc(c.correo || 'sin correo')}</span></td>
+            <td style="font-size:12px">${esc(c.paquete || '')}${c.zona ? ' · ' + esc(c.zona) : ''}<br><span style="color:var(--ts);font-size:11px">${mxn(c.total)}</span></td>
+            <td style="font-size:12px">${avisos}</td><td style="font-size:12px">${badge}</td>
+            <td style="text-align:right;white-space:nowrap">${accion}</td></tr>`;
+        }).join('');
+        const masivo = recordables.length > 1
+          ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:#e8ff4c;border-color:rgba(232,255,76,.35)" onclick='ctrCliRecordar(${JSON.stringify(recordables)})'>📨 Recordar a los ${recordables.length}</button>` : '';
+        return `<div style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+            <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">${esc(g.evento)} <span style="color:var(--ts);font-weight:400;text-transform:none">${esc(g.fecha || '')}${g.ds && g.ds < hoy ? ' · ya pasó' : ''}</span></div>${masivo}</div>
+          <table class="data-table" style="width:100%"><tbody>${filas}</tbody></table></div>`;
+      }).join('');
+  }
+  box.innerHTML = caja(`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">📜 Contratos de viajeros · se firman en el Portal</div>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="ctrCliRecordar([])">👁 Ver el correo del recordatorio</button>
+    </div>
+    <div style="font-size:11.5px;line-height:1.7;margin:6px 0 10px">${estado}<br><span style="color:var(--ts)">${auto}</span>${_ctrCli.catalogo_ok === false ? '<br><span style="color:#ffb020">No se pudo leer el catálogo: las fechas de los eventos no salen y no se sabe quién ya viajó.</span>' : ''}</div>
+    <div class="kh-subnav" style="margin-bottom:4px">${chip('sin_firmar', 'Sin firmar', cuenta.sin_firmar)}${chip('ine', 'INE por revisar', cuenta.ine)}${chip('firmado', 'Firmados', cuenta.firmado)}${chip('todos', 'Todos', todos.length)}</div>
+    <div id="ctr-cli-prev"></div>
+    ${cuerpo}`);
+}
+// SECO primero: el servidor contesta a quién le llegaría, a quién no y por qué,
+// y el correo TAL CUAL. Con [] enseña el correo de ejemplo (para aprobar el
+// texto antes de encender).
+async function ctrCliRecordar(ids) {
+  const prev = document.getElementById('ctr-cli-prev');
+  if (!prev) return;
+  prev.innerHTML = '<div class="loading-state"><div class="spinner"></div>Armando el recordatorio…</div>';
+  try {
+    const r = await khViajeros._call({ accion: 'contrato_cliente_recordar', viajero_ids: ids, seco: true });
+    const esc = _escCtr;
+    const quien = (r.a_quien || []).map((x) => `${esc(x.nombre || '')} &lt;${esc(x.correo)}&gt;`).join(', ');
+    const fuera = (r.saltados || []).map((x) => `${esc(x.nombre || '¿?')}: ${esc(x.motivo)}`).join(' · ');
+    const n = (r.a_quien || []).length;
+    const boton = !n ? ''
+      : r.apagado ? `<span style="color:#ffb020;font-size:12px">El contrato está APAGADO: no se puede mandar todavía.</span>`
+      : `<button class="btn btn-primary btn-sm" onclick='ctrCliMandar(${JSON.stringify(r.a_quien.map((x) => x.viajero_id))})'>Mandar ${n} recordatorio${n === 1 ? '' : 's'}</button>`;
+    prev.innerHTML = `<div style="border:1px dashed var(--border);border-radius:8px;padding:12px;margin:10px 0;font-size:12px;line-height:1.7">
+      <div style="display:flex;justify-content:space-between;gap:10px"><b>${r.ejemplo ? 'Así se ve el recordatorio (ejemplo)' : 'Vista previa · todavía no sale nada'}</b><a href="#" onclick="document.getElementById('ctr-cli-prev').innerHTML='';return false" style="color:var(--ts)">cerrar</a></div>
+      ${n ? `<div><b>Le llegaría a:</b> ${quien}</div>` : ''}${fuera ? `<div style="color:var(--ts)"><b>No le llega a:</b> ${fuera}</div>` : ''}
+      <div><b>Asunto:</b> ${esc(r.render.subject)}</div>
+      <iframe sandbox="" srcdoc="${esc(r.render.html)}" style="width:100%;max-width:620px;height:420px;border:1px solid var(--border);border-radius:6px;background:#000;margin:6px 0"></iframe>
+      <div>${boton}</div></div>`;
+  } catch (e) {
+    prev.innerHTML = `<div class="alert alert-error">No se pudo armar el recordatorio: ${_escCtr(e.message)}</div>`;
+  }
+}
+async function ctrCliMandar(ids) {
+  if (!confirm(`¿Mandar el recordatorio por correo a ${ids.length} persona(s)? Les llega de verdad.`)) return;
+  try {
+    const r = await khViajeros._call({ accion: 'contrato_cliente_recordar', viajero_ids: ids, seco: false, confirmar: true });
+    const k = r.contrato || {};
+    if (r.nada) showToast('A nadie le tocaba recordatorio.', 'warning');
+    else if (k.enviados && k.enviados.length) showToast(`Recordatorio enviado a ${k.enviados.length} correo(s)`, 'success');
+    if (k.errores && k.errores.length) showToast(_escCtr(k.errores.map((e) => e.aviso).join(' · ')), 'error');
+    const prev = document.getElementById('ctr-cli-prev'); if (prev) prev.innerHTML = '';
+    ctrCliCargar();
+  } catch (e) { showToast('No se mandó: ' + _escCtr(e.message), 'error'); }
 }
 
 // ═══ [CREA-1b] Cortesías: de contrato firmado a boleto apartado ═══════════

@@ -103,6 +103,8 @@ const ACCIONES = {
   contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_ine: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] ver la INE (URLs firmadas)
   contrato_cliente_verificar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] la INE coincide
+  contrato_cliente_lista: ROLES_EDITA_VIAJERO, // [CTR-RECUERDA-1] todos los contratos de clientes
+  contrato_cliente_recordar: ROLES_EDITA_VIAJERO, // [CTR-RECUERDA-1] recordatorio de firma (seco por default)
   // [CREA-1b] Regalar un boleto es mover inventario: mismos roles que capturan
   // viajeros. Y la entrada VA AQUÍ o la acción no existe para el portero —
   // ésa fue RAD-FIX-CAMINO: tres RPC vivos y 'accion inválida' en pantalla.
@@ -1296,6 +1298,93 @@ ${entregables}
       const { emitirContratos } = require('./_lib/contrato-cliente');
       const contrato = await emitirContratos({ viajeroIds: [id], reenviar: true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
       return ok(headers, { contrato });
+    }
+
+    // ── [CTR-RECUERDA-1] La pestaña «Clientes» de Contratos y su recordatorio ──
+    // lista: TODOS los contratos de cliente (no anulados), con su evento, cuándo
+    // se mandó, cuántos avisos lleva y si hoy le toca recordatorio (el motivo lo
+    // decide _lib/contrato-cliente, el MISMO dueño que el cron). Solo lee.
+    if (accion === 'contrato_cliente_lista') {
+      const CC = require('./_lib/contrato-cliente');
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?estado=neq.anulado&select=id,viajero_id,evento_id,estado,correo,envios,enviado_at,firmado_at,firmante_nombre,firmante_rol,edad_al_firmar,ine_verificada_at,created_at,nombre:datos->>nombre,evento:datos->>evento,fecha:datos->>fecha,paquete:datos->>paquete_txt,zona:datos->>zona,total:datos->>total&order=created_at.asc&limit=5000`, { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const filas = await r.json();
+      // El catálogo solo aporta la FECHA del viaje (para ordenar y para no
+      // recordar a quien ya viajó). Caído = la lista sale igual y lo DICE.
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      const catalogo_ok = Array.isArray(EV);
+      const ahora = Date.now();
+      const contratos = filas.map((c) => {
+        const ev = catalogo_ok ? EV.find((e) => e && e.id === String(c.evento_id || '').split('#')[0]) : null;
+        const ds = CC.dsDeViajero(ev, c.evento_id);
+        return Object.assign({}, c, {
+          ds,
+          total: c.total != null ? Number(c.total) : null,
+          no_recordar: CC.motivoNoRecordar(c, ds, ahora, 'manual'),
+          no_recordar_auto: CC.motivoNoRecordar(c, ds, ahora, 'auto'),
+        });
+      });
+      return ok(headers, {
+        vivo: CC.CONTRATO_CLIENTE_VIVO, auto_vivo: CC.CONTRATO_CLIENTE_VIVO && CC.RECORDATORIO_AUTO_VIVO,
+        cada_dias: CC.RECORDATORIO_CADA_DIAS, tope: CC.RECORDATORIO_TOPE,
+        catalogo_ok, contratos,
+      });
+    }
+
+    // recordar: SECO por default (enseña a quién y el correo tal cual). Para
+    // mandar hacen falta `seco:false` Y `confirmar:true` (dos gestos), y el
+    // contrato encendido. Tope 60 por clic. Solo PENDIENTES que ya recibieron
+    // su contrato y no se avisaron en las últimas horas.
+    if (accion === 'contrato_cliente_recordar') {
+      const CC = require('./_lib/contrato-cliente');
+      const ids = Array.isArray(body.viajero_ids) ? [...new Set(body.viajero_ids.map(String).filter((x) => UUID_RE.test(x)))] : [];
+      if (ids.length > 60) return bad(headers, `son ${ids.length}: máximo 60 por clic`);
+      const seco = body.seco !== false;
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      const evDe = (eid) => (Array.isArray(EV) ? EV.find((e) => e && e.id === String(eid || '').split('#')[0]) : null);
+
+      let filas = [];
+      if (ids.length) {
+        const lista = ids.map((x) => '"' + x + '"').join(',');
+        const r = await fetch(`${env.KH_SB_URL}/rest/v1/contratos_cliente?viajero_id=in.(${encodeURIComponent(lista)})&estado=neq.anulado&select=id,viajero_id,evento_id,estado,correo,envios,enviado_at,nombre:datos->>nombre&limit=200`, { headers: sbHeaders });
+        if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+        filas = await r.json();
+      }
+      const ahora = Date.now();
+      const tocan = [], saltados = [];
+      ids.forEach((vid) => {
+        const c = filas.find((f) => f.viajero_id === vid);
+        if (!c) { saltados.push({ viajero_id: vid, nombre: null, motivo: 'no tiene contrato' }); return; }
+        const mot = CC.motivoNoRecordar(c, CC.dsDeViajero(evDe(c.evento_id), c.evento_id), ahora, 'manual');
+        if (mot) { saltados.push({ viajero_id: vid, nombre: c.nombre, motivo: mot }); return; }
+        if (!c.correo) { saltados.push({ viajero_id: vid, nombre: c.nombre, motivo: 'sin correo: avísale por WhatsApp' }); return; }
+        tocan.push(c);
+      });
+
+      if (seco) {
+        // El correo TAL CUAL saldría (el primero), o un ejemplo si no hay nadie:
+        // el texto se aprueba antes de encender, aunque la lista esté vacía.
+        const m = tocan[0];
+        const ev = (m && evDe(m.evento_id)) || { a: 'Tu evento', f: '' };
+        const render = CC.renderCorreo({ correo: (m && m.correo) || 'cliente@correo.com', ev, contratos: [{ nombre: (m && m.nombre) || 'Nombre' }], recordatorio: true });
+        return ok(headers, {
+          seco: true, apagado: !CC.CONTRATO_CLIENTE_VIVO, ejemplo: !m,
+          a_quien: tocan.map((c) => ({ viajero_id: c.viajero_id, nombre: c.nombre, correo: c.correo, envios: c.envios })),
+          saltados, render: { subject: render.subject, html: render.html },
+        });
+      }
+      if (!CC.CONTRATO_CLIENTE_VIVO) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato del cliente sigue APAGADO: no sale ningún recordatorio hasta encenderlo.', apagado: true }) };
+      }
+      if (body.confirmar !== true) return bad(headers, 'falta confirmar:true para mandar');
+      if (!tocan.length) return ok(headers, { enviados: [], saltados, nada: true });
+      const contrato = await CC.emitirContratos({
+        viajeroIds: tocan.map((c) => c.viajero_id), reenviar: true, recordatorio: true,
+        creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE,
+      });
+      return ok(headers, { contrato, saltados });
     }
 
     if (accion === 'viajero_elegir_paquete') {

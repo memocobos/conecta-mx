@@ -437,6 +437,42 @@ está caduco antes de escribirse.
   «¿se invirtieron día y mes?» (coordinador/laboral exentos: copian la fecha del
   contrato a propósito).
 
+- 📜⏳ **CTR-RECUERDA-1 (27-oct-2026, en main local, APAGADO): la pestaña
+  Clientes de Contratos ve los contratos de los VIAJEROS y les recuerda firmar.**
+  Palabra de Memo: «no me aparecen los contratos de los clientes y los que faltan
+  por firmar para estarles recordando cada cierto tiempo» → «así ármalo».
+  - **Medido antes, y dicho:** `contratos_cliente` (KH) **0 filas** y
+    `contratos_viajeros` (Portal, F3a) **0 filas** — ningún cliente ha recibido ni
+    firmado contrato. Los firmados que existen son del EQUIPO en
+    `contratos_creadores` (25 creadora · 22 coordinador · 3 auxiliar · 1 giveaway).
+  - **KameHouse:** bloque «📜 Contratos de viajeros» arriba de la tabla de giveaway
+    en la pestaña Clientes: dice ENCENDIDO/APAGADO, chips Sin firmar · INE por
+    revisar · Firmados, agrupado por evento (el más cercano arriba), «📨 Recordar»
+    por fila y «Recordar a los N» por evento, y «👁 Ver el correo del
+    recordatorio» (el texto se aprueba aunque la lista esté vacía).
+  - **Servidor** (`admin-coordi-asignaciones`): `contrato_cliente_lista` (solo
+    lee; catálogo caído = lista igual + `catalogo_ok:false`) ·
+    `contrato_cliente_recordar` — 🔒 **SECO por default** (a quién sí, a quién no
+    y por qué, y el correo tal cual; cero escrituras), mandar exige `seco:false`
+    **y** `confirmar:true` y el contrato encendido (si no, 409), tope 60 por clic.
+  - 🔒 **«¿Le toca recordatorio?» tiene UN dueño** (`motivoNoRecordar` en
+    `_lib/contrato-cliente`) que preguntan el botón y el cron: pendiente, ya
+    recibió su contrato, su evento (la fecha de SU `slug#N`) no ha pasado; el
+    botón solo frena 20 h (anti doble clic), el cron va cada **3 días** con tope de
+    **5 avisos** (propuesta — Memo la firma al encender). El correo es el mismo del
+    contrato con asunto «Recordatorio: te falta firmar…»; uno por dirección, sello
+    después del envío.
+  - **Cron `contratos-cliente-recordatorio`** (22:00 UTC) con DOBLE interruptor:
+    `CONTRATO_CLIENTE_VIVO` + `RECORDATORIO_AUTO_VIVO=false`; apagado no lee nada;
+    sin catálogo no manda (no se le recuerda firmar a quien ya viajó).
+  - `mide:ctr-recuerda-1` **34** (handler y cron reales, Resend contado con
+    control positivo); vecinos verdes (contrato-cliente-1 29 · -2 19 ·
+    portal-solo-1 73 · preventa-portal-1 33 · preventa-elegir-1 14 · req-b1 52 ·
+    confirma-1 28).
+  - ⏳ ENCENDER = palabra de Memo: prueba con un viajero suyo → los dos renglones
+    de CONTRATO-CLIENTE-2 → visto al correo del recordatorio → prender
+    `RECORDATORIO_AUTO_VIVO`.
+
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de
   nacimiento se quedaba en «dd/mm/aaaa» sin teclado ni calendario, y «la foto

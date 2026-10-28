@@ -165,6 +165,15 @@
 [functions."contratos-alerta-cron"]
   schedule = "0 14 * * *"
 
+# [CTR-RECUERDA-1] Recordatorio de firma del contrato del CLIENTE (contratos_cliente,
+# el que se firma en el Portal). DIARIO, pero cada cliente recibe uno cada 3 días
+# como máximo, tope 5 avisos y nunca después de su evento (lo decide
+# _lib/contrato-cliente). APAGADO por doble interruptor en el lib: con el contrato
+# o el recordatorio apagados contesta {apagado:true} sin leer nada.
+# 22:00 UTC = 4:00 PM en Reynosa (5 PM en verano).
+[functions."contratos-cliente-recordatorio"]
+  schedule = "0 22 * * *"
+
 # Vigilante de Radio Conecta — checa el nowplaying CADA 10 MINUTOS (timeout 8s +
 # 1 reintento a los 15s). Si 2 corridas seguidas fallan (~20 min de caída) manda
 # UN correo de alerta a Memo (máx 1 cada 6 h mientras siga caída) y otro al

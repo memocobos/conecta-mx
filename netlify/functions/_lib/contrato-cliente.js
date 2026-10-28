@@ -202,20 +202,26 @@ function renderContratoHTML(d) {
 }
 
 // ── EL CORREO (uno por dirección, con todos sus links) ───────────────────────
-function renderCorreo({ correo, ev, contratos }) {
+function renderCorreo({ correo, ev, contratos, recordatorio }) {
   const artista = String(ev.a || ev.id);
   const primer = (String((contratos[0] && contratos[0].nombre) || '').trim().split(/\s+/)[0]) || 'Hola';
   const varios = contratos.length > 1;
-  const subject = `Firma tu contrato de viaje · ${artista}`;
+  // [CTR-RECUERDA-1] El recordatorio es el MISMO correo con otro arranque: el
+  // camino (Portal + fecha + INE) no cambia, solo se dice que falta.
+  const subject = recordatorio ? `Recordatorio: te falta firmar tu contrato · ${artista}` : `Firma tu contrato de viaje · ${artista}`;
+  const titulo = recordatorio ? `${esc(primer)}, te falta firmar tu contrato` : `${esc(primer)}, firma tu contrato de viaje`;
+  const arranque = recordatorio
+    ? `Te recordamos que tu contrato para <b style="color:#e8ff4c">${esc(artista)}</b>${ev.f ? ' (' + esc(ev.f) + ')' : ''} <b>sigue sin firmar</b>. Se firma dentro de tu <b>Portal</b>: entra (o regístrate) con <b>este mismo correo</b> (<span style="color:#e8ff4c">${esc(correo)}</span>).`
+    : `Tu contrato para <b style="color:#e8ff4c">${esc(artista)}</b>${ev.f ? ' (' + esc(ev.f) + ')' : ''} ya está listo. Se firma dentro de tu <b>Portal</b>: entra (o regístrate) con <b>este mismo correo</b> (<span style="color:#e8ff4c">${esc(correo)}</span>).`;
   const quienes = varios ? `<p style="margin:0 0 14px;color:#ffffff">Contratos por firmar: <b>${contratos.map((c) => esc(c.nombre)).join(', ')}</b>.</p>` : '';
   const html = `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000000;color:#ffffff">
         <div style="background:#e8ff4c;color:#000000;padding:18px 22px;border-bottom:4px solid #ff283b">
           <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#000000">Conecta Reynosa · ${esc(artista)}</div>
-          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, firma tu contrato de viaje</div>
+          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${titulo}</div>
         </div>
         <div style="padding:22px;font-size:15px;line-height:1.6;color:#ffffff">
-          <p style="margin:0 0 14px;color:#ffffff">Tu contrato para <b style="color:#e8ff4c">${esc(artista)}</b>${ev.f ? ' (' + esc(ev.f) + ')' : ''} ya está listo. Se firma dentro de tu <b>Portal</b>: entra (o regístrate) con <b>este mismo correo</b> (<span style="color:#e8ff4c">${esc(correo)}</span>).</p>
+          <p style="margin:0 0 14px;color:#ffffff">${arranque}</p>
           ${quienes}
           <p style="margin:0 0 20px;color:#ffffff">Para firmar vas a necesitar la <b>fecha de nacimiento</b> del viajero y una foto de la <b>INE</b> (frente y reverso) de quien firma. Si el viajero es menor de edad, firma su mamá, papá o tutor con su propia INE.</p>
           <p style="margin:0 0 12px;text-align:center"><a href="${PORTAL_FIRMA}" style="display:inline-block;background:#e8ff4c;color:#000000;font-weight:800;text-decoration:none;padding:14px 26px;border-radius:8px;font-size:15px">Entrar a mi Portal y firmar →</a></p>
@@ -230,7 +236,7 @@ function renderCorreo({ correo, ev, contratos }) {
 // false = solo crear/refrescar sin correo. opts.reenviar: manda aunque ya se haya
 // enviado antes. Devuelve { ok, creados, refrescados, ya_firmados, enviados,
 // sin_correo, saltados:[{id,motivo}], links:[{id,nombre,url}], errores, aviso }.
-async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true, reenviar = false, KH_URL, KH_KEY }) {
+async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true, reenviar = false, recordatorio = false, KH_URL, KH_KEY }) {
   const out = { ok: true, creados: 0, refrescados: 0, ya_firmados: 0, enviados: [], sin_correo: [], saltados: [], links: [], errores: [], aviso: null };
   if (!CONTRATO_CLIENTE_VIVO) return Object.assign(out, { apagado: true });
   try {
@@ -301,7 +307,7 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
       } else {
         const { aplicarModoPrueba } = require('./correo-guard');
         for (const [correo, g] of porCorreo) {
-          const r = renderCorreo({ correo, ev: g.ev, contratos: g.contratos });
+          const r = renderCorreo({ correo, ev: g.ev, contratos: g.contratos, recordatorio });
           const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
           let resp, data = {};
           try {
@@ -328,7 +334,54 @@ async function emitirContratos({ viajeroIds, creado_por, preventa, enviar = true
   }
 }
 
+// ── [CTR-RECUERDA-1 · 27-oct-2026] EL RECORDATORIO DE FIRMA ─────────────────
+// Palabra de Memo: «los que faltan por firmar para estarles recordando cada
+// cierto tiempo» → «así ármalo». UN dueño de «¿a éste le toca recordatorio?»,
+// lo preguntan el botón de KameHouse y el cron. Nada sale con el contrato
+// apagado (CONTRATO_CLIENTE_VIVO) y el cron además tiene su PROPIO interruptor.
+// ⏳ Cadencia y tope son PROPUESTA (3 días · 5 avisos en total): los firma Memo
+// al encender, igual que el texto (se ve en el ensayo en seco).
+const RECORDATORIO_CADA_DIAS = 3;
+const RECORDATORIO_TOPE = 5;          // avisos TOTALES (el primero cuenta)
+const RECORDATORIO_MANUAL_HORAS = 20; // el botón: anti doble clic, no cadencia
+const RECORDATORIO_AUTO_VIVO = false; // el cron · ENCENDER = palabra de Memo
+
+const hoyReynosa = (ms) => new Date(ms == null ? Date.now() : ms).toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+
+// La fecha (YYYY-MM-DD) del viaje de ESA fila: la de su fecha en multifecha,
+// si no la del evento. null si el catálogo no la dice.
+function dsDeViajero(ev, evento_id) {
+  if (!ev) return null;
+  const m = String(evento_id || '').match(/#(\d+)$/);
+  const f = m && Array.isArray(ev.multifecha) ? ev.multifecha[+m[1]] : null;
+  const ds = String((f && f.ds) || ev.ds || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
+}
+
+// PURO. null = le toca; si no, el MOTIVO en palabras (se enseña tal cual).
+// modo 'auto' (cron): cadencia + tope. modo 'manual' (botón): solo el freno de
+// horas — quien aprieta decide, pero un 2º clic no manda dos correos.
+function motivoNoRecordar(c, ds, ahoraMs, modo) {
+  if (!c) return 'sin contrato';
+  if (c.estado !== 'pendiente') return c.estado === 'firmado' ? 'ya firmó' : 'contrato ' + c.estado;
+  const hoy = hoyReynosa(ahoraMs);
+  if (ds && ds < hoy) return 'el evento ya pasó';
+  const envios = Number(c.envios) || 0;
+  if (!envios) return 'nunca se le mandó el contrato: usa «Enviar», no recordatorio';
+  const desde = Date.parse(c.enviado_at || '') || 0;
+  const horas = desde ? (ahoraMs - desde) / 36e5 : Infinity;
+  if (modo === 'auto') {
+    if (envios >= RECORDATORIO_TOPE) return `ya lleva ${envios} avisos (tope ${RECORDATORIO_TOPE}): toca WhatsApp`;
+    if (horas < RECORDATORIO_CADA_DIAS * 24) return `se le avisó hace menos de ${RECORDATORIO_CADA_DIAS} días`;
+  } else if (horas < RECORDATORIO_MANUAL_HORAS) {
+    return `se le avisó hace ${Math.max(0, Math.round(horas))} h`;
+  }
+  return null;
+}
+
 module.exports = {
+  RECORDATORIO_CADA_DIAS, RECORDATORIO_TOPE, RECORDATORIO_MANUAL_HORAS, RECORDATORIO_AUTO_VIVO,
+  motivoNoRecordar, dsDeViajero, hoyReynosa,
   emitirContratos, armarDatos, clausulas, renderContratoHTML, renderCorreo, motivoSinContrato, incluyeDe,
   VERSION_TEXTO, ZONA_PREVENTA, SITIO, PORTAL_FIRMA, CONTRATO_CLIENTE_VIVO, edadEn, _esc: esc,
 };

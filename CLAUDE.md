@@ -384,6 +384,25 @@ está caduco antes de escribirse.
     («Aún no vemos tu viaje») y otro con viaje sin revisar → publicar en la
     bandeja.
 
+- 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
+  su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de
+  nacimiento se quedaba en «dd/mm/aaaa» sin teclado ni calendario, y «la foto
+  tampoco se guarda». Dos defectos:
+  (1) el `<input type="date">` no abre nada en varios Android → hoy la fecha es
+  **tres listas (día · mes · año)**, nacen vacías (DEFAULTS-1), un día que no
+  existe (31-feb) se rechaza diciendo por qué; el valor viaja en el oculto
+  `#p-nacimiento` y el resto del perfil no se movió. Igual en la fecha del
+  contrato del Portal. ⚠️ Queda un `type="date"` en `lug-fnac` (lugares de
+  `solicitudes_tour`, flujo muerto con PORTAL-SOLO-1) — sin tocar a propósito.
+  (2) 🔴 **`subirAvatar` regresaba EN SILENCIO sin perfil** (`if
+  (!perfilExistente) return;`): quien se registra por primera vez nunca pudo
+  subir foto. Hoy queda PENDIENTE, se enseña, y se sube al guardar el perfil
+  (`_avatarSubirBlob`, un dueño). Y el respaldo de decodificación dejó el
+  `blob:` (el CSP no lo permite — REQ-FOTO-1) por FileReader→data:.
+  `mide:fecha3-1` **28** (BASE se cae: las funciones no existen); vecinos
+  verdes (portal-solo-1 45 · contrato-cliente-2 19 · portal-edit-1 28 ·
+  preventa-portal-1 33). ⏳ Push de Memo → la clienta vuelve a intentar.
+
 - 🎟⏳ **PREVENTA-PORTAL-1 (27-oct-2026, en main local): los de la preventa
   ELIGEN su paquete en el Portal y cae a la bandeja.** Palabra de Memo: «que
   ahí mismo en un wizard puedan solicitar su zona y llegue la requisición a

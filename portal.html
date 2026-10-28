@@ -143,6 +143,10 @@ main{
 /* Input numérico con look mono (cliente, celular, código) */
 .field input.mono{font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.06em}
 
+/* [FECHA3-1] Fecha en tres listas (día · mes · año) */
+.fecha3{display:grid;grid-template-columns:1fr 1.5fr 1.25fr;gap:8px}
+.field .fecha3 select{padding:12px 26px 12px 10px;background-position:right 10px center;font-size:14px;min-width:0}
+
 /* ============================ Buttons ============================ */
 .btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
@@ -1504,9 +1508,13 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
         </div>
 
         <div class="field">
-          <label for="p-nacimiento">Fecha de nacimiento</label>
-          <input id="p-nacimiento" name="fecha_nacimiento" type="date" autocomplete="bday" required>
-          <div class="err">Fecha inválida</div>
+          <label for="p-nac-d">Fecha de nacimiento</label>
+          <!-- [FECHA3-1] Día/mes/año en tres listas: el <input type="date"> no abre
+               nada en varios celulares Android (se queda en «dd/mm/aaaa» sin teclado
+               ni calendario — reporte real, 27-oct). El valor viaja en el oculto. -->
+          <input id="p-nacimiento" name="fecha_nacimiento" type="hidden">
+          <div class="fecha3" id="p-nac-3" data-f3-para="p-nacimiento"></div>
+          <div class="err">Elige día, mes y año (y que el día exista en ese mes)</div>
           <div class="hint" id="p-edad-aviso" style="display:none;color:var(--yel)"></div>
         </div>
 
@@ -2124,6 +2132,59 @@ function calcularEdad(fechaIsoStr){
   return edad;
 }
 
+// =====================================================================
+// [FECHA3-1] Fecha en tres listas (día · mes · año). Reporte real (27-oct):
+// en un Android el <input type="date"> se quedaba en «dd/mm/aaaa» sin
+// teclado ni calendario y la clienta no podía completar su perfil. Tres
+// <select> funcionan en TODO navegador (también los de Facebook/Instagram).
+// Nacen vacíos (DEFAULTS-1): una fecha de nacimiento no se presupone.
+// =====================================================================
+const _F3_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function _f3dos(n){ return (n < 10 ? '0' : '') + n; }
+function _fecha3Html(estilo){
+  const st = estilo ? ' style="' + estilo + '"' : '';
+  let d = '<option value="">Día</option>';
+  for (let i = 1; i <= 31; i++) d += '<option value="' + _f3dos(i) + '">' + i + '</option>';
+  let m = '<option value="">Mes</option>';
+  _F3_MESES.forEach((n, i) => { m += '<option value="' + _f3dos(i + 1) + '">' + n + '</option>'; });
+  let a = '<option value="">Año</option>';
+  for (let y = new Date().getFullYear(); y >= 1925; y--) a += '<option value="' + y + '">' + y + '</option>';
+  return '<select data-f3="d" aria-label="Día"' + st + '>' + d + '</select>'
+    + '<select data-f3="m" aria-label="Mes"' + st + '>' + m + '</select>'
+    + '<select data-f3="a" aria-label="Año"' + st + '>' + a + '</select>';
+}
+// '' = nada elegido · null = incompleta o inexistente (31 de febrero) · 'AAAA-MM-DD'
+function _fecha3Leer(cont){
+  const g = (k) => ((cont && cont.querySelector('[data-f3="' + k + '"]')) || {}).value || '';
+  const d = g('d'), m = g('m'), a = g('a');
+  if (!d && !m && !a) return '';
+  if (!d || !m || !a) return null;
+  const t = new Date(+a, +m - 1, +d);
+  if (t.getFullYear() !== +a || t.getMonth() !== +m - 1 || t.getDate() !== +d) return null;
+  return a + '-' + m + '-' + d;
+}
+function _fecha3Poner(cont, iso){
+  const r = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '') || [];
+  [['d', r[3]], ['m', r[2]], ['a', r[1]]].forEach(([k, v]) => {
+    const s = cont && cont.querySelector('[data-f3="' + k + '"]');
+    if (s) s.value = v || '';
+  });
+}
+(function(){
+  const cont = $('#p-nac-3'), hid = $('#p-nacimiento');
+  if (!cont || !hid) return;
+  cont.innerHTML = _fecha3Html();
+  const sd = cont.querySelector('[data-f3="d"]'); if (sd) sd.id = 'p-nac-d';
+  cont.addEventListener('change', () => {
+    const v = _fecha3Leer(cont);
+    hid.value = v || '';
+    const ev = new Event('change'); ev._f3 = true;
+    hid.dispatchEvent(ev);
+  });
+  // prellenarPerfil escribe el oculto y dispara change: las listas lo siguen.
+  hid.addEventListener('change', (e) => { if (!e._f3) _fecha3Poner(cont, hid.value); });
+})();
+
 $('#p-nacimiento').addEventListener('change', (e) => {
   const edad = calcularEdad(e.target.value);
   const aviso = $('#p-edad-aviso');
@@ -2252,17 +2313,23 @@ async function _avatarToBlob(file, size = 512, quality = 0.82){
       if (bmp && bmp.close) { try { bmp.close(); } catch (_) {} }
     }
   }
-  const objUrl = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      const t = setTimeout(() => rej(new Error('timeout >15s')), 15000);
-      i.onload = () => { clearTimeout(t); res(i); };
-      i.onerror = () => { clearTimeout(t); rej(new Error('Image.onerror')); };
-      i.src = objUrl;
-    });
-    return await _drawSquareBlob(img, size, quality);
-  } finally { URL.revokeObjectURL(objUrl); }
+  // [FECHA3-1] Por FileReader → data: y NO por blob: — el CSP del sitio no
+  // permite blob: en img-src (la lección de REQ-FOTO-1), así que este intento
+  // moría siempre en «Image.onerror».
+  const dataUrl = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error('FileReader'));
+    fr.onload = () => res(String(fr.result || ''));
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    const t = setTimeout(() => rej(new Error('timeout >15s')), 15000);
+    i.onload = () => { clearTimeout(t); res(i); };
+    i.onerror = () => { clearTimeout(t); rej(new Error('Image.onerror')); };
+    i.src = dataUrl;
+  });
+  return await _drawSquareBlob(img, size, quality);
   // (Sin 3er intento "raw": un HEIC sin decodificar no se podría mostrar como avatar.)
 }
 
@@ -2275,9 +2342,38 @@ function _avatarLoading(on){
 
 const AVATAR_MAX_BYTES = 12 * 1024 * 1024; // antes de decodificar (la salida queda ~512px)
 
+// [FECHA3-1] La foto de quien todavía NO tiene perfil (primer registro) se
+// guardaba en NINGÚN lado: `if (!perfilExistente) return;` la tiraba en
+// silencio — reporte real, «la foto tampoco se guarda». Hoy se procesa, se
+// enseña y se queda PENDIENTE; se sube al guardar el perfil.
+let _avatarPendiente = null;
+function _avatarPreviewBlob(blob){
+  const fr = new FileReader();
+  fr.onload = () => {
+    const el = document.querySelector('#avatar-preview');
+    if (!el) return;
+    el.textContent = '';
+    const img = document.createElement('img'); img.alt = ''; img.src = String(fr.result || '');
+    el.appendChild(img);
+  };
+  fr.readAsDataURL(blob);
+}
+
 async function subirAvatar(file){
   const alertEl = $('#avatar-alert');
-  if (!perfilExistente || !file) return;
+  if (!file) return;
+  if (!perfilExistente){
+    const okT = /^image\//i.test(file.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || '');
+    if (!okT){ showAlert(alertEl, 'error', 'Elige una imagen (JPG, PNG, WEBP o HEIC).'); return; }
+    if (file.size > AVATAR_MAX_BYTES){ showAlert(alertEl, 'error', 'La imagen es muy grande (máx 12 MB).'); return; }
+    _avatarLoading(true);
+    try { _avatarPendiente = await _avatarToBlob(file); }
+    catch (e) { _avatarLoading(false); showAlert(alertEl, 'error', 'No pudimos procesar esa imagen. Intenta con una foto JPG o PNG.'); return; }
+    _avatarLoading(false);
+    _avatarPreviewBlob(_avatarPendiente);
+    showAlert(alertEl, 'success', 'Listo: tu foto se guarda cuando termines tu perfil (botón de abajo).');
+    return;
+  }
   // Valida mime/size ANTES de decodificar.
   const okTipo = /^image\//i.test(file.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || '');
   if (!okTipo){ showAlert(alertEl, 'error', 'Elige una imagen (JPG, PNG, WEBP o HEIC).'); return; }
@@ -2288,12 +2384,20 @@ async function subirAvatar(file){
   let blob;
   try { blob = await _avatarToBlob(file); }
   catch (e) { _avatarLoading(false); showAlert(alertEl, 'error', 'No pudimos procesar esa imagen. Intenta con una foto JPG o PNG.'); return; }
+  await _avatarSubirBlob(blob, alertEl);
+}
 
+// Sube el JPEG ya procesado y guarda la referencia en clientes.avatar_url.
+// Requiere perfil (la fila de clientes) — lo llaman subirAvatar y el guardado
+// del perfil cuando había una foto PENDIENTE (FECHA3-1).
+async function _avatarSubirBlob(blob, alertEl){
+  if (!perfilExistente || !blob) return false;
+  _avatarLoading(true);
   const path = perfilExistente.auth_user_id + '/avatar.jpg';
   const { error: upErr } = await supabase.storage
     .from('avatars')
     .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-  if (upErr){ _avatarLoading(false); showAlert(alertEl, 'error', 'No se pudo subir: ' + (upErr.message || '')); return; }
+  if (upErr){ _avatarLoading(false); showAlert(alertEl, 'error', 'No se pudo subir: ' + (upErr.message || '')); return false; }
 
   const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
   const url = (pub && pub.publicUrl ? pub.publicUrl : '') + '?v=' + Date.now();
@@ -2303,12 +2407,13 @@ async function subirAvatar(file){
     .update({ avatar_url: url })
     .eq('auth_user_id', perfilExistente.auth_user_id);
   _avatarLoading(false);
-  if (updErr){ showAlert(alertEl, 'error', 'Foto subida pero no se guardó la referencia: ' + (updErr.message || '')); return; }
+  if (updErr){ showAlert(alertEl, 'error', 'Foto subida pero no se guardó la referencia: ' + (updErr.message || '')); return false; }
 
   perfilExistente.avatar_url = url;
   pintarAvatar(perfilExistente); // refresca preview + dashboard
   const lbl = $('#avatar-btn-label'); if (lbl) lbl.textContent = 'Cambiar foto';
   showAlert(alertEl, 'success', '¡Foto de perfil actualizada!');
+  return true;
 }
 
 (function(){
@@ -2367,6 +2472,12 @@ $('#form-profile').addEventListener('submit', async (e) => {
     return;
   }
   perfilExistente = resp.data;
+  // [FECHA3-1] La foto elegida antes de tener perfil se sube AHORA. Si falla,
+  // el perfil ya quedó: se puede volver a subir desde «Editar perfil».
+  if (_avatarPendiente){
+    const b = _avatarPendiente; _avatarPendiente = null;
+    try { await _avatarSubirBlob(b, $('#avatar-alert')); } catch (_) {}
+  }
   renderDashboard(perfilExistente);
   showView('dashboard');
   _procesarInvitacionPendiente(); // [invitacion] acepta si el nuevo usuario llegó por un link
@@ -3460,7 +3571,7 @@ function _migCtrHtml(t){
   let cuerpo;
   if (!c.fecha_nacimiento) {
     cuerpo = '<div style="font-size:12px;opacity:.85;margin-bottom:8px">Para firmar, primero registra la <b>fecha de nacimiento de ' + escapeHtml(c.nombre || 'el viajero') + '</b>. Con ella sabemos si firma él mismo o su mamá, papá o tutor. <b>Una vez guardada ya no se puede cambiar aquí.</b></div>'
-      + '<input data-ctr="fecha" type="date" style="' + inp + '">'
+      + '<div class="fecha3" data-ctr="fecha3">' + _fecha3Html(inp) + '</div>' // [FECHA3-1]
       + '<button type="button" class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" data-mig-act="ctr-fecha" data-mig-id="' + id + '">Guardar fecha de nacimiento</button>';
   } else {
     const menor = c.firma === 'tutor';
@@ -3519,7 +3630,8 @@ async function _ctrPost(body){
 async function _ctrFecha(id){
   const card = _migCard(id); if (!card) return;
   const box = card.querySelector('[data-ctr-box]');
-  const f = (box.querySelector('[data-ctr="fecha"]') || {}).value || '';
+  const f = _fecha3Leer(box.querySelector('[data-ctr="fecha3"]')); // [FECHA3-1]
+  if (f === null) return _migMsg(box, 'Revisa la fecha: elige día, mes y año (y que el día exista en ese mes)');
   if (!f) return _migMsg(box, 'Elige la fecha de nacimiento');
   if (!confirm('¿La fecha de nacimiento es ' + f.split('-').reverse().join('/') + '? Ya no se podrá cambiar aquí.')) return;
   _migMsg(box, 'Guardando…', true);

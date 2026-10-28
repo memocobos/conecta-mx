@@ -141,7 +141,16 @@ exports.handler = async (event) => {
       const rs = await fetch(`${KH_URL}/rest/v1/portal_revisiones?correo=eq.${encodeURIComponent(correo)}&tipo=in.(revisar,ligar)&estado=in.(pendiente,rechazada)&creado_en=gte.${new Date(Date.now() - 60 * 864e5).toISOString()}&select=id,tipo,estado,evento_id,nombre_dado,motivo,creado_en,atendida_at&order=creado_en.desc&limit=20`, { headers: hKH });
       if (rs.ok) solicitudes = await rs.json();
     } catch (_) { /* no tumba el plan */ }
-    const en_revision = [...new Set(sinSello.map((v) => v.evento_id))];
+    // [PRV-FILA-1] Un viaje marcado «no procede» (por viaje) ya NO está «en
+    // revisión»: se dice con su motivo (arriba, en solicitudes), no se promete.
+    let noProcede = new Set();
+    if (sinSello.length) {
+      try {
+        const rn = await fetch(`${KH_URL}/rest/v1/portal_revisiones?correo=eq.${encodeURIComponent(correo)}&tipo=eq.revisar&estado=eq.rechazada&select=viajero_ids&limit=300`, { headers: hKH });
+        if (rn.ok) (await rn.json()).forEach((x) => (x.viajero_ids || []).forEach((id) => noProcede.add(String(id))));
+      } catch (_) { /* sin la lista, se queda «en revisión»: el lado prudente */ }
+    }
+    const en_revision = [...new Set(sinSello.filter((v) => !noProcede.has(String(v.id))).map((v) => v.evento_id))];
 
     if (!viajeros.length) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours: [], en_revision, solicitudes, revision_error: revisionError }) };

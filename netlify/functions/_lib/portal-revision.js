@@ -112,7 +112,7 @@ const PORTAL = 'https://conectareynosa.mx/portal';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
-function renderRevision({ estado, correo, nombre, viajes, motivo }) {
+function renderRevision({ estado, correo, nombre, viajes, motivo, noProceden }) {
   const ok = estado === 'publicada';
   const primer = (String(nombre || '').trim().split(/\s+/)[0]) || 'Hola';
   const subject = ok ? 'Ya puedes ver tu viaje en tu Portal' : 'Sobre tu solicitud en tu Portal';
@@ -122,6 +122,9 @@ function renderRevision({ estado, correo, nombre, viajes, motivo }) {
   const cuerpo = ok
     ? `<p style="margin:0 0 14px;color:#ffffff">Revisamos tu información y ya la puedes ver en tu <b>Portal</b>:</p>
        <table style="width:100%;border-collapse:collapse;margin:0 0 18px">${lista}</table>
+       ${(noProceden || []).length ? `<p style="margin:0 0 8px;color:#ffffff"><b>Sobre otros viajes que revisamos:</b></p>`
+         + (noProceden || []).map((x) => `<p style="margin:0 0 8px;padding:10px 12px;border-left:4px solid #ff283b;background:#1a1a1a;color:#ffffff"><b style="color:#e8ff4c">${esc(x.evento)}</b><br>${esc(x.motivo)}</p>`).join('')
+         + '<p style="margin:0 0 18px"></p>' : ''}
        <p style="margin:0 0 20px;color:#ffffff">Si algo no te cuadra, contéstanos este correo y lo revisamos contigo.</p>`
     : `<p style="margin:0 0 14px;color:#ffffff">Revisamos tu solicitud y esto es lo que encontramos:</p>
        <p style="margin:0 0 16px;padding:12px 14px;border-left:4px solid #ff283b;background:#1a1a1a;color:#ffffff">${esc(motivo || '')}</p>
@@ -142,13 +145,13 @@ function renderRevision({ estado, correo, nombre, viajes, motivo }) {
 }
 
 // rev: la fila de portal_revisiones ya cerrada. viajes: [{evento,fecha,nombre,total,abonado,resta}].
-async function avisarRevision({ rev, viajes, nombre }) {
+async function avisarRevision({ rev, viajes, nombre, noProceden }) {
   try {
     const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
     if (!RESEND_KEY) return { ok: false, aviso: 'falta RESEND_API_KEY: avísale por WhatsApp' };
     if (rev.estado === 'publicada' && !(viajes || []).length) return { ok: false, aviso: 'no hay viajes publicados que contarle: no se mandó correo' };
     const { aplicarModoPrueba } = require('./correo-guard');
-    const r = renderRevision({ estado: rev.estado, correo: rev.correo, nombre, viajes, motivo: rev.motivo });
+    const r = renderRevision({ estado: rev.estado, correo: rev.correo, nombre, viajes, motivo: rev.motivo, noProceden });
     const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },

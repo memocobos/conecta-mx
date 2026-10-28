@@ -57,7 +57,7 @@ async function loadRevisionesPortal() {
   const bit = rec.length ? `<details class="prv-bit" style="margin:0 0 14px"><summary style="cursor:pointer;font-size:12px;color:var(--ts)">📒 Bitácora del Portal · últimas ${rec.length}</summary>${rec.map(_prvBitFila).join('')}</details>` : '';
   if (!_prvRows.length) { box.innerHTML = bit; return; }
   box.innerHTML = `<div class="rq-section">Portal: revisar antes de que el cliente vea su viaje <span class="rq-pill pend">${_prvRows.length}</span></div>`
-    + `<div style="font-size:12px;color:var(--ts);margin:-4px 0 10px">El cliente NO ve nada hasta que aquí se publique. Si un número está mal, corrígelo en <b>Viajeros del evento</b> (➕ Abono / editar) y luego publica.</div>`
+    + `<div style="font-size:12px;color:var(--ts);margin:-4px 0 10px">El cliente NO ve un viaje hasta que aquí se publique. Ve viaje por viaje: corrígelo aquí mismo (<b>✏️ Editar</b> · <b>➕ Pago</b>) y <b>publícalo</b> o márcalo <b>no procede</b>.</div>`
     + _prvRows.map(_prvCard).join('') + bit;
 }
 
@@ -72,25 +72,154 @@ function _prvBitFila(r) {
     + `${r.nota_staff ? `<div style="color:var(--ts)">📝 ${_prvEsc(r.nota_staff)}</div>` : ''}${r.motivo ? `<div style="color:var(--ts)">Motivo: ${_prvEsc(r.motivo)}</div>` : ''}</div>`;
 }
 
+// [PRV-FILA-1] Palabra de Memo: «no puedo editar nada de lo que dice ella …
+// estaría bueno poder editar e ir aceptando uno por uno». Cada viaje se corrige
+// (✏️), se le mete un pago (➕), y se PUBLICA o se marca «no procede» SOLO.
+// Cuando ya no queda ninguno por decidir, la revisión se cierra sola y le llega
+// UN correo al cliente. Lo publicado ya no se edita aquí.
 function _prvFilaHtml(rev, v, i) {
   const c = v.cuenta || {};
-  const sello = v.portal_revisado_at ? '<span class="rq-tag" style="color:var(--green);border-color:var(--green)">✓ ya publicada</span>' : '<span class="rq-tag" style="color:var(--yellow);border-color:var(--yellow)">sin revisar</span>';
+  const publicada = !!v.portal_revisado_at;
+  const np = v.no_procede;
+  const decidida = publicada || !!np;
+  const sello = publicada ? '<span class="rq-tag" style="color:var(--green);border-color:var(--green)">✓ publicado</span>'
+    : np ? '<span class="rq-tag" style="color:var(--red);border-color:var(--red)">✗ no procede</span>'
+    : '<span class="rq-tag" style="color:var(--yellow);border-color:var(--yellow)">por revisar</span>';
+  const pasado = v.evento_pasado ? ' <span class="rq-tag" style="color:var(--ts)">evento pasado</span>' : '';
+  const pagadoSinTotal = (Number(v.abonado_previo) || 0) + (v.abonos_lista || []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
   const abonos = (v.abonos_lista || []).map((a) => `<div>${_prvEsc(a.fecha || '—')} · <b>${_prvMxn(a.monto)}</b>${a.nota ? ' · <span style="color:var(--ts)">' + _prvEsc(String(a.nota).slice(0, 90)) + '</span>' : ''}</div>`).join('') || '<div style="color:var(--ts)">Sin abonos capturados</div>';
-  return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0">
+  const dinero = c.total == null
+    // [PRV-SINTOTAL-1] Sin total, saldoMigrado no cuenta (un cero sería falso):
+    // se DICE que falta y se enseña lo pagado.
+    ? `<div style="font-size:13px;color:var(--yellow)">⚠️ <b>Sin total de contrato</b> — ponlo con ✏️ Editar antes de publicar. Pagado hasta hoy: <b style="color:var(--green)">${_prvMxn(pagadoSinTotal)}</b></div>`
+    : `<div style="font-size:13px">Total <b>${_prvMxn(c.total)}</b> · Pagado <b style="color:var(--green)">${_prvMxn(c.abonado)}</b> · Resta <b>${_prvMxn(c.resta)}</b>${Number(v.abonado_previo) ? ` <span style="color:var(--ts)">(incluye ${_prvMxn(v.abonado_previo)} pagado antes del sistema)</span>` : ''}</div>`;
+  const k = `${rev.id}-${i}`;
+  const acciones = decidida
+    ? (np ? `<div style="font-size:12px;color:var(--ts);margin-top:6px">Motivo: ${_prvEsc(np)}</div>` : '')
+    : `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="rq-btn" onclick="_prvEditarAbrir('${rev.id}', ${i})">✏️ Editar</button>
+        <button class="rq-btn" onclick="_prvAbonoAbrir('${rev.id}', ${i})">➕ Pago</button>
+        <button class="rq-btn" onclick="_prvExcel('${rev.id}', ${i})">📊 Excel</button>
+        <button class="rq-btn pri" onclick="_prvFilaPublicar('${rev.id}', ${i})">✓ Publicar este</button>
+        <button class="rq-btn dan" onclick="_prvFilaNoAbrir('${rev.id}', ${i})">✗ No procede</button>
+      </div>`;
+  return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0;${decidida ? 'opacity:.6' : ''}">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline">
-      <div><b>${_prvEsc(v.nombre || '—')}</b> · ${_prvEsc(v.evento_nombre || v.evento_id)}${v.evento_fecha ? ' <span style="color:var(--ts)">(' + _prvEsc(v.evento_fecha) + ')</span>' : ''}</div>${sello}
+      <div><b>${_prvEsc(v.nombre || '—')}</b> · ${_prvEsc(v.evento_nombre || v.evento_id)}${v.evento_fecha ? ' <span style="color:var(--ts)">(' + _prvEsc(v.evento_fecha) + ')</span>' : ''}${pasado}</div>${sello}
     </div>
     <div style="font-size:13px;margin:4px 0">${_prvEsc([String(v.tipo_paquete || '').toUpperCase(), v.zona_boleto, Number(v.boletos) > 1 ? v.boletos + ' lugares' : ''].filter(Boolean).join(' · ') || '—')}</div>
-    ${c.total == null
-      // [PRV-SINTOTAL-1] Sin total de contrato saldoMigrado no cuenta (a
-      // propósito: un cero sería falso), y la tarjeta pintaba «—» en todo —
-      // tapando lo que SÍ pagó. Se DICE que falta el total y se enseña lo pagado.
-      ? `<div style="font-size:13px;color:var(--yellow)">⚠️ <b>Sin total de contrato capturado</b> — captúralo en Viajeros del evento antes de publicar. Pagado hasta hoy: <b style="color:var(--green)">${_prvMxn((Number(v.abonado_previo) || 0) + (v.abonos_lista || []).reduce((s, a) => s + (Number(a.monto) || 0), 0))}</b></div>`
-      : `<div style="font-size:13px">Total <b>${_prvMxn(c.total)}</b> · Pagado <b style="color:var(--green)">${_prvMxn(c.abonado)}</b> · Resta <b>${_prvMxn(c.resta)}</b>${Number(v.abonado_previo) ? ` <span style="color:var(--ts)">(incluye ${_prvMxn(v.abonado_previo)} de antes)</span>` : ''}</div>`}
-    <details style="margin-top:6px;font-size:12px"><summary style="cursor:pointer;color:var(--ts)">Abonos (${(v.abonos_lista || []).length})</summary>${abonos}</details>
-    <div style="margin-top:8px"><button class="rq-btn" onclick="_prvExcel('${rev.id}', ${i})">📊 Ver qué dice el Excel</button></div>
-    <div id="prv-excel-${rev.id}-${i}" style="font-size:12px;margin-top:6px"></div>
+    ${dinero}
+    <details style="margin-top:6px;font-size:12px"><summary style="cursor:pointer;color:var(--ts)">Pagos capturados (${(v.abonos_lista || []).length})</summary>${abonos}</details>
+    ${acciones}
+    <div id="prv-fila-${k}"></div>
+    <div id="prv-excel-${k}" style="font-size:12px;margin-top:6px"></div>
   </div>`;
+}
+
+function _prvFila(revId, i) {
+  const rev = _prvRows.find((x) => x.id === revId);
+  return { rev, v: rev && rev.filas && rev.filas[i], box: document.getElementById(`prv-fila-${revId}-${i}`) };
+}
+const _prvIn = 'width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)';
+const _prvLb = 'display:block;font-size:11px;color:var(--ts);margin:6px 0 2px';
+// Un panel por viaje: volver a tocar el mismo botón lo cierra; otro botón lo cambia.
+function _prvToggle(box, clave, html) {
+  if (box.dataset.abierto === clave) { box.innerHTML = ''; box.dataset.abierto = ''; return; }
+  box.dataset.abierto = clave; box.innerHTML = html;
+}
+
+function _prvEditarAbrir(revId, i) {
+  const { v, box } = _prvFila(revId, i); if (!v || !box) return;
+  const paq = String(v.tipo_paquete || '').toLowerCase();
+  const op = ['plus', 'stay', 'cheap', 'ride'].map((p) => `<option value="${p}"${p === paq ? ' selected' : ''}>${p.toUpperCase()}</option>`).join('');
+  _prvToggle(box, 'editar', `<div class="rq-panel" style="margin:8px 0 0">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">
+      <div style="grid-column:1/-1"><label style="${_prvLb}">Nombre</label><input id="pe-nom-${revId}-${i}" style="${_prvIn}" value="${_prvEsc(v.nombre || '')}"></div>
+      <div><label style="${_prvLb}">Paquete</label><select id="pe-paq-${revId}-${i}" style="${_prvIn}">${paq ? '' : '<option value="">— elige —</option>'}${op}</select></div>
+      <div><label style="${_prvLb}">Zona (como en la ficha)</label><input id="pe-zon-${revId}-${i}" style="${_prvIn}" value="${_prvEsc(v.zona_boleto || '')}"></div>
+      <div><label style="${_prvLb}">Lugares</label><input id="pe-bol-${revId}-${i}" type="number" min="1" max="20" style="${_prvIn}" value="${Number(v.boletos) || 1}"></div>
+      <div><label style="${_prvLb}">Total del contrato ($)</label><input id="pe-tot-${revId}-${i}" inputmode="decimal" style="${_prvIn}" value="${v.total_contrato == null ? '' : _prvEsc(v.total_contrato)}" placeholder="ej. 7200"></div>
+      <div style="grid-column:1/-1"><label style="${_prvLb}">Pagado ANTES del sistema ($, lo que traía el Excel)</label><input id="pe-pre-${revId}-${i}" inputmode="decimal" style="${_prvIn}" value="${v.abonado_previo == null ? '' : _prvEsc(v.abonado_previo)}" placeholder="0"></div>
+    </div>
+    <div style="font-size:11px;color:var(--ts);margin:6px 0">Los pagos nuevos van con <b>➕ Pago</b> (con su fecha). Cada cambio queda anotado en la ficha.</div>
+    <button class="rq-btn pri full" onclick="_prvEditarGo('${revId}', ${i})">Guardar cambios</button>
+  </div>`);
+}
+async function _prvEditarGo(revId, i) {
+  const { v } = _prvFila(revId, i); if (!v) return;
+  const g = (id) => ((document.getElementById(`pe-${id}-${revId}-${i}`) || {}).value || '').trim();
+  const campos = {};
+  const nom = g('nom'), paq = g('paq'), zon = g('zon'), bol = g('bol'), tot = g('tot'), pre = g('pre');
+  if (nom !== String(v.nombre || '')) campos.nombre = nom;
+  if (paq && paq !== String(v.tipo_paquete || '').toLowerCase()) campos.tipo_paquete = paq;
+  if (zon !== String(v.zona_boleto || '') || (paq && paq !== String(v.tipo_paquete || '').toLowerCase())) campos.zona_boleto = zon;
+  if (bol && Number(bol) !== (Number(v.boletos) || 1)) campos.boletos = Number(bol);
+  if (tot !== (v.total_contrato == null ? '' : String(v.total_contrato))) campos.total_contrato = tot;
+  if (pre !== (v.abonado_previo == null ? '' : String(v.abonado_previo))) campos.abonado_previo = pre;
+  if (!Object.keys(campos).length) { showToast('No cambiaste nada', 'warning'); return; }
+  const j = await _prvCall({ accion: 'fila_editar', id: revId, viajero_id: v.id, campos });
+  if (!j || !j.ok) { showToast(_prvEsc((j && j.error) || 'No se pudo guardar'), 'error'); return; }
+  showToast('Guardado' + (j.zona_aviso ? ' · ' + j.zona_aviso : ''), 'success');
+  loadRevisionesPortal();
+}
+
+function _prvAbonoAbrir(revId, i) {
+  const { box } = _prvFila(revId, i); if (!box) return;
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+  _prvToggle(box, 'pago', `<div class="rq-panel" style="margin:8px 0 0">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">
+      <div><label style="${_prvLb}">Monto ($)</label><input id="pa-mon-${revId}-${i}" inputmode="decimal" style="${_prvIn}" placeholder="ej. 1500"></div>
+      <div><label style="${_prvLb}">Fecha del pago</label><input id="pa-fec-${revId}-${i}" type="date" style="${_prvIn}" value="${hoy}"></div>
+      <div style="grid-column:1/-1"><label style="${_prvLb}">Nota (opcional)</label><input id="pa-not-${revId}-${i}" style="${_prvIn}" placeholder="ej. transferencia BBVA, estaba en el Excel y faltaba"></div>
+    </div>
+    <div style="font-size:11px;color:var(--ts);margin:6px 0">No le manda correo al cliente: el aviso sale cuando publiques.</div>
+    <button class="rq-btn pri full" onclick="_prvAbonoGo('${revId}', ${i})">Guardar pago</button>
+  </div>`);
+}
+async function _prvAbonoGo(revId, i) {
+  const { v } = _prvFila(revId, i); if (!v) return;
+  const g = (id) => ((document.getElementById(`pa-${id}-${revId}-${i}`) || {}).value || '').trim();
+  const monto = Number(g('mon').replace(/[$,\s]/g, ''));
+  if (!(monto > 0)) { showToast('Escribe el monto', 'error'); return; }
+  const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', { method: 'POST',
+    body: JSON.stringify({ accion: 'abono_crear', viajero_id: v.id, monto, fecha: g('fec') || undefined, nota: g('not') || ('Capturado en la revisión del Portal'), avisar: false }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) { showToast(_prvEsc(j.error || 'No se pudo guardar el pago'), 'error'); return; }
+  showToast('Pago guardado', 'success');
+  loadRevisionesPortal();
+}
+
+async function _prvFilaPublicar(revId, i) {
+  const { v } = _prvFila(revId, i); if (!v) return;
+  if (v.cuenta && v.cuenta.total == null && !confirm('Este viaje NO tiene total de contrato: el cliente lo verá sin números. ¿Publicarlo así?')) return;
+  const nota = (document.getElementById('prv-nota-' + revId) || {}).value || '';
+  const j = await _prvCall({ accion: 'fila_publicar', id: revId, viajero_id: v.id, nota });
+  if (!j || !j.ok) { showToast(_prvEsc((j && j.error) || 'No se pudo publicar'), 'error'); return; }
+  const ci = j.cierre || {};
+  if (ci.cerrada) {
+    const co = ci.correo || {};
+    showToast(`Listo: ya no queda nada por revisar · ${co.ok ? 'le llegó el correo' : 'el correo NO salió: ' + (co.aviso || '') + ' — avísale por WhatsApp'}`, co.ok ? 'success' : 'warning');
+  } else showToast(`Publicado · ${ci.restantes || 0} por revisar`, 'success');
+  loadRevisionesPortal();
+}
+
+function _prvFilaNoAbrir(revId, i) {
+  const { box } = _prvFila(revId, i); if (!box) return;
+  _prvToggle(box, 'no', `<div class="rq-panel" style="margin:8px 0 0">
+    <div style="font-size:12px;color:var(--ts);margin-bottom:6px">El motivo lo ve el cliente en su Portal (y en el correo final).</div>
+    <input id="pn-mot-${revId}-${i}" style="${_prvIn}" placeholder="ej. Ese viaje ya pasó · Ese pago es de otro evento · No encontramos ese viaje a tu nombre">
+    <button class="rq-btn dan full" style="margin-top:6px" onclick="_prvFilaNoGo('${revId}', ${i})">Marcar «no procede»</button>
+  </div>`);
+}
+async function _prvFilaNoGo(revId, i) {
+  const { v } = _prvFila(revId, i); if (!v) return;
+  const motivo = ((document.getElementById(`pn-mot-${revId}-${i}`) || {}).value || '').trim();
+  if (motivo.length < 3) { showToast('Escribe el motivo', 'error'); return; }
+  const j = await _prvCall({ accion: 'fila_no_procede', id: revId, viajero_id: v.id, motivo });
+  if (!j || !j.ok) { showToast(_prvEsc((j && j.error) || 'No se pudo guardar'), 'error'); return; }
+  const ci = j.cierre || {};
+  showToast(ci.cerrada ? `Listo: ya no queda nada por revisar · ${(ci.correo || {}).ok ? 'le llegó el correo' : 'el correo NO salió — avísale por WhatsApp'}` : `Marcado · ${ci.restantes || 0} por revisar`, 'success');
+  loadRevisionesPortal();
 }
 
 function _prvCard(rev) {
@@ -116,7 +245,7 @@ function _prvCard(rev) {
       }).join('') : '<div style="font-size:12px;color:var(--ts)">No encontramos a nadie parecido. Búscala en «Viajeros del evento»; si no existe, «No procede» con el motivo.</div>');
     if ((rev.filas || []).length) cuerpo += `<div style="font-size:12px;color:var(--ts);margin:10px 0 0">Ya ligado a su cuenta:</div>` + rev.filas.map((v, i) => _prvFilaHtml(rev, v, i)).join('');
   } else {
-    cuerpo += `<div style="font-size:12px;color:var(--ts);margin:6px 0">Se registró en el Portal con este correo. Revisa que cada número esté bien antes de publicar.</div>`
+    cuerpo += `<div style="font-size:12px;color:var(--ts);margin:6px 0">Se registró en el Portal con este correo. Ve viaje por viaje: corrígelo (✏️ / ➕) y luego <b>Publicar este</b> o <b>No procede</b>. Cuando no quede ninguno, le llega UN correo.</div>`
       + (rev.filas || []).map((v, i) => _prvFilaHtml(rev, v, i)).join('');
   }
   return `<div class="rq-cambio" id="prv-${rev.id}">
@@ -125,11 +254,11 @@ function _prvCard(rev) {
     </div>
     <div class="rq-ev">Pidió ${_prvEsc(_prvFecha(rev.creado_en))}${rev.sin_revisar ? ' · ' + rev.sin_revisar + ' sin revisar' : ''}</div>
     ${cuerpo}
-    <textarea id="prv-nota-${rev.id}" rows="2" placeholder="¿Qué revisaste o corregiste? (queda en la bitácora: pago faltante, pago de más, zona, etc.)" style="width:100%;margin:10px 0 6px;font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"></textarea>
+    <textarea id="prv-nota-${rev.id}" rows="2" placeholder="Nota para la bitácora (opcional): qué revisaste o corregiste" style="width:100%;margin:10px 0 6px;font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"></textarea>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
-      <button class="rq-btn pri" onclick="_prvPublicar('${rev.id}')">✓ Revisado, publicar</button>
-      <button class="rq-btn dan" onclick="_prvRechazarAbrir('${rev.id}')">No procede</button>
+      ${rev.sin_revisar ? `<button class="rq-btn" onclick="_prvPublicar('${rev.id}')">✓ Publicar las ${rev.sin_revisar} que faltan</button>` : ''}
+      <button class="rq-btn dan" onclick="_prvRechazarAbrir('${rev.id}')">No procede (todo)</button>
     </div>
     <div id="prv-form-${rev.id}"></div>
   </div>`;

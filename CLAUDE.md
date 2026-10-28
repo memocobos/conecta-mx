@@ -384,6 +384,33 @@ está caduco antes de escribirse.
     («Aún no vemos tu viaje») y otro con viaje sin revisar → publicar en la
     bandeja.
 
+- 🪪⏳ **PRV-FILA-1 (27-oct-2026, en main local): la revisión del Portal se
+  hace VIAJE POR VIAJE.** Palabra de Memo (con Lesly, 14 viajes, enfrente): «no
+  puedo editar nada de lo que dice ella … estaría bueno poder editar e ir
+  aceptando uno por uno, no tener que revisar todas de golpe». Medido: KameHouse
+  NO tenía ningún editor de total/paquete/zona para un viajero normal
+  (`viajero_editar` solo toca contacto) — 10 de sus 14 filas sin total no se
+  podían corregir en ningún lado.
+  - **`admin-portal-revision` gana 3 acciones** (roshi/bulma/milk): `fila_editar`
+    (nombre · paquete respetando el case de la fila · zona por LA PUERTA de la
+    ficha · lugares · total · pagado-antes; solo filas de ESE correo y aún sin
+    publicar; valor esperado en el PATCH de cada campo que cambia; rastro
+    `[PORTAL-REV fecha] a→b · quien` ANEXADO en notas) · `fila_publicar` (sella
+    UNO con `portal_revisado_at=is.null`, 2º clic 409) · `fila_no_procede`
+    (motivo ≥3, nace su propia fila `rechazada` con `viajero_ids:[uno]` — el
+    Portal le dice el motivo de ESE viaje y `pedirRevision` no lo reabre).
+    Los pagos nuevos van por `abono_crear` de siempre con `avisar:false`.
+  - 🔒 **Cuando ya no queda ningún viaje por decidir, la revisión se cierra SOLA
+    y sale UN correo** («ya puedes ver tu viaje» con lo publicado + «Sobre otros
+    viajes» con los motivos; si nada se publicó, el de «revisamos tu
+    solicitud»). Publicar uno NO manda correo. «Publicar las que faltan» ya NO
+    sella lo marcado «no procede», y el correo solo lista lo visible.
+  - `portal-mi-plan-migrado`: un viaje «no procede» deja de salir «en revisión».
+  - KameHouse: cada viaje con ✏️ Editar · ➕ Pago · 📊 Excel · ✓ Publicar este ·
+    ✗ No procede; lo pendiente arriba, lo pasado marcado «evento pasado», lo
+    decidido atenuado con su sello/motivo. `mide:portal-solo-1` **45→65**
+    (bloque [G]); vecinos verdes.
+
 - 🔴⏳ **FECHA3-1 (27-oct-2026, en main local): una clienta NO podía completar
   su perfil del Portal.** Reporte real (Android, por WhatsApp): la fecha de
   nacimiento se quedaba en «dd/mm/aaaa» sin teclado ni calendario, y «la foto

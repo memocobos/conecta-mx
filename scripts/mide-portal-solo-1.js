@@ -228,6 +228,63 @@ const call = async (file, b, extraH) => {
   const acta = fs.readFileSync(path.join(RAIZ, 'migraciones/PORTAL-SOLO-1.sql'), 'utf8');
   af(() => /grant select, insert, update, delete on public\.portal_revisiones to service_role/.test(acta) && /enable row level security/.test(acta), 'el acta trae RLS + GRANT service_role (regla del 30-oct)');
 
+  console.log('\n[G] PRV-FILA-1 · viaje por viaje: editar, publicar uno, «no procede» uno');
+  DB = semilla();
+  DB.v.push(
+    { id: U(21), evento_id: 'juniorh', nombre: 'Lesly Prueba Medellin', correo: 'lesly@x.mx', tipo_paquete: 'PLUS', zona_boleto: 'General', total_contrato: null, abonado_previo: 2000, boletos: 1, portal_revisado_at: null },
+    { id: U(22), evento_id: 'alfredito', nombre: 'Lesly Prueba Medellin', correo: 'lesly@x.mx', tipo_paquete: 'PLUS', zona_boleto: null, total_contrato: null, abonado_previo: null, boletos: 1, portal_revisado_at: null },
+    { id: U(23), evento_id: 'juniorh', nombre: 'Lesly Prueba Medellin', correo: 'lesly@x.mx', tipo_paquete: 'plus', zona_boleto: 'General', total_contrato: 7000, abonado_previo: 500, boletos: 1, portal_revisado_at: null });
+  USER = { id: 'au-lesly', email: 'lesly@x.mx', email_confirmed_at: 'x' };
+  await call('portal-mi-plan-migrado.js', {});
+  r = await adm({ accion: 'listar' });
+  const itG = (r.j.pendientes || []).find((x) => x.correo === 'lesly@x.mx') || {};
+  af(() => itG.filas && itG.filas.length === 3 && itG.sin_revisar === 3, () => 'listar: sus 3 viajes por revisar · ' + JSON.stringify((itG.filas || []).map((f) => [f.evento_id, f.evento_pasado])));
+  af(() => (itG.filas || []).find((f) => f.id === U(22)).evento_pasado === true && (itG.filas || []).find((f) => f.id === U(21)).evento_pasado === false, 'marca el evento PASADO (alfredito) y no el que viene');
+  af(() => itG.filas[itG.filas.length - 1].id === U(22), 'lo pasado va al final: primero lo que hay que decidir hoy');
+  r = await adm({ accion: 'fila_editar', id: itG.id, viajero_id: U(21), campos: { total_contrato: '9,500', abonado_previo: '2500' } });
+  const v21 = DB.v.find((v) => v.id === U(21));
+  af(() => r.s === 200 && v21.total_contrato === 9500 && v21.abonado_previo === 2500 && /\[PORTAL-REV .*total —→\$9500; pagado antes \$2000→\$2500 · Bulma/.test(v21.notas || ''), () => 'editar: total y pagado-antes quedan, con su rastro en las notas · ' + r.s + ' ' + (r.j.error || '') + ' ' + v21.notas);
+  af(() => !v21.portal_revisado_at, 'editar NO publica');
+  r = await adm({ accion: 'fila_editar', id: itG.id, viajero_id: U(21), campos: { zona_boleto: 'Zona Que No Existe XYZ' } });
+  af(() => r.s === 400 && /no es zona/.test(r.j.error || '') && v21.zona_boleto === 'General', () => 'la zona pasa por LA PUERTA de la ficha (inventada → 400, nada escrito): ' + r.s + ' ' + (r.j.error || ''));
+  r = await adm({ accion: 'fila_editar', id: itG.id, viajero_id: U(21), campos: { total_contrato: '' } });
+  af(() => r.s === 400 && v21.total_contrato === 9500, 'el total no se puede vaciar');
+  r = await adm({ accion: 'fila_editar', id: itG.id, viajero_id: U(1), campos: { nombre: 'Intruso Ajeno' } });
+  af(() => r.s === 409 && DB.v[0].nombre === 'Laura Gómez Ruiz', 'una fila de OTRO correo no se edita desde esta revisión (409)');
+  DB.correos = [];
+  r = await adm({ accion: 'fila_publicar', id: itG.id, viajero_id: U(21) });
+  af(() => r.s === 200 && v21.portal_revisado_at && r.j.cierre && r.j.cierre.cerrada === false && r.j.cierre.restantes === 2 && !DB.correos.length, () => 'publicar UNO: se sella solo ése, quedan 2 y todavía NO sale correo · ' + JSON.stringify(r.j.cierre));
+  r = await adm({ accion: 'fila_publicar', id: itG.id, viajero_id: U(21) });
+  af(() => r.s === 409, '2º clic sobre el mismo viaje → 409');
+  r = await adm({ accion: 'fila_editar', id: itG.id, viajero_id: U(21), campos: { nombre: 'Otro Nombre' } });
+  af(() => r.s === 409, 'lo ya publicado no se edita aquí (409)');
+  r = await adm({ accion: 'fila_no_procede', id: itG.id, viajero_id: U(22), motivo: 'x' });
+  af(() => r.s === 400, '«no procede» sin motivo → 400');
+  r = await adm({ accion: 'fila_no_procede', id: itG.id, viajero_id: U(22), motivo: 'Ese viaje ya pasó y no aparece pagado' });
+  const npRow = DB.rev.find((x) => x.estado === 'rechazada' && (x.viajero_ids || []).includes(U(22)));
+  af(() => r.s === 200 && npRow && npRow.evento_id === 'alfredito' && r.j.cierre.restantes === 1 && !DB.v.find((v) => v.id === U(22)).portal_revisado_at, 'no procede UNO: queda en la bitácora con su motivo, sin sellarse, y queda 1');
+  r = await call('portal-mi-plan-migrado.js', {});
+  af(() => r.j.tours.length === 1 && JSON.stringify(r.j.en_revision) === JSON.stringify(['juniorh']) && (r.j.solicitudes || []).some((x) => x.estado === 'rechazada' && /ya pasó/.test(x.motivo)), () => 'el Portal: ve el publicado, «en revisión» ya no dice alfredito, y le dice el motivo · ' + JSON.stringify(r.j.en_revision));
+  r = await adm({ accion: 'publicar', id: itG.id });
+  af(() => r.s === 200 && !DB.v.find((v) => v.id === U(22)).portal_revisado_at && DB.v.find((v) => v.id === U(23)).portal_revisado_at, '«publicar las que faltan» NO sella lo marcado «no procede»');
+  const revG = DB.rev.find((x) => x.id === itG.id);
+  af(() => revG.estado === 'publicada' && DB.correos.length === 1 && !/Alfredo|alfredito/i.test(DB.correos[0].html.split('Sobre otros')[0]), 'se cierra y sale UN correo sin el viaje que no procedió en la lista de publicados');
+  // El cierre automático: otra persona, decide sus 2 viajes uno por uno.
+  DB.v.push({ id: U(31), evento_id: 'juniorh', nombre: 'Ana Dos Viajes', correo: 'ana@x.mx', tipo_paquete: 'PLUS', zona_boleto: 'General', total_contrato: 6000, abonado_previo: 1000, boletos: 1, portal_revisado_at: null },
+    { id: U(32), evento_id: 'alfredito', nombre: 'Ana Dos Viajes', correo: 'ana@x.mx', tipo_paquete: 'PLUS', zona_boleto: null, total_contrato: null, abonado_previo: null, boletos: 1, portal_revisado_at: null });
+  USER = { id: 'au-ana', email: 'ana@x.mx', email_confirmed_at: 'x' };
+  await call('portal-mi-plan-migrado.js', {});
+  const revA = DB.rev.find((x) => x.correo === 'ana@x.mx' && x.estado === 'pendiente');
+  DB.correos = [];
+  await adm({ accion: 'fila_no_procede', id: revA.id, viajero_id: U(32), motivo: 'Ese viaje ya pasó' });
+  r = await adm({ accion: 'fila_publicar', id: revA.id, viajero_id: U(31) });
+  const co = DB.correos[0] || {};
+  af(() => r.j.cierre && r.j.cierre.cerrada === true && revA.estado === 'publicada' && DB.correos.length === 1, () => 'al decidir el ÚLTIMO, la revisión se cierra sola y sale UN correo · ' + JSON.stringify(r.j.cierre));
+  af(() => /\$6,000/.test(co.html || '') && /Sobre otros viajes/.test(co.html || '') && /Ese viaje ya pasó/.test(co.html || ''), 'el correo trae lo publicado con sus números y, aparte, lo que no procedió con su motivo');
+  await call('portal-mi-plan-migrado.js', {});
+  af(() => !DB.rev.some((x) => x.correo === 'ana@x.mx' && x.estado === 'pendiente'), 'la siguiente visita NO reabre revisión por el viaje que no procedió');
+  af(() => !DB.escrituras.some((e) => e.startsWith('DELETE')), 'CERO DELETEs');
+
   console.log(`\n${R ? '🔴' : (V ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.error('💥 el arnés se cayó:', e); process.exit(2); });

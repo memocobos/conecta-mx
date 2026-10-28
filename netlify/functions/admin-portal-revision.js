@@ -30,7 +30,15 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const PR = require('./_lib/portal-revision');
 
 const ROLES = ['maestro_roshi', 'bulma', 'milk'];
-const ACCIONES = ['listar', 'excel', 'ligar', 'publicar', 'rechazar', 'adelanto'];
+const ACCIONES = ['listar', 'excel', 'ligar', 'publicar', 'rechazar', 'adelanto', 'fila_editar', 'fila_publicar', 'fila_no_procede'];
+// [PRV-FILA-1] Palabra de Memo (27-oct): «no puedo editar nada de lo que dice
+// ella … estaría bueno poder editar e ir aceptando uno por uno, no tener que
+// revisar todas de golpe». Cada viaje de la revisión se EDITA, se PUBLICA o se
+// marca «no procede» por separado; cuando ya no queda ninguno, la revisión se
+// cierra sola y sale UN correo con lo publicado (y lo que no procedió).
+const PAQ = ['plus', 'stay', 'cheap', 'ride'];
+const { puertaZona } = require('./_lib/zona-ficha');
+const numDinero = (x) => { if (x == null) return null; const s = String(x).replace(/[$\s,]/g, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN; };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function j(status, headers, body) { return { statusCode: status, headers, body: JSON.stringify(body) }; }
@@ -94,6 +102,52 @@ exports.handler = async (event) => {
     if (!r.ok) throw new Error('no pude leer la solicitud');
     return (await r.json())[0] || null;
   };
+  // [PRV-FILA-1] Los viajes que ya alguien marcó «no procede» (por viaje o la
+  // revisión entera): viajero_id → motivo. pedirRevision ya los trata como
+  // cubiertos, así que no reabren solos.
+  const noProcedenDe = async (correo) => {
+    const r = await fetch(`${T}?correo=eq.${encodeURIComponent(correo)}&tipo=eq.revisar&estado=eq.rechazada&select=viajero_ids,motivo&limit=300`, { headers: h });
+    if (!r.ok) throw new Error('no pude leer los «no procede» de ese correo');
+    const m = new Map();
+    (await r.json()).forEach((x) => (x.viajero_ids || []).forEach((id) => m.set(String(id), x.motivo || '')));
+    return m;
+  };
+  // La fila tiene que ser de ESE correo (la autoridad es la igualdad exacta).
+  const filaDeRev = async (rev, vid) => {
+    if (!UUID_RE.test(String(vid || ''))) return { error: 'Viajero inválido', status: 400 };
+    const r = await fetch(`${VE}?id=eq.${vid}&select=${PR.VSEL}&limit=1`, { headers: h });
+    if (!r.ok) return { error: 'No pude leer esa fila', status: 502 };
+    const v = (await r.json())[0];
+    if (!v || PR.normCorreo(v.correo) !== rev.correo) return { error: 'Esa fila no es de esta persona (o cambió de correo): recarga', status: 409 };
+    return { v };
+  };
+  // Cuando ya no queda ningún viaje sin decidir, la revisión se cierra SOLA y
+  // sale UN correo: lo publicado (y, aparte, lo que no procedió con su motivo).
+  const cerrarSiTermino = async (rev) => {
+    const filas = await PR.filasDeCorreo(rev.correo, KH);
+    const np = await noProcedenDe(rev.correo);
+    const restantes = filas.filter((v) => !PR.revisada(v) && !np.has(String(v.id)));
+    if (restantes.length) return { cerrada: false, restantes: restantes.length };
+    const publicadas = filas.filter(PR.revisada);
+    const rechazadas = filas.filter((v) => !PR.revisada(v) && np.has(String(v.id)));
+    const ab = await PR.abonosDe(filas.map((v) => v.id), KH);
+    const resumen = `por viaje: ${publicadas.length} publicado${publicadas.length === 1 ? '' : 's'} · ${rechazadas.length} no procede${rechazadas.length === 1 ? '' : 'n'}`;
+    const rc = await fetch(`${T}?id=eq.${rev.id}&estado=eq.pendiente`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ estado: 'publicada', atendida_at: new Date().toISOString(), atendida_por: quien,
+        nota_staff: ((rev.nota_staff ? rev.nota_staff + ' · ' : '') + resumen).slice(0, 1000),
+        despues: PR.foto(publicadas, ab), viajero_ids: [...new Set([...(rev.viajero_ids || []), ...filas.map((v) => v.id)])] }) });
+    if (!rc.ok || !(await rc.json()).length) return { cerrada: false, ya: true };
+    const EVx = await catalogo();
+    const conEv = (f) => { const n = PR.nombreEvento(EVx, f.evento_id); return Object.assign({}, f, { evento: n.nombre, fecha: n.fecha }); };
+    const viajes = PR.foto(publicadas, ab).map(conEv);
+    const noProceden = rechazadas.map((v) => ({ evento: conEv(v).evento, motivo: np.get(String(v.id)) || '' }));
+    const nombre = (filas[0] && filas[0].nombre) || rev.nombre_dado;
+    const correo = viajes.length
+      ? await PR.avisarRevision({ rev: Object.assign({}, rev, { estado: 'publicada' }), viajes, nombre, noProceden })
+      : await PR.avisarRevision({ rev: Object.assign({}, rev, { estado: 'rechazada', motivo: noProceden.map((x) => `${x.evento}: ${x.motivo}`).join(' · ') }), viajes: [], nombre });
+    if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
+    return { cerrada: true, publicadas: publicadas.length, no_proceden: rechazadas.length, correo };
+  };
 
   try {
     // ── listar ──────────────────────────────────────────────────────────────
@@ -110,11 +164,21 @@ exports.handler = async (event) => {
       for (const rev of pend) {
         const filas = await PR.filasDeCorreo(rev.correo, KH);
         const ab = await PR.abonosDe(filas.map((v) => v.id), KH);
-        const conNombre = (v) => Object.assign({}, v, evDe(EVx, v.evento_id), { cuenta: PR.foto([v], ab)[0], abonos_lista: (ab[v.id] || []).map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha, nota: a.nota || null })) });
+        const np = await noProcedenDe(rev.correo);
+        const conNombre = (v) => {
+          const e = evDe(EVx, v.evento_id);
+          return Object.assign({}, v, e, { cuenta: PR.foto([v], ab)[0], abonos_lista: (ab[v.id] || []).map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha, nota: a.nota || null })),
+            no_procede: np.has(String(v.id)) ? (np.get(String(v.id)) || 'no procede') : null,
+            evento_pasado: !!(e.evento_ds && e.evento_ds < hoy) });
+        };
+        // Primero lo que falta decidir, luego lo publicado y lo que no procedió;
+        // dentro, por fecha del evento (lo que viene primero arriba).
+        const orden = (v) => (PR.revisada(v) ? 2 : (np.has(String(v.id)) ? 3 : (v.evento_pasado ? 1 : 0)));
+        const filasOut = filas.map(conNombre).sort((a, b) => (orden(a) - orden(b)) || String(a.evento_ds || '').localeCompare(String(b.evento_ds || '')));
         const item = Object.assign({}, rev, {
           evento: rev.evento_id ? PR.nombreEvento(EVx, rev.evento_id) : null,
-          filas: filas.map(conNombre),
-          sin_revisar: filas.filter((v) => !PR.revisada(v)).length,
+          filas: filasOut,
+          sin_revisar: filas.filter((v) => !PR.revisada(v) && !np.has(String(v.id))).length,
         });
         if (rev.tipo === 'ligar' && rev.evento_id) {
           const base = rev.evento_id.split('#')[0];
@@ -186,7 +250,9 @@ exports.handler = async (event) => {
       if (!rev || rev.estado !== 'pendiente') return j(409, headers, { error: 'Esa solicitud ya no está pendiente' });
       const nota = String(body.nota || '').trim().slice(0, 1000) || null;
       const filas = await PR.filasDeCorreo(rev.correo, KH);
-      const sinSello = filas.filter((v) => !PR.revisada(v));
+      // [PRV-FILA-1] Lo que ya se marcó «no procede» por viaje NO se publica de golpe.
+      const npG = await noProcedenDe(rev.correo);
+      const sinSello = filas.filter((v) => !PR.revisada(v) && !npG.has(String(v.id)));
       if (!filas.length) return j(409, headers, { error: rev.tipo === 'ligar' ? 'Todavía no ligas ninguna fila: elige «Es esta persona» primero' : 'Ese correo ya no tiene filas en KameHouse' });
       const ab = await PR.abonosDe(filas.map((v) => v.id), KH);
       const antes = rev.antes || PR.foto(sinSello, ab);
@@ -209,7 +275,8 @@ exports.handler = async (event) => {
       }
       // 3 · El correo: lo que verá en su Portal (todas sus filas ya revisadas).
       const EVx = await catalogo();
-      const viajes = PR.foto(filas, ab).map((f) => { const n = PR.nombreEvento(EVx, f.evento_id); return Object.assign({}, f, { evento: n.nombre, fecha: n.fecha }); });
+      const visibles = filas.filter((v) => PR.revisada(v) || sinSello.some((s) => s.id === v.id));
+      const viajes = PR.foto(visibles, ab).map((f) => { const n = PR.nombreEvento(EVx, f.evento_id); return Object.assign({}, f, { evento: n.nombre, fecha: n.fecha }); });
       const correo = await PR.avisarRevision({ rev: Object.assign({}, rev, { estado: 'publicada' }), viajes, nombre: (filas[0] && filas[0].nombre) || rev.nombre_dado });
       if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
       return j(200, headers, { ok: true, publicadas: sinSello.length, correo });
@@ -229,6 +296,116 @@ exports.handler = async (event) => {
       const correo = await PR.avisarRevision({ rev: cerrada, viajes: [], nombre: rev.nombre_dado });
       if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
       return j(200, headers, { ok: true, correo });
+    }
+
+    // ── [PRV-FILA-1] fila_editar: corregir UN viaje antes de publicarlo ──────
+    // Lo que se puede corregir aquí: nombre, paquete, zona (por LA PUERTA de la
+    // ficha), lugares, total del contrato y lo pagado ANTES del sistema
+    // (abonado_previo, el número del Excel). Los pagos NUEVOS no se teclean aquí:
+    // son abonos (➕ Abono), con su fecha. 🔒 Valor esperado: si alguien cambió
+    // la fila mientras tanto, 409. Cada cambio queda ANEXADO en sus notas.
+    if (accion === 'fila_editar') {
+      const rev = await leerRev(body.id);
+      if (!rev || rev.estado !== 'pendiente') return j(409, headers, { error: 'Esa revisión ya no está pendiente' });
+      const fr = await filaDeRev(rev, body.viajero_id);
+      if (fr.error) return j(fr.status, headers, { error: fr.error });
+      const v = fr.v;
+      if (PR.revisada(v)) return j(409, headers, { error: 'Ese viaje ya está publicado' });
+      const c = (body.campos && typeof body.campos === 'object') ? body.campos : {};
+      const patch = {}, cambios = [];
+      let zonaAviso = null;
+      const igual = (a, b) => String(a == null ? '' : a) === String(b == null ? '' : b);
+      if ('nombre' in c) {
+        const n = String(c.nombre || '').trim().replace(/\s+/g, ' ');
+        if (n.length < 2 || n.length > 120) return j(400, headers, { error: 'Nombre inválido' });
+        if (!igual(n, v.nombre)) { patch.nombre = n; cambios.push(`nombre «${v.nombre || ''}»→«${n}»`); }
+      }
+      let paqFinal = String(v.tipo_paquete || '').toLowerCase();
+      if ('tipo_paquete' in c) {
+        const p = String(c.tipo_paquete || '').trim().toLowerCase();
+        if (!PAQ.includes(p)) return j(400, headers, { error: 'Paquete inválido (PLUS, STAY, CHEAP o RIDE)' });
+        // Se respeta cómo escribe la base esa fila (hay PLUS y plus): mayúsculas si no hay.
+        const cur = String(v.tipo_paquete || '');
+        const val = cur && cur === cur.toLowerCase() ? p : p.toUpperCase();
+        paqFinal = p;
+        if (p !== cur.toLowerCase()) { patch.tipo_paquete = val; cambios.push(`paquete ${cur || '—'}→${val}`); }
+      }
+      if ('zona_boleto' in c) {
+        let z = String(c.zona_boleto || '').trim();
+        if (!z) {
+          if (paqFinal !== 'ride') return j(400, headers, { error: 'La zona es obligatoria (solo RIDE va sin zona)' });
+        } else {
+          const pz = await puertaZona(v.evento_id, z);
+          if (pz.estado === 'desconocida') return j(400, headers, { error: `«${z}» no es zona de ese evento. Zonas: ${(pz.canonicas || []).join(', ')}` });
+          if (pz.estado === 'canonizada') { zonaAviso = `Zona escrita como en la ficha: «${pz.zona}»`; z = pz.zona; }
+        }
+        if (!igual(z || null, v.zona_boleto)) { patch.zona_boleto = z || null; cambios.push(`zona «${v.zona_boleto || '—'}»→«${z || '—'}»`); }
+      }
+      if ('boletos' in c) {
+        const b = Number(c.boletos);
+        if (!Number.isInteger(b) || b < 1 || b > 20) return j(400, headers, { error: 'Lugares inválidos (1 a 20)' });
+        if (b !== (Number(v.boletos) || 1)) { patch.boletos = b; cambios.push(`lugares ${v.boletos || 1}→${b}`); }
+      }
+      for (const k of ['total_contrato', 'abonado_previo']) {
+        if (!(k in c)) continue;
+        const nv = numDinero(c[k]);
+        if (Number.isNaN(nv) || (nv != null && (nv < 0 || nv > 2000000))) return j(400, headers, { error: (k === 'total_contrato' ? 'Total' : 'Pagado antes') + ' inválido' });
+        if (k === 'total_contrato' && nv == null) return j(400, headers, { error: 'El total no puede quedar vacío' });
+        const cur = v[k] == null ? null : Number(v[k]);
+        if (nv !== cur) { patch[k] = nv; cambios.push(`${k === 'total_contrato' ? 'total' : 'pagado antes'} ${cur == null ? '—' : '$' + cur}→$${nv == null ? 0 : nv}`); }
+      }
+      if (!cambios.length) return j(400, headers, { error: 'No cambiaste nada' });
+      patch.notas = ((v.notas ? v.notas + ' · ' : '') + `[PORTAL-REV ${hoy}] ${cambios.join('; ')} · ${quien}`).slice(0, 4000);
+      // Valor esperado: cada campo que cambia, tal como se leyó.
+      const filtro = Object.keys(patch).filter((k) => k !== 'notas').map((k) => (v[k] == null ? `${k}=is.null` : `${k}=eq.${encodeURIComponent(v[k])}`)).join('&');
+      const rp = await fetch(`${VE}?id=eq.${v.id}&portal_revisado_at=is.null&${filtro}`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }), body: JSON.stringify(patch) });
+      if (!rp.ok) return j(502, headers, { error: 'No pude guardar el cambio', detail: (await rp.text()).slice(0, 200) });
+      const nueva = (await rp.json())[0];
+      if (!nueva) return j(409, headers, { error: 'La fila cambió mientras la editabas: recarga y vuelve a intentar' });
+      return j(200, headers, { ok: true, cambios, zona_aviso: zonaAviso });
+    }
+
+    // ── [PRV-FILA-1] fila_publicar: UN viaje queda visible en su Portal ──────
+    if (accion === 'fila_publicar') {
+      const rev = await leerRev(body.id);
+      if (!rev || rev.estado !== 'pendiente') return j(409, headers, { error: 'Esa revisión ya no está pendiente' });
+      const fr = await filaDeRev(rev, body.viajero_id);
+      if (fr.error) return j(fr.status, headers, { error: fr.error });
+      const v = fr.v;
+      if (PR.revisada(v)) return j(409, headers, { error: 'Ese viaje ya estaba publicado' });
+      const np = await noProcedenDe(rev.correo);
+      if (np.has(String(v.id))) return j(409, headers, { error: 'Ese viaje ya está marcado «no procede»' });
+      const nota = String(body.nota || '').trim().slice(0, 300);
+      const rs = await fetch(`${VE}?id=eq.${v.id}&portal_revisado_at=is.null`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ portal_revisado_at: new Date().toISOString(), portal_revisado_por: quien + ' (por viaje)' + (nota ? ' · ' + nota : '') }) });
+      if (!rs.ok) return j(502, headers, { error: 'No pude publicar ese viaje', detail: (await rs.text()).slice(0, 200) });
+      if (!(await rs.json()).length) return j(409, headers, { error: 'Alguien más ya lo publicó' });
+      await fetch(`${T}?id=eq.${rev.id}&estado=eq.pendiente`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ viajero_ids: [...new Set([...(rev.viajero_ids || []), v.id])] }) });
+      const cierre = await cerrarSiTermino(rev);
+      return j(200, headers, { ok: true, publicada: v.id, cierre });
+    }
+
+    // ── [PRV-FILA-1] fila_no_procede: UN viaje no se publica (con motivo) ────
+    // Queda como su propia fila «rechazada» en la bitácora: así el Portal le
+    // dice el motivo de ESE viaje y la revisión no se vuelve a abrir por él.
+    if (accion === 'fila_no_procede') {
+      const rev = await leerRev(body.id);
+      if (!rev || rev.estado !== 'pendiente') return j(409, headers, { error: 'Esa revisión ya no está pendiente' });
+      const motivo = String(body.motivo || '').trim().slice(0, 500);
+      if (motivo.length < 3) return j(400, headers, { error: 'Escribe el motivo: lo verá el cliente en su Portal' });
+      const fr = await filaDeRev(rev, body.viajero_id);
+      if (fr.error) return j(fr.status, headers, { error: fr.error });
+      const v = fr.v;
+      if (PR.revisada(v)) return j(409, headers, { error: 'Ese viaje ya está publicado' });
+      const np = await noProcedenDe(rev.correo);
+      if (np.has(String(v.id))) return j(409, headers, { error: 'Ese viaje ya estaba marcado «no procede»' });
+      const ab = await PR.abonosDe([v.id], KH);
+      const ri = await fetch(T, { method: 'POST', headers: hw({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ tipo: 'revisar', estado: 'rechazada', correo: rev.correo, evento_id: v.evento_id, viajero_ids: [v.id],
+          antes: PR.foto([v], ab), motivo, nota_staff: 'no procede por viaje', atendida_at: new Date().toISOString(), atendida_por: quien }) });
+      if (!ri.ok) return j(502, headers, { error: 'No pude guardarlo', detail: (await ri.text()).slice(0, 200) });
+      const cierre = await cerrarSiTermino(rev);
+      return j(200, headers, { ok: true, no_procede: v.id, cierre });
     }
 
     // ── adelanto: revisar por adelantado desde la lista del evento ──────────

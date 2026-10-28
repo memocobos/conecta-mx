@@ -30,7 +30,7 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const PR = require('./_lib/portal-revision');
 
 const ROLES = ['maestro_roshi', 'bulma', 'milk'];
-const ACCIONES = ['listar', 'excel', 'ligar', 'publicar', 'rechazar', 'adelanto', 'fila_editar', 'fila_publicar', 'fila_no_procede'];
+const ACCIONES = ['listar', 'excel', 'ligar', 'publicar', 'rechazar', 'adelanto', 'fila_editar', 'fila_publicar', 'fila_no_procede', 'cerrar_resuelta'];
 // [PRV-FILA-1] Palabra de Memo (27-oct): «no puedo editar nada de lo que dice
 // ella … estaría bueno poder editar e ir aceptando uno por uno, no tener que
 // revisar todas de golpe». Cada viaje de la revisión se EDITA, se PUBLICA o se
@@ -282,6 +282,64 @@ exports.handler = async (event) => {
       const correo = await PR.avisarRevision({ rev: Object.assign({}, rev, { estado: 'publicada' }), viajes, nombre: (filas[0] && filas[0].nombre) || rev.nombre_dado });
       if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
       return j(200, headers, { ok: true, publicadas: sinSello.length, correo });
+    }
+
+    // ── [PRV-EDITA-1a] cerrar_resuelta: «✓ Ya quedó» ────────────────────────
+    // Palabra de Memo (28-oct): «esa notificación no se quita nunca de
+    // requisiciones, siempre aparece».
+    // 🔴 EL HUECO: una solicitud de «ligar» cuyos candidatos YA están ligados y
+    // publicados no tenía forma de cerrarse. Los únicos botones eran WhatsApp y
+    // «No procede», y ése le manda al cliente un correo diciendo que su solicitud
+    // NO procedió — mentira en el caso real (Frida): su caso sí procedía, le
+    // faltaba un día de viaje. Así que la tarjeta se quedaba pegada para siempre,
+    // y una bandeja con un pendiente eterno deja de ser una bandeja.
+    // 🔒 `resuelta` es SU PROPIO ESTADO, no un `rechazada` disfrazado: el Portal
+    // le diría «tu solicitud no procedió» sobre algo que sí se resolvió.
+    if (accion === 'cerrar_resuelta') {
+      const rev = await leerRev(body.id);
+      if (!rev || rev.estado !== 'pendiente') return j(409, headers, { error: 'Esa solicitud ya no está pendiente' });
+      // La nota es obligatoria y es INTERNA: queda en la bitácora para que el
+      // siguiente que abra la bandeja sepa por qué se cerró sin publicar nada.
+      const nota = String(body.nota || '').trim().slice(0, 1000);
+      if (nota.length < 3) return j(400, headers, { error: 'Escribe qué pasó: queda en la bitácora para quien lo lea después' });
+      // 🔒 La casilla nace PRENDIDA (palabra de Memo), pero se respeta el `false`
+      // explícito: si ya le hablaron por WhatsApp, repetir por correo quema.
+      const avisar = body.avisar !== false;
+
+      // Lo que el cliente YA puede ver: solo lo publicado, nunca lo que sigue
+      // sin revisar — prometerle un viaje que no verá es el defecto de siempre.
+      const filas = await PR.filasDeCorreo(rev.correo, KH);
+      const visibles = filas.filter((v) => PR.revisada(v));
+
+      const rc = await fetch(`${T}?id=eq.${rev.id}&estado=eq.pendiente`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ estado: 'resuelta', atendida_at: new Date().toISOString(), atendida_por: quien, nota_staff: nota }) });
+      if (!rc.ok) return j(502, headers, { error: 'No pude cerrar la solicitud', detail: (await rc.text()).slice(0, 200) });
+      const cerrada = (await rc.json())[0];
+      if (!cerrada) return j(409, headers, { error: 'Alguien más ya la atendió' });
+
+      // 🔒 EL CORREO JAMÁS TUMBA EL CIERRE (la ley del correo único): si Resend
+      // falla, la solicitud queda cerrada igual y la bandeja lo DICE.
+      let correo = { ok: false, aviso: 'no se pidió avisar' };
+      if (avisar) {
+        if (!visibles.length) {
+          // Un cero es una afirmación: no hay nada publicado que contarle, así
+          // que no se manda un «ya puedes verlo» sobre una pantalla vacía.
+          correo = { ok: false, aviso: 'no tiene ningún viaje publicado todavía: no se mandó correo' };
+        } else {
+          const ab = await PR.abonosDe(visibles.map((v) => v.id), KH);
+          const EVx = await catalogo();
+          const viajes = PR.foto(visibles, ab).map((f) => {
+            const n = PR.nombreEvento(EVx, f.evento_id);
+            return Object.assign({}, f, { evento: n.nombre, fecha: n.fecha });
+          });
+          correo = await PR.avisarRevision({ rev: Object.assign({}, cerrada, { estado: 'publicada' }),
+            viajes, nombre: (filas[0] && filas[0].nombre) || rev.nombre_dado });
+          // 🔒 El sello SOLO si el correo salió: sellar sin haber mandado deja a
+          // alguien marcado como avisado (la lección de RECHAZO-AVISO-1).
+          if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
+        }
+      }
+      return j(200, headers, { ok: true, estado: 'resuelta', visibles: visibles.length, correo });
     }
 
     // ── rechazar ────────────────────────────────────────────────────────────

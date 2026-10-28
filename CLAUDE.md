@@ -188,6 +188,41 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✅ **PRV-EDITA-1a (28-oct-2026, en main local): «✓ YA QUEDÓ» — la bandeja ya
+  se puede cerrar sin mentirle al cliente.** Palabra de Memo, citada: *«esa
+  notificación no se quita nunca de requisiciones, siempre aparece»*.
+  - 🔴 **EL HUECO, medido:** una solicitud de «ligar» cuyos candidatos YA están
+    ligados y publicados **no tenía forma de cerrarse**. Los únicos botones eran
+    WhatsApp y «No procede (todo)», y ése le manda al cliente un correo diciendo
+    que su solicitud NO procedió — **mentira en el caso real (Frida): su caso sí
+    procedía, le faltaba un día de viaje**. La tarjeta se quedaba pegada para
+    siempre, y una bandeja con un pendiente eterno deja de ser una bandeja.
+  - 🔒 **`resuelta` ES SU PROPIO ESTADO, no un `rechazada` disfrazado** (acta
+    `migraciones/PRV-EDITA-1A.sql`, YA CORRIDA, **CHECK mordido en los dos
+    sentidos**: «resuelta» entra ✓, un estado inventado rebota con 23514 ✓, cero
+    basura de la prueba). Meterlo como rechazo habría hecho que el Portal le
+    dijera «tu solicitud no procedió» sobre algo que sí se resolvió — el mismo
+    defecto que RECHAZO-AVISO-1 vino a curar, con otra cara.
+  - 🔒 **Los dos índices únicos parciales se liberan SOLOS** (van `where estado =
+    'pendiente'`), así que la persona puede volver a pedir revisión si hace
+    falta. No hubo que tocarlos — verificado leyendo PORTAL-SOLO-1.sql.
+  - **La acción `cerrar_resuelta`** (roshi/bulma/milk): nota **obligatoria e
+    INTERNA** (queda en la bitácora, no le llega al cliente) + **casilla de aviso
+    que nace PRENDIDA** (palabra de Memo). El correo le dice «ya puedes ver tu
+    viaje» con lo que de verdad está publicado.
+  - 🔒 **Tres candados heredados de lo que ya costó caro:** sin nada publicado
+    **no se manda** un «ya puedes verlo» sobre una pantalla vacía (y la bandeja
+    DICE por qué) · el correo **jamás tumba el cierre** · y `correo_enviado_at`
+    **solo se sella si el correo salió** — sellar sin mandar deja a alguien
+    marcado como avisado (la lección de RECHAZO-AVISO-1).
+  - `mide:portal-solo-1` **73 → 89** (bloque [R], por el handler REAL: 2º clic
+    409 con cero correos de más, casilla apagada que no sella, y el candado de
+    que la acción esté en `ACCIONES` o el portero la rechaza antes de llegar —
+    la ley de RAD-FIX-CAMINO). Vecinos verdes: preventa-portal-1 33 ·
+    portal-edit-1 28 · acomp-2 43 · contrato-cliente-2 19 · req-b1 52 ·
+    rechazo-1 60 · confirma-1 28.
+  - ⏳ Push de Memo → Bulma cierra la tarjeta de Frida con el botón.
+
 - 🔴✅ **CHATARRA-REGLA-1 (28-oct-2026, en main local): EL VIERNES DE CORONA
   OFRECÍA 9 LUGARES QUE NO EXISTEN — la regla de zona nombra la FECHA, no la
   zona.** Salió al medir el caso de Frida, no de un reporte.

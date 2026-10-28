@@ -314,6 +314,67 @@ const call = async (file, b, extraH) => {
   await call('portal-mi-plan-migrado.js', {});
   af(() => DB.rev.some((x) => x.correo === 'crea@x.mx' && (x.viajero_ids || []).includes(U(44))), 'control: una CREADORA sí se revisa como clienta (su cortesía es su viaje)');
 
+  // ── [R] PRV-EDITA-1a · «✓ Ya quedó»: cerrar sin mentirle al cliente ───────
+  // 🔴 El caso REAL (Frida, 28-oct): pidió revisión, su viaje ya estaba ligado y
+  // publicado, y la tarjeta se quedó pegada porque los únicos botones eran
+  // WhatsApp y «No procede» — que le habría mandado un «tu solicitud no
+  // procedió» FALSO. `resuelta` es su propio estado, no un rechazo disfrazado.
+  console.log('\n[R] PRV-EDITA-1a · «✓ Ya quedó» cierra el pendiente sin decir que no procedió');
+  DB = semilla();
+  DB.v.push({ id: U(61), evento_id: 'juniorh', nombre: 'Ya Quedo Uno', correo: 'yaquedo@x.mx', tipo_paquete: 'PLUS',
+    zona_boleto: 'General', total_contrato: 6000, abonado_previo: 1000, boletos: 1, tipo_viajero: 'cliente', portal_revisado_at: ahora });
+  DB.rev.push({ id: U(7101), tipo: 'ligar', estado: 'pendiente', correo: 'yaquedo@x.mx', evento_id: 'juniorh',
+    nombre_dado: 'Ya Quedo Uno', viajero_ids: [], creado_en: ahora });
+  DB.correos = [];
+  r = await adm({ accion: 'cerrar_resuelta', id: U(7101), nota: 'ok' });
+  af(() => r.s === 400 && DB.rev.find((x) => x.id === U(7101)).estado === 'pendiente',
+    () => 'sin nota de verdad → 400 y la solicitud SIGUE pendiente (no se cierra a medias) · ' + r.s);
+  r = await adm({ accion: 'cerrar_resuelta', id: U(7101), nota: 'Su viaje ya estaba bien; se le movió la fecha y se le avisó por WhatsApp.' });
+  const cerr = DB.rev.find((x) => x.id === U(7101)) || {};
+  af(() => r.s === 200 && cerr.estado === 'resuelta', () => 'queda en «resuelta», que NO es «rechazada» · ' + cerr.estado);
+  af(() => cerr.estado !== 'rechazada' && !cerr.motivo,
+    'no se guarda motivo: un motivo es lo que le llega al cliente cuando NO procede, y aquí sí procedió');
+  af(() => /se le movió la fecha/.test(cerr.nota_staff || ''), 'la nota del staff queda en la bitácora');
+  af(() => cerr.atendida_por && cerr.atendida_at, 'queda QUIÉN la cerró y CUÁNDO');
+  af(() => DB.correos.length === 1 && !/no proced/i.test(DB.correos[0].html),
+    () => 'sale UN correo y NO le dice que no procedió · ' + DB.correos.length);
+  af(() => cerr.correo_enviado_at, 'y se sella que el correo salió');
+  // 2º clic: idempotente de verdad, no «parece que sí».
+  const correosAntes = DB.correos.length;
+  r = await adm({ accion: 'cerrar_resuelta', id: U(7101), nota: 'otra vez' });
+  af(() => r.s === 409 && DB.correos.length === correosAntes, () => '2º clic → 409 y CERO correos de más · ' + r.s);
+
+  // La casilla apagada: se respeta y no se sella un envío que no ocurrió.
+  DB.rev.push({ id: U(7102), tipo: 'ligar', estado: 'pendiente', correo: 'yaquedo@x.mx', evento_id: 'alfredito',
+    nombre_dado: 'Ya Quedo Uno', viajero_ids: [], creado_en: ahora });
+  DB.correos = [];
+  r = await adm({ accion: 'cerrar_resuelta', id: U(7102), nota: 'Resuelto por WhatsApp, ya no hace falta correo.', avisar: false });
+  const sinAviso = DB.rev.find((x) => x.id === U(7102)) || {};
+  af(() => r.s === 200 && DB.correos.length === 0 && sinAviso.estado === 'resuelta',
+    () => 'con la casilla apagada cierra y NO manda correo · ' + DB.correos.length);
+  af(() => !sinAviso.correo_enviado_at,
+    'y NO sella `correo_enviado_at`: sellar sin haber mandado deja a alguien marcado como avisado');
+
+  // 🔒 Nada publicado = nada que contarle. Un cero es una afirmación.
+  DB.v.push({ id: U(62), evento_id: 'juniorh', nombre: 'Sin Nada', correo: 'sinnada@x.mx', tipo_paquete: 'PLUS',
+    zona_boleto: 'General', total_contrato: 4000, abonado_previo: 0, boletos: 1, tipo_viajero: 'cliente', portal_revisado_at: null });
+  DB.rev.push({ id: U(7103), tipo: 'ligar', estado: 'pendiente', correo: 'sinnada@x.mx', evento_id: 'juniorh',
+    nombre_dado: 'Sin Nada', viajero_ids: [], creado_en: ahora });
+  DB.correos = [];
+  r = await adm({ accion: 'cerrar_resuelta', id: U(7103), nota: 'Se le explicó por WhatsApp que falta revisar su pago.' });
+  af(() => r.s === 200 && DB.correos.length === 0 && r.j.correo && /ningún viaje publicado/.test(r.j.correo.aviso || ''),
+    () => 'sin nada publicado NO se manda «ya puedes verlo», y la bandeja DICE por qué · ' + JSON.stringify((r.j.correo || {}).aviso));
+  af(() => !DB.escrituras.some((e) => e.startsWith('DELETE')), 'CERO DELETEs en todo el bloque');
+
+  // El botón existe de verdad en la pantalla y llama a la acción real.
+  const kprv = fs.readFileSync(path.join(RAIZ, 'kamehouse-portal-revision.js'), 'utf8');
+  af(() => /_prvResueltaAbrir\('\$\{rev\.id\}'\)/.test(kprv), 'el botón «✓ Ya quedó» está en la tarjeta');
+  af(() => /accion: 'cerrar_resuelta'/.test(kprv), 'y llama a la acción que el servidor despacha');
+  af(() => /id="prv-ok-avisar-\$\{revId\}" checked/.test(kprv), 'la casilla de aviso nace PRENDIDA (palabra de Memo)');
+  const srv = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-portal-revision.js'), 'utf8');
+  af(() => /ACCIONES = \[[^\]]*'cerrar_resuelta'/.test(srv),
+    'la acción está en ACCIONES o el portero la rechaza antes de llegar (la ley de RAD-FIX-CAMINO)');
+
   console.log(`\n${R ? '🔴' : (V ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.error('💥 el arnés se cayó:', e); process.exit(2); });

@@ -258,7 +258,11 @@ function _prvCard(rev) {
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
       ${rev.sin_revisar ? `<button class="rq-btn" onclick="_prvPublicar('${rev.id}')">✓ Publicar las ${rev.sin_revisar} que faltan</button>` : ''}
+      <button class="rq-btn" onclick="_prvResueltaAbrir('${rev.id}')">✓ Ya quedó</button>
       <button class="rq-btn dan" onclick="_prvRechazarAbrir('${rev.id}')">No procede (todo)</button>
+    </div>
+    <div style="font-size:11px;color:var(--ts);margin-top:6px">
+      <b>✓ Ya quedó</b> cierra el pendiente sin decirle que no procedió — para cuando se resolvió por WhatsApp o su viaje ya estaba bien.
     </div>
     <div id="prv-form-${rev.id}"></div>
   </div>`;
@@ -317,6 +321,40 @@ function _prvRechazarAbrir(revId) {
     <textarea id="prv-motivo-${revId}" rows="2" placeholder="Ej.: No encontramos un viaje a tu nombre en ese evento; escríbenos por WhatsApp." style="width:100%;font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"></textarea>
     <div style="margin-top:6px"><button class="rq-btn dan full" onclick="_prvRechazarGo('${revId}')">Enviar «No procede»</button></div>
   </div>`;
+}
+
+// [PRV-EDITA-1a] «✓ Ya quedó»: cierra el pendiente sin mandarle al cliente un
+// «no procedió» que sería falso. La casilla de aviso nace PRENDIDA (palabra de
+// Memo, 28-oct) y se apaga si ya se le habló por WhatsApp.
+function _prvResueltaAbrir(revId) {
+  const box = document.getElementById('prv-form-' + revId);
+  if (!box) return;
+  if (box.dataset.abierto === 'ok') { box.innerHTML = ''; box.dataset.abierto = ''; return; }
+  box.dataset.abierto = 'ok';
+  box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
+    <div style="font-size:12px;color:var(--ts);margin-bottom:6px">Cierra el pendiente. Esta nota es <b>interna</b>: queda en la bitácora, no le llega al cliente.</div>
+    <textarea id="prv-ok-nota-${revId}" rows="2" placeholder="Ej.: Ya se le movió su viaje a Vie+Sáb y se le avisó por WhatsApp." style="width:100%;font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"></textarea>
+    <label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="prv-ok-avisar-${revId}" checked>
+      <span>Avisarle por correo que ya puede ver su viaje en el Portal</span>
+    </label>
+    <div><button class="rq-btn full" onclick="_prvResueltaGo('${revId}')">✓ Ya quedó</button></div>
+  </div>`;
+}
+
+async function _prvResueltaGo(revId) {
+  const nota = ((document.getElementById('prv-ok-nota-' + revId) || {}).value || '').trim();
+  if (nota.length < 3) { showToast('Escribe qué pasó: queda en la bitácora', 'error'); return; }
+  const avisar = !!((document.getElementById('prv-ok-avisar-' + revId) || {}).checked);
+  const j = await _prvCall({ accion: 'cerrar_resuelta', id: revId, nota, avisar });
+  if (!j || !j.ok) { showToast(_prvEsc((j && j.error) || 'No se pudo cerrar'), 'error'); return; }
+  const co = j.correo || {};
+  // Los tres estados se DICEN distinto: cerrada+avisada, cerrada sin avisar a
+  // propósito, y cerrada pero el correo no salió (ahí hay que hablarle a mano).
+  if (!avisar) showToast('Cerrada · sin correo, como pediste', 'success');
+  else if (co.ok) showToast('Cerrada · correo enviado', 'success');
+  else showToast('Cerrada, pero el correo NO salió: ' + _prvEsc(co.aviso || '') + ' — avísale por WhatsApp', 'warning');
+  loadRevisionesPortal();
 }
 
 async function _prvRechazarGo(revId) {

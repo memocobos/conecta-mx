@@ -399,9 +399,22 @@ está caduco antes de escribirse.
   subir foto. Hoy queda PENDIENTE, se enseña, y se sube al guardar el perfil
   (`_avatarSubirBlob`, un dueño). Y el respaldo de decodificación dejó el
   `blob:` (el CSP no lo permite — REQ-FOTO-1) por FileReader→data:.
-  `mide:fecha3-1` **28** (BASE se cae: las funciones no existen); vecinos
+  `mide:fecha3-1` **28→33** (BASE se cae: las funciones no existen); vecinos
   verdes (portal-solo-1 45 · contrato-cliente-2 19 · portal-edit-1 28 ·
   preventa-portal-1 33). ⏳ Push de Memo → la clienta vuelve a intentar.
+  🔴 **PS-EVENTOS-1 (mismo día, segunda clienta con captura): el selector de
+  «¿No ves uno de tus viajes?» se quedaba en «— cargando eventos… —» PARA
+  SIEMPRE.** Medido en los logs de Netlify: `portal-revision` le contestó **200**
+  (02:09 UTC) y aun así su pantalla no cambió — y a las 01:58 llegaron TRES
+  pedidos `eventos` en paralelo de otra cuenta: el panel se pinta varias veces
+  (`renderPlanMigrado` corre en cada `renderTours`). La función guardaba el
+  `<select>` al empezar, lo llenaba al volver (ya fuera del DOM) y prendía una
+  BANDERA «ya cargué» que dejaba mudo al select nuevo. Hoy se guarda la LISTA (no
+  una bandera), se pinta en el select que exista AL VOLVER, el pedido en vuelo se
+  comparte, la falla se DICE y se puede reintentar, y el fetch lleva reloj de
+  15 s. 🔒 **Una bandera de «ya hice X» sobre un nodo que se repinta es una
+  promesa sobre un nodo que ya no existe.** `mide:fecha3-1` **33** (bloque [E],
+  con el repintado a medio vuelo simulado).
 
 - 🎟⏳ **PREVENTA-PORTAL-1 (27-oct-2026, en main local): los de la preventa
   ELIGEN su paquete en el Portal y cae a la bandeja.** Palabra de Memo: «que

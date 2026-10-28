@@ -3301,20 +3301,45 @@ function _psEstadoHtml(j){
   }
   return out;
 }
-let _psEventosOk = false;
-async function _psCargarEventos(){
-  const sel = document.getElementById('ps-evento');
-  if (!sel || _psEventosOk) return;
+// [PS-EVENTOS-1] Reporte real (27-oct, captura de una clienta): el selector se
+// quedaba en «— cargando eventos… —» PARA SIEMPRE. La causa: aquí había una
+// BANDERA (`_psEventosOk`) que decía «ya cargué» — pero el panel se vuelve a
+// pintar (renderPlanMigrado corre más de una vez) y cada repintado crea un
+// <select> NUEVO con «cargando…». Con la bandera arriba, la función se salía sin
+// llenarlo. Lo que se guarda ahora es la LISTA, y se pinta en el select que
+// exista en ese momento; el pedido en curso se comparte (no se piden dos).
+// Y el fetch lleva reloj: un servidor colgado ya no deja el selector mudo.
+let _psEventosLista = null, _psEventosPromesa = null;
+function _psPintarEventos(sel, lista){
+  sel.innerHTML = '<option value="">— elige tu evento —</option>' + lista.map((e) => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.nombre + (e.fecha ? ' · ' + e.fecha : '')) + '</option>').join('');
+}
+async function _psPedirEventos(){
+  const { data: { session } } = await supabase.auth.getSession();
+  const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+  const t = ctl ? setTimeout(() => ctl.abort(), 15000) : null;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
     const r = await fetch('/.netlify/functions/portal-revision', { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((session && session.access_token) || '') },
-      body: JSON.stringify({ accion: 'eventos' }) });
-    const jj = await r.json();
-    if (!jj || !jj.ok) throw new Error((jj && jj.error) || 'sin respuesta');
-    sel.innerHTML = '<option value="">— elige tu evento —</option>' + (jj.eventos || []).map((e) => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.nombre + (e.fecha ? ' · ' + e.fecha : '')) + '</option>').join('');
-    _psEventosOk = true;
-  } catch (e) { sel.innerHTML = '<option value="">No pude cargar los eventos: recarga la página</option>'; }
+      body: JSON.stringify({ accion: 'eventos' }), signal: ctl ? ctl.signal : undefined });
+    const jj = await r.json().catch(() => null);
+    if (!jj || !jj.ok || !Array.isArray(jj.eventos)) throw new Error((jj && jj.error) || 'sin respuesta');
+    return jj.eventos;
+  } finally { if (t) clearTimeout(t); }
+}
+async function _psCargarEventos(){
+  const sel = document.getElementById('ps-evento');
+  if (!sel) return;
+  if (_psEventosLista) { if (sel.options.length <= 1) _psPintarEventos(sel, _psEventosLista); return; }
+  try {
+    if (!_psEventosPromesa) _psEventosPromesa = _psPedirEventos();
+    _psEventosLista = await _psEventosPromesa;
+    const actual = document.getElementById('ps-evento'); // el panel pudo repintarse mientras tanto
+    if (actual) _psPintarEventos(actual, _psEventosLista);
+  } catch (e) {
+    _psEventosPromesa = null; // el siguiente intento vuelve a pedir
+    const actual = document.getElementById('ps-evento');
+    if (actual) actual.innerHTML = '<option value="">No pude cargar los eventos: toca «¿No ves uno de tus viajes?» otra vez o recarga</option>';
+  }
 }
 function _psAbrir(){
   const f = document.getElementById('ps-form'); if (!f) return;

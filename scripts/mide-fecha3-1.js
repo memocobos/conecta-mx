@@ -91,5 +91,50 @@ const dec = rebanar(html, 'async function _avatarToBlob(');
 af(!/createObjectURL/.test(sinComentarios(dec)), '_avatarToBlob ya no arma un blob: (el CSP lo bloquea)');
 af(/readAsDataURL/.test(dec), 'lee por FileReader → data:');
 
+// [E] PS-EVENTOS-1 — el selector «cargando eventos…» que no se llenaba nunca.
+// Medido en los logs de Netlify: el servidor contestó 200 a la clienta (27-oct
+// 02:09 UTC) y aun así su pantalla siguió en «cargando». El panel se repinta
+// mientras el pedido vuela: se llenaba el <select> VIEJO (ya fuera del DOM) y
+// la bandera «ya cargué» dejaba el nuevo mudo para siempre.
+(async () => {
+  console.log('[E] el selector de eventos se llena aunque el panel se repinte');
+  const srcE = 'let _psEventosLista = null, _psEventosPromesa = null;\n'
+    + rebanar(html, 'function _psPintarEventos(') + '\n' + rebanar(html, 'async function _psPedirEventos(') + '\n'
+    + rebanar(html, 'async function _psCargarEventos(');
+  const mkSel = () => ({ innerHTML: '<option value="">— cargando eventos… —</option>', get options() { return { length: (this.innerHTML.match(/<option/g) || []).length }; } });
+  let actual = mkSel();
+  let pedidos = 0, falla = false;
+  const ctxE = {
+    escapeHtml: (s) => String(s), setTimeout, clearTimeout, AbortController,
+    document: { getElementById: (id) => (id === 'ps-evento' ? actual : null) },
+    supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'x' } } }) } },
+    fetch: async () => { pedidos++; await new Promise((r) => setTimeout(r, 30));
+      if (falla) return { json: async () => ({ ok: false, error: 'caído' }) };
+      return { json: async () => ({ ok: true, eventos: [{ id: 'karolg#1', nombre: 'Karol G', fecha: '7 nov' }] }) }; },
+  };
+  vm.createContext(ctxE);
+  vm.runInContext(srcE + '\nthis.F={_psCargarEventos};', ctxE);
+  // Falla primero: dice que no pudo y NO se queda en «cargando».
+  falla = true;
+  await ctxE.F._psCargarEventos();
+  af(/No pude cargar/.test(actual.innerHTML), 'si el servidor falla, el selector LO DICE (no se queda en «cargando»)');
+  // Reintento (ya sano) con repintado A MEDIO VUELO: el select nuevo se llena.
+  falla = false;
+  const p = ctxE.F._psCargarEventos();
+  const viejo = actual; actual = mkSel(); // el panel se repinta mientras vuela el pedido
+  await p;
+  af(/Karol G/.test(actual.innerHTML), 'el select NUEVO (repintado a medio vuelo) se llena con los eventos');
+  af(pedidos === 2, 'tras una falla se vuelve a pedir (2 pedidos, no se queda con la promesa rota)');
+  // Otro repintado después: se llena de la lista guardada, sin pedir otra vez.
+  actual = mkSel();
+  await ctxE.F._psCargarEventos();
+  af(/Karol G/.test(actual.innerHTML) && pedidos === 2, 'un repintado posterior se llena de la lista guardada sin otro pedido');
+  af(!/_psEventosOk/.test(html.replace(/\/\/[^\n]*/g, '')), 'la bandera vieja «_psEventosOk» ya no existe en el código');
+  void viejo;
+  fin();
+})().catch((e) => { mal++; console.log('  ✗ [E] truena: ' + e.message); fin(); });
+
+function fin() {
 console.log('\n' + (mal ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde · ' + mal + ' en rojo');
 process.exit(mal || !ok ? 1 : 0);
+}

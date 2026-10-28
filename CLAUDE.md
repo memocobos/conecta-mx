@@ -332,10 +332,8 @@ está caduco antes de escribirse.
     meses:** una compra cuyo `costo_unitario` no sea `> 0` **queda fuera del
     promedio y fuera de la inversión**, así que el costo del evento sigue en
     «no sé», que es la verdad. Si se hubiera puesto un número inventado, la
-    utilidad mentiría; si no se carga nada, el stock sigue ciego. ⏳ **Pendiente
-    de Memo: el costo real por zona Y confirmar el proveedor** (va a Matriz por
-    ser 256 de 266 compras; con costo 0 no le imputa un peso a nadie, pero al
-    capturar el costo hay que confirmarlo). La nota de cada fila lo dice.
+    utilidad mentiría; si no se carga nada, el stock sigue ciego. ✅ **El costo y
+    el proveedor llegaron el MISMO día** — ver STOCK-CIEGO-1b abajo.
   - 🔴 **TRES COSAS QUE EL PEDIDO DESTAPÓ, nombradas y sin decidir:**
     (a) **Platino del 12-ene está ABIERTA en la ficha y NO viene en el pedido**
     → es la única zona que sigue vendiendo a ciegas en ese evento;
@@ -353,6 +351,38 @@ está caduco antes de escribirse.
     de `admin-requisiciones` **no consultan la disponibilidad** (cero referencias
     medidas) — el candado real vive en el front. Para los 68 gestionados eso es
     defensa en profundidad que falta, no el hueco de hoy. Tuerca propia.
+  - 💰 **STOCK-CIEGO-1b (28-oct, MISMA TARDE): EL COSTO REAL ENTRÓ Y EL
+    PROVEEDOR ES MATRIZ.** Palabra de Memo, citada: *«el provedor es matris lo
+    de doritos y platino bulma y mlk estan resolviendo»*, con la tabla de costos
+    (columna CONECTA) en captura. **14 de 14 filas actualizadas**, `costo_unitario
+    = 0` como **valor esperado en el WHERE** (una fila ya con costo no se pisa) y
+    nota ANEXADA con la fuente y la fecha.
+    - **Costos por zona:** Coke Studio 4,237.50 · Banco Azteca / Megacable / Oro
+      3,590.01 · Cancha VIP 2,936.87 · Barrera 2,545.89 · Butaca 2,284.86 ·
+      Luneta 1,775.46 · Balcón 1,070.56.
+    - 🔒 **SE VERIFICÓ QUE SON COSTOS Y NO PRECIOS ANTES DE ESCRIBIR**, careando
+      cada zona contra la ficha: el CHEAP queda **$1,109.99 – $1,163.13 ARRIBA**
+      del costo y el PLUS **$2,909.99 – $2,963.13**. **Zonas vendiéndose BAJO
+      costo: 0 de 9.** Un número de venta cargado como costo habría dejado el
+      margen en cero y la utilidad mintiendo hacia el verde.
+    - **Careo de salida:** `sin_costo 0` · 161 boletos · **inversión
+      $510,866.29** (#0 11-ene $335,469.94 · #1 12-ene $175,396.35) · abonos a
+      Matriz **$0** · contratado $168,150 · cobrado $10,100.
+    - 🔴🔒 **CONSECUENCIA DE DINERO, DICHA ANTES DE QUE APAREZCA EN EL RESUMEN:**
+      la deuda de boletos a Matriz **sube $510,866.29** y, por UTIL-C
+      (`cobrado − inversión − gastos`), Fuerza Regida **nace en ~−$500,766** y se
+      endereza cobrando. **No es un error de la cuenta: es la forma del negocio**
+      («un evento recién cargado NACE MUY EN ROJO»). Y entra al calendario de caja
+      como liquidación a Matriz **la semana previa al 11-ene-2027** (regla de la
+      casa), o sea **~4-ene-2027**.
+    - 📊 **El pedido completo vale $694,700 a precio CHEAP** (margen $183,833.71)
+      y **$984,500 a PLUS** (margen $473,633.71, del que todavía salen hotel,
+      transporte y kit como gasto aparte). **Punto de equilibrio: ~118 de los 161
+      boletos** a precio CHEAP promedio solo para cubrir el costo; hoy van 28.
+    - 🔒 **Doritos y Platino siguen SIN cargar a propósito** (Bulma y Milk las
+      están resolviendo): cargarlas con un costo que nadie confirmó metería una
+      deuda inventada, y con stock inventado reabriría o cerraría venta por
+      adivinanza.
 
 - 🔥⏳ **NSQK-PREVENTA-1 (26-oct-2026, en main local): nsqkmty entra a la
   PREVENTA A CIEGAS $300 — el circuito de PN27, replicado.** Palabra de Memo,

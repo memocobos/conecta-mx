@@ -70,7 +70,9 @@ const semilla = () => ({ escrituras: [], subidas: [],
     { id: U(13), viajero_id: U(3), estado: 'pendiente', datos: { nombre: 'Otra Persona', evento: 'NSQK' } },
   ] });
 const cargar = (vivo) => {
-  if (vivo) process.env.CONTRATO_CLIENTE_ARNES = '1'; else delete process.env.CONTRATO_CLIENTE_ARNES;
+  // [CONTRATO-ON-1 · 29-oct-2026] El default del lib SIN env es VIVO; la env
+  // CONTRATO_CLIENTE_APAGAR_ARNES solo existe para medir el camino apagado.
+  if (vivo) delete process.env.CONTRATO_CLIENTE_APAGAR_ARNES; else process.env.CONTRATO_CLIENTE_APAGAR_ARNES = '1';
   for (const k of Object.keys(require.cache)) if (k.includes('/netlify/functions/')) delete require.cache[k];
   return require(path.join(RAIZ, 'netlify/functions/portal-contrato.js')).handler;
 };

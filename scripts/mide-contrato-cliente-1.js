@@ -76,20 +76,34 @@ const L = () => { for (const k of Object.keys(require.cache)) if (k.includes('/n
 const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
 
 (async () => {
-  console.log('══ mide:contrato-cliente-1 ══\n[I] el interruptor APAGADO (CONTRATO-CLIENTE-1b)');
+  // [CONTRATO-ON-1 · 29-oct-2026] El interruptor se ENCENDIÓ por palabra de Memo
+  // («Sí, enciéndelo ya») y el default SIN variable es VIVO (la forma de
+  // CORREOS_MODO). Este bloque ya no mide «el estado de producción apagado»:
+  // mide que el CAMINO apagado sigue siendo seguro — la env
+  // CONTRATO_CLIENTE_APAGAR_ARNES existe SOLO para esto; producción no la define.
+  console.log('══ mide:contrato-cliente-1 ══\n[I] el camino APAGADO sigue siendo seguro (env solo del arnés)');
   {
-    delete process.env.CONTRATO_CLIENTE_ARNES;
+    process.env.CONTRATO_CLIENTE_APAGAR_ARNES = '1';
     DB = semilla(); RESEND = []; const l0 = L();
     const r0 = await l0.emitirContratos(Object.assign({ viajeroIds: [U(1), U(2), U(3)] }, KH));
     af(r0.apagado === true && DB.c.length === 0 && RESEND.length === 0, 'apagado: no nace NINGÚN contrato ni sale correo');
     // ⚰️ La firma pública (contrato-cliente.js) se RETIRÓ en CONTRATO-CLIENTE-2:
     // se firma en el Portal; su careo vive en mide:contrato-cliente-2.
     af(!fs.existsSync(path.join(RAIZ, 'netlify/functions/contrato-cliente.js')) && !fs.existsSync(path.join(RAIZ, 'contrato-cliente.html')), 'la firma pública por token ya no existe (se firma en el Portal)');
+    // [CONTRATO-ON-1] El espejo de la pantalla está ENCENDIDO (antes exigía false)
+    // y el default del lib SIN env es VIVO — los dos renglones del encendido, careados.
     const kh = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
-    af(/const KH_CONTRATO_CLIENTE_VIVO = false;/.test(kh), 'la pantalla también lo esconde (espejo apagado)');
+    af(/const KH_CONTRATO_CLIENTE_VIVO = true;/.test(kh), 'la pantalla también lo enseña (espejo ENCENDIDO)');
+    const libSrc = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/contrato-cliente.js'), 'utf8');
+    af(/const CONTRATO_CLIENTE_VIVO = process\.env\.CONTRATO_CLIENTE_APAGAR_ARNES === '1' \? false : true;/.test(libSrc), 'el default del lib SIN variable es VIVO (la forma de CORREOS_MODO)');
+    // Y el default se mide por el HECHO, no solo por el grep: sin env, emite.
+    delete process.env.CONTRATO_CLIENTE_APAGAR_ARNES;
+    DB = semilla(); RESEND = []; const l1 = L();
+    const r1 = await l1.emitirContratos(Object.assign({ viajeroIds: [U(1)] }, KH));
+    af(r1.apagado !== true && DB.c.length === 1, 'sin la env (como producción): el contrato NACE — el default es VIVO');
   }
-  process.env.CONTRATO_CLIENTE_ARNES = '1';
-  console.log('\n[T] el texto (de aquí en adelante, camino ENCENDIDO solo para el arnés)');
+  delete process.env.CONTRATO_CLIENTE_APAGAR_ARNES;
+  console.log('\n[T] el texto (de aquí en adelante, camino ENCENDIDO — el default)');
   let lib = L();
   const base = { nombre: 'Ana', paquete: 'plus', paquete_txt: 'PLUS', incluye: ['Boleto'], con_transporte: true, total: 5500, pagado: 300, saldo: 5200, evento: 'NSQK', folio: 'X' };
   const txt = (d) => lib.clausulas(d).map((c) => c.t + ' ' + c.items.join(' ')).join(' ');

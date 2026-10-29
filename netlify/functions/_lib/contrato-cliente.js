@@ -30,15 +30,19 @@
 
 const crypto = require('crypto');
 
-// 🔒 [CONTRATO-CLIENTE-1b] INTERRUPTOR — APAGADO (27-oct-2026). Palabra de
-// Memo: con un selector «¿quién firma?» cualquiera dice «soy su mamá» y nos
-// falsifican. La firma se muda al PORTAL: edad del perfil (fecha de nacimiento
-// obligatoria) decide titular vs tutor, con INE obligatoria. Mientras eso no
-// exista, NO nace ni sale ningún contrato. Medido al apagar: 0 filas en
-// contratos_cliente (ninguno salió).
-// ⚠️ La variable CONTRATO_CLIENTE_ARNES existe SOLO para que el careo mida el
-// camino encendido; producción jamás la define (verlo en Netlify si hay duda).
-const CONTRATO_CLIENTE_VIVO = process.env.CONTRATO_CLIENTE_ARNES === '1';
+// 🔒 [CONTRATO-ON-1 · 29-oct-2026] INTERRUPTOR — ENCENDIDO, palabra de Memo
+// («Sí, enciéndelo ya», con la medición enfrente: 1 contrato firmado — su
+// prueba punta a punta del 27-oct — y el circuito del Portal careado). Desde
+// aquí: aprobar requisición, alta manual y «elegir paquete» emiten el contrato
+// y el cliente firma en su Portal con INE. **El default SIN variable es VIVO**
+// (la forma de CORREOS_MODO): olvidar una env en Netlify no puede apagar el
+// contrato en silencio.
+// ⚠️ La variable CONTRATO_CLIENTE_APAGAR_ARNES existe SOLO para que el careo
+// mida el camino APAGADO; producción jamás la define.
+// ⚰️ Lo que decía aquí antes (CONTRATO-CLIENTE-1b, «APAGADO mientras la firma
+// se muda al Portal») quedó CUMPLIDO, no revertido: la firma YA vive en el
+// Portal (CONTRATO-CLIENTE-2) y por eso se pudo encender.
+const CONTRATO_CLIENTE_VIVO = process.env.CONTRATO_CLIENTE_APAGAR_ARNES === '1' ? false : true;
 // 🔒 [CTR-PRUEBA-1 · 27-oct-2026] MODO PRUEBA: con el contrato APAGADO, vive
 // SOLO para estos correos — la prueba en producción que pidió Memo («haz la
 // prueba tú mismo») sin que nazca ni salga nada a un cliente. Un correo de

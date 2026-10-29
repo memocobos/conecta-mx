@@ -188,6 +188,45 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📜🔥⏳ **CONTRATO-ON-1 (29-oct-2026, en main local): EL CONTRATO DEL CLIENTE
+  SE ENCENDIÓ — para TODOS los eventos, por los tres caminos.** Palabra de Memo,
+  citada: *«Sí, enciéndelo ya»*, con la medición enfrente (1 contrato firmado —
+  su propia prueba punta a punta del 27-oct — y el circuito del Portal careado).
+  Desde el push: **aprobar requisición, alta manual y «elegir paquete» EMITEN el
+  contrato** y el cliente lo firma en su Portal con INE (CONTRATO-CLIENTE-2).
+  - **Los DOS renglones del encendido + la casilla**, como CONTRATO-CLIENTE-2
+    dejó dicho: `CONTRATO_CLIENTE_VIVO` en el lib · `KH_CONTRATO_CLIENTE_VIVO =
+    true` en kamehouse.js · la casilla `mig-contrato` del alta manual DESTAPADA
+    (sigue prendida-ANUNCIADA, DEFAULTS-1 caso b, y se puede apagar por captura).
+  - 🔒 **El default SIN variable es VIVO** (la forma de CORREOS_MODO): el lib
+    quedó `process.env.CONTRATO_CLIENTE_APAGAR_ARNES === '1' ? false : true` —
+    olvidar una env en Netlify **no puede apagar el contrato en silencio**. La
+    env existe SOLO para que el careo mida el camino apagado; producción jamás
+    la define. ⚰️ La env vieja `CONTRATO_CLIENTE_ARNES` (que PRENDÍA) murió con
+    sus 4 lectores: 0 referencias en el repo.
+  - 🔒 **El careo mide el default por el HECHO, no solo por grep**: sin env, el
+    contrato NACE (bloque [I] nuevo de `mide:contrato-cliente-1`); y el camino
+    apagado sigue careado vía la env del arnés (apagado: 0 contratos, 0 correos).
+    **Sabotaje mordido** (default a false, sha1 careado antes/después → 8 rojos
+    con nombre, restaurado byte a byte `ec2a4064`). ⚠️ Y una mordida del
+    sabotaje que vale el renglón: `git checkout --` sobre un archivo CON edits
+    sin commitear restaura el COMMIT, no tu edit — el encendido se rehízo.
+  - `mide:contrato-cliente-1` **29 → 31** · contrato-cliente-2 **19** ·
+    ctr-recuerda-1 **49** (los tres con la env invertida). Vecinos verdes:
+    capsule-ux-1 67 · preventa-portal-1 33 · confirma-1 28 · preventa-elegir-1
+    14 · req-b1 52 · portal-solo-1 89 · plan-pagos-1 81 · portal-vivo-1 36.
+  - ⚠️ **Lo que el encendido NO prende, dicho:** el cron de recordatorios
+    (`RECORDATORIO_AUTO_VIVO=false`) sigue APAGADO a propósito — es palanca
+    aparte y su cadencia (cada 3 días, tope 5) pide firma de Memo al encenderla;
+    mientras, el botón «📨 Recordar» de la pestaña Clientes es el camino manual.
+    Y los clientes EXISTENTES no reciben contrato retroactivo solo: el botón
+    «📜 Contrato» por viajero y «Recordar a los N» por evento son esa puerta.
+  - ⚠️ `CONTRATO_PRUEBA_CORREOS` / `KH_CONTRATO_PRUEBA_CORREOS` quedan SIN
+    tocar: con el interruptor vivo dejan de importar (contratoVivoPara contesta
+    true antes de mirarlas) y son la red si algún día se vuelve a apagar.
+  - ⏳ Push de Memo → el primer contrato real sale solo con la siguiente
+    aprobación/alta/elección de paquete.
+
 - 💬⏳ **CAPSULE-WA-1 (29-oct-2026, en main local): el celular de la lista de
   viajeros es LINK de WhatsApp.** Palabra de Memo: *«hay algunos clientes que
   tengo que hablarles para cambios — dame link a sus celular para poder

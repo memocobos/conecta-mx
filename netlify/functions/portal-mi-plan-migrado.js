@@ -173,8 +173,47 @@ exports.handler = async (event) => {
     const { gruposDe } = require('./_lib/grupo-whatsapp');
     const linksWA = await gruposDe(viajeros.map((v) => v.evento_id), { KH_URL, KH_KEY });
 
+    // ═══ [PLAN-PAGOS-1b] EL CALENDARIO DE PAGOS ════════════════════════════
+    // Palabra de Memo (28-oct): «el cliente debe de poder ver su rol de pagos
+    // basado en la fórmula que siempre hemos tenido… y ver cuánto falta».
+    //
+    // 🔒 La fórmula NO se re-escribe aquí: se le pide a `_lib/plan-pagos`, el
+    // dueño. Una cuarta copia de «cuándo te toca pagar» sería la cuarta lista
+    // que todavía no diverge — y ésta la leería el cliente.
+    //
+    // 🔒 Y EL CALENDARIO VA HACIA ADELANTE, por lo que dice el dato y no por
+    // comodidad: el `creado_en` de los migrados es la fecha de la MIGRACIÓN, su
+    // primer abono es la fecha de la primera COSECHA, y 1,049 de 1,632 filas con
+    // correo no tienen un solo abono con fecha. El pasado de su plan no existe
+    // en ninguna columna; dibujarlo sería inventar fechas sobre dinero. Lo que
+    // sí es verdad —cuánto lleva abonado, y sus abonos cuando los hay con su
+    // fecha— ya viaja abajo.
+    //
+    // ⚠️ SIN CATÁLOGO NO SE INVENTA NINGUNO. `fetchEventosRaw` es best-effort y
+    // devuelve null si el index no se pudo leer: entonces el plan viaja en null
+    // CON su motivo, y el Portal dice que no se pudo armar. Un calendario vacío
+    // se leería como «ya no tienes pagos», que es justo lo contrario.
+    const PP = require('./_lib/plan-pagos');
+    let evRaw = null, planError = null;
+    try { evRaw = await require('./_lib/catalogo-index').fetchEventosRaw(); }
+    catch (e) { planError = e.message; }
+    if (!evRaw) planError = planError || 'no se pudo leer el catálogo';
+    const evPorSlug = {};
+    (Array.isArray(evRaw) ? evRaw : []).forEach((e) => { if (e && e.id) evPorSlug[String(e.id)] = e; });
+    const ahora = new Date();
+
     const tours = viajeros.map((v) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
+      const evCat = evPorSlug[String(v.evento_id).split('#')[0]] || null;
+      const dsEv = evCat ? PP.dsDeEvento(evCat, v.evento_id) : null;
+      const plan = evRaw ? PP.planDelViaje({
+        total: s ? s.total : null,
+        abonado: s ? s.abonado : 0,
+        ds: dsEv,
+        paquete: v.tipo_paquete,
+        diasAntes: evCat ? evCat.diasAntes : null,
+        ahora,
+      }) : null;
       return {
         // [PORTAL-EDIT-1] el id y los datos EDITABLES viajan para que el cliente
         // los complete/corrija (portal-viajero vuelve a comprobar que son suyos).
@@ -197,12 +236,28 @@ exports.handler = async (event) => {
         total: s ? s.total : null,
         abonado: s ? s.abonado : null,
         resta: s ? s.resta : null,
+        // 🔒 Lo abonado ANTES de que existiera un abono con fecha. Viaja aparte y
+        // no se deriva en el navegador: sin este número, el historial de abonos
+        // contradice al «Abonado» de arriba (de 1,632 filas con correo, 1,049 no
+        // tienen un solo abono con fecha — su dinero entero vive aquí) y el
+        // cliente ve $5,200 abonados con $1,200 en la lista. Un hueco callado.
+        abonado_previo: Number(v.abonado_previo) || 0,
         sin_plan: !s,
-        abonos: (porViajero[v.id] || []).map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null })),
+        // [PLAN-PAGOS-1b] El calendario de lo que le FALTA. `null` = no se pudo
+        // armar (catálogo ilegible), que no es lo mismo que «sin cuotas».
+        plan,
+        // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
+        evento_ds: dsEv,
+        // 🔒 Los abonos van ORDENADOS por fecha y con su fecha tal cual está. Los
+        // de la cosecha traen la fecha del careo, no la del pago: el Portal lo
+        // dice con palabras en vez de presentarlas como fecha de pago.
+        abonos: (porViajero[v.id] || [])
+          .map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null }))
+          .sort((x, y) => String(x.fecha || '').localeCompare(String(y.fecha || ''))),
       };
     });
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours, en_revision, solicitudes, revision_error: revisionError, fuente: 'kamehouse/viajeros_evento' }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours, en_revision, solicitudes, revision_error: revisionError, plan_error: planError, fuente: 'kamehouse/viajeros_evento' }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error leyendo tu plan', detail: e.message }) };
   }

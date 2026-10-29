@@ -3235,7 +3235,7 @@ async function renderPlanMigrado(){
         + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
+        + cuenta + _migPagosHtml(t) + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3382,6 +3382,124 @@ function _migFaltantes(t){
 // (el titular ve las tarjetas de sus acompañantes del mismo viaje). Solo un
 // link de chat.whatsapp.com — cualquier otra cosa no se pinta.
 let _migGrupoVisto = new Set();
+// ── [PLAN-PAGOS-1c] EL ROL DE PAGOS DEL CLIENTE, EN SU TARJETA ─────────────
+// Palabra de Memo (28-oct): «el cliente debe de poder ver su rol de pagos basado
+// en la fórmula que siempre hemos tenido, y que se vayan marcando cada pago que
+// vaya realizando y pueda ver cuánto falta… todo desde cada card del evento».
+//
+// 🔒 EL CALENDARIO LO ARMA EL SERVIDOR (`_lib/plan-pagos`, el dueño). Aquí NO se
+// calcula una fecha ni un monto: se pinta `t.plan` tal como llega. Repetir la
+// fórmula de las quincenas en el navegador sería la quinta copia — y la primera
+// que el cliente lee.
+//
+// 🔒 Y EL PASADO NO SE DIBUJA. El `creado_en` de los migrados es el día de la
+// migración y su primer abono es el día de la cosecha del careo, así que un
+// calendario «desde tu separo» pondría fechas inventadas sobre dinero. Lo que se
+// pinta del pasado es lo único cierto: cuánto lleva abonado, y sus abonos con la
+// fecha en que se REGISTRARON (nunca rotulada como «fecha de pago»).
+//
+// Los seis estados del plan se dicen por su nombre: un «no hay cuotas» que tape
+// «no sabemos tu total» o «no se pudo leer el catálogo» es el cero falso de
+// siempre, aquí sobre el dinero de alguien.
+function _migPagosHtml(t){
+  if (!t || t.sin_plan) return '';
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-MX');
+  const caja = (html) => '<div style="margin:14px 0 2px;padding:14px;border:1px solid rgba(255,255,255,.14);border-radius:12px">'
+    + '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:10px">Tu plan de pagos</div>'
+    + html + '</div>';
+
+  const p = t.plan;
+  // `null` = no se pudo armar (catálogo ilegible). NO es «no tienes pagos».
+  if (!p) return caja('<div style="font-size:13px;opacity:.8">No pudimos armar tu calendario en este momento. Vuelve a entrar en un rato — tus pagos y tu saldo de arriba sí están al día.</div>');
+
+  // ── La barra: avance real sobre el total. Se pinta UNA vez por render (no
+  // anima por frame), así que `width` aquí es el precedente ya sellado de las
+  // tres barras con radio — no la regla de transform/opacity.
+  const total = Number(t.total) || 0;
+  const abon = Number(t.abonado) || 0;
+  const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((abon / total) * 100))) : 0;
+  const barra = total > 0
+    ? '<div style="margin-bottom:12px">'
+      + '<div style="height:9px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden">'
+      + '<div style="height:100%;width:' + pct + '%;border-radius:99px;background:linear-gradient(90deg,#88ea4e,#e8ff4c)"></div></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:12px;opacity:.78;margin-top:6px">'
+      + '<span>' + money(abon) + ' de ' + money(total) + '</span><span><b>' + pct + '%</b></span></div></div>'
+    : '';
+
+  // ── El historial: lo único cierto del pasado.
+  const abonos = Array.isArray(t.abonos) ? t.abonos : [];
+  const previo = Number(t.abonado_previo) || 0;
+  let hist = '';
+  if (abonos.length || previo > 0) {
+    const fmtF = (f) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || ''));
+      if (!m) return '';
+      const MM = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      return ' · registrado el ' + Number(m[3]) + ' ' + (MM[Number(m[2]) - 1] || '');
+    };
+    let filas = '';
+    // 🔒 Lo que no tiene fecha se DICE sin fecha, no se le inventa una. Si se
+    // omitiera, el historial sumaría menos que el «Abonado» de la barra.
+    if (previo > 0) {
+      filas += '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px">'
+        + '<span style="opacity:.8">Pagos anteriores</span><span><b>' + money(previo) + '</b></span></div>';
+    }
+    abonos.forEach((a) => {
+      filas += '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px">'
+        + '<span style="opacity:.8">Abono' + escapeHtml(fmtF(a.fecha)) + '</span><span><b>' + money(a.monto) + '</b></span></div>';
+    });
+    hist = '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;opacity:.85">Tus pagos registrados ('
+      + (abonos.length + (previo > 0 ? 1 : 0)) + ')</summary>'
+      + '<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,.1);padding-top:6px">' + filas + '</div></details>';
+  }
+
+  // ── Cómo pago: la MISMA regla de banco del sitio (cheap → Banamex).
+  const anc = String(t.paquete || '').trim().toLowerCase() === 'cheap' ? '#heybanco' : '#bbva';
+  const comoPago = '<a href="pagos.html' + anc + '" style="display:inline-block;margin-top:12px;font-size:13px;color:#e8ff4c;text-decoration:none">¿Cómo pago? Ver datos de la cuenta →</a>';
+  const mandaComp = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Cuando pagues, mándanos tu comprobante por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a> y aquí se te registra.</div>';
+
+  if (p.estado === 'liquidado') {
+    return caja(barra + '<div style="font-size:14px;font-weight:800;color:#88ea4e">✓ ¡Ya está liquidado!</div>'
+      + '<div style="font-size:13px;opacity:.8;margin-top:4px">No te falta ningún pago. Nos vemos en el viaje.</div>' + hist);
+  }
+  if (p.estado === 'sin_total') {
+    return caja('<div style="font-size:13px;opacity:.85">Todavía no tenemos cargado el total de tu viaje, así que no podemos armarte el calendario.</div>' + mandaComp + hist);
+  }
+  if (p.estado === 'sin_fecha') {
+    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. En cuanto confirmemos la fecha del evento, aquí aparece tu calendario de pagos.</div>' + comoPago + mandaComp + hist);
+  }
+  if (p.estado === 'evento_pasado') {
+    return caja(barra + '<div style="font-size:13px;opacity:.85">Este viaje ya pasó'
+      + (Number(p.resta) > 0 ? '. Quedó un saldo de <b>' + money(p.resta) + '</b>: escríbenos por WhatsApp para cerrarlo.' : '.') + '</div>' + hist);
+  }
+
+  // 'calendario' y 'liquidar' comparten la forma: cuotas con su ventana.
+  const cuotas = Array.isArray(p.cuotas) ? p.cuotas : [];
+  const prox = p.proxima;
+  const destacado = prox
+    ? '<div style="margin:2px 0 12px;padding:11px 13px;border-radius:10px;background:rgba(232,255,76,.1);border:1px solid rgba(232,255,76,.4)">'
+      + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.75">Tu próximo pago</div>'
+      + '<div style="font-size:19px;font-weight:900;margin-top:2px">' + money(prox.monto)
+      + ' <span style="font-size:13px;font-weight:600;opacity:.8">· ' + escapeHtml(prox.lbl) + '</span></div></div>'
+    : '';
+  let lista = '';
+  cuotas.forEach((c) => {
+    lista += '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px">'
+      + '<span style="opacity:.85">Pago ' + c.n + ' <span style="opacity:.7">· ' + escapeHtml(c.lbl) + '</span></span>'
+      + '<span><b>' + money(c.monto) + '</b></span></div>';
+  });
+  const nota = p.estado === 'liquidar'
+    ? '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Ya no alcanzan más quincenas antes del viaje: este saldo se liquida antes de la fecha del evento.</div>'
+    : '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Las fechas son las quincenas de siempre (del 9 al 16 y del 24 al 1). Si abonas de más, los siguientes pagos bajan solos.</div>';
+
+  return caja(barra + destacado
+    // El encabezado ATA el número de arriba con la lista de abajo: sin él, el
+    // «Te falta $5,500» de la tarjeta y una lista de cuotas sueltas se leen como
+    // dos datos distintos en vez de uno repartido.
+    + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;margin-bottom:2px">Te faltan ' + money(p.resta) + ' en ' + cuotas.length + (cuotas.length === 1 ? ' pago' : ' pagos') + '</div>'
+    + lista + nota + comoPago + mandaComp + hist);
+}
+
 function _migGrupoHtml(t){
   const l = String(t.grupo_whatsapp || '');
   if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/.test(l)) return '';

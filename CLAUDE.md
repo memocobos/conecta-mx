@@ -188,6 +188,81 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳⏳ **PLAN-PAGOS-1 (28-oct-2026, en main local): EL CLIENTE VE SU ROL DE PAGOS
+  EN EL PORTAL — y la fórmula de las quincenas gana UN DUEÑO.** Palabra de Memo,
+  citada: *«el cliente debe de poder ver su rol de pagos basado en la fórmula que
+  siempre hemos tenido, y que se vayan marcando cada pago que vaya realizando y
+  pueda ver cuánto falta … que pueda hacer todo desde cada card del evento»*.
+  Alcance firmado por él: **«Fase 1: que lo vea»** — el comprobante sigue yendo
+  por WhatsApp; subirlo desde el Portal es Fase 2 y NO se coló.
+  - 🔴🔒 **LA PREMISA NO SOBREVIVIÓ A LA MEDICIÓN, y eso cambió la forma de lo
+    construido.** El pedido natural era «armemos el calendario desde que apartó y
+    marquemos lo ya pagado». **No se puede, y no es opinión:**
+    · el `creado_en` de los migrados es **28-ago-2026 para TODOS** — la fecha de
+      la MIGRACIÓN, no la de su separo;
+    · su primer abono es del **20-sep-2026** — la fecha de la primera COSECHA del
+      careo, no la de su pago;
+    · y **1,049 de 1,632 filas con correo no tienen UN SOLO abono con fecha**: su
+      dinero entero vive en `abonado_previo`, que no tiene columna de fecha.
+    O sea que para **dos de cada tres clientes el pasado de su plan NO EXISTE en
+    ninguna columna**. Un calendario «desde tu separo» habría sido una fecha
+    inventada sobre dinero — el pecado que esta casa lleva meses nombrando.
+  - 🔒 **POR ESO EL PLAN VA HACIA ADELANTE:** las quincenas que QUEDAN entre hoy y
+    el evento, con la `resta` repartida. El pasado se cuenta con lo que sí es
+    verdad —cuánto lleva abonado y, cuando los hay, sus abonos— y **los abonos se
+    rotulan «registrado el», jamás «pagado el»**: su fecha es la de captura.
+    ⚠️ Y **`abonado_previo` VIAJA aparte**: sin él el historial sumaría menos que
+    la barra y el cliente vería dos verdades distintas de su propio dinero.
+  - ✅ **Y la fórmula HACE SOLA lo correcto con `from = hoy`**: su `cutoff`
+    (from + 5 días) deja fuera las ventanas pasadas y la que arranca pasado
+    mañana. **No hubo que tocarle una línea** para que sirviera a este lector.
+  - **`_lib/plan-pagos` es el dueño** (`quincenasEntre` · `hoyReynosa` ·
+    `dsDeEvento` · `planDelViaje`). Es la copia de **rol.html, que es el canon
+    declarado** (lo dice el propio comentario de index.html: «EL CANON ES LA FIRMA
+    DE rol.html»), con la lógica intacta y el reloj **inyectable**.
+    ⚠️ **Las TRES copias del navegador siguen vivas y NO se tocan** (index.html,
+    rol.html y kamehouse.js son páginas sin bundler: no pueden `require`). Lo que
+    esto compra es que **el CUARTO lector no estrene una cuarta copia** — y el
+    careo las carea: medido, sus BYTES difieren (sha1 `1656f00d` / `bc2434c6` /
+    `37285878`) y su SALIDA coincide en **784 casos de 784**. Tres listas que
+    todavía no divergen, con alguien mirando.
+  - 🔒 **«Hoy» es el día de REYNOSA, no el de Greenwich.** Netlify corre en UTC:
+    a las 7 de la noche de acá allá ya es mañana y el calendario se corría un
+    día. `hoyReynosa` deriva el día en `America/Matamoros` y construye a MEDIODÍA
+    (ningún corrimiento de huso cruza la medianoche). El careo lo mide con el
+    instante real: 02:00 UTC del 29-oct → **28** en Reynosa, y deja el control de
+    que `toISOString()` de ESE MISMO instante dice 29.
+  - 🔒 **SEIS estados, cada uno por su nombre** — aplastarlos en «no hay cuotas»
+    sería el cero falso sobre el dinero de alguien: `sin_total` (≠ «no debes
+    nada») · `liquidado` · `sin_fecha` · `evento_pasado` · `liquidar` (ya no caben
+    quincenas: se paga antes del evento, la fila `liq` de rol.html) · `calendario`.
+    Y **`plan: null` cuando el catálogo no se pudo leer**, con su motivo: un
+    calendario vacío se leería como «ya no tienes pagos».
+  - 🔒 **Un `#N` que la ficha no tiene devuelve null, NO el `ds` del evento**:
+    enseñarle el calendario de otra fecha es peor que no enseñarle ninguno.
+  - **La tarjeta del Portal** (`_migPagosHtml`, bajo el renglón de Total/Abonado/
+    Te falta): barra de avance · **Tu próximo pago** destacado · «Te faltan $X en
+    N pagos» + las cuotas numeradas con su ventana · **¿Cómo pago?** a
+    `pagos.html` por la MISMA regla de banco del sitio (CHEAP → Banamex) · el
+    WhatsApp para el comprobante · y el historial plegable.
+    🔒 **La pantalla NO calcula una fecha ni un monto**: pinta lo que el servidor
+    manda, y el careo lo AFIRMA (cero quincenas armadas en el navegador).
+  - `mide:plan-pagos-1` **67** (sin ancla — árbol). Entra por el **handler REAL**
+    y por la **pantalla REAL rebanada de portal.html**; la paridad trae **control
+    positivo por construcción** (una lib saboteada rompe las 496 comparaciones con
+    cuotas: si no se pusiera roja, el careo no estaría comparando) y **candado de
+    cardinalidad** (496 de 784 casos devuelven cuotas, o el «0 diferencias» sería
+    el acuerdo de cuatro funciones sobre el conjunto vacío). Vecinos verdes:
+    portal-solo-1 89 · portal-edit-1 28 · preventa-portal-1 33 ·
+    contrato-cliente-2 19 · acomp-2 43 · req-b1 52 · confirma-1 28 ·
+    plan-case-1 18 · rechazo-1 60 · fecha3-1 33.
+  - ⚠️ **Hoy lo ven POCOS, y es por diseño:** de 1,632 filas con correo solo **87
+    están revisadas**, y PORTAL-SOLO-1 manda que sin sello no viaja nada. El plan
+    llega a cada quien conforme Bulma/Milk publican su viaje.
+  - ⏳ **Push de Memo** → prueba con su cuenta en el Portal. **Fase 2** (subir el
+    comprobante desde el Portal + su bandeja de revisión) queda nombrada y sin
+    empezar, por su palabra.
+
 - ✅ **PRV-EDITA-1a (28-oct-2026, en main local): «✓ YA QUEDÓ» — la bandeja ya
   se puede cerrar sin mentirle al cliente.** Palabra de Memo, citada: *«esa
   notificación no se quita nunca de requisiciones, siempre aparece»*.

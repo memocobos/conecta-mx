@@ -116,6 +116,7 @@
     "mide:fecha3-1": "node scripts/mide-fecha3-1.js",
     "mide:ctr-recuerda-1": "node scripts/mide-ctr-recuerda-1.js",
     "mide:rechazo-1": "node scripts/mide-rechazo-1.js",
-    "mide:chatarra-regla-1": "node scripts/mide-chatarra-regla-1.js"
+    "mide:chatarra-regla-1": "node scripts/mide-chatarra-regla-1.js",
+    "mide:plan-pagos-1": "node scripts/mide-plan-pagos-1.js"
   }
 }

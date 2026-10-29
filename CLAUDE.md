@@ -188,9 +188,70 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎸⏳ **FR-VENTA-1 (30-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
+  de Memo): EL 15 Y 16 DE FUERZA REGIDA SALEN A LA VENTA con su pedido cargado
+  y lo no mencionado agotado.** Palabra de Memo, citada: *«carga el pedido de
+  15 y 16 agota las zonas que no mencione y salgamos a venta — 15 de enero: 30
+  oro, 10 cancha vip, 4 butaca, 4 Luneta · 16 de enero: 30 Oro, 10 Cancha Vip,
+  8 butaca · todo lo demas agotado en esas fechas y salgamos a venta»*. Supera
+  el «15/16 en PRÓXIMAMENTE» de FR-PROX-1 (ayer) por palabra nueva — el
+  MECANISMO prox de esa tuerca sigue vivo para cualquier fecha futura; lo que
+  murió es el dato de estas dos. Acta `migraciones/FR-VENTA-1.sql` (registro:
+  los dos bloques YA CORRIERON; re-correrla escribe cero filas).
+  - **La ficha** (UPDATE con md5 pre-tuerca `8e4238da…` como valor esperado →
+    1 fila; md5 nuevo **`215174cf…`**): #2 (15-ene) y #3 (16-ene) pierden el
+    prox de la ENTRADA y de sus 60 zonas; quedan abiertas EXACTAS las del
+    pedido — **#2: Oro · Cancha VIP · Butaca · Luneta · #3: Oro · Cancha VIP ·
+    Butaca** — y las otras 11/12 de cada lista (zonas Y cheapZonas) van
+    `ag:1` a mano. #0/#1 intactos (careados byte a byte por resumen).
+  - **El pedido** (7 compras nuevas, `WHERE NOT EXISTS` sobre #2/#3):
+    `fuerzaregida#2` Oro 30 · Cancha VIP 10 · Butaca 4 · Luneta 4 ·
+    `fuerzaregida#3` Oro 30 · Cancha VIP 10 · Butaca 8 = **96 boletos**.
+    Proveedor **Matriz**. 🔒 **`costo_unitario=0` A PROPÓSITO (MER-1)**: nadie
+    confirmó el costo del 15/16 — en $0 queda fuera del promedio y de la
+    inversión, y la deuda a Matriz NO sube un peso hasta la palabra de Memo
+    (patrón STOCK-CIEGO-1b: al confirmar se escribe con `WHERE
+    costo_unitario=0`). Si cuesta como el 11/12 (Oro 3,590.01 · CanchaVIP
+    2,936.87 · Butaca 2,284.86 · Luneta 1,775.46), serían **~$276,961** más de
+    deuda.
+  - 🔒 **Simetría pedido↔ficha careada 7/7**: toda zona abierta de #2/#3 tiene
+    pedido exacto y viceversa — las dos fechas nacen GESTIONADAS (no ciegas
+    como los 60 de STOCK-CIEGO), con 0 viajeros: el candado automático las
+    cierra solo al venderse. Al publicar, **Butaca #2 (4) y Luneta #2 (4)
+    pintan chip «¡Últimos 4!» de inmediato** (restante ≤5); Butaca #3 (8) no,
+    por diseño.
+  - ✅ **Verificado por el DUEÑO (35 verdes, 0 rojos):** compilarEV real con la
+    ficha fresca + index del árbol (125 eventos, ambos parsers OK, MEDIA-GUARD
+    callado) → #2/#3 emiten sus abiertas exactas sin prox, con las 15 zonas
+    (agotadas, no borradas) · `f` sigue «11, 12, 15 y 16 ene 2027» · las
+    GLOBALES derivadas (ESF-UX-2c) hacen lo correcto solas: **Oro y Butaca
+    globales ABREN** (antes agotadas — la tarjeta deja de negar lo que hay) y
+    **Platino pasa de PRÓXIMAMENTE a AGOTADA** (ag en las 4) · `_calcularPrecio`
+    cotiza #2 Oro PLUS $6,500 / Luneta CHEAP $2,900 / #3 Butaca PLUS $5,200,
+    los 4 con separo $300, y RECHAZA por SU motivo («zona agotada») Platino #2,
+    Luneta #3, Coke Studio #2 y Doritos #3; #0/#1 cotizan igual (regresión).
+  - ⚠️ **Tres mordidas del instrumento, dichas:** (a) transcribir la ficha a
+    mano al sandbox dejó 2 campos infieles y **el candado de md5 lo cazó antes
+    de medir nada** — se localizó por resumen semántico campo a campo (eran
+    los 2 ag post-publish ajenos que FR-FECHAS-1 ya nombraba, con las fechas
+    INVERTIDAS a como el acta las recordaba: Balcón cheap **#0** y Megacable
+    cheap **#1** — el dato manda); (b) `_calcularPrecio` pide `num_personas`,
+    no `viajeros` — con la firma mala TODO rechazaba y mis «rechaza la
+    agotada» pasaban por la razón FALSA: se re-midió exigiendo el MOTIVO;
+    (c) el EV compilado se evalúa con las constantes del PROPIO index
+    (BANCO_*, HOTEL_*), no inventadas.
+  - ⏳ **ENCENDER = Memo publica desde Esferas** (la venta no pide push:
+    FR-PROX-1 ya está en origin y sin prox en la ficha el compilador viejo y
+    el nuevo emiten lo mismo) → verificar en el sitio: el selector ofrece
+    15/16 vivos con 4/3 zonas y Butaca/Luneta del 15 con «¡Últimos 4!».
+    🔴⏳ **Pregunta abierta de dinero:** ¿el costo del 15/16 es el mismo del
+    11/12? Con su sí, se escriben los 7 costos (deuda Matriz +~$277k).
+
 - ↻⏳ **FR-PROX-1 (29-oct-2026, en main local + base YA ESCRITA): LAS FECHAS
-  DEL MULTIFECHA GANAN «PRÓXIMAMENTE» — y el 15/16 de Fuerza Regida ya están
-  así.** Palabra de Memo: *«las fechas en el multifecha en esferas se puedan
+  DEL MULTIFECHA GANAN «PRÓXIMAMENTE» — ⚰️ y el dato «15/16 de FR en prox»
+  quedó SUPERADO al día siguiente por FR-VENTA-1 (arriba): hoy esas dos fechas
+  VENDEN. El mecanismo (botón, compilador, derivación) sigue vivo y es la
+  herramienta para la próxima fecha que se anuncie sin abrir.** Palabra de Memo: *«las fechas en el multifecha en esferas se puedan
   poner en lugar de agotado también opción de Próximamente, como ahorita en
   fuerza regida que aún no puedo abrir las fechas 15 y 16 y las puse en agotado
   pero quiero mejor ponerlas como proximamente»*. `mide:fr-prox-1` **46** (sin
@@ -271,9 +332,10 @@ está caduco antes de escribirse.
 
 - 🎸⏳ **FR-FECHAS-1 (29-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
   de Memo): FUERZA REGIDA GANA EL 15 Y 16 DE ENERO, todas las zonas abiertas,
-  separo $300.** ⚠️ *Actualizada el MISMO día por FR-PROX-1 (arriba): el 15/16
-  ya NO están abiertos ni agotados — están en PRÓXIMAMENTE por palabra nueva de
-  Memo. Lo demás de este bloque (las 4 fechas, fechas_extra, sep 300) sigue.* Palabra de Memo: *«fuerza ergida anuncio 15 y 16 de enero
+  separo $300.** ⚠️ *Actualizada DOS veces: FR-PROX-1 (29-oct) puso el 15/16 en
+  PRÓXIMAMENTE y FR-VENTA-1 (30-oct, arriba) los sacó A LA VENTA con su pedido
+  cargado y lo no mencionado agotado. Lo que sigue vigente de este bloque: las
+  4 fechas, fechas_extra y sep 300.* Palabra de Memo: *«fuerza ergida anuncio 15 y 16 de enero
   tambien … activa esas 2 fechas extras en multifecha y en esas dos fechas
   activa todas las zonas nuevamente y separo de $300 igual, dale»*. Acta
   `migraciones/FR-FECHAS-1.sql` (los UPDATEs YA CORRIERON con valor esperado
@@ -312,11 +374,10 @@ está caduco antes de escribirse.
   - **Lo que entra solo con el slug base, medido en actas previas:**
     `REQUISICION_EVENTOS` y `RESERVA_2027` ya cubren fuerzaregida — las fechas
     nuevas venden por requisición y mandan el correo único sin tocar nada.
-  - 🔴⏳ **Lo que el encendido NO trae, dicho:** las fechas #2/#3 quedan **SIN
-    pedido cargado** (ciegas — STOCK-CIEGO): venden sin candado automático
-    hasta que Memo dicte el pedido de boletos del 15 y 16, como dictó el de
-    11/12 el 28-oct. Y fuerzaregida sigue sin pestaña de Excel (el careo no
-    cambia).
+  - ✅ **«Las fechas #2/#3 quedan SIN pedido» quedó CERRADO por FR-VENTA-1
+    (30-oct):** Memo dictó el pedido del 15/16 (96 boletos) y las dos fechas
+    nacen gestionadas. Lo que sigue: fuerzaregida sin pestaña de Excel (el
+    careo no cambia).
   - ⏳ **ENCENDER = Memo publica desde Esferas** (la venta no pide push de
     código — el index se recompila al publicar; precedente NSQK-VENTA-1) →
     verificación en producción: la card dice las 4 fechas y el selector de día

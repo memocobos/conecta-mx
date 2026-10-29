@@ -55,7 +55,10 @@ const { saldoMigrado } = require('./_lib/cuenta-evento');
 // [DISPO-NORM-1] La puerta de zonas: la zona del boleto nace con la ortografía
 // de la FICHA o no nace (firmado por Memo, 28-sep). Sin ella, un alta con
 // «GENERAL» descuenta stock de una llave que el aviso de agotado no consulta.
-const { puertaZona } = require('./_lib/zona-ficha');
+// [VIAJERO-MUDAR-1] `zonasDeFecha` contesta las zonas de UNA fecha (`slug#N`),
+// que es otra pregunta que `zonasCanonicasDe` (el universo del evento entero):
+// al mover a alguien de día hay que validar su zona contra la ficha de ESE día.
+const { puertaZona, zonasDeFecha, resolverZonaFicha } = require('./_lib/zona-ficha');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -99,6 +102,13 @@ const ACCIONES = {
   viajero_eliminar: ROLES_ADMIN,
   viajero_editar: ROLES_EDITA_VIAJERO,
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
+  // [VIAJERO-EDITA-1] corregir paquete/zona/lugares/total/pagado-antes de
+  // CUALQUIER viajero — publicado o no. `viajero_editar` solo toca contacto y
+  // el `fila_editar` de la bandeja exige una revisión del Portal PENDIENTE
+  // (hoy: 0 de 2,790 viajeros alcanzables). Ver la cabecera de la acción.
+  viajero_editar_full: ROLES_EDITA_VIAJERO,
+  viajero_mudar_fecha: ROLES_EDITA_VIAJERO,    // [VIAJERO-MUDAR-1]
+  fechas_de_evento: ROLES_EDITA_VIAJERO,       // [VIAJERO-MUDAR-1] solo LEE el catálogo
   contrato_cliente_estado: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_ine: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] ver la INE (URLs firmadas)
@@ -1470,6 +1480,343 @@ ${entregables}
       // la bandeja pide `contrato_sin_correo` y el contrato nace sin su propio correo.
       const contrato = await emitirContratos({ viajeroIds: [filas[0].id], preventa: true, enviar: body.contrato_sin_correo !== true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
       return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso, contrato });
+    }
+
+    // ═══ [VIAJERO-MUDAR-1] LAS FECHAS DE UN EVENTO, PARA ELEGIR DESTINO ══════
+    // Solo LEE el catálogo servido. La lista se DERIVA de la ficha (multifecha),
+    // jamás se teclea: un `slug#N` escrito a mano manda a alguien a una fecha
+    // que la ficha no tiene, y de ahí nacen los huérfanos de zona.
+    if (accion === 'fechas_de_evento') {
+      const evId = String(body.evento_id || '').trim();
+      if (!evId || !SLUG_RE.test(evId)) return bad(headers, 'evento_id inválido');
+      const base = evId.split('#')[0];
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      // 🔒 Catálogo ilegible se DICE. Una lista vacía se leería como «este evento
+      // no tiene otras fechas», y con eso nadie podría mover a nadie nunca.
+      if (!Array.isArray(EV)) return ok(headers, { fechas: null, motivo: 'no se pudo leer el catálogo' });
+      const ev = EV.find((e) => e && e.id === base);
+      if (!ev) return ok(headers, { fechas: null, motivo: `«${base}» no está en el catálogo (¿cancelado?)` });
+      const mf = Array.isArray(ev.multifecha) ? ev.multifecha : [];
+      const fechas = mf.length
+        ? mf.map((m, i) => ({
+            evento_id: `${base}#${i}`,
+            etiqueta: String((m && (m.f || m.ds)) || `Fecha ${i + 1}`),
+            zonas: zonasDeFecha(ev, `${base}#${i}`),
+          }))
+        : [{ evento_id: base, etiqueta: String(ev.f || ev.ds || base), zonas: zonasDeFecha(ev, base) }];
+      return ok(headers, { fechas, evento: ev.a || base, base });
+    }
+
+    // ═══ [VIAJERO-EDITA-1] (28-oct-2026) EL EDITOR QUE FALTABA ═══════════════
+    //
+    // 🔴 EL HUECO, MEDIDO CONTRA PRODUCCIÓN ANTES DE ESCRIBIR UNA LÍNEA:
+    //   viajeros en el padrón ............................ 2,790
+    //   revisiones del Portal PENDIENTES ................. 0
+    //   viajeros alcanzables por `fila_editar` ........... 0
+    //   filas con total en NULL o $0 ..................... 1,303
+    // El único editor de total/paquete/zona/lugares del Palacio es
+    // `fila_editar` (PRV-FILA-1), y cuelga de una revisión del Portal
+    // PENDIENTE — hoy no hay ninguna. `viajero_editar`, el de siempre, solo
+    // toca contacto (correo · celular · talla · emergencia · notas). O sea que
+    // hasta hoy **el total de un viajero no se podía corregir en ningún lado**.
+    // No es «no se puede editar un viaje PUBLICADO»: es la familia de la guarda
+    // inalcanzable, al revés — una CAPACIDAD inalcanzable.
+    //
+    // 🔒 LO QUE ESTO NO HACE, y es deliberado:
+    //   · NO mueve `evento_id` — eso es `viajero_mudar_fecha`, abajo, porque
+    //     cambiar de día obliga a re-validar la zona contra OTRA ficha.
+    //   · NO toca `abonos_viajero`. Un pago nuevo es un ABONO con su fecha
+    //     (`abono_crear`), nunca un número tecleado encima: `abonado_previo` es
+    //     «lo que ya traía del Excel», y confundirlos borra el rastro del pago.
+    //   · NO toca contacto — ése es `viajero_editar` y sigue vivo.
+    if (accion === 'viajero_editar_full') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede corregir el viaje' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
+      if (!campos) return bad(headers, 'campos inválido');
+      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo'];
+      const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
+      if (ajenos.length) return bad(headers, 'campo no editable aquí: ' + ajenos.join(', ') + ' (el contacto va por «Editar datos»; el evento, por «Mover de fecha»)');
+
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const v = (await pre.json())[0];
+      if (!v) return bad(headers, 'ese viajero no existe');
+
+      const igual = (a, b) => String(a == null ? '' : a) === String(b == null ? '' : b);
+      const patch = {}, cambios = [];
+      let zonaAviso = null, stockAviso = null;
+
+      if ('nombre' in campos) {
+        const n = _normNombre(campos.nombre);
+        if (!n || n.length < 2 || n.length > 120) return bad(headers, 'nombre inválido (2 a 120)');
+        if (!igual(n, v.nombre)) { patch.nombre = n; cambios.push(`nombre «${v.nombre || ''}» → «${n}»`); }
+      }
+      // El paquete se decide ANTES de la zona: con RIDE la zona puede ir vacía.
+      let paqFinal = String(v.tipo_paquete || '').toLowerCase();
+      if ('tipo_paquete' in campos) {
+        const p = String(campos.tipo_paquete || '').trim().toLowerCase();
+        if (!PAQUETES_MIGRAR.includes(p)) return bad(headers, `paquete inválido: ${PAQUETES_MIGRAR.join(', ')}`);
+        // Se respeta cómo escribe la base ESA fila (hay 'PLUS' y 'plus' vivos).
+        const cur = String(v.tipo_paquete || '');
+        const val = cur && cur === cur.toLowerCase() ? p : p.toUpperCase();
+        paqFinal = p;
+        if (p !== cur.toLowerCase()) { patch.tipo_paquete = val; cambios.push(`paquete ${cur || '—'} → ${val}`); }
+      }
+      if ('zona_boleto' in campos) {
+        let z = String(campos.zona_boleto || '').trim();
+        if (!z) {
+          // Solo el RIDE va sin zona (no consume boleto) — RIDE-SIN-ZONA-1.
+          if (paqFinal !== 'ride') return bad(headers, 'la zona es obligatoria (solo RIDE va sin zona)');
+        } else {
+          // 🔒 LA PUERTA DE ZONAS (DISPO-NORM-1): desconocida se RECHAZA
+          // nombrando las de la ficha; mal escrita se guarda canónica y SE DICE.
+          const pz = await puertaZona(v.evento_id, z);
+          if (pz.estado === 'desconocida') {
+            const lista = (pz.canonicas || []).join(' · ');
+            return bad(headers, `«${z}» no es zona de ${v.evento_id}. ` + (lista ? `Las de la ficha: ${lista}.` : ''));
+          }
+          if (pz.estado === 'canonizada') { zonaAviso = `Zona guardada como la ficha: «${pz.zona}»`; z = pz.zona; }
+          else if (pz.estado === 'sin-catalogo' || pz.estado === 'sin-evento') zonaAviso = 'La zona se guardó SIN validar contra la ficha (catálogo ilegible).';
+        }
+        if (!igual(z || null, v.zona_boleto)) { patch.zona_boleto = z || null; cambios.push(`zona «${v.zona_boleto || '—'}» → «${z || '—'}»`); }
+      }
+      if ('boletos' in campos) {
+        const b = Number(campos.boletos);
+        if (!Number.isInteger(b) || b < 1 || b > 20) return bad(headers, 'lugares inválidos (1 a 20)');
+        if (b !== (Number(v.boletos) || 1)) { patch.boletos = b; cambios.push(`lugares ${v.boletos || 1} → ${b}`); }
+      }
+      for (const k of ['total_contrato', 'abonado_previo']) {
+        if (!(k in campos)) continue;
+        const nv = _numDinero(campos[k]);
+        if (nv === null && k === 'total_contrato') return bad(headers, 'el total no puede quedar vacío');
+        if (nv !== null && (!Number.isFinite(nv) || nv < 0 || nv > 2000000)) return bad(headers, (k === 'total_contrato' ? 'total' : 'pagado antes') + ' inválido');
+        const cur = v[k] == null ? null : Number(v[k]);
+        if (nv !== cur) {
+          patch[k] = nv;
+          cambios.push(`${k === 'total_contrato' ? 'total' : 'pagado antes'} ${cur == null ? '—' : '$' + cur} → $${nv == null ? 0 : nv}`);
+        }
+      }
+      if (!cambios.length) return bad(headers, 'no cambiaste nada');
+
+      // ⚠️ EL INVENTARIO AVISA, NO BLOQUEA — y esa asimetría con
+      // `viajero_elegir_paquete` es a propósito: ahí se está VENDIENDO (si no
+      // hay lugar, no se vende) y aquí se está CORRIGIENDO un dato que ya
+      // existe. Bloquear una corrección por falta de cupo dejaría el dato malo
+      // escrito para siempre, que es peor que un sobregiro nombrado.
+      // ⚠️ Y SE MIDE SOBRE LA ZONA NUEVA RESTANDO SUS PROPIOS LUGARES, porque
+      // esto corre ANTES del PATCH: `vendidosPorZona` todavía lo cuenta en su
+      // zona VIEJA, así que el `restante` de la nueva no lo incluye. Leerlo a
+      // secas habría reportado la sobreventa que YA existía y callado la que
+      // este cambio va a causar — el resultado correcto por la razón falsa.
+      const zonaFinal = 'zona_boleto' in patch ? patch.zona_boleto : v.zona_boleto;
+      const cambiaZona = 'zona_boleto' in patch;
+      const lugares = 'boletos' in patch ? patch.boletos : (Number(v.boletos) || 1);
+      if (zonaFinal && paqFinal !== 'ride' && env.PORTAL_SB_URL && env.PORTAL_SB_SERVICE) {
+        try {
+          const disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id: v.evento_id });
+          if (!disp.error) {
+            const ez = evaluarZona(disp, zonaFinal, 1);
+            if (!ez.gestionada) {
+              stockAviso = `«${zonaFinal}» no tiene pedido cargado en Kamisama: no se pudo medir el cupo.`;
+            } else {
+              // Si la zona no cambia, esta fila YA está contada ahí: lo que
+              // queda es lo que queda. Si cambia, hay que restarle sus lugares.
+              const queda = Number(ez.restante) - (cambiaZona ? lugares : 0);
+              if (queda < 0) stockAviso = `Ojo: «${zonaFinal}» queda SOBREVENDIDA en ${Math.abs(queda)} con este cambio (hoy quedan ${ez.restante}).`;
+            }
+          }
+        } catch (_) { stockAviso = 'No se pudo medir el inventario.'; }
+      }
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      patch.notas = ((v.notas ? v.notas + ' · ' : '') + `[EDITA ${hoyMx}] ${cambios.join('; ')} · ${quien}`).slice(0, 4000);
+      // 🔒 VALOR ESPERADO POR CADA CAMPO QUE CAMBIA: si alguien lo movió entre
+      // la lectura y la escritura, cero filas → 409. El 2º clic no re-escribe.
+      const filtro = Object.keys(patch).filter((k) => k !== 'notas')
+        .map((k) => (v[k] == null ? `${k}=is.null` : `${k}=eq.${encodeURIComponent(v[k])}`)).join('&');
+      const r = await fetch(`${baseVE}?id=eq.${id}${filtro ? '&' + filtro : ''}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien movió esta fila mientras la editabas. Recarga y vuelve a intentar.', ya: true }) };
+
+      // ── El aviso al cliente · NACE APAGADO (palabra de Memo, 28-oct) ───────
+      // 🔒 Y SE REHÚSA SOBRE UN VIAJE SIN PUBLICAR: el correo lleva botón «Ver
+      // mi plan en el Portal», y sin sello el Portal le contesta «estamos
+      // revisando tu viaje» (PORTAL-SOLO-1). Mandar a alguien a una pantalla
+      // que no dice lo que el correo prometió es el defecto que PRV-EDITA-1a
+      // vino a curar — aquí se cierra por delante.
+      let aviso = null;
+      if (body.avisar === true) {
+        if (!v.portal_revisado_at) {
+          aviso = { ok: false, aviso: 'No avisé: ese viaje todavía no está publicado en su Portal (el correo lo mandaría a «estamos revisando»). Publícalo primero o avísale por WhatsApp.' };
+        } else {
+          const { avisarAjuste } = require('./_lib/correo-ajuste');
+          aviso = await avisarAjuste({ v: filas[0], cambios, modo: 'ajuste', nota: String(body.nota_cliente || '').trim().slice(0, 300) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+        }
+      }
+      return ok(headers, { viajero: filas[0], cambios, zona_aviso: zonaAviso, stock_aviso: stockAviso, aviso, publicado: !!v.portal_revisado_at });
+    }
+
+    // ═══ [VIAJERO-MUDAR-1] (28-oct-2026) MOVER UN VIAJE DE FECHA ═════════════
+    //
+    // El caso de Frida, hecho botón. MUDANZA-FRIDA-1 la movió con SQL de Jane
+    // (Corona Vie → Vie+Sáb) y dejó el camino escrito; esto es ese camino,
+    // apretable por Bulma/Milk — la forma de CANCEL-UI-1.
+    //
+    // 🔒 EL DINERO NO SE TOCA, Y NO ES UNA PROMESA: `abonado_previo` no entra
+    // al PATCH y `abonos_viajero` llavea por `viajero_id`, no por evento, así
+    // que sus pagos viajan solos (precedente MUDANZA-KAROLG-1, verificado en
+    // esa acta al peso). Lo único que puede moverse es el TOTAL, y solo si
+    // Bulma lo teclea: el catálogo cobra distinto por día (Frida: $3,900 por 1
+    // día contra $6,300 por 2) pero un descuento negociado se perdería si el
+    // precio nuevo se aplicara solo. Palabra de Memo: «propone, Bulma confirma».
+    if (accion === 'viajero_mudar_fecha') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede mover un viaje de fecha' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const destino = String(body.destino || '').trim();
+      if (!destino || !SLUG_RE.test(destino)) return bad(headers, 'destino inválido');
+
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,notas,habitacion_id,grupo_viaje,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const v = (await pre.json())[0];
+      if (!v) return bad(headers, 'ese viajero no existe');
+      const origen = String(v.evento_id || '');
+      if (origen === destino) return bad(headers, 'ya está en esa fecha');
+      // 🔒 MISMO EVENTO BASE. Mover entre eventos DISTINTOS es otra cosa (el
+      // traspaso de YAMCHA, que además cierra un reembolso y pone el contrato
+      // en lo cobrado): aquí solo se cambia de DÍA dentro del mismo tour.
+      const base = origen.split('#')[0];
+      if (destino.split('#')[0] !== base) {
+        return bad(headers, `Solo se puede mover entre fechas del MISMO evento (${base}). Para pasar a otro tour se usa el traspaso.`);
+      }
+
+      // La fecha destino tiene que EXISTIR en la ficha, y su zona también.
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer el catálogo: no muevo a nadie a ciegas.' }) };
+      const ev = EV.find((e) => e && e.id === base);
+      if (!ev) return bad(headers, `«${base}» no está en el catálogo (¿cancelado?)`);
+      const mIdx = /#(\d+)$/.exec(destino);
+      const mf = Array.isArray(ev.multifecha) ? ev.multifecha : [];
+      if (mIdx && !mf[Number(mIdx[1])]) return bad(headers, `${destino} no es una fecha de ese evento (tiene ${mf.length})`);
+      if (!mIdx && mf.length) return bad(headers, `${base} es multifecha: elige una de sus ${mf.length} fechas`);
+
+      const patch = { evento_id: destino };
+      const cambios = [];
+      const etiqDe = (eid) => {
+        const mm = /#(\d+)$/.exec(String(eid));
+        if (mm && mf[Number(mm[1])]) { const x = mf[Number(mm[1])]; return String(x.f || x.ds || eid); }
+        return String(ev.f || ev.ds || eid);
+      };
+      const etiqAntes = etiqDe(origen), etiqDest = etiqDe(destino);
+      cambios.push(`fecha «${etiqAntes}» → «${etiqDest}»`);
+
+      // ── La zona, contra la ficha de LA FECHA DESTINO ───────────────────────
+      // 🔒 `zonasDeFecha` y no `zonasCanonicasDe`: son preguntas distintas. Una
+      // zona que existe en el evento puede no existir ESE día, y guardarla así
+      // nace huérfana — el defecto que CHATARRA-REGLA-1 acabó de pagar.
+      const paq = String(v.tipo_paquete || '').toLowerCase();
+      const zonasDest = zonasDeFecha(ev, destino);
+      let zonaFinal = String(v.zona_boleto || '').trim();
+      if ('zona_boleto' in (body || {})) {
+        const z = String(body.zona_boleto || '').trim();
+        if (!z && paq !== 'ride') return bad(headers, 'la zona es obligatoria (solo RIDE va sin zona)');
+        zonaFinal = z;
+      }
+      if (zonaFinal) {
+        // 🔴🔒 AQUÍ **NO** SE USA `puertaZona`, Y LA RAZÓN ES LA MITAD DE ESTA
+        // TUERCA. `puertaZona` valida contra `zonasCanonicasDe` — el universo
+        // del EVENTO ENTERO— y eso es correcto para sus bebedores (compras,
+        // vendidos-fuera, altas: DISPO-NORM-1), pero aquí deja pasar una zona
+        // que existe en OTRO día. Medido en el careo: «Comfort» solo está en
+        // `coronacapital#2` y `puertaZona` la aceptaba para `#1` → nacería un
+        // huérfano de zona, el defecto que CHATARRA-REGLA-1 acabó de pagar.
+        //
+        // 🔒 Y NO se le estrecha la respuesta al dueño para que encaje con esta
+        // pantalla —eso es justo lo que NUBE-3 prohíbe: le cambiaría la
+        // respuesta a todos los que ya beben de él—. Se le pregunta a los DOS
+        // dueños de cada mitad, sin re-implementar ninguna: `zonasDeFecha`
+        // contesta «¿cuáles son las de ESTE día?» y `resolverZonaFicha` —la
+        // misma que usa `puertaZona` por dentro— contesta la canonización.
+        const rz = resolverZonaFicha(zonasDest, zonaFinal);
+        if (rz.estado === 'desconocida') {
+          return bad(headers, `«${zonaFinal}» no es zona del ${etiqDest}. ` + (zonasDest.length ? `Las de esa fecha: ${zonasDest.join(' · ')}.` : 'Esa fecha no tiene zonas en la ficha.'));
+        }
+        zonaFinal = rz.zona;
+      } else if (paq !== 'ride') {
+        return bad(headers, 'ese viajero no tiene zona y su paquete sí la necesita: elige una de la fecha destino');
+      }
+      if (String(zonaFinal || '') !== String(v.zona_boleto || '')) {
+        patch.zona_boleto = zonaFinal || null;
+        cambios.push(`zona «${v.zona_boleto || '—'}» → «${zonaFinal || '—'}»`);
+      }
+
+      // ── El total: SOLO si lo teclean (ver la cabecera) ─────────────────────
+      let totalAviso = null;
+      if (body.total_contrato !== undefined && body.total_contrato !== null && String(body.total_contrato) !== '') {
+        const nv = _numDinero(body.total_contrato);
+        if (nv === null || !Number.isFinite(nv) || nv < 0 || nv > 2000000) return bad(headers, 'total inválido');
+        const cur = v.total_contrato == null ? null : Number(v.total_contrato);
+        if (nv !== cur) { patch.total_contrato = nv; cambios.push(`total ${cur == null ? '—' : '$' + cur} → $${nv}`); }
+      } else {
+        totalAviso = `El total se quedó en ${v.total_contrato == null ? '— (sin capturar)' : '$' + v.total_contrato}: el precio de la fecha nueva puede ser otro.`;
+      }
+
+      // ── Los satélites de la fecha vieja se SUELTAN, y se DICEN ─────────────
+      // La habitación era de ESE día (su rooming); el grupo, de las personas
+      // con las que compartía ESA fecha. Arrastrarlos deja un cuarto asignado
+      // en un día en el que ya no viaja. Se sueltan y la pantalla lo nombra —
+      // Bulma los re-arma con el Rooming y «👥 Juntar seleccionados».
+      const sueltos = [];
+      if (v.habitacion_id) { patch.habitacion_id = null; sueltos.push('su habitación (re-asígnala en Rooming)'); }
+      if (v.grupo_viaje) { patch.grupo_viaje = null; sueltos.push('su grupo «viaja con» (re-júntalos si se mudaron juntos)'); }
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const motivo = String(body.motivo || '').trim().slice(0, 200);
+      patch.notas = ((v.notas ? v.notas + ' · ' : '')
+        + `[MUDANZA ${hoyMx}] ${origen} → ${destino} · ${cambios.join('; ')}`
+        + (sueltos.length ? ` · se soltó: ${sueltos.join(', ')}` : '')
+        + ` · dinero INTACTO (abonos viajan por viajero_id)`
+        + (motivo ? ` · motivo: ${motivo}` : '') + ` · ${quien}`).slice(0, 4000);
+
+      // 🔒 Valor esperado: SIGUE en el origen. El 2º clic da 409 y no mueve a
+      // nadie dos veces (ni a una fecha que ya no es la que Bulma eligió).
+      const r = await fetch(`${baseVE}?id=eq.${id}&evento_id=eq.${encodeURIComponent(origen)}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: `Ese viajero ya no está en ${origen}. Nadie se movió. Recarga.`, ya: true }) };
+
+      let aviso = null;
+      if (body.avisar === true) {
+        if (!v.portal_revisado_at) {
+          aviso = { ok: false, aviso: 'No avisé: ese viaje todavía no está publicado en su Portal. Publícalo primero o avísale por WhatsApp.' };
+        } else {
+          const { avisarAjuste } = require('./_lib/correo-ajuste');
+          aviso = await avisarAjuste({ v: filas[0], cambios, modo: 'mudanza', fechaAntes: etiqAntes, nota: String(body.nota_cliente || '').trim().slice(0, 300) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+        }
+      }
+      return ok(headers, {
+        viajero: filas[0], cambios, sueltos, total_aviso: totalAviso, aviso,
+        de: origen, a: destino, etiqueta_destino: etiqDest, publicado: !!v.portal_revisado_at,
+      });
     }
 
     // ── [MIG-1a] viajeros_evento: ALTA DE UN VIAJERO DEL EXCEL ─────────────

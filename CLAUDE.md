@@ -305,6 +305,104 @@ está caduco antes de escribirse.
     comprobante desde el Portal + su bandeja de revisión) queda nombrada y sin
     empezar, por su palabra.
 
+- 🔴✏️⏳ **VIAJERO-EDITA-1 + VIAJERO-MUDAR-1 (28-oct-2026, en main local): HOY NO
+  SE PODÍA CORREGIR EL TOTAL DE NADIE — y mover de fecha era SQL de Jane.**
+  Nacieron de las dos pendientes del caso de Frida, y la medición las hizo más
+  grandes que el encargo. `mide:viajero-edita-1` **63** (sin ancla — árbol).
+  - 🔴 **EL HUECO, MEDIDO CONTRA PRODUCCIÓN ANTES DE ESCRIBIR UNA LÍNEA:**
+    **2,790** viajeros en el padrón · **0** revisiones del Portal pendientes ·
+    **0** alcanzables por `fila_editar` · **1,303** con total en NULL o $0.
+    El único editor de total/paquete/zona/lugares del Palacio es `fila_editar`
+    (PRV-FILA-1) y **cuelga de una revisión del Portal PENDIENTE** — hoy no hay
+    ninguna; `viajero_editar`, el de siempre, solo toca CONTACTO (correo ·
+    celular · talla · emergencia · notas). O sea que la tarea decía «editar un
+    viaje aunque esté publicado» y la verdad era peor: **no se podía corregir el
+    total de NADIE.** Es la familia de *la guarda inalcanzable*, al revés —
+    **una CAPACIDAD inalcanzable**, que no grita nunca porque no falla: falta.
+  - **Las tres decisiones de Memo (28-oct), firmadas con la medición enfrente:**
+    (1) el aviso al cliente es **una casilla que nace APAGADA** — con 1,303
+    filas sin total, prenderlo por default mandaría mil correos el día que se
+    completen; (2) al mover de fecha **se PROPONE el precio del día nuevo y
+    Bulma confirma** (el catálogo cobra $3,900 por 1 día y $6,300 por 2, pero un
+    descuento negociado se perdería si se aplicara solo); (3) el editor vive **en
+    la lista de viajeros del evento**, donde Bulma y Milk ya los ven.
+  - **✏️ Corregir** (`viajero_editar_full`): nombre · paquete respetando el case
+    de la fila · zona POR LA PUERTA · lugares · total · pagado-antes. Valor
+    esperado por CADA campo que cambia (2º clic sin cambios → «no cambiaste
+    nada», cero escrituras) y rastro `[EDITA fecha] a→b · quien` ANEXADO.
+    🔒 **Lo que NO hace, y es deliberado:** no mueve `evento_id` (eso obliga a
+    re-validar la zona contra otra ficha) · **no toca `abonos_viajero`** (un pago
+    nuevo es un ABONO con su fecha, nunca un número tecleado encima) · no toca
+    contacto (ésa es `viajero_editar`, y mezclarlas haría que «editar datos»
+    pudiera mover dinero sin que nadie lo pidiera).
+  - ⚠️ **El inventario AVISA, NO BLOQUEA, y esa asimetría con
+    `viajero_elegir_paquete` es a propósito:** ahí se está VENDIENDO (sin lugar
+    no se vende) y aquí se está CORRIGIENDO un dato que ya existe — bloquear una
+    corrección por falta de cupo dejaría el dato malo escrito para siempre.
+  - 🔴🔒 **Y EL AVISO SE REHÚSA SOBRE UN VIAJE SIN PUBLICAR.** El correo lleva
+    botón «Ver mi plan en el Portal» y sin sello el Portal contesta «estamos
+    revisando tu viaje» (PORTAL-SOLO-1): mandar a alguien a una pantalla que no
+    dice lo que el correo prometió **es el defecto que PRV-EDITA-1a vino a
+    curar**, cerrado por delante. La pantalla lo dice ANTES del clic y ni ofrece
+    la casilla.
+  - **📅 Mover fecha** (`viajero_mudar_fecha`): el caso de Frida hecho botón —
+    MUDANZA-FRIDA-1 lo hizo con SQL y dejó el camino escrito; esto es ese camino
+    (la forma de CANCEL-UI-1). Solo entre fechas del **MISMO evento** (a otro
+    tour es el traspaso de Yamcha), la fecha tiene que EXISTIR en la ficha, y los
+    satélites del día viejo **se SUELTAN y se DICEN** (habitación y grupo «viaja
+    con»: arrastrarlos deja un cuarto asignado en un día en el que ya no viaja).
+    🔒 **EL DINERO NO SE TOCA, y no es una promesa: `abonado_previo` no entra al
+    PATCH y `abonos_viajero` llavea por `viajero_id`** — el careo lo AFIRMA
+    comparando los abonos byte a byte antes y después.
+  - 🔒 **Sin teclear total, el total NO se mueve solo** y la pantalla avisa de
+    que el precio del día nuevo puede ser otro. El propuesto sale de
+    `precio_sugerido` → `resolverPrecioVenta`, el dueño: cero cuarta copia de la
+    regla de precios en el navegador.
+  - 🔒 **Catálogo ilegible → NO mueve a nadie** (502, «no muevo a nadie a
+    ciegas») y la lista de fechas devuelve **null con su motivo**, no una lista
+    vacía: un vacío se leería como «este evento no tiene otras fechas» y nadie
+    podría mover a nadie nunca.
+  - 🔴🔒 **EL DEFECTO PROPIO QUE CAZÓ MI PROPIA ASERCIÓN, y es la lección de la
+    tuerca: `puertaZona` valida contra el EVENTO ENTERO, no contra la FECHA.**
+    Mi comentario prometía «la zona, contra la ficha de la fecha destino» y el
+    código llamaba a `puertaZona` — que resuelve con `zonasCanonicasDe` (todo el
+    evento). Medido: **«Comfort» solo existe en `coronacapital#2` y pasaba para
+    `#1`** → habría nacido un huérfano de zona, el defecto que CHATARRA-REGLA-1
+    acabó de pagar. 🔒 **Y NO se le estrechó la respuesta al dueño** —eso es lo
+    que NUBE-3 prohíbe: le cambiaría la respuesta a todos sus bebedores (compras,
+    vendidos-fuera, altas de DISPO-NORM-1)—: se les pregunta a los DOS dueños de
+    cada mitad, `zonasDeFecha` («¿cuáles son las de ESTE día?») y
+    `resolverZonaFicha` (la misma que `puertaZona` usa por dentro). Con control
+    positivo en los dos sentidos: «Comfort» rebota en #1 y PASA en #2.
+  - **`_lib/correo-ajuste` es el dueño del aviso** (dos modos: `ajuste` ·
+    `mudanza`). 🔒 **Las palabras del correo son las MISMAS que el PATCH
+    escribió** — recibe la lista de cambios, no la recalcula: un correo que
+    recalculara podría contar otra historia que la base. Y el dinero por
+    `saldoMigrado`: **sin poder leerlo NO se manda** (decir «tu total ahora es X»
+    sin poder decir cuánto lleva pagado deja al cliente peor que el silencio).
+    Jamás tumba la edición, y si Resend falla **no se sella nada**.
+  - 🔒 **La pantalla REUSA la misma fila expandible** (`vj-ab-<id>` +
+    `dataset.modo`) de «Elegir paquete» y «Abono»: un segundo mecanismo de panel
+    serían dos listas que todavía no divergen — y dos paneles abiertos a la vez
+    sobre la misma persona.
+  - ⚠️ **DOS ROJOS DE LA PRIMERA CORRIDA, y los dos valen más que la tuerca:**
+    (a) el de `puertaZona`, arriba — **un defecto real del código, cazado por la
+    aserción que escribí para vigilarlo**; (b) mi caso de canonización tecleaba
+    «  general  » sobre quien YA estaba en «General»: canonizaba bien pero no
+    producía un cambio, así que el handler contestaba «no cambiaste nada»
+    (correcto) y el careo lo leyó como defecto. **Un caso cuyo resultado coincide
+    con el estado inicial no distingue «funcionó» de «no hizo nada».**
+  - ⚠️ **Y un tercer rojo del INSTRUMENTO:** el candado de cardinalidad leía
+    `DB.escrituras`, que `semilla()` reinicia — al medirlo al final daba 0 y se
+    puso rojo **con razón**, diciendo que los candados de «no escribió» pasaban
+    en vacío. Hoy el contador de la corrida vive FUERA de la semilla. *Un
+    contador que el propio arnés resetea mide el último escenario, no la corrida.*
+  - Vecinos verdes en la misma corrida: portal-solo-1 89 · preventa-elegir-1 14 ·
+    req-b1 52 · acomp-1 67 · acomp-2 43 · confirma-1 28 · contrato-cliente-1 29 ·
+    contrato-cliente-2 19 · dispo-norm-1 35 · chatarra-regla-1 26 · crea-2 27.
+  - ⏳ **Push de Memo** → prueba humana: corregir el total de alguien de Fuerza
+    Regida y mover a una viajera de Corona entre sus fechas. **Cero SQL.**
+
 - ✅ **PRV-EDITA-1a (28-oct-2026, en main local): «✓ YA QUEDÓ» — la bandeja ya
   se puede cerrar sin mentirle al cliente.** Palabra de Memo, citada: *«esa
   notificación no se quita nunca de requisiciones, siempre aparece»*.

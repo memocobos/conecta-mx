@@ -2202,6 +2202,15 @@ const khViajeros = {
   buscarParecido(evento_id, nombre, correo) {
     return this._call({ accion: 'viajero_buscar_parecido', evento_id, nombre, correo }).then(j => j.parecidos || []);
   },
+  // [VIAJERO-EDITA-1] corregir paquete/zona/lugares/total/pagado-antes de
+  // CUALQUIER viajero. ⚠️ No confundir con `editar` (arriba), que es el de
+  // SIEMPRE y solo toca contacto: son dos listas blancas distintas en el
+  // servidor a propósito, y mezclarlas haría que «editar datos» pudiera mover
+  // dinero sin que nadie lo pidiera.
+  editarFull(id, campos, extra) { return this._call(Object.assign({ accion: 'viajero_editar_full', id, campos }, extra || {})); },
+  // [VIAJERO-MUDAR-1] mover de FECHA dentro del mismo evento.
+  mudarFecha(payload) { return this._call(Object.assign({ accion: 'viajero_mudar_fecha' }, payload)); },
+  fechasDeEvento(evento_id) { return this._call({ accion: 'fechas_de_evento', evento_id }); },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6221,6 +6230,17 @@ async function _vj2Cargar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
             onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
+          <!-- [VIAJERO-EDITA-1] El editor que faltaba. Medido el 28-oct: el
+               único que tocaba total/paquete/zona colgaba de la bandeja del
+               Portal y había 0 revisiones pendientes — inalcanzable para los
+               2,790 del padrón, con 1,303 sin total. -->
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--yellow);border-color:var(--yellow)"
+            title="Corregir paquete, zona, lugares, total o lo pagado antes de ${_esfEsc(v.nombre || '')}"
+            onclick="_vjEditarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">✏️ Corregir</button>
+          <!-- [VIAJERO-MUDAR-1] El caso de Frida, hecho botón. -->
+          <button class="btn btn-ghost btn-sm" style="font-size:10px"
+            title="Mover a ${_esfEsc(v.nombre || '')} a otra fecha de este mismo evento (su dinero viaja con ella)"
+            onclick="_vjMudarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📅 Mover fecha</button>
           <button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
           title="Eliminar a ${_esfEsc(v.nombre || '')} de este evento"
           onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button></td>` : ''}
@@ -6333,6 +6353,211 @@ function _vjAbonoAbrir(id, nombre) {
 // del CATÁLOGO servido (jamás tecleadas), el costo se SUGIERE con la regla de
 // precios del servidor y se puede ajustar (descuento de $300 al acompañante,
 // hotel), y el servidor valida zona + inventario + valor esperado.
+// ═══ [VIAJERO-EDITA-1] ✏️ CORREGIR — el editor que faltaba ═════════════════
+//
+// 🔒 REUSA LA MISMA FILA EXPANDIBLE (`vj-ab-<id>` + `dataset.modo`) que «Elegir
+// paquete» y «Abono». Un segundo mecanismo de panel serían dos listas que
+// todavía no divergen, y encima dos paneles podrían quedar abiertos a la vez
+// sobre la misma persona.
+//
+// 🔒 Y LA PANTALLA NO CALCULA NADA: los campos nacen con lo que la fila TRAE y
+// se manda tal cual. La zona la valida la PUERTA en el servidor (el navegador
+// no decide si una zona existe) y el total se queda como lo teclee Bulma — la
+// regla de oro de VJ-3: lo que manda es lo que ella ve, no el catálogo.
+function _vjEditarAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'editar';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id));
+  if (!v) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'editar';
+  const e = _esfEsc(id);
+  const paqAct = String(v.tipo_paquete || '').toLowerCase();
+  const opt = (val, et) => `<option value="${val}"${paqAct === val ? ' selected' : ''}>${et}</option>`;
+  // El aviso NACE APAGADO (palabra de Memo) y solo se ofrece si el viaje está
+  // publicado: sin sello el Portal le contesta «estamos revisando», así que el
+  // correo lo mandaría a una pantalla que no dice lo que el correo promete.
+  const pub = !!v.portal_revisado_at;
+  tr.firstElementChild.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--yellow);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);min-width:140px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>corregir su viaje<br><i>los pagos NO se tocan aquí: eso es ➕ Abono</i></div>
+      <label style="font-size:10px;color:var(--ts)">NOMBRE<br><input class="cot-input" id="vjx-n-${e}" value="${_esfEsc(v.nombre || '')}" style="width:170px"></label>
+      <label style="font-size:10px;color:var(--ts)">PAQUETE<br><select class="cot-input" id="vjx-p-${e}">
+        ${opt('plus', 'PLUS')}${opt('stay', 'STAY')}${opt('cheap', 'CHEAP')}${opt('ride', 'RIDE')}</select></label>
+      <label style="font-size:10px;color:var(--ts)">ZONA<br><input class="cot-input" id="vjx-z-${e}" value="${_esfEsc(v.zona_boleto || '')}" placeholder="como en la ficha" style="width:150px"></label>
+      <label style="font-size:10px;color:var(--ts)">LUGARES<br><input class="cot-input" id="vjx-b-${e}" type="number" min="1" max="20" step="1" value="${Number(v.boletos) || 1}" style="width:70px"></label>
+      <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
+      <label style="font-size:10px;color:var(--ts)">PAGADO ANTES<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px"></label>
+      <button class="btn btn-primary btn-sm" id="vjx-b2-${e}" onclick="_vjEditarGuardar('${_attrJs(id)}')">Guardar corrección</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjEditarAbrir('${_attrJs(id)}')">Cancelar</button>
+      <div style="flex-basis:100%;font-size:11px;color:var(--ts);border-top:1px solid var(--line);padding-top:8px;margin-top:4px">
+        ${pub
+          ? `<label style="cursor:pointer"><input type="checkbox" id="vjx-av-${e}"> Avisarle por correo lo que cambió</label>
+             <span style="color:var(--ts)"> · su Portal ya muestra este viaje, así que el correo lo manda a su plan al día.</span>`
+          : '🪪 <b>Sin publicar en su Portal</b>: no se puede avisar por correo (el cliente vería «estamos revisando tu viaje»). Publícalo primero o avísale por WhatsApp.'}
+      </div>
+      <div id="vjx-s-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)"></div>
+      <div id="vjx-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
+    </div>`;
+}
+async function _vjEditarGuardar(id) {
+  const g = (k) => (document.getElementById(`vjx-${k}-${id}`) || {});
+  const er = document.getElementById(`vjx-e-${id}`), ok = document.getElementById(`vjx-s-${id}`);
+  const btn = document.getElementById(`vjx-b2-${id}`);
+  if (er) er.textContent = ''; if (ok) ok.textContent = '';
+  const campos = {
+    nombre: String(g('n').value || '').trim(),
+    tipo_paquete: String(g('p').value || ''),
+    zona_boleto: String(g('z').value || '').trim(),
+    boletos: Number(g('b').value),
+    // Vacío viaja como null: «sin capturar» y «$0» son cosas distintas y el
+    // servidor las distingue (un total vacío se rechaza, un pagado-antes vacío
+    // es cero). Mandar '' las aplastaría en una sola.
+    total_contrato: String(g('t').value || '') === '' ? null : Number(g('t').value),
+    abonado_previo: String(g('a').value || '') === '' ? null : Number(g('a').value),
+  };
+  const avisar = !!(document.getElementById(`vjx-av-${id}`) || {}).checked;
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const j = await khViajeros.editarFull(id, campos, { avisar });
+    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo guardar');
+    const partes = ['✓ ' + (j.cambios || []).join('; ')];
+    if (j.zona_aviso) partes.push('· ' + j.zona_aviso);
+    if (j.stock_aviso) partes.push('· ⚠️ ' + j.stock_aviso);
+    if (j.aviso) partes.push(j.aviso.ok ? '· 📨 avisado a ' + j.aviso.enviado : '· ⚠️ ' + (j.aviso.aviso || 'el correo no salió'));
+    if (ok) ok.innerHTML = _esfEsc(partes.join(' '));
+    showToast('Corrección guardada', 'success');
+    await _vj2Cargar();
+  } catch (e) {
+    if (er) er.textContent = (e && e.message) || 'No se pudo guardar.';
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Guardar corrección'; } }
+}
+
+// ═══ [VIAJERO-MUDAR-1] 📅 MOVER FECHA — el caso de Frida, hecho botón ══════
+// 🔒 Las fechas destino las DERIVA el servidor de la ficha (`fechas_de_evento`),
+// jamás se teclean: un `slug#N` escrito a mano manda a alguien a una fecha que
+// la ficha no tiene, y de ahí nacen los huérfanos de zona (CHATARRA-REGLA-1).
+async function _vjMudarAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'mudar';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id));
+  if (!v) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'mudar';
+  const e = _esfEsc(id);
+  const pub = !!v.portal_revisado_at;
+  tr.firstElementChild.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--blue);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);min-width:150px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>hoy está en <b style="color:var(--text)">${_esfEsc(v.evento_id || '')}</b><br><i style="color:var(--green)">su dinero viaja con ella, completo</i></div>
+      <label style="font-size:10px;color:var(--ts)">MOVER A<br><select class="cot-input" id="vjm-d-${e}" onchange="_vjMudarZonas('${_attrJs(id)}')"><option value="">— cargando fechas… —</option></select></label>
+      <label style="font-size:10px;color:var(--ts)">ZONA EN LA FECHA NUEVA<br><select class="cot-input" id="vjm-z-${e}" onchange="_vjMudarSugerido('${_attrJs(id)}')"><option value="">— elige fecha primero —</option></select></label>
+      <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjm-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="déjalo igual" style="width:120px"></label>
+      <label style="font-size:10px;color:var(--ts)">MOTIVO (opcional)<br><input class="cot-input" id="vjm-m-${e}" placeholder="p.ej. «son 2 días»" style="width:180px"></label>
+      <button class="btn btn-primary btn-sm" id="vjm-b-${e}" onclick="_vjMudarGuardar('${_attrJs(id)}')">Mover de fecha</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjMudarAbrir('${_attrJs(id)}')">Cancelar</button>
+      <div style="flex-basis:100%;font-size:11px;color:var(--ts);border-top:1px solid var(--line);padding-top:8px;margin-top:4px">
+        ${pub
+          ? `<label style="cursor:pointer"><input type="checkbox" id="vjm-av-${e}"> Avisarle por correo que su viaje cambió de fecha</label>`
+          : '🪪 <b>Sin publicar en su Portal</b>: no se puede avisar por correo. Avísale por WhatsApp.'}
+      </div>
+      <div id="vjm-s-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)"></div>
+      <div id="vjm-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
+    </div>`;
+  // Las fechas, del servidor. Catálogo ilegible se DICE: una lista vacía se
+  // leería como «este evento no tiene otras fechas».
+  try {
+    const j = await khViajeros.fechasDeEvento(v.evento_id);
+    const sel = document.getElementById(`vjm-d-${id}`);
+    if (!sel) return;
+    if (!j || !j.ok || !Array.isArray(j.fechas)) {
+      sel.innerHTML = '<option value="">— no se pudieron leer las fechas —</option>';
+      const err = document.getElementById(`vjm-e-${id}`);
+      if (err) err.textContent = (j && j.motivo) || 'No se pudo leer el catálogo: no muevas a nadie a ciegas.';
+      return;
+    }
+    window.__vjmFechas = window.__vjmFechas || {};
+    window.__vjmFechas[id] = j.fechas;
+    const otras = j.fechas.filter((f) => f.evento_id !== v.evento_id);
+    sel.innerHTML = otras.length
+      ? '<option value="">— elige la fecha —</option>' + otras.map((f) => `<option value="${_esfEsc(f.evento_id)}">${_esfEsc(f.etiqueta)} (${_esfEsc(f.evento_id)})</option>`).join('')
+      : '<option value="">— este evento no tiene otra fecha —</option>';
+  } catch (_) {
+    const sel = document.getElementById(`vjm-d-${id}`);
+    if (sel) sel.innerHTML = '<option value="">— no se pudieron leer las fechas —</option>';
+  }
+}
+function _vjMudarZonas(id) {
+  const dest = (document.getElementById(`vjm-d-${id}`) || {}).value || '';
+  const z = document.getElementById(`vjm-z-${id}`);
+  if (!z) return;
+  const f = ((window.__vjmFechas || {})[id] || []).find((x) => x.evento_id === dest);
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id)) || {};
+  const actual = String(v.zona_boleto || '');
+  if (!f) { z.innerHTML = '<option value="">— elige fecha primero —</option>'; return; }
+  // 🔒 Las zonas son las de ESA FECHA (zonasDeFecha), no las del evento entero:
+  // una zona que existe en el evento puede no existir ese día.
+  z.innerHTML = (f.zonas || []).length
+    ? (f.zonas || []).map((n) => `<option value="${_esfEsc(n)}"${n === actual ? ' selected' : ''}>${_esfEsc(n)}</option>`).join('')
+      + (String(v.tipo_paquete || '').toLowerCase() === 'ride' ? '<option value="">(RIDE · sin zona)</option>' : '')
+    : '<option value="">— esa fecha no tiene zonas en la ficha —</option>';
+  _vjMudarSugerido(id);
+}
+// El total PROPUESTO sale del dueño del precio (`precio_sugerido` →
+// `resolverPrecioVenta`), no de una cuarta copia de la regla en el navegador.
+// Palabra de Memo: propone, Bulma confirma — jamás se aplica solo.
+async function _vjMudarSugerido(id) {
+  const dest = (document.getElementById(`vjm-d-${id}`) || {}).value || '';
+  const zona = (document.getElementById(`vjm-z-${id}`) || {}).value || '';
+  const s = document.getElementById(`vjm-s-${id}`);
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id)) || {};
+  if (!dest || !s) return;
+  s.textContent = 'Consultando el precio de esa fecha…';
+  try {
+    const j = await khViajeros.precioSugerido({ evento_id: dest, tipo_paquete: String(v.tipo_paquete || '').toLowerCase(), zona });
+    if (j && j.ok && j.total != null) {
+      s.innerHTML = `El catálogo cobra <b style="color:var(--yellow)">${_vj3Money(j.total)}</b> por esa fecha. `
+        + `Su total hoy es ${v.total_contrato == null ? '<i>sin capturar</i>' : _vj3Money(v.total_contrato)}. `
+        + `<a href="#" onclick="document.getElementById('vjm-t-${_attrJs(id)}').value=${Number(j.total)};return false" style="color:var(--yellow)">usar ${_vj3Money(j.total)}</a>`
+        + ` · o déjalo como está si trae descuento negociado.`;
+    } else {
+      s.textContent = 'El catálogo no pudo cotizar esa fecha' + (j && j.motivo ? ' (' + j.motivo + ')' : '') + ': el total se queda como está salvo que lo teclees.';
+    }
+  } catch (_) { s.textContent = 'No se pudo consultar el precio: el total se queda como está salvo que lo teclees.'; }
+}
+async function _vjMudarGuardar(id) {
+  const dest = (document.getElementById(`vjm-d-${id}`) || {}).value || '';
+  const zona = (document.getElementById(`vjm-z-${id}`) || {}).value || '';
+  const total = String((document.getElementById(`vjm-t-${id}`) || {}).value || '');
+  const motivo = String((document.getElementById(`vjm-m-${id}`) || {}).value || '');
+  const avisar = !!(document.getElementById(`vjm-av-${id}`) || {}).checked;
+  const er = document.getElementById(`vjm-e-${id}`), ok = document.getElementById(`vjm-s-${id}`);
+  const btn = document.getElementById(`vjm-b-${id}`);
+  if (er) er.textContent = '';
+  if (!dest) { if (er) er.textContent = 'Elige la fecha destino.'; return; }
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id)) || {};
+  if (!confirm(`¿Mover a ${v.nombre || 'esta persona'} de ${v.evento_id} a ${dest}?\n\nSu dinero viaja con ella. Se le suelta la habitación y el grupo «viaja con» (eran de la fecha vieja).`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Moviendo…'; }
+  try {
+    const j = await khViajeros.mudarFecha({ id, destino: dest, zona_boleto: zona, total_contrato: total === '' ? undefined : Number(total), motivo, avisar });
+    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo mover');
+    const partes = ['✓ ' + (j.cambios || []).join('; ')];
+    if ((j.sueltos || []).length) partes.push('· se soltó ' + j.sueltos.join(' y '));
+    if (j.total_aviso) partes.push('· ⚠️ ' + j.total_aviso);
+    if (j.aviso) partes.push(j.aviso.ok ? '· 📨 avisado a ' + j.aviso.enviado : '· ⚠️ ' + (j.aviso.aviso || 'el correo no salió'));
+    if (ok) ok.textContent = partes.join(' ');
+    showToast('Movido a ' + (j.etiqueta_destino || dest), 'success');
+    await _vj2Cargar();
+  } catch (e) {
+    if (er) er.textContent = (e && e.message) || 'No se pudo mover.';
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Mover de fecha'; } }
+}
+
 async function _vjElegirAbrir(id, nombre) {
   const tr = document.getElementById(`vj-ab-${id}`);
   if (!tr) return;

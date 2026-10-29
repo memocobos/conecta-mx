@@ -188,6 +188,47 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📨✅ **RECORDATORIO-REGISTRO-1 (29-oct-2026, EJECUTADO): 30 correos de
+  «regístrate al Portal» a los aprobados sin cuenta — los 30 `delivered`.**
+  Palabra de Memo: *«Sí: seco → mi visto → enviar»*, y el visto llegó con las
+  tres muestras y la lista enfrente («Sí, manda a los 30»).
+  - **La audiencia se RE-MIDIÓ contra las bases de HOY** (lección de
+    RECHAZO-AVISO-1b: un aviso tardío habla de un mundo que pudo cambiar): de
+    50 correos con requisición aprobada, 17 registrados exactos — y el cruce
+    fino cazó **3 que el conteo viejo («33») metía mal**: Lizbeth Vicencio SÍ
+    está registrada pero con un PUNTO de más (mismo buzón de Gmail; el Portal
+    no casa puntos → no ve su viaje: es un «🔗 Ligar Portal», no un correo),
+    Dana Paola registrada con OTRO correo (ídem), y el correo roto
+    `@hmail.com` de Hannia (se corrige por WhatsApp antes de mandarle nada).
+    Candado de vida: los 30 con filas vivas Y selladas (verán su viaje al
+    registrarse). Y el candado final justo antes del envío: nadie de los 30 se
+    registró entre el seco y el clic.
+  - 🔒 **El render es el del DUEÑO, byte a byte** (`renderInvitacion` de
+    `_lib/invitacion-portal` — cero texto nuevo, cero divergencia) con el `ev`
+    del catálogo por slug BASE, la MISMA forma de admin-portal-invitar.
+    Pa'l Norte salió «Por confirmar · Parque Fundidora» — la fecha NO se fugó
+    (afirmado en el seco, no supuesto). ⚠️ El fetch de node está vetado en el
+    sandbox: el EV salió del index LOCAL **verificado byte a byte con el
+    commit publicado** (`git diff 16f46f1..HEAD -- index.html` vacío; 16f46f1
+    es el deploy ready/current de Netlify) — la ley de CONSUELO-VERDAD («el
+    index SERVIDO») cumplida por el hecho, no por el transporte.
+  - 🔒 **Bitácora PROPIA `portal_recordatorios`** (acta
+    `migraciones/RECORDATORIO-REGISTRO-1.sql`, YA CORRIDA, candados MORDIDOS
+    con error visible: CHECK minúsculas 23514 ✓ · UNIQUE(campana,correo)
+    23505 ✓ · RLS deny-all + GRANT service_role). **No se reusó
+    `invitaciones_portal` a propósito**: su UNIQUE(evento,correo) ya tiene
+    asentada a la mayoría (CONFIRMA-1 asienta al aprobar) y ese candado es
+    correcto para LA INVITACIÓN — un recordatorio es otro envío con su propia
+    idempotencia; meterlo ahí pedía borrar asientos (jamás) o un evento_id
+    sintético (dos significados en una columna). Forma de `genkidama_envios`:
+    campaña `registro-2026-10`; una campaña nueva es decisión nueva de Memo.
+  - ✅ **30 asentados con su email_id** (30 ids distintos), correspondencia
+    id↔correo VERIFICADA leyendo el primero y el último de los lotes en Resend
+    (no supuesta del orden), los dos `delivered`. Por evento: fuerzaregida 15
+    (11 del #0 · 4 del #1) · palnorte 9 · nsqkmty 6.
+  - ⚠️ **La lista nominal NO se versiona** (vive en el chat y en la bitácora);
+    los renders temporales se borraron del scratch.
+
 - 📜🔥⏳ **CONTRATO-ON-1 (29-oct-2026, en main local): EL CONTRATO DEL CLIENTE
   SE ENCENDIÓ — para TODOS los eventos, por los tres caminos.** Palabra de Memo,
   citada: *«Sí, enciéndelo ya»*, con la medición enfrente (1 contrato firmado —

@@ -98,7 +98,13 @@ exports.handler = async (event) => {
                  // ⚠️ Y se DICE cuando el catálogo no se pudo leer: con él en null la
                  // puerta no canoniza nada y los montones de zona salen vacíos.
                  // Un vacío sin razón se lee como «no había nada que cambiar».
-                 zonas_sin_catalogo: plan.zonas_sin_catalogo === true } }) };
+                 zonas_sin_catalogo: plan.zonas_sin_catalogo === true,
+                 // [CAREO-DUP-FECHA-1] Las altas que NO se proponen porque esa
+                 // persona ya vive en otra fecha del mismo evento. Un montón sin
+                 // conteo no se ve en la pantalla — y éste es el que impide crear
+                 // dinero de la nada, así que tiene que verse.
+                 dup_otra_fecha: (plan.dup_otra_fecha || []).length,
+                 hermanas_ilegibles: plan.hermanas_ilegibles === true } }) };
   }
 
   const resultado = await ejecutarPlan({
@@ -119,5 +125,11 @@ exports.handler = async (event) => {
                partidas: (resultado.partidas || []).length,
                bajas: (resultado.bajas || []).length,
                avisos_zonas: (plan.avisos_zonas || []).length,
+               // [CAREO-DUP-FECHA-1] Del PLAN, no del resultado, y a propósito:
+               // este montón nunca se aplica (nadie lo obra), así que «lo
+               // aplicado» sería siempre 0 y el aviso desaparecería justo en la
+               // respuesta que mira quien acaba de apretar el botón.
+               dup_otra_fecha: (plan.dup_otra_fecha || []).length,
+               hermanas_ilegibles: plan.hermanas_ilegibles === true,
                errores: resultado.errores.length } }) };
 };

@@ -216,6 +216,16 @@ function mundoFalso() {
         if ((m = /^eq\.(.*)$/.exec(expr))) { out = out.filter((f) => String(f[k]) === decodeURIComponent(m[1])); continue; }
         if ((m = /^is\.(.*)$/.exec(expr))) { const vv = m[1] === 'true' ? true : m[1] === 'false' ? false : null; out = out.filter((f) => f[k] === vv); continue; }
         if ((m = /^in\.\((.*)\)$/.exec(expr))) { const vals = m[1].split(',').map((x) => decodeURIComponent(x).replace(/^"|"$/g, '')); out = out.filter((f) => vals.includes(String(f[k]))); continue; }
+        // [CAREO-DUP-FECHA-1] `like.slug*` como lo hace PostgREST (el `*` es el
+        // comodín). El careo lo usa para leer las OTRAS fechas del mismo evento.
+        // 🔒 Se modela SOBRE-pescando igual que el real: `coronacapital2` casa
+        // con `like.coronacapital*`. Ésa es justo la razón de que la autoridad
+        // sea `esDelEvento` y no el filtro — un fake que ya filtrara «bien»
+        // escondería el defecto que esa función existe para cerrar.
+        if ((m = /^like\.(.*)$/.exec(expr))) {
+          const pat = decodeURIComponent(m[1]).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+          out = out.filter((f) => new RegExp('^' + pat + '$').test(String(f[k] == null ? '' : f[k]))); continue;
+        }
         throw new Error('el mundo falso no entiende el filtro: ' + k + '=' + expr);
       }
       return { ok: true, status: 200, json: async () => out, text: async () => '' };

@@ -54,10 +54,10 @@ const sbHeaders = (extra) => Object.assign({
 // El `like slug*` de la consulta solo ESTRECHA (sobre-pesca por diseño);
 // la AUTORIDAD es esta función — un prefijo no es un ancla (natanael ≠
 // natanaelcano2), la forma de PLAN-CASE-1.
-function esDelEvento(eventoId, slug) {
-  const v = String(eventoId || '');
-  return v === slug || v.startsWith(slug + '#');
-}
+// [CAREO-DUP-FECHA-1] Nació aquí y ganó un segundo lector (el careo, que
+// necesita las OTRAS fechas del mismo evento base): se mudó a
+// `_lib/misma-persona` con el cuerpo intacto. Aquí solo se PIDE.
+const { esDelEvento } = require('./_lib/misma-persona');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);

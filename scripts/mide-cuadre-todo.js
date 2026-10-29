@@ -100,6 +100,15 @@ function redFalsa(base) {
       if ((m = /^eq\.(.*)$/.exec(expr))) { out = out.filter((f) => String(f[campo]) === decodeURIComponent(m[1])); continue; }
       if ((m = /^is\.(.*)$/.exec(expr))) { const v = m[1] === 'true' ? true : m[1] === 'false' ? false : null; out = out.filter((f) => f[campo] === v); continue; }
       if ((m = /^in\.\((.*)\)$/.exec(expr))) { const vs = m[1].split(',').map((v) => decodeURIComponent(v).replace(/^"|"$/g, '')); out = out.filter((f) => vs.includes(String(f[campo]))); continue; }
+      // [CAREO-DUP-FECHA-1] `like.slug*` como lo hace PostgREST (el `*` es el
+      // comodín). El careo lo usa para leer las OTRAS fechas del mismo evento.
+      // 🔒 Se modela SOBRE-pescando igual que el real: `coronacapital2` casa con
+      // `like.coronacapital*`. Ésa es justo la razón de que la autoridad sea
+      // `esDelEvento` y no el filtro.
+      if ((m = /^like\.(.*)$/.exec(expr))) {
+        const pat = decodeURIComponent(m[1]).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+        out = out.filter((f) => new RegExp('^' + pat + '$').test(String(f[campo] == null ? '' : f[campo]))); continue;
+      }
       throw new Error('filtro no modelado: ' + campo + '=' + expr);
     }
     return out;

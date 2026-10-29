@@ -38,6 +38,10 @@ const { resolverZonaFicha } = require('./zona-ficha');
 // [DISPO-NORM-1] El dueño de «¿son la misma zona?» — el montón `fuera` empareja
 // chatarra↔base por zona normalizada, jamás por cadena exacta.
 const { normalizarZona } = require('./normalizar-zona');
+// [CAREO-DUP-FECHA-1] «¿es la misma persona?» — el dueño que CREA-3 ya tenía,
+// mudado a su lib. Aquí se PIDE; re-implementar el parecido sería la segunda
+// lista, y la que se equivocara dejaría nacer un duplicado de dinero.
+const { parecido } = require('./misma-persona');
 const DISPO = require('./excel-disponibilidad');
 
 // Los paquetes que `viajero_migrar` acepta. Se dicen aquí para poder SALTAR
@@ -166,6 +170,19 @@ function planear(careo, opciones) {
   const porClave = new Map((careo.personas || []).map((p) => [p.clave, p]));
   const vPorId = new Map((careo.viajeros || []).map((v) => [v.id, v]));
   const abonos = [], totales = [], altas = [], negativas = [], saltados = [], boletos = [];
+  // [CAREO-DUP-FECHA-1] El montón que NOMBRA a quien el careo iba a crear de
+  // nuevo cuando ya vive en otra fecha del mismo evento. Es informativo por
+  // construcción: `ejecutarPlan` no lo lee (careado), igual que `negativas`.
+  const dupOtraFecha = [];
+  // Las hermanas vienen del careo (su lectura vive en `correrCareo`, que es
+  // quien habla con la base). `null` = no se pudieron leer; `undefined` = este
+  // careo es de una versión anterior y no las trae. 🔒 Los dos casos se tratan
+  // igual —no proponer altas— porque en los dos la pregunta «¿ya viaja en otra
+  // fecha?» quedó sin contestar, y una ausencia de respuesta no es un «no».
+  const hermanas = (careo.hermanas === undefined) ? null : careo.hermanas;
+  const hermanasError = careo.hermanas_error
+    || (careo.hermanas === undefined ? 'este careo no trae las otras fechas del evento' : null);
+  const eventoIdPlan = careo.evento_id || (careo.base && careo.base.evento_id) || null;
 
   // ── 1. PAGOS ──────────────────────────────────────────────────────────────
   for (const g of (M.pagos || [])) {
@@ -580,6 +597,48 @@ function planear(careo, opciones) {
     const p = porClave.get(clave);
     if (!p) { saltados.push({ nombre: c.nombre, montón: 'altas', motivo: 'no lo encontré en la pestaña al recalcular' }); continue; }
 
+    // 🔒 [CAREO-DUP-FECHA-1] ¿YA VIVE EN OTRA FECHA DE ESTE MISMO EVENTO?
+    // Entonces NO es un alta: es la misma persona capturada en otro día, y
+    // crearla aquí duplicaría su contrato Y su dinero. Medido en producción el
+    // 29-oct sobre Corona: 7 de las 9 altas propuestas eran esto — $35,345 de
+    // contrato y $28,396 de abonado que habrían nacido de la nada, más 7
+    // boletos restados dos veces del inventario.
+    //
+    // 🔒 SE NOMBRA, NO SE DECIDE (la forma de CREA-3): el careo NO funde las
+    // dos filas ni mueve a nadie de fecha —eso es `viajero_mudar_fecha`, con un
+    // humano enfrente—; deja el caso con los montos de LAS DOS fuentes para que
+    // se vea de un golpe que no coinciden. Adivinar «es la misma, júntalas»
+    // sería peor que el duplicado: movería dinero sin que nadie lo pidiera.
+    //
+    // ⚠️ Y SI NO SE PUDIERON LEER LAS HERMANAS, NO SE PROPONE NADA. Es el lado
+    // seguro medido: equivocarse hacia «no propongo» cuesta que alguien capture
+    // un alta a mano; equivocarse hacia «propongo» mete dinero inventado, que es
+    // lo invisible. El motivo lo dice, así que no es un silencio.
+    if (hermanas === null) {
+      saltados.push({ nombre: c.nombre, montón: 'altas',
+        motivo: 'no pude leer las otras fechas de este evento, así que no sé si ya viaja en una de ellas — el alta no se propone a ciegas'
+                + (hermanasError ? ' (' + hermanasError + ')' : '') });
+      continue;
+    }
+    const yaEnOtraFecha = hermanas.filter((h) => parecido(c.nombre, h.nombre));
+    if (yaEnOtraFecha.length) {
+      dupOtraFecha.push({
+        nombre: c.nombre,
+        // lo que dice EL EXCEL de esta fecha
+        excel: { evento_id: eventoIdPlan, paquete: p.paquete || null, zona: p.zona || null,
+                 total: p.total, abonado: p.abonado != null ? p.abonado : null },
+        // y lo que dice LA BASE de la otra fecha — los dos, porque la gracia
+        // está en que casi nunca coinciden
+        en_sistema: yaEnOtraFecha.map((h) => ({
+          viajero_id: h.id, nombre: h.nombre, evento_id: h.evento_id,
+          paquete: h.tipo_paquete || null, zona: h.zona_boleto || null,
+          boletos: h.boletos, total_contrato: Number(h.total_contrato || 0),
+          abonado_previo: Number(h.abonado_previo || 0),
+        })),
+      });
+      continue;
+    }
+
     // Las tres que `viajero_migrar` EXIGE. Se comprueban aquí para poder
     // saltar CON NOMBRE Y MOTIVO —el patrón del puente al Portal— en vez de
     // mandar el alta a rebotar y perder a la persona en un error genérico.
@@ -725,7 +784,17 @@ function planear(careo, opciones) {
            // ⚠️ Se DICE cuando el catálogo no se pudo leer: sin él la puerta no
            // canoniza nada y los montones de zona salen vacíos — un vacío sin
            // razón se lee como «no había nada que cambiar».
-           zonas_sin_catalogo: CANON ? false : true };
+           zonas_sin_catalogo: CANON ? false : true,
+           // [CAREO-DUP-FECHA-1] Las que el careo SE REHUSÓ a crear porque esa
+           // persona ya vive en otra fecha de este mismo evento. Van con los
+           // montos de LAS DOS fuentes: la gracia del montón es que casi nunca
+           // coinciden, y ese desacuerdo es el dato que hay que mirar.
+           dup_otra_fecha: dupOtraFecha,
+           // ⚠️ Y se DICE si las hermanas no se pudieron leer: en ese caso NO
+           // se propuso ningún alta, y un `altas: []` sin razón se leería como
+           // «el Excel no trae gente nueva» — la ley del cero falso.
+           hermanas_ilegibles: hermanas === null,
+           hermanas_motivo: hermanas === null ? hermanasError : null };
 }
 
 

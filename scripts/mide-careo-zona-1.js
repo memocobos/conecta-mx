@@ -319,7 +319,17 @@ function armarRed(dir, { sinColores = false, saboteado = false, sinCatalogo = fa
           const vals = m[1].split(',').map((v) => decodeURIComponent(v).replace(/^"|"$/g, ''));
           filas = filas.filter((f) => vals.includes(String(f[campo]))); continue;
         }
-        throw new Error('la red falsa no entiende el filtro: ' + campo + '=' + expr);
+        // [CAREO-DUP-FECHA-1] `like.slug*` como lo hace PostgREST (el `*` es el
+      // comodín). El careo lo usa para leer las OTRAS fechas del mismo evento.
+      // 🔒 Se modela SOBRE-pescando igual que el real: `coronacapital2` casa con
+      // `like.coronacapital*`. Ésa es justo la razón de que la autoridad sea
+      // `esDelEvento` y no el filtro — un fake que ya filtrara «bien» escondería
+      // el defecto que esa función existe para cerrar.
+      if ((m = /^like\.(.*)$/.exec(expr))) {
+        const pat = decodeURIComponent(m[1]).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+        out = out.filter((f) => new RegExp('^' + pat + '$').test(String(f[campo] == null ? '' : f[campo]))); continue;
+      }
+      throw new Error('la red falsa no entiende el filtro: ' + campo + '=' + expr);
       }
       return { ok: true, status: 200, json: async () => filas, text: async () => '' };
     }

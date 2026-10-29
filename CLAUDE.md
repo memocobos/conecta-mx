@@ -305,6 +305,100 @@ está caduco antes de escribirse.
     comprobante desde el Portal + su bandeja de revisión) queda nombrada y sin
     empezar, por su palabra.
 
+- 🔴🔒⏳ **CAREO-DUP-FECHA-1 (29-oct-2026, en main local): EL CAREO DE CORONA
+  QUERÍA CREAR SIETE PERSONAS QUE YA EXISTEN — $28,396 de dinero inventado a un
+  clic de distancia.** Nació de verificar CHATARRA-REGLA-1 en producción, no de
+  un reporte. `mide:careo-dup-fecha-1` **52** (sin ancla — árbol).
+  - 🔴 **MEDIDO POR LA VISTA PREVIA DEL HANDLER REAL, cero escrituras:** el careo
+    de `coronacapital#0` proponía **9 altas** y **SIETE eran gente que ya vive en
+    otra fecha del MISMO evento** — Frida en `#3` (la que yo mudé ayer) y seis en
+    `#5`: Alexis, Daniel, Ilse, Magnolia, Reynaldo y Rogelio. El «aplicar» global
+    habría creado **$35,345 de contrato y $28,396 de abonado previo de la nada**,
+    más **7 boletos restados dos veces** del inventario.
+  - 🔴🔒 **Y LA TRAMPA ERA QUE EL REMEDIO Y LA BOMBA COMPARTÍAN EL BOTÓN:**
+    CHATARRA-REGLA-1 acababa de dar una razón nueva y urgente para apretar
+    «Comparar con Excel → aplicar» en Corona (cerrar los 9 lugares fantasma del
+    viernes), y ese mismo clic arrastraba las 7 altas. Por eso la chatarra se
+    aplicó **acotada** (`solo:'fuera'`, los demás montones en cero — careado) en
+    vez de con el clic global.
+  - **LA CAUSA, y no es un defecto de `leerBase`:** filtra `evento_id=eq.<esta
+    fecha>` y eso es CORRECTO (es el padrón de esa fecha). Lo que pasa es que la
+    pestaña de Corona es **COMPARTIDA** entre #0/#1/#2/#5 y se parte por
+    `regla_zona`; quien tiene «General Sabado» en su columna Boleto pero está
+    capturado en el **pase de 3 días** no aparece en el padrón de #1 → el careo lo
+    da por nuevo. **El Excel dice que compró el sábado y la base dice que compró
+    los tres días: dos verdades sobre la misma persona, y el careo se creía la
+    única que ve.** ⚠️ Es textualmente el riesgo que MUDANZA-KAROLG-1 nombró el
+    2-oct («si el careo corría antes, les daba ALTA con su fila viva: $22,350 de
+    dinero fantasma entre eventos») y que **MUDANZA-FRIDA-1 no cerró** — peor: al
+    mudarla a `#3`, una fecha que **ninguna pestaña sirve**, la dejó huérfana.
+  - 🔒 **EL CANDADO ES LA FORMA DE CREA-3, NO UNA REGLA NUEVA:** antes de empujar
+    un alta se pregunta si esa persona ya vive en otra fecha del mismo evento
+    base; si sí, **NO se propone** y sale en el montón `dup_otra_fecha` con **los
+    montos de LAS DOS fuentes**. 🔒 Que no coincidan ES la gracia: ese desacuerdo
+    es el dato que un humano tiene que mirar, y un montón que solo dijera «ya
+    existe» no diría qué está en disputa. **Se NOMBRA, no se decide:** el careo no
+    funde las dos filas ni mueve a nadie de fecha —eso es `viajero_mudar_fecha`,
+    con un humano enfrente—. Adivinar «es la misma, júntalas» movería dinero sin
+    que nadie lo pidiera, que es peor que el duplicado.
+  - 🔒 **DOS FUNCIONES LOCALES SE MUDARON A SU DUEÑO, `_lib/misma-persona`** (la
+    forma de `imagen-magia`/`audio-magia`): `parecido` —que vivía DENTRO de una
+    acción de `admin-coordi-asignaciones`, el candado de las cortesías— y
+    `esDelEvento`, que vivía en `esferas-cancelar`. **Es una MUDANZA, no una
+    reescritura**, y los dos dueños originales ahora la PIDEN: declarar una gemela
+    en `_lib/` habrían sido dos listas que todavía no divergen, y el día que
+    divergieran **una de las dos dejaría nacer un duplicado de dinero**. El careo
+    lo afirma careando la salida del lib contra el cuerpo viejo en **10 pares** y
+    exigiendo que el dueño original ya **no declare** su `_tok`.
+  - 🔒 **UN PREFIJO NO ES UN ANCLA, y el fake lo PRUEBA en vez de taparlo:** el
+    `like.slug*` solo ESTRECHA y la autoridad es `esDelEvento` (la ley de
+    CANCEL-UI-1, que sembró `brunomars2` junto a `bruno`). La red falsa modela el
+    `like` **sobre-pescando igual que PostgREST**, así que `coronacapital2#0`
+    SÍ entra en la consulta y lo único que lo deja fuera es la función — un fake
+    que ya filtrara «bien» habría escondido el defecto que ella existe para cerrar.
+    El careo siembra un homónimo ahí y exige que **no frene** su alta.
+  - 🔒 **SIN HERMANAS NO SE PROPONE NADA, Y SE DICE** (`hermanas: null`, jamás
+    lista vacía): equivocarse hacia «no propongo» cuesta capturar un alta a mano;
+    hacia «propongo» mete dinero inventado, que es lo invisible. Y un `altas: []`
+    sin razón se leería como «el Excel no trae gente nueva» — el cero falso. Las
+    personas caen en `saltados` **con nombre y motivo**, y el resumen trae
+    `hermanas_ilegibles`.
+  - ✅ **VERIFICADO CON LOS DATOS REALES DE PRODUCCIÓN, no solo con fixtures:** el
+    lib corrido contra los 9 candidatos reales y el padrón real de las otras
+    fechas **frena 7 y deja pasar 2** (Luis padilla y Brian Eliud, que de verdad
+    no existen) — **al peso contra lo que midió la vista previa**.
+  - 🔒 **EL MONTÓN NO SE APLICA NUNCA, medido por el HECHO y no por un grep:** se
+    confirma el plan y se mira qué se escribió — nace UNA fila (la legítima), cero
+    escrituras mencionan a la duplicada, y su fila de `#5` queda **byte a byte**
+    con su dinero. **Con el candado desarmado a mano el careo se pone ROJO
+    nombrando que nacen 2 y una es la duplicada**: el sabotaje (sha1 careado antes
+    y después) prueba que el verde mide algo.
+  - ⚠️ **SIETE ARNESES VECINOS GRITARON, y eran el INSTRUMENTO, no el código:**
+    sus redes falsas **truenan ante un filtro que no entienden** —por diseño— y
+    `like.` era nuevo. Se les enseñó, **modelado igual que el real**. 🔒 La familia
+    se barrió **por el HECHO** (qué arnés tiene ese `throw`, con **cualquiera de
+    las tres redacciones** que usan: «la red falsa no entiende», «el mundo falso no
+    entiende», «filtro no modelado» — un grep de una sola frase habría encontrado
+    la mitad) y se parchó **solo a los que de verdad cargan el careo**: los otros
+    11 quedan **nombrados aquí**, sin tocar, para el día que una lectura con `like`
+    los alcance. Parchar 11 arneses que hoy no lo necesitan es ruido; dejarlos sin
+    nombrar es la bomba.
+  - ⚠️ **Y una lección del parche automático:** el nombre de la variable del campo
+    **se LEE del propio archivo** (cada fake la llama distinto: `campo` o `k`), no
+    se adivina — escrito de memoria habría insertado un filtro que no compila, o
+    peor, uno que compila y filtra por `undefined`.
+  - Vecinos verdes tras el barrido: cuadre-aplicar **110** · cuadre-total **160** ·
+    cuadre-numerologia **89** · cuadre-todo **61** · cuadre-6 46 · careo-zona-1 87 ·
+    chatarra-regla-1 26 · excel-ag-pantalla 60 · boletos 15 · crea-2 27 ·
+    cancel-ui-1 27 · viajero-edita-1 63 · dispo-norm-1 35.
+  - 🔴⏳ **LO QUE NO DECIDE EL CÓDIGO Y PIDE PALABRA DE MEMO:** de esas 7 personas,
+    **¿compraron el día suelto (lo que dice el Excel) o el pase de 3 días (lo que
+    dice la base)?** Y sus montos **no coinciden entre las dos fuentes** (Alexis:
+    Excel 9,500/8,780 contra base 13,745/7,340). Hasta que eso se resuelva, el
+    careo las va a seguir nombrando cada vez — que es justo lo que debe hacer.
+  - ⏳ **Push de Memo.** Hasta el deploy, **nadie debe apretar el «aplicar» global
+    de Corona**: el candado vive en el código que todavía no está arriba.
+
 - 🔴✏️⏳ **VIAJERO-EDITA-1 + VIAJERO-MUDAR-1 (28-oct-2026, en main local): HOY NO
   SE PODÍA CORREGIR EL TOTAL DE NADIE — y mover de fecha era SQL de Jane.**
   Nacieron de las dos pendientes del caso de Frida, y la medición las hizo más
@@ -481,8 +575,19 @@ está caduco antes de escribirse.
     contra el 2**). Vecinos verdes: cuadre-aplicar 110 · cuadre-numerologia 89 ·
     careo-zona-1 87 · dispo-norm-1 35 · zona-norm-1 35 · cuadre-6 46 ·
     boletos 15 · excel-ag-pantalla 60 · concilia-1 83.
-  - ⏳ **Push de Memo → el próximo careo de Corona reescribe la llave.** Hasta el
-    deploy, el viernes sigue ofreciendo 9 lugares que no hay.
+  - ✅ **APLICADA Y CERRADA EN PRODUCCIÓN (29-oct, tras el push de Memo).** La
+    vista previa del handler REAL propuso exactamente lo que el acta prometía
+    —`General Viernes 9→0` · `General 0→9`— y se aplicó **ACOTADA**
+    (`solo:'fuera'`, con los demás montones en CERO: altas 0 · abonos 0 ·
+    totales 0 · bajas 0), **no con el clic global**. 🔒 La razón de acotarlo es
+    CAREO-DUP-FECHA-1: ese mismo clic arrastraba 7 altas duplicadas — el remedio
+    y la bomba compartían el botón.
+  - ✅ **VERIFICADO POR LA PUERTA DEL CLIENTE**, que es la que manda:
+    `disponibilidad-evento` de `coronacapital#0` pasó de `zonas_pocas: {}` (y 11
+    libres por dentro) a **`{General: 2}`** — la verdad `19 − 9 − 8`, con su chip
+    de «¡Últimos 2!» saliendo solo. **2º clic: cero escrituras** (idempotente).
+    De paso quedó medido que los tres días de Corona están casi agotados:
+    **viernes 2 · sábado 3 · pase completo 1**.
 
 - ✅ **MUDANZA-FRIDA-1 (28-oct-2026, APLICADA): su Corona pasa de Vie (#0) a
   Vie+Sáb (#3).** Palabra de Memo: «Son 2 días (Vie+Sáb)». Acta

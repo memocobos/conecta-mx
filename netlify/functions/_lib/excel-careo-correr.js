@@ -31,6 +31,9 @@ const { normalizarZona } = require('./normalizar-zona');
 // [DISPO-NORM-1] La puerta de la chatarra: sus llaves se canonizan a la
 // ortografía de la ficha antes de que `planear` las compare con la base.
 const { zonasCanonicasDe, zonasDeFecha, resolverZonaFicha } = require('./zona-ficha');
+// [CAREO-DUP-FECHA-1] «¿es la misma persona?» y «¿esta llave es de este evento
+// base?» — los dos dueños, mudados de sus handlers (ver el lib).
+const { esDelEvento, slugBase } = require('./misma-persona');
 const DISPO = require('./excel-disponibilidad');
 
 // [CAREO-ZONA-1] Cuántas celdas rojas hacen una fila roja. ⚠️ DECLARADO Y
@@ -244,6 +247,50 @@ async function correrCareo(eventoId) {
   // valor malo vivo un instante y dos sitios donde se decide lo mismo.
   const base = await leerBase(eventoId, sb);
   if (base.error) return { error: { status: 502, mensaje: base.error } };
+
+  // ── 2.4 [CAREO-DUP-FECHA-1] LAS HERMANAS: las OTRAS fechas del evento ─────
+  // Medido en producción el 29-oct: el careo de `coronacapital#0` proponía como
+  // ALTA NUEVA a Frida —que vive en `#3`— y el de `#1` a SEIS personas que
+  // viven en `#5`. Son $35,345 de contrato y $28,396 de abonado que habrían
+  // nacido de la nada, más 7 boletos descontados dos veces.
+  //
+  // LA CAUSA: `leerBase` filtra `evento_id=eq.<esta fecha>` (correcto: es el
+  // padrón de ESTA fecha), y la pestaña de Corona es COMPARTIDA entre #0/#1/#2
+  // y #5. Una persona cuya columna Boleto dice «General Sabado» pero que está
+  // capturada en el pase de 3 días no aparece en el padrón de #1 → el careo la
+  // da por nueva. El Excel dice que compró el sábado y la base dice que compró
+  // los tres días: dos verdades sobre la misma persona, y el careo se creía la
+  // única que ve.
+  //
+  // 🔒 SE LEE UNA VEZ Y SOLO SIRVE PARA FRENAR Y NOMBRAR. Estas filas JAMÁS
+  // entran a `base.viajeros` (eso metería el dinero de otra fecha en esta
+  // cuenta, que es el defecto al revés y más grande): viajan aparte para que
+  // `planear` pueda rehusarse a proponer un alta y DECIR dónde vive la persona.
+  //
+  // 🔒 UN PREFIJO NO ES UN ANCLA: el `like` solo ESTRECHA y la autoridad es
+  // `esDelEvento` (la ley de CANCEL-UI-1, que sembró `brunomars2` junto a
+  // `bruno`). Y se excluye la fecha propia, que ya la trajo `leerBase`.
+  //
+  // 🔒 FAIL-SOFT QUE NO SE CALLA: si no se pueden leer, `hermanas` va en NULL
+  // —no en lista vacía— y `planear` NO propone altas a ciegas. Una lista vacía
+  // se leería como «no vive en ninguna otra fecha», que es justo la afirmación
+  // falsa que costó esto.
+  let hermanas = null, hermanasError = null;
+  try {
+    const slugH = slugBase(eventoId);
+    const hp = new URLSearchParams();
+    hp.set('select', 'id,nombre,evento_id,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo');
+    hp.set('evento_id', 'like.' + slugH + '*');
+    hp.set('limit', '5000');
+    const hr = await fetch(`${SB_URL}/rest/v1/viajeros_evento?${hp.toString()}`, { headers: sb });
+    if (!hr.ok) throw new Error('consulta ' + hr.status);
+    const todasH = await hr.json();
+    if (!Array.isArray(todasH)) throw new Error('la lista no vino como lista');
+    hermanas = todasH.filter((v) => esDelEvento(v.evento_id, slugH) && v.evento_id !== eventoId);
+  } catch (e) {
+    hermanas = null;
+    hermanasError = 'no pude leer las otras fechas de «' + slugBase(eventoId) + '»: ' + e.message;
+  }
 
   // ── 2.5 [CUADRE-2a] LA TERCERA FUENTE ────────────────────────────────────
   // El lado-Excel deja de ser «la pestaña» y pasa a ser «la pestaña + el libro
@@ -665,6 +712,11 @@ async function correrCareo(eventoId) {
            // zona. Viaja SIEMPRE (incluso vacío) para que la pantalla pueda
            // distinguir «no hubo ninguna» de «este careo es viejo y no lo mide».
            chatarra_regla: chatarraReglaAvisos,
+           // [CAREO-DUP-FECHA-1] Los viajeros de las OTRAS fechas del mismo
+           // evento base. `null` = no se pudieron leer, y entonces `planear`
+           // NO propone altas (ver 2.4): una lista vacía afirmaría que nadie
+           // vive en otra fecha, que es la mentira que costó $28,396.
+           hermanas, hermanas_error: hermanasError,
            chatarraPorZona, staffReconocido, ajustes: Array.isArray(ajustes) ? ajustes : [],
            // [EXCEL-AG-2] `null` = la palomita de este evento-fecha está APAGADA.
            // No es lo mismo que «no había nada»: se distingue a propósito.

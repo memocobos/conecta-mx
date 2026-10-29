@@ -897,13 +897,13 @@ ${entregables}
       //   · `viajero_existente_id` → es ella: se COMPLETA esa fila (como Victor);
       //   · `es_otra_persona: true` → son personas distintas: se crea igual.
       // Un candado que adivina «es la misma» y escribe sería peor que ninguno.
-      const _tok = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length >= 3);
-      const _parecido = (a, b) => {
-        const ta = _tok(a), tb = new Set(_tok(b));
-        if (!ta.length || !tb.has(ta[0])) return false;
-        return ta.length === 1 || ta.slice(1).some((t) => tb.has(t));
-      };
+      // [CAREO-DUP-FECHA-1] Esta pregunta —«¿son la misma persona?»— ganó un
+      // SEGUNDO lector (el careo del Excel, que proponía altas de gente que ya
+      // vivía en otra fecha del mismo evento) y por eso se MUDÓ a su propio
+      // dueño. El cuerpo es el mismo byte a byte; aquí solo se PIDE. Declarar
+      // una gemela sería la segunda lista esperando a divergir, y el día que
+      // divergiera una de las dos dejaría nacer un duplicado de dinero.
+      const _parecido = require('./_lib/misma-persona').parecido;
       let filasEvento = null;
       const _filasEvento = async () => {
         if (filasEvento) return filasEvento;

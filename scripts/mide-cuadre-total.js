@@ -352,12 +352,26 @@ const CASO = () => ({
       filaExcel(CAB_YOUNGMIKO, { 'Nombre': 'Vendido Sin Zona', 'Boleto': '' }),
     ]);
     const rCh = parsearPestana(filasCh, { fila: 10 }, null);
-    console.log('    chatarra por zona: ' + JSON.stringify(rCh.chatarraPorZona) + ' · personas: ' + rCh.personas.length);
-    af(rCh.chatarraPorZona && rCh.chatarraPorZona['VIP'] === 2,
-       'la chatarra de VIP no se contó: ' + JSON.stringify(rCh.chatarraPorZona)
+    console.log('    chatarra por zona: ' + JSON.stringify(rCh.chatarraPorZona)
+      + ' · staff del Excel: ' + JSON.stringify(rCh.staffExcelPorZona)
+      + ' · personas: ' + rCh.personas.length);
+    // ⚠️ [STAFF-BOLETO-2 · 13-oct] ESTE BLOQUE SE ACTUALIZÓ A LA VERDAD NUEVA,
+    // no se silenció. Antes exigía `VIP: 2` (Marietta creadora) y `Plata: 1`
+    // (Coordinador) dentro de la CHATARRA. Palabra de Memo: «KameHouse manda»
+    // el boleto de coordis y creadoras — su boleto lo pone su fila del staff
+    // (botón 🎟 de Capsule y la cortesía), así que contarlo también aquí lo
+    // descontaría DOS VECES. Hoy viaja aparte en `staffExcelPorZona`.
+    // 🔒 Las dos mitades quedan con dientes: la chatarra de verdad SÍ descuenta
+    // y el staff NO — si alguien funde los dos montones otra vez, cae aquí.
+    af(rCh.chatarraPorZona && rCh.chatarraPorZona['Balcón'] === 1,
+       'la chatarra de verdad no se contó: ' + JSON.stringify(rCh.chatarraPorZona)
        + ' — «Vendido X» no es viajero pero SÍ ocupa un boleto');
-    af(rCh.chatarraPorZona && rCh.chatarraPorZona['Balcón'] === 1 && rCh.chatarraPorZona['Plata'] === 1,
-       'falta chatarra de alguna zona: ' + JSON.stringify(rCh.chatarraPorZona));
+    af(!(rCh.chatarraPorZona || {})['VIP'] && !(rCh.chatarraPorZona || {})['Plata'],
+       '🔴 el staff del Excel volvió a descontar boleto: ' + JSON.stringify(rCh.chatarraPorZona)
+       + ' — STAFF-BOLETO-2 dice que su boleto lo pone KameHouse, contarlo aquí lo descuenta dos veces');
+    af(rCh.staffExcelPorZona && rCh.staffExcelPorZona['VIP'] === 2 && rCh.staffExcelPorZona['Plata'] === 1,
+       'el staff del Excel no se contó APARTE: ' + JSON.stringify(rCh.staffExcelPorZona)
+       + ' — no descuenta, pero desaparecerlo deja al careo sin con qué avisar');
     // Sin zona no se le puede descontar a ninguna: se cuenta aparte, no se inventa.
     af(!(rCh.chatarraPorZona || {})[''] && !(rCh.chatarraPorZona || {})['(sin zona)'],
        'la chatarra SIN zona se le asignó a alguna: ' + JSON.stringify(rCh.chatarraPorZona));
@@ -369,10 +383,32 @@ const CASO = () => ({
     // le restaría stock ajeno. La guarda de chatarra corre ANTES del filtro de
     // zona, así que este caso NO es teórico.
     const rZona = parsearPestana(filasCh, { fila: 10 }, 'VIP');
-    console.log('    con regla_zona «VIP»: ' + JSON.stringify(rZona.chatarraPorZona));
-    af(rZona.chatarraPorZona['VIP'] === 2 && !rZona.chatarraPorZona['Balcón'] && !rZona.chatarraPorZona['Plata'],
+    console.log('    con regla_zona «VIP»: chatarra ' + JSON.stringify(rZona.chatarraPorZona)
+      + ' · staff ' + JSON.stringify(rZona.staffExcelPorZona));
+    af(!rZona.chatarraPorZona['Balcón'] && !rZona.chatarraPorZona['Plata'],
        'con regla de zona se contó chatarra de OTRAS zonas: ' + JSON.stringify(rZona.chatarraPorZona)
        + ' — eso le resta stock a un evento que no es');
+    // Y el filtro de zona vale para los DOS montones: el staff de otra zona
+    // tampoco es de este evento. Con «VIP» solo pueden quedar las dos de
+    // Marietta, y en el montón del staff — jamás en el que descuenta.
+    af(rZona.staffExcelPorZona['VIP'] === 2 && !rZona.staffExcelPorZona['Plata'],
+       'la regla de zona no se aplicó al staff: ' + JSON.stringify(rZona.staffExcelPorZona));
+    // 🔴 TESTIGO · EL AVISO PROMETIDO NO EXISTE. El comentario de STAFF-BOLETO-2
+    // dice que el staff se cuenta aparte «para que el careo pueda AVISAR si no
+    // cuadran» — y medido por el HECHO (quién lee la llave en todo el repo),
+    // `staffExcelPorZona` solo se escribe y se devuelve: NADIE la lee. Es un
+    // candado prometido en un comentario, la familia que esta casa ya pagó
+    // varias veces. El día que ese aviso se construya, este testigo se pone
+    // rojo y manda a leer esta nota en vez de dejar un verde caducado.
+    {
+      const barrido = require('child_process').execSync(
+        "grep -rln 'staffExcelPorZona' --include=*.js . | grep -v node_modules | grep -v '/scripts/' || true",
+        { cwd: RAIZ, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+      console.log('    lectores de staffExcelPorZona fuera del lib: ' + (barrido.length - 1));
+      af(barrido.length === 1 && /excel-careo\.js$/.test(barrido[0]),
+        '🟡 TESTIGO CAÍDO (bueno): alguien ya LEE staffExcelPorZona → ' + barrido.join(', ')
+        + '. Actualiza este bloque: el aviso que el comentario promete por fin existe.');
+    }
 
     // 🔒 La llave `zona` de siempre NO se toca: hay consumidores que la leen.
     af(serg && serg.zona === 'VIP', 'se perdió la llave `zona` de siempre: ' + JSON.stringify(serg && serg.zona));
@@ -462,9 +498,42 @@ const CASO = () => ({
     }
     throw new Error('llaves desbalanceadas en ' + nombre);
   };
+  // 🔒 [CAREO-DEPS-1] LAS DEPENDENCIAS SE DERIVAN, NO SE TECLEAN.
+  // Este bloque llevaba semanas CAÍDO con `_excelTestigoPreventaHtml is not
+  // defined`: PREVENTA-DESCUENTO-1 metió un pintor nuevo dentro de
+  // `_excelCareoHtml`, barrió TRES arneses buscando el hecho (`new Function(`)
+  // y aun así este CUARTO se quedó con su lista a mano. Una lista escrita al
+  // lado de la realidad envejece sola — y un arnés CAÍDO no reporta: deja todo
+  // lo que viene después sin medir, así que los 151 verdes de CUADRE-5/6 eran
+  // un verde caducado. Hoy la lista SALE del cuerpo de la función.
+  const DECLARADAS = new Set(
+    [...fuente.matchAll(/^\s*function\s+([A-Za-z0-9_$]+)\s*\(/gm)].map((m) => m[1]));
+  const depsDe = (nombre, vistos) => {
+    vistos = vistos || new Set();
+    if (vistos.has(nombre)) return vistos;
+    vistos.add(nombre);
+    for (const m of recortar(nombre).matchAll(/([A-Za-z0-9_$]+)\s*\(/g)) {
+      if (m[1] !== nombre && DECLARADAS.has(m[1])) depsDe(m[1], vistos);
+    }
+    return vistos;
+  };
+  const NECESITA = [...depsDe('_excelCareoHtml')];
+  console.log('    dependencias DERIVADAS (' + NECESITA.length + '): ' + NECESITA.join(' · '));
+  // Candado de cardinalidad: si la derivación devolviera solo la propia función
+  // estaría midiendo en vacío y el `new Function` pasaría por casualidad.
+  af(NECESITA.length >= 5, 'la derivación encontró ' + NECESITA.length + ' funciones: el instrumento no está mirando');
+  af(NECESITA.includes('_excelTestigoPreventaHtml'),
+    '🔒 la derivación NO ve `_excelTestigoPreventaHtml` — que es la que tenía este bloque caído');
+  // CONTROL POSITIVO: la lista VIEJA (a mano, sin el testigo) tiene que tronar.
+  // Sin esta mitad, «ya no se cae» no distingue el arreglo de la suerte.
+  let viejaTrono = false;
+  try {
+    const vieja = ['_evtEsc', '_evtMxn', '_excelFuenteNumerologia', '_excelChipFuentes', '_excelCareoHtml'];
+    new Function(vieja.map(recortar).join('\n') + '\nreturn _excelCareoHtml;')()(d);
+  } catch (e) { viejaTrono = /_excelTestigoPreventaHtml/.test(String(e.message)); }
+  af(viejaTrono, '🔒 CONTROL POSITIVO: la lista a mano YA NO se cae — este careo no está probando nada');
   const pintar = new Function(
-    recortar('_evtEsc') + '\n' + recortar('_evtMxn') + '\n' + recortar('_excelFuenteNumerologia') + '\n' + recortar('_excelChipFuentes') + '\n' + recortar('_excelCareoHtml')
-    + '\nreturn _excelCareoHtml;')();
+    NECESITA.map(recortar).join('\n') + '\nreturn _excelCareoHtml;')();
   const html = pintar(d);
   // ASERCIONES SOBRE EL HTML IMPRESO, no sobre el fuente.
   af(html.includes('Valeria Colin'), 'la pantalla no imprime a Valeria, que SÍ está en el montón');
@@ -485,6 +554,32 @@ const CASO = () => ({
   af(/tecleado en la pestaña/.test(bloque), 'la pantalla no avisa de los «$0» tecleados');
   console.log('    HTML: ' + html.length + ' bytes · el bloque de totales: ' + bloque.length
     + ' · chip derivado ×' + chips);
+
+  // ── [8b] LA FAMILIA · ningún arnés hermano puede quedarse corto ───────────
+  // 🔒 Arreglar ESTE sitio y reportar sería repetir el error que lo causó: la
+  // vez pasada se barrieron tres y quedó un cuarto. Los hermanos se DESCUBREN
+  // por el hecho (qué archivo menciona `_excelCareoHtml`), jamás por una lista,
+  // y a cada uno se le exige que su recorte nombre TODAS las dependencias
+  // derivadas arriba. El día que alguien meta un pintor nuevo, los que no lo
+  // recorten salen aquí con su nombre antes de caerse en una corrida ajena.
+  console.log('\n[8b] la familia de arneses que pinta esta pantalla');
+  const dirScripts = path.join(RAIZ, 'scripts');
+  const hermanos = require('fs').readdirSync(dirScripts)
+    .filter((n) => n.endsWith('.js'))
+    .filter((n) => require('fs').readFileSync(path.join(dirScripts, n), 'utf8').includes('_excelCareoHtml'))
+    .filter((n) => n !== 'mide-cuadre-total.js');
+  af(hermanos.length >= 2, 'el barrido encontró ' + hermanos.length + ' hermano(s): el instrumento no está mirando');
+  for (const h of hermanos) {
+    const src = require('fs').readFileSync(path.join(dirScripts, h), 'utf8');
+    // Solo cuentan las dependencias que ese arnés tiene que recortar A MANO;
+    // si derivara como éste, el literal no haría falta — por eso se acepta
+    // también que el archivo derive (mencione `DECLARADAS`).
+    const deriva = /matchAll\(\/\^\\s\*function/.test(src);
+    const faltan = deriva ? [] : NECESITA.filter((fn) => !src.includes("'" + fn + "'"));
+    af(faltan.length === 0, '🔴 ' + h + ' no recorta: ' + faltan.join(', ')
+      + ' — se va a caer con «is not defined» como se cayó éste');
+    console.log('    ' + h + ' → ' + (deriva ? 'deriva sus dependencias' : 'recorta las ' + NECESITA.length + ' a mano ✓'));
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // [9] CUADRE-5 · LAS CUATRO CLASES DEL «$0» TECLEADO

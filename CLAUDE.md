@@ -413,19 +413,58 @@ está caduco antes de escribirse.
     recalcula solo. ⏳ Y **`coronacapital#3` no tiene pedido cargado**, así que
     queda ciego como los otros 60 de STOCK-CIEGO-1.
 
-- 🔴⏳ **DOS CAREOS VECINOS EN ROJO, PREEXISTENTES Y AJENOS (medido el 28-oct
-  con un worktree LIMPIO de HEAD: reproducen idénticos sin mis cambios).** No se
-  tocaron, y se nombran para que nadie los lea como daño de la tuerca de hoy:
-  - `mide:cuadre-todo` — «EL SEGUNDO CLIC GLOBAL ESCRIBIÓ 1 vez: stock_ajustes:
-    PATCH». Es la guarda vieja «el 2º clic escribe CERO» que CHATARRA-SELLO-1
-    actualizó en `mide:cuadre-aplicar` y nadie actualizó aquí (el sello de
-    solo-nota la tumba). Ya estaba nombrada en SALDOS-CAJA-1.
-  - 🔴 `mide:cuadre-total` — **SE CAE** con `_excelTestigoPreventaHtml is not
-    defined`. Es el **CUARTO sitio** de la familia que PREVENTA-DESCUENTO-1 cazó
-    en tres (`cuadre-aplicar` ×2 y `cuadre-numerologia`) y dio por barrida. Su
-    acta decía «el tercer sitio lo encontré buscando EL HECHO (`new Function(`)»
-    — y aun así quedó uno. ⚠️ **Eso significa que el careo de CUADRE-5/6 lleva
-    semanas sin correr**: sus 151 verdes son un verde caducado.
+- ✅🔴 **CAREO-DEPS-1 (28-oct-2026, en main local): LOS DOS CAREOS VECINOS EN
+  ROJO, CERRADOS — y el de CUADRE-5/6 llevaba SEMANAS sin medir nada.**
+  Diff **100% de instrumento**: dos archivos de `scripts/`, cero de producción.
+  `mide:cuadre-total` **151 → 160** · `mide:cuadre-todo` **59 → 61**; vecinos
+  verdes en la misma corrida (cuadre-aplicar 110 · cuadre-numerologia 89 ·
+  cuadre-6 46 · chatarra-regla-1 26 · careo-zona-1 87).
+  - 🔴 **`mide:cuadre-total` SE CAÍA** con `_excelTestigoPreventaHtml is not
+    defined` — el **CUARTO sitio** de la familia que PREVENTA-DESCUENTO-1 cazó
+    en tres y dio por barrida. 🔒 **Y un arnés CAÍDO no reporta**: moría en el
+    bloque [8] y dejaba los bloques [9]-[14] —toda la regla de CUADRE-5/6— sin
+    ejercitar y sin marcador. Sus «151 verdes» eran un verde caducado.
+  - 🔒 **EL ARREGLO NO ES PARCHAR LA LISTA: ES DERIVARLA.** Parchar habría
+    repetido el error que lo causó (una lista a mano al lado de la realidad, que
+    ya se quedó corta dos veces). Hoy las dependencias se **recortan del cuerpo**
+    de `_excelCareoHtml` por transitividad — salen **6** — con candado de
+    cardinalidad y **control positivo**: la lista VIEJA tiene que seguir
+    tronando con ESE mensaje, o «ya no se cae» no distingue el arreglo de la
+    suerte.
+  - 🔒 **Y LA FAMILIA SE BARRE POR EL HECHO, en bloque `[8b]` nuevo:** los
+    hermanos se DESCUBREN preguntando qué archivo de `scripts/` menciona
+    `_excelCareoHtml` (jamás por lista) y a cada uno se le exige que nombre las 6
+    — o que derive. El día que alguien meta un pintor nuevo, los que se queden
+    cortos salen **con su nombre** antes de caerse en una corrida ajena.
+  - ⚠️ **AL REVIVIRLO APARECIERON 3 ROJOS QUE LA CAÍDA ESCONDÍA, y eran EL ARNÉS
+    PODRIDO, no el código:** medían la verdad del 20-sep sobre la chatarra.
+    **STAFF-BOLETO-2 (13-oct, palabra de Memo: «KameHouse manda» el boleto de
+    coordis y creadoras)** sacó al staff del descuento — su boleto lo pone su
+    fila de KameHouse, contarlo también aquí lo restaría DOS VECES— y lo mandó a
+    `staffExcelPorZona`. Actualizados a la verdad nueva **con dientes en las dos
+    mitades**: la chatarra de verdad («Vendido X») SÍ descuenta · el staff NO
+    descuenta **y se cuenta aparte** · y la regla de zona se aplica a los DOS
+    montones. Si alguien los funde otra vez, cae ahí.
+  - 🔴🔒 **MI PROPIA GUARDA NUEVA CAZÓ UN DEFECTO DEL INSTRUMENTO:** la red falsa
+    de `cuadre-todo` **no guardaba el `parche`** de sus PATCH, así que «el 2º
+    clic no movió dinero ni boletos» salía **VERDE por falta de datos**. Es la
+    ley de *antes de creerle una AUSENCIA a un instrumento, hazlo contestar algo
+    que sí existe*. El parche ya viaja en la bitácora, y la guarda lleva su
+    **control positivo** (un abono inyectado tiene que caer en el filtro).
+  - **La guarda del 2º clic global quedó como la de `cuadre-aplicar`:** mira
+    **QUÉ** escribe, columna por columna —ninguna de dinero ni boletos, y lo
+    único permitido es el sello de solo-nota de CHATARRA-SELLO-1— que es **más
+    estricto que contar**: con el «cero», una escritura futura que sí moviera
+    algo se habría podido «arreglar» subiendo el número.
+  - 🔴⏳ **DOS HALLAZGOS NOMBRADOS SIN TOCAR (los dos piden palabra de Memo):**
+    (a) **`staffExcelPorZona` NO TIENE LECTOR** — su comentario promete que se
+    cuenta aparte «para que el careo pueda AVISAR si no cuadran» y, medido por el
+    hecho (quién lee la llave en todo el repo), **solo se escribe y se
+    devuelve**: es un candado prometido en un comentario. Queda un **TESTIGO**
+    que se pone rojo el día que ese aviso exista, en vez de dejar un verde
+    caducado; (b) **STAFF-BOLETO-2 no tiene acta en este libro** (grep: cero) —
+    una decisión de dinero firmada por Memo que vive solo en un comentario de
+    `_lib/excel-careo`.
 
 - 📨⏳ **RECHAZO-AVISO-1 (28-oct-2026, en main local): RECHAZAR UNA SOLICITUD
   AHORA LE AVISA AL CLIENTE.** Pregunta de Memo, citada: *«¿está seguro que al

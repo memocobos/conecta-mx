@@ -137,7 +137,12 @@ function redFalsa(base) {
     }
     if (met === 'PATCH') {
       const parche = JSON.parse(opts.body); const tocadas = filtrar(tablas[tabla], u.searchParams);
-      tocadas.forEach((f) => { Object.assign(f, parche); escrituras.push({ tabla, op: 'PATCH', fila: f, filtro: u.search }); });
+      // 🔒 El `parche` VIAJA en la bitácora. Sin él, una aserción de «no movió
+      // dinero» sale VERDE por falta de datos en vez de por bondad — lo cazó la
+      // guarda nueva del segundo clic global, que medía `Object.keys(e.parche)`
+      // sobre un objeto que esta red nunca guardaba. Un instrumento que no
+      // registra el cuerpo contesta la ausencia cómoda.
+      tocadas.forEach((f) => { Object.assign(f, parche); escrituras.push({ tabla, op: 'PATCH', fila: f, parche, filtro: u.search }); });
       return { ok: true, status: 200, json: async () => tocadas, text: async () => '' };
     }
     throw new Error('método no modelado: ' + met);
@@ -247,8 +252,39 @@ const cuenta = (t, tabla) => (t[tabla] || []).length;
     const ap2 = await recorrer({ tanda: 2, confirmar: true }, red2);
     console.log('    escrituras 1er recorrido: ' + red.escrituras.length + ' · 2º: ' + red2.escrituras.length);
     af(!ap2.error, 'el segundo recorrido falló: ' + JSON.stringify(ap2.error || '').slice(0, 150));
-    af(red2.escrituras.length === 0, 'EL SEGUNDO CLIC GLOBAL ESCRIBIÓ ' + red2.escrituras.length
-       + ' vez(ces): ' + JSON.stringify(red2.escrituras.map((e) => e.tabla + ':' + e.op)));
+    // ⚠️ [CHATARRA-SELLO-1 · 1-oct] ESTA GUARDA SE ACTUALIZÓ A SU INTENCIÓN,
+    // no se silenció. Decía «el 2º clic escribe CERO» y el sello la tumbó con
+    // razón: hoy el segundo recorrido SELLA («verificada ⟨hoy⟩») la chatarra que
+    // el primero acabó de cuadrar — una escritura de NOTA, nunca de dinero.
+    // `mide:cuadre-aplicar` ya se había actualizado el 1-oct y este hermano se
+    // quedó atrás: llevaba semanas en rojo hablando del pasado.
+    // 🔒 Y mirar QUÉ escribe es MÁS ESTRICTO que contar: con el «cero», una
+    // escritura futura que sí moviera algo se habría podido «arreglar» subiendo
+    // el número. Aquí cualquier columna de dinero o boletos tumba el careo.
+    const COLUMNAS_PROHIBIDAS = ['vendidos_fuera', 'monto', 'abonado_previo', 'total_contrato',
+                                 'boletos', 'zona_boleto', 'precio', 'cantidad'];
+    console.log('    el 2º clic escribió: ' + JSON.stringify(red2.escrituras.map(
+      (e) => e.tabla + ' ' + JSON.stringify(Object.keys(e.parche || {})))));
+    const ofensoras = red2.escrituras.filter((e) =>
+      Object.keys(e.parche || {}).some((k) => COLUMNAS_PROHIBIDAS.includes(k)));
+    af(ofensoras.length === 0,
+       '🔴 EL SEGUNDO CLIC GLOBAL MOVIÓ DINERO O BOLETOS: '
+       + JSON.stringify(ofensoras.map((e) => ({ t: e.tabla, parche: e.parche }))));
+    // Lo único que puede escribir es el sello, NOMBRADO: otra clase de
+    // escritura tiene que caerse aquí en vez de tolerarse.
+    const noSellos = red2.escrituras.filter((e) =>
+      !(e.tabla === 'stock_ajustes' && JSON.stringify(Object.keys(e.parche || {}).sort()) === '["nota"]'));
+    af(noSellos.length === 0, 'el 2º clic global escribió algo que NO es un sello de nota: '
+       + JSON.stringify(noSellos.map((e) => ({ t: e.tabla, op: e.op, parche: e.parche }))));
+    // 🔒 CONTROL POSITIVO DEL FILTRO. Las dos aserciones de arriba acabaron de
+    // salir verdes; sin esta mitad no se distingue «no movió dinero» de «la
+    // bitácora llegó vacía y no medí nada» — que es justo el defecto que la red
+    // falsa tenía un minuto antes de este renglón.
+    {
+      const sabotaje = [{ tabla: 'viajeros_evento', op: 'PATCH', parche: { abonado_previo: 999 } }];
+      const of2 = sabotaje.filter((e) => Object.keys(e.parche || {}).some((k) => COLUMNAS_PROHIBIDAS.includes(k)));
+      af(of2.length === 1, '🔒 el filtro de columnas prohibidas NO caza un abono inyectado: sus ceros no valen nada');
+    }
   }
 
   // ── [4] UN EVENTO TRUENA: los demás siguen, y se NOMBRA ─────────────────

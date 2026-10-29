@@ -188,6 +188,64 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💬⏳ **CAPSULE-WA-1 (29-oct-2026, en main local): el celular de la lista de
+  viajeros es LINK de WhatsApp.** Palabra de Memo: *«hay algunos clientes que
+  tengo que hablarles para cambios — dame link a sus celular para poder
+  preguntar su cambio de paquete etc»*. `mide:capsule-ux-1` **67** (eran 52;
+  bloque [H] + el pintor REAL arma los links; sabotaje con sha1 careado → 5
+  rojos con nombre → restaurado byte a byte).
+  - 🔒 **`_waDigits10` es el dueño, EXTRAÍDO de `_cobWaHref`** (la cobranza ya
+    resolvía 521/52/10 desde antes): dos escaleras serían dos listas que
+    todavía no divergen. La cobranza careada tras la mudanza: misma salida.
+  - **Medido en el padrón ANTES de construir:** 793 de 2,631 activos traen
+    celular de 10 dígitos · 1,833 sin celular · 5 raros. 🔒 **Un 11 dígitos NO
+    se adivina** — hay celulares de EE.UU. en el padrón («1956…») y pelarlos
+    armaría un wa.me/52 hacia un número que no existe. Sin 10 dígitos MX el
+    celular se pinta como siempre, sin link.
+  - El saludo es **NEUTRO** (nombra a la persona y a su evento, jamás un
+    motivo — el motivo lo escribe el humano) y el nombre del evento viaja por
+    PARÁMETRO: la función no depende del estado de la pantalla; sin catálogo
+    dice «tu tour», no un slug crudo.
+  - ⏳ Push de Memo → tocar un 💬 en la lista de viajeros y mandar el mensaje.
+
+- 🎨⏳ **PORTAL-VIVO-1 (29-oct-2026, en main local): la card del viaje deja de
+  estar SECA — foto del artista, muestra de 30 s, Spotify y la radio a un
+  toque.** Palabra de Memo: *«el portal lo veo muy seco… poner foto del artista
+  de su tour basado en el del index, música del artista alguna liga a spotify
+  preview, hacerlo más dinámico, algún link más sencillo para la radio»*.
+  `mide:portal-vivo-1` **36** (nuevo, sin ancla — árbol; sabotaje sha-careado →
+  rojo → restaurado). Vecinos verdes: plan-pagos-1 81 · portal-solo-1 89 ·
+  portal-edit-1 28 · preventa-portal-1 33 · fecha3-1 33 · viajero-edita-1 63.
+  - 🔒 **El HERO reusa la piel que YA existía** (`.tc-hero` de las cards del
+    flujo viejo — cero CSS gemelo; `.mig-hero` solo neutraliza el cursor del
+    acordeón, que aquí no hay). Foto estática de STATIC_IMGS INLINE (cero red);
+    sin ella, Deezer async por el dueño de siempre (`_artDeezerUrl`): UNA
+    petición por evento BASE con caché, y el hueco deja el gradiente de la
+    casa — nunca un shimmer eterno. 🔒 El atributo lleva el slug BASE y el
+    upgrade casa por IGUALDAD: un prefijo no es un ancla («palnorte» es
+    prefijo de «palnorte2026» y un `^=` pintaría la foto del vecino).
+  - **▶ La muestra de 30 s**: la URL de Deezer viene FIRMADA y caduca en
+    15-30 min (la lección del sorteo) → se pide AL CLIC, jamás al cargar la
+    página. UN solo `<audio>` para todas las cards; si la radio está sonando
+    se pausa POR SU PROPIO BOTÓN (el dueño del toggle) — jamás tocando su
+    `<audio>` por dentro. «Sin muestra» se DICE, no se queda un botón mudo.
+  - 🔒 **Spotify va por LINK** (search del artista, URL-encodeado): el
+    reproductor incrustado NO cabe en el CSP del sitio (`frame-src`) — la
+    misma pared que el sorteo ya pagó. **📻 Radio** en cada card delega en el
+    `#rcp-play` REAL del mini-player.
+  - ⚠️ **Lección del instrumento, escrita en el arnés:** `escapeHtml` trae
+    REGEX con comillas (`/"/g`) y el parser de strings de `rebana` se comía
+    **210 KB hasta `</html>`** — un regex literal no es un string. Esa función
+    plana se corta por `\n}` (`rebanaPlana`), y sigue siendo LA REAL.
+  - **Estado medido el mismo día (para las preguntas de Memo):** 53
+    requisiciones aprobadas · 50 correos distintos → **17 registrados en el
+    Portal · 33 sin registrarse** (uno con correo roto «…@hmail.com») ·
+    Portal: 63 clientes, 28 con cuenta · `contratos_cliente` sigue en **1**
+    (la prueba de Memo — el interruptor sigue APAGADO esperando su palabra).
+  - ⏳ Push de Memo → prueba humana con su cuenta en el Portal (foto, ▶,
+    radio). Subir el comprobante desde el Portal sigue siendo Fase 2 de
+    PLAN-PAGOS, nombrada y sin construir — pide su palabra.
+
 - 🧭⏳ **CAPSULE-UX-1 (29-oct-2026, en main local): CAPSULE SE PUEDE BUSCAR —
   eventos en parrilla con buscador por slug, y la lista real con buscador +
   contadores por paquete/boletos.** Palabra de Memo, citada: *«es complicado

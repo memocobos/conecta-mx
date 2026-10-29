@@ -4490,3 +4490,8 @@ button.vj-chip:hover{border-color:var(--orange)}
 .vj-chip-zonas>div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .vj-filtro-nota{font-size:12px;color:var(--ts);margin:4px 0 8px}
 .vj-filtro-nota a{color:var(--orange)}
+
+/* [CAPSULE-WA-1] El celular de la lista de viajeros como link de WhatsApp.
+   Token de la casa (var(--green)), cero literales — vigia:color-literal no crece. */
+.vj2-wa{color:var(--green);text-decoration:none;white-space:nowrap}
+.vj2-wa:hover{text-decoration:underline}

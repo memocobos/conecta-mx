@@ -3138,14 +3138,25 @@ function _cobEventoLabel(t) {
 
 function _cobDigits(s) { return String(s || '').replace(/\D/g, ''); }
 
+// [CAPSULE-WA-1] El celular a 10 dígitos MX, con UN dueño. La escalera nació
+// DENTRO de _cobWaHref (cobranza); al ganar un segundo lector (el link WA de la
+// lista de viajeros) se EXTRAJO — dos escaleras serían dos listas que todavía
+// no divergen. Pela 521+10 y 52+10; un 11 dígitos NO se adivina: medido en el
+// padrón (29-oct) hay celulares de EE.UU. («1956…») y pelarlos a 10 armaría un
+// wa.me/52 hacia un número que no existe. Devuelve los 10 dígitos o null.
+function _waDigits10(s) {
+  let d = _cobDigits(s);
+  if (d.length === 13 && d.startsWith('521')) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith('52')) d = d.slice(2);
+  return d.length === 10 ? d : null;
+}
+
 // Enlace WhatsApp al cliente con recordatorio prellenado. Devuelve null si el
 // celular no resuelve a 10 dígitos (entonces se muestra sin enlace).
 function _cobWaHref(t) {
   const c = t.clientes || {};
-  let d = _cobDigits(c.celular);
-  if (d.length === 13 && d.startsWith('521')) d = d.slice(3);
-  else if (d.length === 12 && d.startsWith('52')) d = d.slice(2);
-  if (d.length !== 10) return null;
+  const d = _waDigits10(c.celular);
+  if (!d) return null;
   const primer = (String(c.nombre_completo || '').trim().split(/\s+/)[0]) || 'viajero';
   const prox = (t.pago || {}).proximo;
   const evN = t.evento_nombre || 'tu tour';
@@ -6137,6 +6148,23 @@ function _vjFiltraFilas(filas, q, chip) {
   });
 }
 
+// [CAPSULE-WA-1] Palabra de Memo (29-oct): «hay algunos clientes que tengo que
+// hablarles para cambios — dame link a su celular». El celular de la lista se
+// vuelve link de WhatsApp con un saludo NEUTRO: prellenar «cambio de paquete»
+// afirmaría un motivo que a veces no es — el motivo lo escribe el humano.
+// Los 10 dígitos los resuelve _waDigits10 (el dueño compartido con la
+// cobranza); sin 10 dígitos MX no hay link — un wa.me adivinado abre chat con
+// NADIE o con un desconocido. El nombre del evento llega por parámetro para
+// que la función no dependa del estado de la pantalla.
+function _vjWaHref(v, evNombre) {
+  const d = _waDigits10(v && v.celular);
+  if (!d) return null;
+  const primer = (String((v && v.nombre) || '').trim().split(/\s+/)[0]) || '';
+  const msg = 'Hola' + (primer ? ' ' + primer : '') + ', te saludamos de Conecta Reynosa sobre tu lugar para '
+    + (evNombre || 'tu tour') + '.';
+  return 'https://wa.me/52' + d + '?text=' + encodeURIComponent(msg);
+}
+
 // El buscador vive en el HTML (no en el innerHTML que se repinta): el foco no
 // se pierde al filtrar. Debounce corto para no reconstruir la tabla por tecla.
 function vjBuscar(q) {
@@ -6338,6 +6366,12 @@ function _vj2Pintar() {
     return;
   }
 
+  // [CAPSULE-WA-1] El nombre del evento se resuelve UNA vez (no por fila) y
+  // viaja al link por parámetro; si el catálogo de la pantalla no lo sabe, el
+  // saludo dice «tu tour» en vez de un slug crudo.
+  const _waEvN = (((typeof _ccEventosCache !== 'undefined' && _ccEventosCache) || [])
+    .find((e) => e && e.id === (typeof _ccEventoActual !== 'undefined' ? _ccEventoActual : null)) || {}).nombre || '';
+
   list.innerHTML = dineroHtml + grupoBarra + filtroNota + `<div class="vj2-wrap"><table class="vj2-tabla">
     <thead><tr>
       ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
@@ -6349,7 +6383,14 @@ function _vj2Pintar() {
       // lo que viene del Excel no lo trae. Sin la etiqueta, las dos clases de
       // fila se leerían igual y son cosas distintas.
       const staff = v.tipo_viajero && String(v.tipo_viajero) !== 'cliente';
-      const contacto = [v.celular, v.correo].filter(Boolean).map(_esfEsc).join('<br>') || '<span class="vj2-vacio">—</span>';
+      // [CAPSULE-WA-1] El celular es LINK a WhatsApp cuando resuelve a 10
+      // dígitos; si no, se pinta como siempre — un link que no abre el chat
+      // correcto es peor que el texto pelado.
+      const _wa = _vjWaHref(v, _waEvN);
+      const _cel = v.celular
+        ? (_wa ? `<a href="${_wa}" target="_blank" rel="noopener" class="vj2-wa" title="Abrir WhatsApp con ${_esfEsc(v.nombre || '')}">💬 ${_esfEsc(v.celular)}</a>` : _esfEsc(v.celular))
+        : '';
+      const contacto = [_cel, v.correo ? _esfEsc(v.correo) : ''].filter(Boolean).join('<br>') || '<span class="vj2-vacio">—</span>';
       const emerg = [v.emergencia_nombre, v.num_emergencia].filter(Boolean).join(' · ');
       const gCol = v.grupo_viaje && _grpColor[v.grupo_viaje];
       const compas = gCol ? _grp[v.grupo_viaje].filter((x) => x.id !== v.id).map((x) => x.nombre || '—') : [];

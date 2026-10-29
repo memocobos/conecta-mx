@@ -198,6 +198,8 @@ try {
   [decl(js, 'KH_PREVENTA_EVENTOS'), fn(js, 'khEsPreventaCiegas'), fn(js, 'khPaqueteTexto'), fn(js, '_esStaff'),
    decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'),
    fn(js, '_esfEsc'), fn(js, '_attrJs'), fn(js, '_vj3Saldo'), fn(js, '_vj3Money'),
+   // [CAPSULE-WA-1] el pintor ahora arma links de WhatsApp: sus tres dueños van al sandbox
+   fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'),
    decl(js, 'VJ_ROLES_ELIMINAR'), fn(js, '_vjPuedeEliminar'), fn(js, '_vjCtrPuede'), fn(js, '_vjCtrChip'),
    decl(js, 'KH_CONTRATO_CLIENTE_VIVO'), decl(js, 'KH_CONTRATO_PRUEBA_CORREOS'),
    'let _vj2Filas = []; let _vj2Q = ""; let _vj2Chip = null; let _vj2Ctx = null;',
@@ -218,8 +220,56 @@ try {
   const filas2 = (tabla2.match(/<tr(?![^>]*id="vj-ab-)[^>]*>\s*(<td><input|<td><b>)/g) || []).length;
   af(filas2 === 7, 'sin filtro la tabla pinta las 7 filas de siempre (bajas incluidas): ' + filas2);
   af(/Baja Prueba/.test(tabla2), 'la baja sigue a la vista por default (hoy no se esconde nada)');
+  // [CAPSULE-WA-1] por el pintor REAL: 4 fixtures traen celular de 10 dígitos
+  // (a,b,c,d) → 4 links; las 3 filas sin celular, ninguno.
+  const links = (tabla2.match(/class="vj2-wa"/g) || []).length;
+  af(links === 4, 'el pintor arma 4 links de WhatsApp — los 4 celulares de 10 dígitos: ' + links);
+  af(tabla2.indexOf('https://wa.me/528991112233?text=') !== -1, 'y el de María lleva SU número con el 52 delante');
 } catch (e) {
   af(false, 'EL PINTOR REVENTÓ al ejecutarse: ' + e.message);
+}
+
+// ── [H] CAPSULE-WA-1 · el celular como link de WhatsApp ────────────────────────
+// _waDigits10 es el dueño EXTRAÍDO de _cobWaHref (cobranza): aquí se carea que
+// la escalera resuelve lo mismo de siempre Y que la cobranza no cambió de
+// conducta con la mudanza — una extracción que moviera la salida sería una
+// reescritura disfrazada.
+console.log('\n[H] CAPSULE-WA-1 · el celular como link de WhatsApp');
+try {
+  const sbH = {};
+  vm.createContext(sbH);
+  ['const _spFmtMxn = (n) => "$" + n;',
+   fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'), fn(js, '_cobWaHref')]
+    .forEach((c) => vm.runInContext(c, sbH));
+  const w10 = (s) => vm.runInContext('_waDigits10(' + JSON.stringify(s) + ')', sbH);
+  af(w10('899 111-2233') === '8991112233', '10 dígitos con ruido → los 10 limpios');
+  af(w10('528991112233') === '8991112233', '52+10 → pela el 52');
+  af(w10('5218991112233') === '8991112233', '521+10 → pela el 521');
+  af(w10('19566586239') === null, '11 dígitos de EE.UU. (caso REAL del padrón) NO se adivina → null');
+  af(w10('899111223') === null && w10('') === null && w10(null) === null, '9 dígitos / vacío / null → null');
+  // La cobranza (el llamador viejo) sigue contestando lo de siempre:
+  const cob = vm.runInContext(
+    '_cobWaHref({ clientes: { celular: "52 899 111 2233", nombre_completo: "Ana López" }, evento_nombre: "Frontera" })', sbH);
+  af(typeof cob === 'string' && cob.indexOf('https://wa.me/528991112233?text=') === 0,
+     'la cobranza sigue armando wa.me/52+10 tras la extracción');
+  af(decodeURIComponent(cob.split('?text=')[1]).indexOf('Ana') !== -1, 'y su mensaje sigue nombrando a la persona');
+  // El link nuevo de la lista de viajeros:
+  const va = vm.runInContext('_vjWaHref({ celular: "8991112233", nombre: "María Pérez" }, "Frontera Tour")', sbH);
+  af(typeof va === 'string' && va.indexOf('https://wa.me/528991112233?text=') === 0,
+     'viajero con 10 dígitos → link wa.me/52+10');
+  const msgH = decodeURIComponent(String(va).split('?text=')[1] || '');
+  af(msgH.indexOf('María') !== -1 && msgH.indexOf('Frontera Tour') !== -1,
+     'el saludo nombra a la persona y a SU evento');
+  af(msgH.toLowerCase().indexOf('cambio') === -1,
+     'el saludo es NEUTRO: no afirma un motivo — el motivo lo escribe el humano');
+  af(vm.runInContext('_vjWaHref({ celular: "", nombre: "X" }, "E")', sbH) === null, 'sin celular → sin link');
+  af(vm.runInContext('_vjWaHref({ celular: "19566586239", nombre: "X" }, "E")', sbH) === null,
+     'celular de EE.UU. → sin link (no se inventa la lada 52)');
+  const sinEv = vm.runInContext(
+    'decodeURIComponent(_vjWaHref({ celular: "8991112233", nombre: "X" }, "").split("?text=")[1])', sbH);
+  af(sinEv.indexOf('tu tour') !== -1, 'sin nombre de evento el saludo dice «tu tour», no un slug crudo');
+} catch (e) {
+  af(false, '[H] reventó: ' + e.message);
 }
 
 console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');

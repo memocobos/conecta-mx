@@ -618,6 +618,21 @@ main{
 .tour-card.is-pasado{opacity:.62;filter:saturate(.7)}
 .tour-card.is-pasado .tc-hero{filter:grayscale(.55)}
 
+/* [PORTAL-VIVO-1] La card migrada con el hero de la casa y su fila de media.
+   .mig-hero reusa .tc-hero (cero CSS gemelo) y solo neutraliza el cursor del
+   acordeón, que en la card migrada no existe. */
+.mig-hero{cursor:default}
+.mig-body{padding:14px 18px 16px}
+.mig-media{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
+.mig-chip{
+  display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.05);color:inherit;border-radius:var(--r-chip,999px);
+  padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;
+}
+.mig-chip:hover{border-color:var(--yel)}
+.mig-chip.is-on{background:var(--yel);color:#000;border-color:var(--yel)}
+.mig-chip[disabled]{opacity:.6;cursor:wait}
+
 /* [acordeon] Cabecera (.tc-hero) togglea; cuerpo (.tc-body) colapsa. */
 .tc-hero{cursor:pointer;border:none;width:100%;text-align:left;font:inherit;color:inherit;padding:0;outline:none}
 .tc-hero:focus-visible{box-shadow:inset 0 0 0 2px var(--yel)}
@@ -3180,6 +3195,71 @@ async function renderToursList(){
 //
 // FAIL-SOFT ESTRICTO: cualquier fallo deja la sección oculta. Este bloque no
 // puede tumbar el portal de nadie.
+
+// ── [PORTAL-VIVO-1] La card migrada deja de estar «seca» ─────────────────────
+// Palabra de Memo (29-oct): «el portal lo veo muy seco… poner foto del artista
+// de su tour basado en el del index, música del artista, alguna liga a spotify,
+// la radio más sencilla». El HERO reusa la piel que YA existía (.tc-hero de las
+// cards del flujo viejo — cero CSS gemelo; .mig-hero solo neutraliza el cursor
+// del acordeón, que aquí no hay). La foto: estática de STATIC_IMGS si existe
+// (inline, cero red) y si no, Deezer async por el MISMO dueño (_artDeezerUrl).
+// Jamás tumba la card: sin foto queda el gradiente de la casa.
+// 🔒 El atributo lleva el slug BASE (sin #N) y el upgrade casa por IGUALDAD:
+// un prefijo no es un ancla — «palnorte» es prefijo de «palnorte2026» y un
+// ^= le pintaría la foto del festival al evento equivocado.
+function _migHeroHtml(t, titulo) {
+  const ev = _evBySlug(t.evento_id);
+  const est = _artStaticDeEv(ev);
+  const base = String(t.evento_id || '').split('#')[0];
+  const bg = est ? ' style="background-image:url(&quot;' + escapeHtml(est) + '&quot;)"' : '';
+  return '<div class="tc-hero mig-hero' + (est ? '' : ' is-loading') + '" data-mig-hero="' + escapeHtml(base) + '"' + bg + '>'
+    + '<span class="tc-hero-name">' + escapeHtml(titulo || '') + '</span></div>';
+}
+
+// La fila de media: ▶ muestra de 30 s por Deezer (el reproductor INCRUSTADO de
+// Spotify no cabe en el CSP del sitio — frame-src — así que a Spotify se va por
+// LINK, que es navegación y no pelea con nada) y la radio a un toque, que
+// DELEGA en el botón real del mini-player: un segundo reproductor de radio
+// serían dos listas que todavía no divergen. Sin artista en el catálogo no se
+// pinta nada — fail-soft, nunca un botón que no puede sonar.
+function _migMediaHtml(t) {
+  const ev = _evBySlug(t.evento_id);
+  const artista = ev && (ev.img || ev.a);
+  if (!artista) return '';
+  return '<div class="mig-media">'
+    + '<button type="button" class="mig-chip" data-mig-act="tunes" data-mig-artista="' + escapeHtml(artista) + '">▶ Escucha a ' + escapeHtml(artista) + '</button>'
+    + '<a class="mig-chip" href="https://open.spotify.com/search/' + encodeURIComponent(artista) + '" target="_blank" rel="noopener">Spotify ↗</a>'
+    + '<button type="button" class="mig-chip" data-mig-act="radio" title="Enciende Radio Conecta (el reproductor de abajo)">📻 Radio</button>'
+    + '</div>';
+}
+
+// Las fotos async DESPUÉS de pintar: UNA petición por evento base (dos viajes
+// al mismo evento comparten foto), con caché de módulo — jamás una por latido.
+const _migFotoCache = new Map();
+async function _migFotosUpgrade(tours) {
+  const vistos = new Set();
+  for (const t of (tours || [])) {
+    const base = String(t.evento_id || '').split('#')[0];
+    if (!base || vistos.has(base)) continue;
+    vistos.add(base);
+    const sel = (window.CSS && CSS.escape) ? CSS.escape(base) : base;
+    const heroes = Array.prototype.filter.call(
+      document.querySelectorAll('[data-mig-hero="' + sel + '"]'),
+      (h) => h.classList.contains('is-loading'));
+    if (!heroes.length) continue;
+    let url;
+    if (_migFotoCache.has(base)) url = _migFotoCache.get(base);
+    else {
+      url = await _artDeezerUrl(t).catch(() => null);
+      _migFotoCache.set(base, url || null);
+    }
+    heroes.forEach((h) => {
+      if (url) h.style.backgroundImage = 'url("' + url + '")';
+      h.classList.remove('is-loading');   // sin foto queda el gradiente — nunca el shimmer eterno
+    });
+  }
+}
+
 async function renderPlanMigrado(){
   _migGrupoVisto = new Set();
   const cont = document.getElementById('tours-migrados');
@@ -3231,16 +3311,21 @@ async function renderPlanMigrado(){
           + '<span>Total <b>' + money(t.total) + '</b></span>'
           + '<span>Abonado <b>' + money(t.abonado) + '</b></span>'
           + '<span>Te falta <b>' + money(t.resta) + '</b></span></div>';
-      return '<div class="tour-card" style="padding:16px 18px" data-mig-viajero="' + escapeHtml(t.viajero_id || '') + '">'
-        + '<div style="font-weight:800;margin-bottom:2px">' + escapeHtml(titulo) + '</div>'
+      // [PORTAL-VIVO-1] El título vive en el HERO (la piel de siempre); el
+      // cuerpo conserva TODO lo de antes dentro de .mig-body (el padding que
+      // llevaba la card se muda ahí para que la foto corra de borde a borde).
+      return '<div class="tour-card" data-mig-viajero="' + escapeHtml(t.viajero_id || '') + '">'
+        + _migHeroHtml(t, titulo)
+        + '<div class="mig-body">'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migPagosHtml(t) + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div>';
+        + cuenta + _migMediaHtml(t) + _migPagosHtml(t) + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div></div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
       + 'Tus tours con nosotros</div>' + filas + estadoPs;
     cont.style.display = '';
+    _migFotosUpgrade(j.tours);   // [PORTAL-VIVO-1] async, fail-soft: la card ya está pintada
     window.__migTours = j.tours;
     // Quien solo tiene tours de KameHouse no debe ver «Sin solicitudes todavía /
     // Crea tu primer tour» debajo de su viaje: se lee como que no tiene nada.
@@ -3830,7 +3915,64 @@ document.addEventListener('click', (ev) => {
   else if (act === 'paq-enviar') _paqEnviar(id);
   else if (act === 'ps-abrir') _psAbrir();
   else if (act === 'ps-enviar') _psEnviar();
+  // [PORTAL-VIVO-1] La muestra de 30 s y la radio a un toque.
+  else if (act === 'tunes') _migTunes(b);
+  else if (act === 'radio') { const p = document.getElementById('rcp-play'); if (p) p.click(); }
 });
+
+// [PORTAL-VIVO-1] La muestra de 30 s. La URL del preview de Deezer viene
+// FIRMADA y caduca en 15–30 min (la lección del sorteo): se pide AL CLIC,
+// jamás al cargar la página. UN solo <audio> para todas las cards — dos
+// muestras encimadas no son «dinámico», son ruido — y si la radio está
+// sonando se pausa POR SU PROPIO BOTÓN (el dueño del toggle), nunca tocando
+// su <audio> por dentro. Fail-soft con palabras: sin muestra se DICE, no se
+// queda un botón que no suena.
+let _migAudio = null, _migTunesBtn = null;
+function _migTunesReset(b) {
+  if (!b) return;
+  const lbl = b.getAttribute('data-mig-label');
+  if (lbl) b.textContent = lbl;
+  b.classList.remove('is-on');
+}
+async function _migTunes(btn) {
+  // Mismo botón sonando → pausa (toggle); el listener de 'pause' restaura.
+  if (_migTunesBtn === btn && _migAudio && !_migAudio.paused) { _migAudio.pause(); return; }
+  const q = btn.getAttribute('data-mig-artista');
+  if (!q) return;
+  if (!btn.getAttribute('data-mig-label')) btn.setAttribute('data-mig-label', btn.textContent);
+  if (_migAudio && !_migAudio.paused) _migAudio.pause();
+  _migTunesReset(_migTunesBtn);
+  const rcpBtn = document.querySelector('.rcp.rcp-playing #rcp-play') || document.querySelector('.rcp.rcp-playing .rcp-play');
+  if (rcpBtn) rcpBtn.click();
+  btn.disabled = true; btn.textContent = '… buscando';
+  try {
+    const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q) + '&type=track');
+    const d = await r.json();
+    const tr = d && Array.isArray(d.data) ? d.data.find((x) => x && x.preview) : null;
+    if (!tr) {
+      btn.textContent = 'Sin muestra 😕';
+      setTimeout(() => { _migTunesReset(btn); }, 1600);
+      _migTunesBtn = null; btn.disabled = false;
+      return;
+    }
+    if (!_migAudio) {
+      _migAudio = new Audio();
+      _migAudio.addEventListener('ended', () => _migTunesReset(_migTunesBtn));
+      _migAudio.addEventListener('pause', () => _migTunesReset(_migTunesBtn));
+    }
+    _migAudio.src = tr.preview;
+    await _migAudio.play();
+    btn.textContent = '❚❚ ' + (tr.title_short || tr.title || q);
+    btn.classList.add('is-on');
+    _migTunesBtn = btn;
+  } catch (e) {
+    btn.textContent = 'No se pudo 😕';
+    setTimeout(() => { _migTunesReset(btn); }, 1600);
+    _migTunesBtn = null;
+  }
+  btn.disabled = false;
+}
+
 function _migCard(id){ return document.querySelector('[data-mig-viajero="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }
 function _migAbrir(id, cual){
   const c = _migCard(id); if (!c) return;

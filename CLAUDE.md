@@ -235,9 +235,11 @@ está caduco antes de escribirse.
     en 6·7. Y ya pagó su boleto en la primera corrida: cazó que al sandbox le
     faltaba `KH_CONTRATO_PRUEBA_CORREOS` (dependencia de `_vjCtrPuede` que un
     grep del fuente jamás habría visto) — *probar el camino, no la función*.
-  - ⏳ Push de Memo → prueba humana: buscar «edc27» en la lista de eventos,
-    abrir juniorh (168 filas) y encontrar a alguien tecleando su nombre, y
-    filtrar con un chip de paquete.
+  - ✅ **PUSHEADO Y DESPLEGADO (29-oct):** producción corre `16f46f1` (leído
+    del deploy publicado de Netlify — estado `ready`/`current` —, no supuesto).
+    ⏳ Prueba humana de Memo: recargar KameHouse → buscar «edc27» en la lista
+    de eventos, abrir juniorh (168 filas) y encontrar a alguien tecleando su
+    nombre, y filtrar con un chip de paquete.
 
 - 🩺✅ **AUD-3DIAS-1 (29-oct-2026): AUDITORÍA DE LOS ÚLTIMOS 3 DÍAS — ~75
   careos corridos, 4 arneses podridos curados, 1 defecto real cazado por la

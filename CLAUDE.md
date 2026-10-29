@@ -188,6 +188,57 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎸⏳ **FR-FECHAS-1 (29-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
+  de Memo): FUERZA REGIDA GANA EL 15 Y 16 DE ENERO, todas las zonas abiertas,
+  separo $300.** Palabra de Memo: *«fuerza ergida anuncio 15 y 16 de enero
+  tambien … activa esas 2 fechas extras en multifecha y en esas dos fechas
+  activa todas las zonas nuevamente y separo de $300 igual, dale»*. Acta
+  `migraciones/FR-FECHAS-1.sql` (los UPDATEs YA CORRIERON con valor esperado
+  en el WHERE — md5 del multifecha pre-tuerca + fechas_extra exacto; re-correrla
+  escribe cero filas).
+  - **La ficha:** multifecha 2 → **4 entradas** («15 Enero» ds 2027-01-15 ·
+    «16 Enero» ds 2027-01-16), cada una **DERIVADA de la entrada #0** con
+    jsonb_set (jamás tecleada): 15 zonas PLUS + 15 CHEAP con los MISMOS precios
+    del 11-ene y **todas `ag:0`**. Escritura por concatenación TEXTUAL (la
+    columna es TEXT): #0/#1 quedaron **byte a byte** (md5 careado). Y
+    **`fechas_extra` ganó el 15 y el 16** — ese campo alimenta `f` y `dsList`
+    de la card (esferas-compile L1073); sin él la card seguía diciendo «11 y
+    12 ene» con las 4 fechas ya en multifecha.
+  - 🔒 **Lo que NO se tocó, deliberado:** `fecha_fin` sigue NULL (un rango
+    11→16 metería el 13/14 SIN show a `_diasDelRango`) · las zonas agotadas
+    de #0/#1 siguen agotadas (ventas reales) · sep/sep_cheap ya eran 300/300 y
+    las fechas nuevas lo HEREDAN · las zonas GLOBALES de la columna ni se
+    editaron: con multifecha el compilador las **DERIVA** (ESF-UX-2c).
+  - ✅ **Verificado por el DUEÑO (compilarEV real con la ficha post-update +
+    index del árbol = byte a byte el publicado 16f46f1): 38 verdes, 0 rojos.**
+    `f` emite **«11, 12, 15 y 16 ene 2027»** · dsList con las 4 · #2/#3 con 30
+    zonas abiertas c/u y precios = #0 · #0/#1 FIELES a la ficha · la global
+    derivada cumple «abierta ⇔ alguna fecha abierta» 15/15 — las 9 globales
+    que estaban ag:1 salen abiertas porque 15/16 tienen lugar (la tarjeta deja
+    de decir agotado donde hay) · cotiza por la puerta del cliente
+    (`_calcularPrecio`): #2 PLUS Cancha VIP $5,900 · #2 CHEAP Balcón $2,200 ·
+    #3 PLUS Platino $7,200 · #3 CHEAP Luneta $2,900, **los 4 con separo $300**;
+    Platino en #0 (agotada real) RECHAZA y una zona inventada RECHAZA.
+  - ⚠️ **Mis 3 rojos de la primera corrida eran MI expectativa:** exigí #0/#1
+    «byte-igual al index publicado» y la vara buena es «fiel a la FICHA» — el
+    publicado es del último publish y la ficha siguió moviéndose. Los diffs
+    reales, nombrados: las 9 globales derivadas abiertas (ESF-UX-2c haciendo
+    su trabajo) y **Megacable cheap #0 + Balcón cheap #1 con ag:1 en la ficha
+    y no en el index** — cambios de Esferas POST-publish ajenos a esta tuerca
+    que el próximo publish lleva.
+  - **Lo que entra solo con el slug base, medido en actas previas:**
+    `REQUISICION_EVENTOS` y `RESERVA_2027` ya cubren fuerzaregida — las fechas
+    nuevas venden por requisición y mandan el correo único sin tocar nada.
+  - 🔴⏳ **Lo que el encendido NO trae, dicho:** las fechas #2/#3 quedan **SIN
+    pedido cargado** (ciegas — STOCK-CIEGO): venden sin candado automático
+    hasta que Memo dicte el pedido de boletos del 15 y 16, como dictó el de
+    11/12 el 28-oct. Y fuerzaregida sigue sin pestaña de Excel (el careo no
+    cambia).
+  - ⏳ **ENCENDER = Memo publica desde Esferas** (la venta no pide push de
+    código — el index se recompila al publicar; precedente NSQK-VENTA-1) →
+    verificación en producción: la card dice las 4 fechas y el selector de día
+    ofrece 15 y 16 con todas las zonas.
+
 - 💳⏳ **PAGOS-PORTAL-2 (29-oct-2026, en main local): EL CLIENTE SUBE SU
   COMPROBANTE DESDE EL PORTAL — Fase 2 del plan de pagos, construida.** Palabra
   de Memo: *«Sí, constrúyela»* (la Fase 2 que PLAN-PAGOS-1 dejó nombrada). El

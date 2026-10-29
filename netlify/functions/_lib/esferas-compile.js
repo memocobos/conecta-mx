@@ -305,6 +305,11 @@ function parseMultifecha(raw) {
       // son valores DISTINTOS, así que normalizarlos rompía a morat.
       rideAgotado: (f.rideAgotado === true) ? true
         : ((f.rideAgotado === 1 || f.rideAgotado === '1') ? 1 : 0),
+      // [FR-PROX-1] El PRÓXIMAMENTE de la fecha entera, con el tipo conservado
+      // (la misma forma que rideAgotado). Sin esto el parser lo recortaba y el
+      // lector del index (`buildFechaButtons`) nunca lo recibía.
+      prox: (f.prox === true) ? true
+        : ((f.prox === 1 || f.prox === '1') ? 1 : 0),
     });
   }
   return out.length ? out : null;
@@ -328,7 +333,12 @@ function _hotelFilaTexto(it) {
 
 function multifechaTexto(f) {
   // Orden del catálogo: lbl · sublbl? · ds · noches? · music? · zonas ·
-  // cheapZonas? · ride? · hotel? · rideAgotado?
+  // cheapZonas? · ride? · hotel? · rideAgotado? · prox?
+  // [FR-PROX-1] `prox` es de la ENTRADA (la fecha entera, no una zona): el
+  // index lo lee desde siempre (`buildFechaButtons`: botón deshabilitado
+  // «↻ Próximamente») pero su escritor murió con la era pre-Esferas — este
+  // emisor lo tiraba y `parseMultifecha` lo recortaba: un lector sin escritor.
+  // Va AL FINAL a propósito: un evento sin prox emite byte-igual que antes.
   return "{lbl:'" + escStr(f.lbl) + "'" +
     (f.sublbl ? ",sublbl:'" + escStr(f.sublbl) + "'" : '') +
     (f.ds ? ",ds:'" + f.ds + "'" : '') +
@@ -338,7 +348,8 @@ function multifechaTexto(f) {
     (f.cheapZonas ? ',cheapZonas:[' + f.cheapZonas.map(cheapZonaTexto).join(',') + ']' : '') +
     (f.ride != null ? ',ride:' + f.ride : '') +
     (f.hotel ? ',hotel:[' + f.hotel.map(_hotelFilaTexto).join(',') + ']' : '') +
-    (f.rideAgotado ? (',rideAgotado:' + (f.rideAgotado === true ? 'true' : '1')) : '') + '}';
+    (f.rideAgotado ? (',rideAgotado:' + (f.rideAgotado === true ? 'true' : '1')) : '') +
+    (f.prox ? (',prox:' + (f.prox === true ? 'true' : '1')) : '') + '}';
 }
 
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona

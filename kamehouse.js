@@ -9883,8 +9883,12 @@ const _MF_DESC_NOCHES = / · \d+ noches?$/;
 // [ESF-UX-1] Las llaves CON boca de captura en el bloque de fecha. Lo que no
 // esté aquí no se administra y por lo tanto no se pisa —el mismo espíritu de
 // CAMPOS_DEL_COMPILADOR: lo que no gobiernas, lo devuelves como venía.
+// [FR-PROX-1] `prox` entró al Set al ganar su boca (el botón «↻ Próximamente»
+// del bloque de fecha): sin esto, Reabrir lo quitaría del box y la
+// PRESERVACIÓN lo re-insertaría desde la ficha original — el mismo bug que el
+// Set existe para evitar, en espejo.
 const MF_ADMINISTRADAS = new Set(
-  ['lbl', 'sublbl', 'ds', 'noches', 'music', 'zonas', 'cheapZonas', 'ride', 'hotel', 'rideAgotado']);
+  ['lbl', 'sublbl', 'ds', 'noches', 'music', 'zonas', 'cheapZonas', 'ride', 'hotel', 'rideAgotado', 'prox']);
 
 
 

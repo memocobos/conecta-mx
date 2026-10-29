@@ -2227,6 +2227,10 @@ function _esfTabAgotar(col, agotar) {
       if (ag.checked !== !!agotar) tocadas++;
       ag.checked = !!agotar;
       if (agotar && px) px.checked = false;
+      // [FR-PROX-1] Reabrir = A LA VENTA: también suelta el próximamente. Antes
+      // solo quitaba el agotado y una zona prox se quedaba sin vender con el
+      // botón diciendo que ya abrió — un Reabrir que no abre miente.
+      if (!agotar && px && px.checked) { tocadas++; px.checked = false; px.dispatchEvent(new Event('change', { bubbles: true })); }
       ag.dispatchEvent(new Event('change', { bubbles: true }));
     });
   } else {
@@ -2234,11 +2238,14 @@ function _esfTabAgotar(col, agotar) {
       const l = (c === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
       (Array.isArray(l) ? l : []).forEach((z) => {
         total++;
-        const antes = !!z.ag;
-        if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; }
-        if (antes !== !!z.ag) tocadas++;
+        const antes = !!z.ag, antesPx = !!z.prox;
+        if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; delete z.prox; }
+        if (antes !== !!z.ag || antesPx !== !!z.prox) tocadas++;
       });
     });
+    // [FR-PROX-1] Los dos verbos viejos quitan el PRÓXIMAMENTE de la entrada:
+    // una noche agotada no es «va a haber», y una reabierta tampoco.
+    if (col.box._esfProx) { tocadas++; col.box._esfProx = false; _esfMfProxPintar(col.box); }
     const ride = col.box.querySelector('.esf-mf-ride'), rag = col.box.querySelector('.esf-mf-rideag');
     if (agotar) { if (ride && ride.value && rag) { if (!rag.checked) tocadas++; rag.checked = true; } }
     else if (rag) { if (rag.checked) tocadas++; rag.checked = false; }
@@ -2255,6 +2262,52 @@ function _esfTabAgotar(col, agotar) {
   _esfAviso(agotar
     ? '✓ ' + tocadas + ' de ' + total + ' zona(s) de ' + donde + ' quedaron agotadas. Se ve en el sitio al publicar.'
     : '✓ ' + tocadas + ' de ' + total + ' zona(s) de ' + donde + ' volvieron a la venta. Se ve en el sitio al publicar.');
+}
+// ═══ [FR-PROX-1] LA NOCHE EN PRÓXIMAMENTE ═══════════════════════════════════
+// Palabra de Memo (29-oct): «las fechas en el multifecha se puedan poner en
+// lugar de agotado también opción de Próximamente» — el caso real son el 15 y
+// 16 de enero de Fuerza Regida: anunciadas, todavía sin abrir.
+// Escribe el estado en DOS niveles, y los dos hacen falta:
+//   · la ENTRADA (`box._esfProx` → `prox:1` del multifecha): es lo que lee
+//     `buildFechaButtons` del index — el botón de la fecha sale deshabilitado
+//     con «↻ Próximamente» y nadie llega a sus zonas;
+//   · TODAS las zonas (`prox:1`, sin `ag`): es lo que frena al SERVIDOR
+//     (`_calcularPrecio` rebota zona prox — un POST directo con esa fecha no
+//     nace) y lo que la derivación del global (ESF-UX-2c) ya sabe leer — una
+//     zona viva solo en fechas prox sale PRÓXIMAMENTE en la tarjeta, no
+//     disponible ni agotada.
+// El RIDE no se toca a propósito: con la entrada prox la fecha entera está
+// cerrada en el sitio, y al Reabrir el RIDE vuelve como estaba.
+function _esfMfProx(col) {
+  if (!col || !col.box) return;
+  let total = 0;
+  ['zonas', 'cheapZonas'].forEach((c) => {
+    const l = (c === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
+    (Array.isArray(l) ? l : []).forEach((z) => { total++; z.prox = 1; delete z.ag; });
+  });
+  const yaEstaba = !!col.box._esfProx;
+  col.box._esfProx = true;
+  _esfMfProxPintar(col.box);
+  _esfTableroPintar();
+  const donde = '«' + (col.lbl || (col.box.querySelector('.esf-mf-lbl')?.value || 'esta fecha').trim() || 'esta fecha') + '»';
+  _esfAviso(yaEstaba
+    ? donde + ' YA estaba en Próximamente — las ' + total + ' zona(s) quedaron re-marcadas.'
+    : '✓ ' + donde + ' quedó en PRÓXIMAMENTE (' + total + ' zona(s)). El sitio la anuncia sin vender. Se ve al publicar.');
+}
+// El estado SE VE: el botón del bloque cambia de cara cuando la noche está en
+// próximamente — un estado que solo vive en memoria es un estado que se olvida.
+function _esfMfProxPintar(box) {
+  const b = box && box.querySelector ? box.querySelector('.esf-mf-prox') : null;
+  if (!b) return;
+  if (box._esfProx) {
+    b.textContent = '✓ Próximamente';
+    b.style.color = 'var(--yellow, #e8ff4c)';
+    b.style.borderColor = 'var(--yellow, #e8ff4c)';
+  } else {
+    b.textContent = '↻ Próximamente';
+    b.style.color = '';
+    b.style.borderColor = '';
+  }
 }
 // [ESF-UX-5] El primer «Zona N» que no choque con lo que ya hay. El tablero
 // DEDUPLICA por nombre —dos zonas que se llaman igual son una sola fila—, así
@@ -2416,8 +2469,14 @@ function _esfMfAddFecha(data) {
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
       '<input class="cot-input esf-mf-lbl" placeholder="Etiqueta (ej. 20 Abril)" style="flex:2;min-width:150px" autocomplete="off">' +
       '<input class="cot-input esf-mf-ds" type="date" title="Fecha real de esta noche. Vacía = el sitio solo muestra la etiqueta." style="flex:1;min-width:140px">' +
-      '<button type="button" class="btn btn-ghost esf-mf-agotar" style="font-size:11px" title="Marca agotadas TODAS las zonas de esta noche, y el RIDE si lo tiene">Agotar la noche</button>' +
-      '<button type="button" class="btn btn-ghost esf-mf-reabrir" style="font-size:11px" title="Quita el agotado de todas las zonas de esta noche">Reabrir</button>' +
+      '<button type="button" class="btn btn-ghost esf-mf-agotar" style="font-size:11px" title="Marca agotadas TODAS las zonas de esta noche, y el RIDE si lo tiene. Quita el Próximamente.">Agotar la noche</button>' +
+      // [FR-PROX-1] El tercer verbo: la noche que AÚN NO SALE a la venta. No es
+      // lo mismo que agotada («se acabó») — el sitio pinta el botón de la fecha
+      // deshabilitado con «↻ Próximamente». Escribe el estado en la ENTRADA
+      // (que es lo que lee buildFechaButtons del index) Y en todas las zonas
+      // (que es lo que frena al servidor y a la derivación del global).
+      '<button type="button" class="btn btn-ghost esf-mf-prox" style="font-size:11px" title="Marca esta noche como PRÓXIMAMENTE: el sitio la anuncia pero aún no vende. Quita el agotado.">↻ Próximamente</button>' +
+      '<button type="button" class="btn btn-ghost esf-mf-reabrir" style="font-size:11px" title="Abre la noche a la venta: quita el agotado Y el próximamente de todas sus zonas">Reabrir</button>' +
       // `margin-left:auto` lo manda al extremo: borrar la noche entera no puede
       // quedar pegado a Reabrir, que es lo contrario y se aprieta seguido.
       '<button type="button" class="btn btn-ghost esf-mf-del" style="color:var(--red);margin-left:auto" title="Quitar esta fecha">✕</button>' +
@@ -2464,6 +2523,10 @@ function _esfMfAddFecha(data) {
   // propio de cada fecha (morat NO sigue el de la unión) y la forma exacta.
   box._esfZonas = Array.isArray(d.zonas) ? d.zonas : [];
   box._esfCheap = Array.isArray(d.cheapZonas) ? d.cheapZonas : null;
+  // [FR-PROX-1] El PRÓXIMAMENTE de la noche vive en el box (como _esfZonas):
+  // lo siembran la ficha y el botón, y _esfGetMultifecha lo emite al guardar.
+  box._esfProx = !!d.prox;
+  _esfMfProxPintar(box);
   box.querySelector('.esf-mf-del').addEventListener('click', () => { box.remove(); _esfTabSync(); });
   box.querySelector('.esf-mf-lbl').addEventListener('input', () => _esfTableroPintar());
   // [ESF-UX-2b] «Copiar de arriba» se retiró con el mago: en un multifecha ya
@@ -2475,6 +2538,7 @@ function _esfMfAddFecha(data) {
   const _col = () => ({ box: box, fecha: true, i: _esfTabBloques().indexOf(box) });
   box.querySelector('.esf-mf-agotar').addEventListener('click', () => _esfTabAgotar(_col(), true));
   box.querySelector('.esf-mf-reabrir').addEventListener('click', () => _esfTabAgotar(_col(), false));
+  box.querySelector('.esf-mf-prox').addEventListener('click', () => _esfMfProx(_col()));
   cont.appendChild(box);
   _esfTabSync();
 }
@@ -2580,6 +2644,13 @@ function _esfGetMultifecha() {
       // valor original; si Memo la prendió ahora, es 1.
       const previo = (b._esfMfOrig || {}).rideAgotado;
       o.rideAgotado = previo ? previo : 1;
+    }
+    // [FR-PROX-1] El PRÓXIMAMENTE de la noche, con el tipo conservado (la misma
+    // forma que rideAgotado). `prox` ya vive en MF_ADMINISTRADAS: al quitarlo
+    // con Reabrir/Agotar la preservación de abajo NO lo re-inserta del original.
+    if (b._esfProx) {
+      const previoPx = (b._esfMfOrig || {}).prox;
+      o.prox = previoPx ? previoPx : 1;
     }
     // [ESF-UX-1] PRESERVACIÓN. Toda llave de la ficha que este bloque no
     // administra vuelve intacta. Sin esto, una llave que el parser aprenda

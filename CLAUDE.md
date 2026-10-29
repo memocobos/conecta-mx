@@ -188,9 +188,62 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ↻⏳ **FR-PROX-1 (29-oct-2026, en main local + base YA ESCRITA): LAS FECHAS
+  DEL MULTIFECHA GANAN «PRÓXIMAMENTE» — y el 15/16 de Fuerza Regida ya están
+  así.** Palabra de Memo: *«las fechas en el multifecha en esferas se puedan
+  poner en lugar de agotado también opción de Próximamente, como ahorita en
+  fuerza regida que aún no puedo abrir las fechas 15 y 16 y las puse en agotado
+  pero quiero mejor ponerlas como proximamente»*. `mide:fr-prox-1` **46** (sin
+  ancla — árbol; sabotaje a la emisión mordido con sha1 y restaurado byte a
+  byte). Acta `migraciones/FR-PROX-1.sql` (el UPDATE YA CORRIÓ con md5 como
+  valor esperado).
+  - 🔴 **LO MEDIDO ANTES: el index LEE `prox` de la ENTRADA desde siempre**
+    (`buildFechaButtons` pinta el botón del día deshabilitado con
+    «↻ Próximamente» y el panel dice «costos disponibles muy pronto») **pero su
+    ESCRITOR murió con la era pre-Esferas**: `parseMultifecha` lo recortaba y
+    `multifechaTexto` no lo emitía — un lector sin escritor, la familia de la
+    guarda inalcanzable al revés. Las otras tres patas YA existían: zonas prox
+    (emisión+parser), el candado del servidor (`_calcularPrecio` rebota «zona
+    aún no disponible») y la derivación del global (ESF-UX-2c).
+  - **El compilador:** `parseMultifecha` conserva el prox de la entrada (tipo
+    conservado, la forma de rideAgotado) y `multifechaTexto` lo emite **AL
+    FINAL** — sin prox, byte-igual que antes (careado por round-trip de la
+    entrada #0 real del index).
+  - **Esferas:** cada bloque de fecha gana el botón **«↻ Próximamente»** (entre
+    Agotar y Reabrir): escribe la ENTRADA + TODAS las zonas `{prox:1, sin ag}`,
+    y el botón CAMBIA de cara («✓ Próximamente» en amarillo — un estado solo en
+    memoria se olvida). 🔒 **«Agotar la noche» y «Reabrir» QUITAN el prox** (una
+    noche agotada no es «va a haber»; **Reabrir = a la venta: suelta ag Y prox**,
+    en fecha y en mago — antes solo quitaba el ag y una zona prox se quedaba sin
+    vender con el botón diciendo que abrió). `MF_ADMINISTRADAS` ganó `'prox'`:
+    sin eso, al quitarlo la PRESERVACIÓN lo re-insertaría del original — el bug
+    que el Set existe para evitar, en espejo. `_esfGetMultifecha` lo emite
+    conservando el tipo.
+  - **El dato de hoy:** las entradas #2/#3 de fuerzaregida pasaron de ag:1×60
+    (el agotón a mano de Memo) a **`prox:1` en la entrada + 60 zonas prox sin
+    ag** — valor esperado md5 `81241dea…`, careo de salida en query fresca.
+  - ✅ **Verificado por el DUEÑO (46 verdes):** compilarEV emite prox en #2/#3 ·
+    `f` sigue «11, 12, 15 y 16 ene 2027» (anunciadas) · **la global Platino
+    deriva PRÓXIMAMENTE** (ag en 11/12 + prox en 15/16 — la tarjeta dice «va a
+    haber» en vez de agotado o abierto falso) y Cancha VIP sigue abierta ·
+    `buildFechaButtons` REAL pinta 15/16 deshabilitados y 11/12 vivos ·
+    `_calcularPrecio` rebota fecha_idx 2/3 y #0 sigue cotizando. Vecinos
+    verdes: preventa-pn27 62 · capsule-ux-1 67 · req-b1 52 · plan-pagos-1 81.
+  - ⚠️ **El RIDE de una noche prox no se toca a propósito** (con la entrada
+    prox la fecha entera está cerrada en el sitio; al Reabrir vuelve como
+    estaba) — dicho en el title del botón.
+  - ⏳ **ORDEN DEL ENCENDIDO: push de Memo PRIMERO → publish de Esferas
+    DESPUÉS** (el publish corre en Netlify con el compilador desplegado: sin el
+    push, el compilador viejo TIRA el prox de la entrada y el 15/16 saldrían
+    como fechas normales CON ZONAS PROX — venderían «Próximamente» por zona,
+    sin el botón de fecha cerrado). Tras el publish: la card dice las 4 fechas
+    y el selector pinta 15/16 «↻ Próximamente».
+
 - 🎸⏳ **FR-FECHAS-1 (29-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
   de Memo): FUERZA REGIDA GANA EL 15 Y 16 DE ENERO, todas las zonas abiertas,
-  separo $300.** Palabra de Memo: *«fuerza ergida anuncio 15 y 16 de enero
+  separo $300.** ⚠️ *Actualizada el MISMO día por FR-PROX-1 (arriba): el 15/16
+  ya NO están abiertos ni agotados — están en PRÓXIMAMENTE por palabra nueva de
+  Memo. Lo demás de este bloque (las 4 fechas, fechas_extra, sep 300) sigue.* Palabra de Memo: *«fuerza ergida anuncio 15 y 16 de enero
   tambien … activa esas 2 fechas extras en multifecha y en esas dos fechas
   activa todas las zonas nuevamente y separo de $300 igual, dale»*. Acta
   `migraciones/FR-FECHAS-1.sql` (los UPDATEs YA CORRIERON con valor esperado

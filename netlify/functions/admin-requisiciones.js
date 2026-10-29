@@ -44,6 +44,11 @@ const ACCIONES = {
   // [PORTAL-EDIT-1] las solicitudes de cambio que el cliente manda desde el Portal.
   cambios_listar: ROLES_BANDEJA,
   cambio_cerrar: ROLES_BANDEJA,
+  // [PAGOS-PORTAL-2] El comprobante que el cliente subió desde el Portal:
+  // verlo (URL firmada) y CAPTURAR el abono con el monto TECLEADO por quien lo
+  // vio — el humano decide el dinero, la solicitud solo lo avisa.
+  cambio_foto: ROLES_BANDEJA,
+  cambio_pago_capturar: ROLES_BANDEJA,
   // [PRUEBA-ARCHIVO-1] Quitar una solicitud de PRUEBA (y lo que nació de ella).
   // Solo Memo: es la única acción que saca filas de dinero de la vista.
   archivar_prueba: ['maestro_roshi'],
@@ -169,6 +174,106 @@ exports.handler = async (event) => {
       correo = await avisarPaquete({ cambio: rows[0], KH_URL: SB_URL, KH_KEY: SB_KEY });
     }
     return j(200, headers, { ok: true, cambio: rows[0], correo });
+  }
+
+  // ── [PAGOS-PORTAL-2] el comprobante del cliente, por URL firmada ──────────
+  // La MISMA forma que `detalle` (el comprobante de la requisición): firmar el
+  // path del bucket privado, 1 h. Solo paths de cambios_viajero — el id manda,
+  // el path se LEE de la fila, jamás del cuerpo (un path tecleado podría firmar
+  // cualquier objeto del bucket).
+  if (accion === 'cambio_foto') {
+    const cid = String(body.id || '');
+    if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });
+    const r = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=id,foto_path`, { headers: sbH });
+    if (!r.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
+    const c = (await r.json())[0];
+    if (!c) return j(404, headers, { error: 'Esa solicitud no existe' });
+    if (!c.foto_path) return j(404, headers, { error: 'Esta solicitud no trae comprobante' });
+    let signed_url = null;
+    try {
+      const rs = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${encodeURI(c.foto_path)}`, {
+        method: 'POST',
+        headers: Object.assign({}, sbH, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ expiresIn: SIGN_EXPIRA }),
+      });
+      if (rs.ok) {
+        const js = await rs.json().catch(() => null);
+        if (js && js.signedURL) signed_url = `${SB_URL}/storage/v1${js.signedURL}`;
+      }
+    } catch (_) { /* sin firma: se dice abajo */ }
+    if (!signed_url) return j(502, headers, { error: 'No se pudo firmar el comprobante' });
+    return j(200, headers, { ok: true, signed_url });
+  }
+
+  // ── [PAGOS-PORTAL-2] capturar el abono de un comprobante del Portal ──────
+  // El clic que convierte el AVISO en dinero, con un humano enfrente:
+  //   1) el abono nace con el monto TECLEADO por quien vio el comprobante
+  //      (jamás el «declarado» del cliente — ese es texto, no cifra) y HEREDA
+  //      el foto_path de la solicitud (la forma del aprobar de REQ-B1: mismo
+  //      bucket, el 📎 de la lista de viajeros lo abre sin copiar);
+  //   2) la solicitud se cierra con VALOR ESPERADO (estado=eq.pendiente): el
+  //      2º clic contesta 409 y no nace un segundo abono.
+  // ⚠️ El ORDEN es cerrar PRIMERO y abonar DESPUÉS, y es deliberado: si el
+  // abono falla, la solicitud quedó 'atendida' sin abono (se reabre a mano o
+  // se captura por ➕ Abono — la respuesta 207 lo dice con el monto); al revés,
+  // una carrera de dos clics podría crear DOS abonos del mismo comprobante,
+  // que es dinero inventado y no se deshace solo. Equivocarse hacia «falta
+  // capturar» se ve y se corrige; hacia «capturado dos veces» es lo invisible.
+  if (accion === 'cambio_pago_capturar') {
+    const cid = String(body.id || '');
+    if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });
+    // Las MISMAS validaciones de monto que abono_crear (admin-coordi-
+    // asignaciones) — copiadas, no inventadas; si divergen, el careo las carea.
+    const monto = Number(body.monto);
+    if (!Number.isFinite(monto) || monto <= 0) return j(400, headers, { error: 'El monto tiene que ser mayor que cero' });
+    if (monto > 1000000) return j(400, headers, { error: 'Monto fuera de rango' });
+
+    const rc = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=id,viajero_id,evento_id,tipo,estado,foto_path,detalle,nombre`, { headers: sbH });
+    if (!rc.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
+    const c = (await rc.json())[0];
+    if (!c) return j(404, headers, { error: 'Esa solicitud no existe' });
+    if (c.tipo !== 'pago') return j(409, headers, { error: 'Esa solicitud no es un pago — se atiende con los botones de siempre' });
+
+    // 1 · Cerrar con valor esperado: el reclamo. 0 filas = alguien ganó el clic.
+    const respuesta = `Abono capturado: $${Math.round(monto).toLocaleString('es-MX')} · ${quien}`;
+    const rz = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&estado=eq.pendiente`, {
+      method: 'PATCH',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ estado: 'atendida', respuesta, atendida_por: quien, atendida_at: new Date().toISOString() }),
+    });
+    if (!rz.ok) return j(502, headers, { error: 'No se pudo reclamar la solicitud', detail: (await rz.text()).slice(0, 300) });
+    if (!(await rz.json()).length) return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la atendió' });
+
+    // 2 · El abono — capturado_por del JWT (anti-spoofing, como abono_crear),
+    // foto_path heredado del comprobante.
+    const filaAbono = { viajero_id: c.viajero_id, monto, foto_path: c.foto_path || null,
+      nota: ('Pago subido desde el Portal · ' + String(c.detalle || '').slice(0, 300)).slice(0, 500),
+      capturado_por: quien };
+    const ra = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
+      method: 'POST',
+      headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(filaAbono),
+    });
+    if (!ra.ok) {
+      // La solicitud YA quedó atendida; el dinero NO entró. Se DICE con el
+      // monto para capturarlo por ➕ Abono — nada se borra ni se reintenta solo.
+      return j(207, headers, { error: 'La solicitud se cerró pero el ABONO NO SE GUARDÓ: captúralo por ➕ Abono con $' + monto, detail: (await ra.text()).slice(0, 300) });
+    }
+    const abono = (await ra.json())[0] || null;
+
+    // 3 · «Recibimos tu pago» — el MISMO correo de la captura manual, con la
+    // FIRMA del dueño (leída de abono_crear, no adivinada). EVENTOS_CORREO
+    // decide; fuera de la lista no sale nada. Jamás tumba el abono.
+    let correo = null;
+    try {
+      correo = await enviarCorreoPago({
+        tipo: 'abono', evento_id: c.evento_id, viajeroIds: [c.viajero_id],
+        recibidoPorViajero: { [c.viajero_id]: monto },
+        enviado_por: (auth.user && auth.user.correo) || null,
+        KH_URL: SB_URL, KH_KEY: SB_KEY,
+      });
+    } catch (e) { correo = { error: e.message }; }
+    return j(200, headers, { ok: true, abono, correo });
   }
 
   // Las tres restantes piden el id.

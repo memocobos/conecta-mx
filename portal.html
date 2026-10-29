@@ -3547,7 +3547,15 @@ function _migPagosHtml(t){
   // enseña las DOS cuentas con su etiqueta (PG-1), en vez de señalar la que no es.
   const anc = t.banco === 'banamex' ? '#heybanco' : (t.banco === 'bbva' ? '#bbva' : '');
   const comoPago = '<a href="pagos.html' + anc + '" style="display:inline-block;margin-top:12px;font-size:13px;color:#e8ff4c;text-decoration:none">¿Cómo pago? Ver datos de la cuenta →</a>';
-  const mandaComp = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Cuando pagues, mándanos tu comprobante por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a> y aquí se te registra.</div>';
+  // [PAGOS-PORTAL-2] El comprobante se sube AQUÍ MISMO (Fase 2, palabra de
+  // Memo): cae a la bandeja de KameHouse y el equipo captura el abono viendo la
+  // foto — nada automático mueve dinero. El WhatsApp queda como camino alterno.
+  const vjId = String(t.viajero_id || '');
+  const mandaComp = '<div style="margin-top:10px">'
+    + (vjId ? '<button type="button" class="btn btn-secondary" style="width:auto;padding:9px 14px;font-size:13px" data-mig-act="pago-subir" data-mig-id="' + escapeHtml(vjId) + '">📤 Ya pagué — subir mi comprobante</button>'
+      + '<input type="file" id="mig-pago-file-' + escapeHtml(vjId) + '" accept="image/*,.pdf" style="display:none">'
+      + '<div class="mig-pago-msg" id="mig-pago-msg-' + escapeHtml(vjId) + '" style="font-size:12px;margin-top:6px;min-height:14px"></div>' : '')
+    + '<div style="font-size:12px;opacity:.7;margin-top:6px;line-height:1.5">También puedes mandarlo por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a>. En cuanto el equipo lo capture, tu saldo se actualiza aquí.</div></div>';
 
   if (p.estado === 'liquidado') {
     return caja(barra + '<div style="font-size:14px;font-weight:800;color:#88ea4e">✓ ¡Ya está liquidado!</div>'
@@ -3918,7 +3926,66 @@ document.addEventListener('click', (ev) => {
   // [PORTAL-VIVO-1] La muestra de 30 s y la radio a un toque.
   else if (act === 'tunes') _migTunes(b);
   else if (act === 'radio') { const p = document.getElementById('rcp-play'); if (p) p.click(); }
+  // [PAGOS-PORTAL-2] Subir el comprobante de un pago.
+  else if (act === 'pago-subir') _migPagoSubir(id, b);
 });
+
+// [PAGOS-PORTAL-2] El comprobante: foto o PDF → portal-viajero `subir_pago` →
+// bandeja de KameHouse. 🔒 La foto viaja por FileReader→canvas (JAMÁS blob: —
+// el CSP no lo permite, REQ-FOTO-1), reescalada a 1600px como el comprobante
+// de la requisición; un PDF va tal cual con su tope. Esto NO mueve dinero: el
+// abono lo captura el equipo tecleando el monto que DICE el comprobante.
+async function _migPagoSubir(id, btn){
+  const inp = document.getElementById('mig-pago-file-' + id);
+  const msg = document.getElementById('mig-pago-msg-' + id);
+  const say = (t, ok) => { if (msg) { msg.textContent = t; msg.style.color = ok ? '#88ea4e' : '#ff283b'; } };
+  if (!inp) return;
+  if (!inp.files || !inp.files[0]) {
+    // Primer clic: abrir el selector; al elegir, volvemos aquí solos.
+    inp.onchange = () => { if (inp.files && inp.files[0]) _migPagoSubir(id, btn); };
+    inp.click();
+    return;
+  }
+  const f = inp.files[0];
+  say('Preparando tu comprobante…', true);
+  if (btn) btn.disabled = true;
+  let b64 = null;
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result || ''));
+      fr.onerror = () => rej(new Error('No se pudo leer el archivo'));
+      fr.readAsDataURL(f);
+    });
+    if (/^data:application\/pdf/i.test(dataUrl)) {
+      if (dataUrl.length > 4.8 * 1024 * 1024) { say('Tu PDF pesa demasiado: mándalo por WhatsApp o súbelo como foto.'); if (btn) btn.disabled = false; inp.value = ''; return; }
+      b64 = dataUrl;
+    } else {
+      // Imagen: reescalar a 1600px por el lado largo (la forma de _reqArchivoB64
+      // del index) — un ticket de 12 MP pesa 6 MB y el cable topa antes.
+      b64 = await new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const esc = Math.min(1, 1600 / Math.max(img.width, img.height));
+            const cv = document.createElement('canvas');
+            cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            res(cv.toDataURL('image/jpeg', 0.85));
+          } catch (e) { rej(e); }
+        };
+        img.onerror = () => rej(new Error('Esa imagen no se pudo abrir'));
+        img.src = dataUrl;
+      });
+    }
+  } catch (e) { say((e && e.message) || 'No se pudo leer tu archivo. Inténtalo otra vez.'); if (btn) btn.disabled = false; inp.value = ''; return; }
+  say('Subiendo…', true);
+  try {
+    const j = await _migPost({ accion: 'subir_pago', viajero_id: id, comprobante_base64: b64 });
+    if (j && j.ok) { say('✓ Recibimos tu comprobante. El equipo lo captura y tu saldo se actualiza aquí mismo.', true); inp.value = ''; }
+    else { say((j && j.error) || 'No se pudo subir. Inténtalo otra vez.'); if (btn) btn.disabled = false; }
+  } catch (e) { say('No se pudo subir. Revisa tu conexión e inténtalo otra vez.'); if (btn) btn.disabled = false; }
+}
 
 // [PORTAL-VIVO-1] La muestra de 30 s. La URL del preview de Deezer viene
 // FIRMADA y caduca en 15–30 min (la lección del sorteo): se pide AL CLIC,

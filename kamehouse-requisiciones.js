@@ -85,7 +85,7 @@ async function loadCambiosPortal() {
   if (!j || !j.ok) { box.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:10px">No se pudieron leer las solicitudes de cambio del Portal: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`; return; }
   const rows = j.cambios || [];
   if (!rows.length) { box.innerHTML = ''; return; }
-  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro', paquete: '🎟 Elige su paquete (preventa)' };
+  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro', paquete: '🎟 Elige su paquete (preventa)', pago: '💳 Comprobante de pago' };
   _reqCambiosRows = rows;
   box.innerHTML = `<div class="rq-section">Cambios pedidos desde el Portal <span class="rq-pill pend">${rows.length}</span></div>`
     + rows.map((c) => {
@@ -105,6 +105,26 @@ async function loadCambiosPortal() {
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
           <button class="rq-btn pri" onclick="_reqPaqAbrir('${c.id}')">✓ Aplicar paquete</button>
+          <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
+        </div>
+        <div id="rq-cambio-form-${c.id}"></div></div>`;
+      }
+      // [PAGOS-PORTAL-2] El comprobante que el cliente subió desde el Portal:
+      // «Ver comprobante» (URL firmada por el servidor) y «➕ Capturar abono» con
+      // el monto TECLEADO por quien lo vio. «No procede» sigue para lo que no
+      // es un pago de verdad (foto equivocada, pago de otra cosa).
+      if (c.tipo === 'pago') {
+        return `<div class="rq-cambio" id="rq-cambio-${c.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
+          <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
+          <span class="rq-tag">${_reqBdjEsc(TIPO.pago)}</span>
+        </div>
+        <div class="rq-ev">${_reqBdjEsc(c.evento_id)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        <q>${_reqBdjEsc(c.detalle)}</q>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="rq-btn" onclick="_reqPagoVer('${c.id}')">📎 Ver comprobante</button>
+          <button class="rq-btn pri" onclick="_reqPagoAbrir('${c.id}')">➕ Capturar abono</button>
+          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
           <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
         </div>
         <div id="rq-cambio-form-${c.id}"></div></div>`;
@@ -170,6 +190,54 @@ async function _reqPaqAplicar(id) {
     loadCambiosPortal();
   }
   else say('El paquete SÍ se aplicó, pero no se pudo cerrar la solicitud: ' + ((j2 && j2.error) || 'sin respuesta') + '. Ciérrala con «No procede»/recarga.');
+}
+// [PAGOS-PORTAL-2] Ver el comprobante del Portal: la URL la FIRMA el servidor
+// (bucket privado, 1 h) — la pantalla solo la abre.
+async function _reqPagoVer(id) {
+  try {
+    const j = await _reqBdjCall({ accion: 'cambio_foto', id });
+    if (j && j.ok && j.signed_url) window.open(j.signed_url, '_blank', 'noopener');
+    else showToast(_reqBdjEsc((j && j.error) || 'No se pudo abrir el comprobante'), 'error');
+  } catch (e) { showToast(_reqBdjEsc(e.message || 'No se pudo abrir el comprobante'), 'error'); }
+}
+// [PAGOS-PORTAL-2] Capturar el abono: el monto lo TECLEA quien vio el
+// comprobante (el «declara $X» del detalle es del cliente y no se prellena a
+// ciegas — se prellena solo como AYUDA visible, editable, jamás se manda solo).
+function _reqPagoAbrir(id) {
+  const box = document.getElementById('rq-cambio-form-' + id);
+  const c = _reqCambiosRows.find((x) => x.id === id);
+  if (!box || !c) return;
+  if (box.dataset.abierto === 'pago') { box.innerHTML = ''; box.dataset.abierto = ''; return; }
+  box.dataset.abierto = 'pago';
+  // Si el cliente declaró un monto, se PRELLENA como punto de partida — pero el
+  // número que entra es el que quede en la caja tras mirar el comprobante.
+  const dec = (String(c.detalle || '').match(/declara \$([\d,]+)/) || [])[1];
+  box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
+    <label class="rq-field">Monto del abono — el que DICE el comprobante, no el que declaró *
+      <input type="number" min="1" step="1" id="rq-pago-monto-${id}" value="${dec ? dec.replace(/,/g, '') : ''}"></label>
+    <div style="font-size:11px;opacity:.75;margin-top:4px">Abre el 📎 comprobante y teclea lo que el banco dice. Al capturar: nace el abono (con el comprobante ligado), la solicitud se cierra y al cliente le llega «Recibimos tu pago» si su evento manda correo.</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="rq-btn pri" id="rq-pago-go-${id}" onclick="_reqPagoCapturar('${id}')">Capturar y cerrar</button>
+      <button class="rq-btn quiet" onclick="_reqPagoAbrir('${id}')">Cancelar</button>
+    </div><div class="rq-msg" id="rq-cambio-msg-${id}"></div></div>`;
+  const inp = document.getElementById('rq-pago-monto-' + id); if (inp) inp.focus();
+}
+async function _reqPagoCapturar(id) {
+  const msg = document.getElementById('rq-cambio-msg-' + id);
+  const say = (t, ok) => { if (msg) { msg.textContent = t; msg.style.color = ok ? 'var(--green, #88ea4e)' : 'var(--red)'; } };
+  const monto = Number((document.getElementById('rq-pago-monto-' + id) || {}).value);
+  if (!(monto > 0)) return say('Teclea el monto que dice el comprobante.');
+  const btn = document.getElementById('rq-pago-go-' + id); if (btn) btn.disabled = true;
+  say('Capturando…', true);
+  const j = await _reqBdjCall({ accion: 'cambio_pago_capturar', id, monto }).catch((e) => ({ error: e.message }));
+  if (j && j.ok) {
+    showToast(_reqBdjEsc('Abono capturado: $' + Math.round(monto).toLocaleString('es-MX') + ' · ' + (_reqCorreoTxt(j.correo) || 'sin correo (evento fuera de la lista)')), 'success');
+    loadCambiosPortal();
+  } else {
+    // El 207 del servidor: la solicitud quedó cerrada pero el abono NO entró —
+    // el texto trae el monto y el camino (➕ Abono). No se reintenta solo.
+    say((j && j.error) || 'No se pudo capturar'); if (btn) btn.disabled = false;
+  }
 }
 // [PREVENTA-PORTAL-2] Lo que pasó con el correo al cliente, dicho en el aviso.
 function _reqCorreoTxt(c) {

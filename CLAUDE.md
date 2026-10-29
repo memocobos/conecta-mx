@@ -188,6 +188,76 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳⏳ **PAGOS-PORTAL-2 (29-oct-2026, en main local): EL CLIENTE SUBE SU
+  COMPROBANTE DESDE EL PORTAL — Fase 2 del plan de pagos, construida.** Palabra
+  de Memo: *«Sí, constrúyela»* (la Fase 2 que PLAN-PAGOS-1 dejó nombrada). El
+  circuito: botón «📤 Ya pagué — subir mi comprobante» en la card del viaje →
+  `cambios_viajero` tipo **'pago'** con la foto → la bandeja de KameHouse →
+  **Bulma/Milk capturan el abono TECLEANDO el monto con el comprobante
+  enfrente**. 🔒 **Nada automático decide dinero** (el rumbo del 12-oct): la
+  solicitud es un AVISO con foto; el «declara $X» del cliente viaja como TEXTO
+  en el detalle, jamás como cifra que algo sume. `mide:pagos-portal-2` **38**
+  (sin ancla — árbol; sabotaje mordido: subir_pago saboteado para escribir un
+  abono → 5 rojos con nombre «dinero: POST abonos», restaurado).
+  - **La base** (acta `migraciones/PAGOS-PORTAL-2.sql`, YA CORRIDA, candados
+    MORDIDOS con error visible): tipo `'pago'` en el CHECK de `cambios_viajero`
+    + columna `foto_path` + CHECK `pago_foto` (un pago SIN comprobante no
+    existe; con `is not null` explícito — la lección del CHECK de
+    PREVENTA-PORTAL-1). ⚠️ Dos hallazgos del candado, dichos: `viajero_id`
+    TIENE FK (23503 con uuid inventado) y el DELETE en la MISMA sentencia que
+    el INSERT (CTE) no ve la fila recién nacida — se barrió con query aparte
+    (la ley del snapshot de PAGOS-MATRIZ-3b, cara de DELETE).
+  - **`portal-viajero` gana `subir_pago`**: pasa por los filtros de SIEMPRE
+    gratis (suyo por correo verificado · sellado · no-equipo → ajena/sin sello
+    contestan 404 igual), magia de BYTES con PDF (`_lib/imagen-magia`, la
+    decisión del comprobante de requisición heredada), tope ~3.6 MB dicho,
+    tope 3 pendientes tipo pago (429 — un buzón, no un chat), la foto sube
+    PRIMERO al bucket privado `abonos-viajeros` bajo `portal/<viajero_id>/` —
+    el MISMO bucket de los abonos a propósito.
+  - **La bandeja (`admin-requisiciones`) gana dos acciones** (roshi/bulma/milk):
+    `cambio_foto` (firma 1 h el path DE LA FILA, jamás uno tecleado — un path
+    del cuerpo podría firmar cualquier objeto del bucket) y
+    `cambio_pago_capturar`: cierra con VALOR ESPERADO (2º clic 409, cero
+    segundo abono) → el abono nace con el monto TECLEADO + **`foto_path`
+    HEREDADO** (la forma del aprobar de REQ-B1: el 📎 de la lista de viajeros
+    lo abre sin copiar) + `capturado_por` del JWT → «Recibimos tu pago» por
+    `enviarCorreoPago` con la FIRMA del dueño (leída de abono_crear, no
+    adivinada; EVENTOS_CORREO decide y jamás tumba el abono).
+  - 🔒 **EL ORDEN ES CERRAR PRIMERO Y ABONAR DESPUÉS, deliberado y careado:**
+    si el abono falla, la solicitud quedó 'atendida' sin abono y el **207 lo
+    DICE con el monto** (se captura por ➕ Abono); al revés, una carrera de dos
+    clics podría crear DOS abonos del mismo comprobante — dinero inventado que
+    no se deshace solo. Equivocarse hacia «falta capturar» se ve; hacia
+    «capturado dos veces» es lo invisible.
+  - **Pantallas:** la fila tipo pago en la bandeja (💳 chip · 📎 Ver
+    comprobante · ➕ Capturar abono con el declarado PRELLENADO editable · No
+    procede); el Portal reemplaza el «mándalo por WhatsApp» por el botón de
+    subir (file → FileReader → canvas 1600px JPEG, PDF directo — jamás
+    `blob:`, REQ-FOTO-1), con WhatsApp como camino alterno. La tarjeta de
+    inicio de Milk/Bulma cuenta estas solicitudes GRATIS (cuenta pendientes de
+    cambios_viajero sin filtrar tipo).
+  - **El careo** entra por los DOS handlers reales con red falsa que modela
+    STORAGE (subir + firmar — firmar un objeto inexistente es 404), el CHECK
+    de la base (pago sin foto rebota 23514) y la sesión viva. Candado central
+    POR EL HECHO con control positivo: cero escrituras a
+    abonos_viajero/viajeros_evento en todo el bloque del Portal, y el contador
+    SÍ ve una inyectada. Las validaciones de monto careadas contra abono_crear.
+    Vecinos verdes: portal-edit-1 28 · portal-solo-1 89 · preventa-portal-1 33
+    · req-b1 52 · plan-pagos-1 81 · portal-vivo-1 36 · rechazo-1 60.
+  - ⚠️ **Dos rojos de la primera corrida, los dos del INSTRUMENTO:** (a) mi
+    aserción buscaba el objeto sin el prefijo del bucket; (b) mi `sinCom`
+    (quitar comentarios por regex) se comió **170 KB** del portal.html — un
+    `/*` suelto traga hasta el `*/` lejano (la lección de rebanaPlana, otra
+    cara): hoy se RECORTA el bloque que se mide y se busca ahí.
+  - ⚠️ **Y la mordida doble del `git checkout` en sabotajes sobre árbol SUCIO**
+    (pagada dos veces hoy, aquí y en CONTRATO-ON-1): `git checkout --`
+    restaura el COMMIT, no tu edit sin commitear — el encendido y subir_pago
+    se rehicieron. Para sabotajes con edits sin commitear: respaldo con `cp`,
+    jamás checkout.
+  - ⏳ Push de Memo → prueba humana: subir un comprobante real desde el Portal
+    (su cuenta) y capturarlo desde la bandeja. **El flujo viejo (WhatsApp)
+    sigue vivo como alterno — nada se apagó.**
+
 - 📨✅ **RECORDATORIO-REGISTRO-1 (29-oct-2026, EJECUTADO): 30 correos de
   «regístrate al Portal» a los aprobados sin cuenta — los 30 `delivered`.**
   Palabra de Memo: *«Sí: seco → mi visto → enviar»*, y el visto llegó con las

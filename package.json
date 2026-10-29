@@ -121,6 +121,7 @@
     "mide:viajero-edita-1": "node scripts/mide-viajero-edita-1.js",
     "mide:careo-dup-fecha-1": "node scripts/mide-careo-dup-fecha-1.js",
     "mide:capsule-ux-1": "node scripts/mide-capsule-ux-1.js",
-    "mide:portal-vivo-1": "node scripts/mide-portal-vivo-1.js"
+    "mide:portal-vivo-1": "node scripts/mide-portal-vivo-1.js",
+    "mide:pagos-portal-2": "node scripts/mide-pagos-portal-2.js"
   }
 }

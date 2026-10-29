@@ -59,7 +59,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (_) { return json(400, headers, { ok: false, error: 'Cuerpo inválido' }); }
   const accion = String(body.accion || '');
-  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
+  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete', 'subir_pago'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
   const viajero_id = String(body.viajero_id || '');
   if (!UUID_RE.test(viajero_id)) return json(400, headers, { ok: false, error: 'Viajero inválido' });
 
@@ -196,6 +196,72 @@ exports.handler = async (event) => {
     const filas = await r.json().catch(() => []);
     if (!Array.isArray(filas) || filas.length !== 1) return json(409, headers, { ok: false, error: 'No se pudo guardar. Recarga e inténtalo otra vez.' });
     return json(200, headers, { ok: true, guardado: Object.keys(cambios).filter((k) => k !== 'editado_portal_at') });
+  }
+
+  // ── 3$ · [PAGOS-PORTAL-2] SUBIR UN COMPROBANTE DE PAGO ──────────────────
+  // Palabra de Memo (29-oct, «Sí, constrúyela»): el cliente sube la foto de su
+  // transferencia/depósito desde la card de su viaje; cae a la bandeja de
+  // KameHouse (cambios_viajero tipo 'pago') y Bulma/Milk CAPTURAN el abono
+  // tecleando el monto con el comprobante enfrente (cambio_pago_capturar).
+  // 🔒 ESTO NO ESCRIBE DINERO: ni abonos_viajero ni viajeros_evento se tocan —
+  // es un AVISO con foto, exactamente como la requisición (el rumbo del
+  // 12-oct: nada automático decide dinero). El monto que el cliente DECLARA
+  // viaja como TEXTO en el detalle, jamás como número que alguien sume.
+  if (accion === 'subir_pago') {
+    // El comprobante — la MISMA forma que requisicion-crear: base64 → bytes →
+    // magia (jpg/png/webp + PDF: los bancos dan PDF) → bucket PRIVADO
+    // `abonos-viajeros`, prefijo portal/<viajero_id>/. Mismo bucket que los
+    // abonos a propósito: al capturar, el abono HEREDA este path (la forma del
+    // aprobar de REQ-B1) y el 📎 de la lista de viajeros lo abre sin copiar.
+    const MAX_B64_PAGO = 4.8 * 1024 * 1024; // ~3.6 MB reales, como requisicion-crear
+    const b64 = String(body.comprobante_base64 || '').replace(/^data:[^;]+;base64,/, '');
+    if (!b64) return json(400, headers, { ok: false, error: 'Sube la foto de tu comprobante' });
+    if (b64.length > MAX_B64_PAGO) return json(413, headers, { ok: false, error: 'Tu comprobante pesa demasiado. Súbelo como foto e inténtalo otra vez.' });
+    let buf; try { buf = Buffer.from(b64, 'base64'); } catch (_) { buf = null; }
+    const { tipoImagen } = require('./_lib/imagen-magia');
+    const tipoImg = tipoImagen(buf, { pdf: true });
+    if (!tipoImg) return json(400, headers, { ok: false, error: 'El comprobante tiene que ser foto (JPG/PNG) o PDF' });
+
+    // Monto DECLARADO, opcional. Solo viaja en el texto del detalle: la cifra
+    // que vale es la que Bulma teclee viendo el comprobante.
+    const montoDec = Number(body.monto);
+    const montoTxt = (Number.isFinite(montoDec) && montoDec > 0 && montoDec <= 1000000)
+      ? ` · el cliente declara $${Math.round(montoDec).toLocaleString('es-MX')}` : '';
+    const notaCliente = String(body.nota || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+
+    // Tope de pendientes tipo pago (el MISMO número que las solicitudes de
+    // cambio: un buzón, no un chat). Dos comprobantes legítimos seguidos caben;
+    // el cuarto espera a que el equipo capture.
+    try {
+      const p = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.pago&estado=eq.pendiente&select=id&limit=${MAX_PENDIENTES + 1}`, { headers: hKH });
+      if (!p.ok) return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' });
+      if ((await p.json()).length >= MAX_PENDIENTES) {
+        return json(429, headers, { ok: false, error: 'Ya tienes comprobantes en revisión: el equipo los está capturando. Si urge, escríbenos por WhatsApp.' });
+      }
+    } catch (_) { return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' }); }
+
+    // La foto PRIMERO (sin comprobante no nace la solicitud — el CHECK
+    // cambios_viajero_pago_foto lo exige también desde la base).
+    const foto_path = `portal/${viajero_id}/${require('crypto').randomUUID()}.${tipoImg.ext}`;
+    let up;
+    try {
+      up = await fetch(`${KH_URL}/storage/v1/object/abonos-viajeros/${encodeURI(foto_path)}`, {
+        method: 'POST',
+        headers: Object.assign({}, hKH, { 'Content-Type': tipoImg.mime }),
+        body: buf,
+      });
+    } catch (e) { return json(502, headers, { ok: false, error: 'No se pudo subir tu comprobante. Revisa tu señal e inténtalo otra vez.' }); }
+    if (!up.ok) return json(502, headers, { ok: false, error: 'No se pudo guardar tu comprobante. Inténtalo otra vez.' });
+
+    const detallePago = ('Comprobante subido desde el Portal' + montoTxt + (notaCliente ? ' · «' + notaCliente + '»' : '')).slice(0, 600);
+    const fPago = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'pago', detalle: detallePago, foto_path };
+    const rI = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
+      method: 'POST',
+      headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(fPago),
+    });
+    if (!rI.ok) return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' });
+    return json(200, headers, { ok: true, solicitud: 'pendiente', mensaje: 'Recibimos tu comprobante: el equipo lo captura y tu saldo se actualiza aquí mismo.' });
   }
 
   // ── 3b · SOLICITAR UN CAMBIO (hotel / zona / fecha / otro) ───────────────

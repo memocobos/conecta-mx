@@ -3453,8 +3453,14 @@ function _migPagosHtml(t){
       + '<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,.1);padding-top:6px">' + filas + '</div></details>';
   }
 
-  // ── Cómo pago: la MISMA regla de banco del sitio (cheap → Banamex).
-  const anc = String(t.paquete || '').trim().toLowerCase() === 'cheap' ? '#heybanco' : '#bbva';
+  // ── Cómo pago: el ANCLA LA DECIDE EL SERVIDOR (`t.banco`), no esta pantalla.
+  // 🔴 Aquí vivía un `paquete === 'cheap' ? Banamex : BBVA` que repetía la regla
+  // del sitio SIN su excepción: la PREVENTA A CIEGAS cobra en BBVA aunque por
+  // dentro sea CHEAP (PN27-BANCO-1). Era el mismo defecto que ya se pagó una vez
+  // — un paquete disfrazado hereda las reglas del camino que usa por dentro.
+  // 🔒 Sin dato del servidor NO se adivina: se manda a pagos.html sin ancla, que
+  // enseña las DOS cuentas con su etiqueta (PG-1), en vez de señalar la que no es.
+  const anc = t.banco === 'banamex' ? '#heybanco' : (t.banco === 'bbva' ? '#bbva' : '');
   const comoPago = '<a href="pagos.html' + anc + '" style="display:inline-block;margin-top:12px;font-size:13px;color:#e8ff4c;text-decoration:none">¿Cómo pago? Ver datos de la cuenta →</a>';
   const mandaComp = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Cuando pagues, mándanos tu comprobante por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a> y aquí se te registra.</div>';
 

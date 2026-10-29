@@ -256,9 +256,51 @@ está caduco antes de escribirse.
     portal-solo-1 89 · portal-edit-1 28 · preventa-portal-1 33 ·
     contrato-cliente-2 19 · acomp-2 43 · req-b1 52 · confirma-1 28 ·
     plan-case-1 18 · rechazo-1 60 · fecha3-1 33.
+  - 🔴🔒 **PLAN-PAGOS-1d (28-oct, MISMA TARDE, cazado por una PREGUNTA de Memo):
+    EL «¿CÓMO PAGO?» REPETÍA LA REGLA DE BANCO SIN SU EXCEPCIÓN.** Él preguntó
+    «ahí les menciona Banamex para cheap y BBVA para stay, ride y plus ¿no?» — y
+    al medirlo salió que mi pantalla decía exactamente eso, **sin la excepción de
+    PN27-BANCO-1: la PREVENTA A CIEGAS cobra en BBVA** aunque por dentro viaje por
+    el camino CHEAP. **Es el MISMO defecto que ya se pagó el 13-oct, por segunda
+    vez** — la ley de «un paquete con otro nombre HEREDA todas las reglas del
+    camino que usa por dentro, y al disfrazar uno hay que barrerlas TODAS».
+    - ✅ **Medido antes de alarmarse: HOY no se veía.** Las **27 filas de
+      «Preventa a ciegas»** (22+2 palnorte · 3 nsqk) tienen **total = abonado**,
+      así que su plan sale `liquidado` — y esa rama **no pinta el «¿Cómo pago?»**.
+      El defecto estaba **latente**, no suelto: mordía en cuanto a una le subiera
+      el total al elegir paquete.
+    - 🔒 **El arreglo: la pantalla ya NO decide el banco — lo DECIDE EL SERVIDOR**
+      (`bancoDeViajero`, `banco: 'bbva'|'banamex'` por tour) y la pantalla pinta.
+      Y la pregunta **no se re-implementa: se copia la forma del DUEÑO**,
+      `khEsPreventaCiegas` de kamehouse.js — que contesta «¿este VIAJERO es de
+      preventa?» **por su ZONA**, no por la ficha (una vez que el evento sale a la
+      venta deja de ser `cheapOnly` y los de la preventa siguen siéndolo).
+      kamehouse.js es navegador y no se puede `require`, así que la lista va de
+      **espejo CON NOMBRE** y el careo **la carea contra su dueño**.
+    - 🔒 **Sin banco del servidor NO se adivina:** manda a `pagos.html` **sin
+      ancla** (las dos cuentas con su etiqueta, PG-1) en vez de señalar la que no
+      es. Señalar mal una cuenta de banco es peor que no señalar ninguna.
+    - 🔴 **Y la aserción que escribí para vigilarlo SE CAZÓ SOLA**: hacía grep de
+      «heybanco» sobre la fuente y **mi propio comentario, el que explica por qué
+      la regla ya no vive ahí, la NOMBRA**. Cambiada por **el HECHO**: se pinta el
+      MISMO viaje con `cheap` y con `plus` y el mismo banco, y la salida tiene que
+      ser IDÉNTICA — así el ancla ya no puede depender del paquete.
+    - ⏳ **Hallazgo vecino NOMBRADO sin tocar:** `cuentaParaPaquete` de
+      `_lib/catalogo-index` **tampoco tiene la excepción** (PN27-BANCO-1 solo curó
+      el index). Sus lectores son otros —contratos, correos— y cambiarle la
+      respuesta al dueño sin medir a sus bebedores es justo lo que NUBE-3 prohíbe.
+      **Tuerca propia, con su propia medición.**
+    - `mide:plan-pagos-1` **67 → 81** (bloque [B], con el espejo careado contra
+      kamehouse.js). Vecinos verdes: portal-solo-1 89 · preventa-portal-1 33 ·
+      preventa-elegir-1 14 · paq-preventa-1 8 · confirma-1 28 · req-b1 52.
   - ⚠️ **Hoy lo ven POCOS, y es por diseño:** de 1,632 filas con correo solo **87
     están revisadas**, y PORTAL-SOLO-1 manda que sin sello no viaja nada. El plan
     llega a cada quien conforme Bulma/Milk publican su viaje.
+  - ⚠️ **Y los 27 de la preventa ven «✓ Ya está liquidado»**, que es CIERTO (su
+    contrato hoy son $300 y están pagados) y puede leerse como «ya no debo nada».
+    Encima de ese bloque sale su «🎟 ¡Ya hay costos! Elige tu paquete»
+    (PREVENTA-PORTAL-1), así que el par se entiende — queda dicho por si Memo
+    prefiere otro texto para ese caso.
   - ⏳ **Push de Memo** → prueba con su cuenta en el Portal. **Fase 2** (subir el
     comprobante desde el Portal + su bandeja de revisión) queda nombrada y sin
     empezar, por su palabra.

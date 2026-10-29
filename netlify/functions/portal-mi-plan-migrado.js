@@ -27,6 +27,36 @@
 
 const { saldoMigrado } = require('./_lib/cuenta-evento');
 
+// ═══ [PLAN-PAGOS-1d] ¿A QUÉ CUENTA MANDA ESTE VIAJERO? ═══════════════════════
+// La regla de la casa: **CHEAP → Banamex · PLUS/STAY/RIDE → BBVA** (el banco del
+// evento, que por default es BBVA).
+//
+// 🔴 CON UNA EXCEPCIÓN QUE YA COSTÓ CARO UNA VEZ: **la PREVENTA A CIEGAS cobra en
+// BBVA** aunque por dentro viaje por el camino CHEAP (PN27-BANCO-1, palabra de
+// Memo del 13-oct). Es la ley de «un paquete con otro nombre HEREDA todas las
+// reglas del camino que usa por dentro»: al disfrazar uno hay que barrer TODAS
+// las del camino — banco incluido. Esta pantalla la repitió sin la excepción y
+// la habría mandado a Banamex.
+//
+// 🔒 **NO se re-implementa la pregunta: se copia la forma del DUEÑO**,
+// `khEsPreventaCiegas` de kamehouse.js (que es quien contesta «¿este VIAJERO es
+// de preventa?», por su ZONA y no por la ficha — una vez que el evento sale a la
+// venta deja de ser cheapOnly y los de la preventa siguen siéndolo). kamehouse.js
+// es navegador y no se puede `require`, así que la lista va de ESPEJO CON NOMBRE
+// y el careo las carea: el día que una se mueva sin la otra, suena.
+const PREVENTA_EVENTOS_ESPEJO = ['palnorte'];   // espejo de KH_PREVENTA_EVENTOS
+function esPreventaCiegasViajero(v) {
+  if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
+  if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;
+  return PREVENTA_EVENTOS_ESPEJO.includes(String(v.evento_id || '').split('#')[0]);
+}
+// 'bbva' | 'banamex' — el ANCLA de pagos.html, decidida en el servidor para que
+// la pantalla no vuelva a cargar con una regla de dinero.
+function bancoDeViajero(v) {
+  if (esPreventaCiegasViajero(v)) return 'bbva';
+  return String(v && v.tipo_paquete || '').trim().toLowerCase() === 'cheap' ? 'banamex' : 'bbva';
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -246,6 +276,9 @@ exports.handler = async (event) => {
         // [PLAN-PAGOS-1b] El calendario de lo que le FALTA. `null` = no se pudo
         // armar (catálogo ilegible), que no es lo mismo que «sin cuotas».
         plan,
+        // [PLAN-PAGOS-1d] A qué cuenta manda ESTE viajero, con la excepción de
+        // la preventa ya aplicada. La pantalla pinta, no decide.
+        banco: bancoDeViajero(v),
         // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
         evento_ds: dsEv,
         // 🔒 Los abonos van ORDENADOS por fecha y con su fecha tal cual está. Los
@@ -262,3 +295,9 @@ exports.handler = async (event) => {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error leyendo tu plan', detail: e.message }) };
   }
 };
+
+// Expuestos SOLO para el careo (mide:plan-pagos-1): la decisión de banco y su
+// espejo, para poder carearlos contra kamehouse.js sin re-implementarlos.
+module.exports._bancoDeViajero = bancoDeViajero;
+module.exports._esPreventaCiegasViajero = esPreventaCiegasViajero;
+module.exports._PREVENTA_EVENTOS_ESPEJO = PREVENTA_EVENTOS_ESPEJO;

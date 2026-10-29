@@ -259,6 +259,39 @@ async function correr() {
   vm.runInContext(rebana(PORTAL, 'function _migPagosHtml(t){') + ';', ctx);
   af(() => typeof ctx._migPagosHtml === 'function', 'la pantalla se rebanó de portal.html y corre (es la de verdad, no un doble)');
   const pinta = (t) => ctx._migPagosHtml(t);
+  const fuentePagos = rebana(PORTAL, 'function _migPagosHtml(t){');
+
+  // ═══ [B] EL BANCO: LA EXCEPCIÓN DE LA PREVENTA, QUE YA COSTÓ CARO UNA VEZ ═══
+  // 🔴 PN27-BANCO-1: la preventa a ciegas cobra en BBVA aunque por dentro viaje
+  // por el camino CHEAP. Esta pantalla nació repitiendo «cheap → Banamex» sin la
+  // excepción — el MISMO defecto, por segunda vez. Hoy lo decide el servidor.
+  console.log('\n[B] El banco lo decide el servidor, con la excepción de la preventa');
+  limpiaCache();
+  const SRV = require(path.join(RAIZ, 'netlify/functions/portal-mi-plan-migrado.js'));
+  const banco = SRV._bancoDeViajero;
+  af(() => typeof banco === 'function', 'el servidor expone su decisión de banco (si no, el bloque no mide nada)');
+  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'juniorh' }) === 'banamex', 'CHEAP normal → Banamex');
+  af(() => banco({ tipo_paquete: 'plus', evento_id: 'juniorh' }) === 'bbva', 'PLUS → BBVA');
+  af(() => banco({ tipo_paquete: 'stay', evento_id: 'juniorh' }) === 'bbva', 'STAY → BBVA');
+  af(() => banco({ tipo_paquete: 'ride', evento_id: 'juniorh' }) === 'bbva', 'RIDE → BBVA');
+  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'nsqkmty' }) === 'bbva',
+    '🔒 PREVENTA A CIEGAS por su ZONA → BBVA, aunque el paquete diga cheap [PN27-BANCO-1]');
+  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'palnorte#0' }) === 'bbva',
+    'y por su EVENTO (palnorte), con `slug#N` y todo');
+  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: '  PREVENTA A CIEGAS ', evento_id: 'x' }) === 'bbva',
+    'la zona se normaliza: espacios y mayúsculas no abren el hoyo');
+  // 🔒 El ESPEJO se carea contra su dueño: kamehouse.js no se puede `require`, así
+  // que si una lista se mueve sin la otra, suena aquí.
+  const espejoSrv = JSON.stringify(SRV._PREVENTA_EVENTOS_ESPEJO || null);
+  const mKH = /const KH_PREVENTA_EVENTOS\s*=\s*(\[[^\]]*\])/.exec(KH);
+  af(() => !!mKH, 'KH_PREVENTA_EVENTOS se encontró en kamehouse.js (si no, el espejo no se puede carear)');
+  af(() => mKH && JSON.stringify(JSON.parse(mKH[1].replace(/'/g, '"'))) === espejoSrv,
+    () => 'el espejo del servidor es IGUAL al de kamehouse.js: ' + espejoSrv + ' vs ' + (mKH ? mKH[1] : '?'));
+  // 🔒 Y la forma de la pregunta es la del DUEÑO (khEsPreventaCiegas), no una mía:
+  // un no-cheap jamás es preventa, por mucho que su zona lo diga.
+  af(() => banco({ tipo_paquete: 'plus', zona_boleto: 'Preventa a ciegas', evento_id: 'palnorte' }) === 'bbva', 'un PLUS con esa zona sigue en BBVA (no cambia nada, pero no se cuela por otra puerta)');
+  af(() => SRV._esPreventaCiegasViajero({ tipo_paquete: 'plus', zona_boleto: 'Preventa a ciegas' }) === false,
+    'la pregunta exige CHEAP primero — la forma de khEsPreventaCiegas, copiada');
 
   const base = { viajero_id: U(1), total: 9000, abonado: 3500, resta: 5500, abonado_previo: 2000, abonos: [{ monto: 1500, fecha: '2026-10-01' }], paquete: 'plus' };
   const hCal = pinta(Object.assign({}, base, { plan: pPlus }));
@@ -266,8 +299,25 @@ async function correr() {
   af(() => /Tu próximo pago/.test(hCal), 'destaca el próximo pago');
   af(() => /width:39%/.test(hCal), () => 'la barra pinta el avance real (3,500 de 9,000 = 39%)');
   af(() => /Pago 1 /.test(hCal) && /Pago 2 /.test(hCal), 'lista las cuotas numeradas');
-  af(() => /pagos\.html#bbva/.test(hCal), 'PLUS manda a la cuenta BBVA de pagos.html');
-  af(() => /pagos\.html#heybanco/.test(pinta(Object.assign({}, base, { paquete: 'cheap', plan: pCheap }))), 'CHEAP manda a Banamex — la misma regla de banco del sitio');
+  af(() => /pagos\.html#bbva/.test(pinta(Object.assign({}, base, { banco: 'bbva', plan: pPlus }))), 'PLUS manda a la cuenta BBVA de pagos.html');
+  af(() => /pagos\.html#heybanco/.test(pinta(Object.assign({}, base, { paquete: 'cheap', banco: 'banamex', plan: pCheap }))), 'CHEAP manda a Banamex — la regla de banco del sitio');
+  // 🔒 [PLAN-PAGOS-1d] LA PANTALLA NO DECIDE EL BANCO: lo pinta. Sin dato manda a
+  // pagos.html SIN ancla (las dos cuentas con su etiqueta), jamás a la que no es.
+  af(() => {
+    const h = pinta(Object.assign({}, base, { paquete: 'cheap', banco: undefined, plan: pCheap }));
+    return /pagos\.html"/.test(h) && !/#heybanco/.test(h) && !/#bbva/.test(h);
+  }, 'sin banco del servidor NO adivina: manda a pagos.html sin ancla (las dos cuentas)');
+  // 🔒 EL HECHO, NO LA PALABRA. Mi primera versión de esta aserción hacía grep de
+  // «heybanco» sobre la fuente y SE CAZÓ SOLA: el comentario que explica por qué
+  // la regla ya no vive aquí la NOMBRA. Lo que de verdad hay que afirmar es que
+  // la salida ya no depende de `paquete` — así que se pinta el MISMO viaje con
+  // los dos paquetes y el mismo banco, y el ancla tiene que salir idéntica.
+  af(() => {
+    const comun = { banco: 'bbva', plan: pPlus };
+    const a = pinta(Object.assign({}, base, comun, { paquete: 'cheap' }));
+    const b = pinta(Object.assign({}, base, comun, { paquete: 'plus' }));
+    return a === b && /#bbva/.test(a);
+  }, 'el ancla ya NO depende del paquete: mismo banco → misma salida con cheap y con plus');
   af(() => /Pagos anteriores/.test(hCal) && /\$2,000/.test(hCal), 'el historial DICE los $2,000 sin fecha en vez de callarlos');
   af(() => /registrado el/.test(hCal) && !/pagado el/.test(hCal), 'los abonos se rotulan «registrado el» — su fecha es la de captura, no la del pago');
   // 🔒 El historial tiene que sumar lo mismo que la barra, o el cliente ve dos verdades.
@@ -287,7 +337,7 @@ async function correr() {
   af(() => /Antes del evento/.test(pinta(Object.assign({}, base, { plan: pCerca }))), 'liquidar → una cuota «Antes del evento»');
   af(() => pinta({ sin_plan: true }) === '', 'una fila sin plan en la base no pinta bloque (lo dice el mensaje que ya existía)');
   // 🔒 La pantalla NO re-calcula la fórmula: no puede haber quincenas aquí.
-  const fuente = rebana(PORTAL, 'function _migPagosHtml(t){');
+  const fuente = fuentePagos;
   af(() => !/new Date\([^)]*,\s*\d+,\s*(9|24)\s*\)/.test(fuente) && !/getQuincenas/.test(fuente),
     'la pantalla no arma ninguna quincena: pinta lo que el servidor manda (cero quinta copia)');
 

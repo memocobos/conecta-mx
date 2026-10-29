@@ -59,7 +59,13 @@ af(/_ctrTabDe\(c\) === _ctrTab/.test(pintor), 'la pestaña corta PRIMERO (filtro
 af(/\.sort\(_ctrOrdenUso\)/.test(pintor), 'y los visibles se ordenan con _ctrOrdenUso');
 af(/delTab\.forEach\(\(c\) => \{ cuenta\[_ctrClase\(c\)\]\+\+; \}\)/.test(pintor), 'los chips cuentan DENTRO de la pestaña');
 af(/ctrt-creadoras/.test(pintor) && /ctrt-coordis/.test(pintor) && /ctrt-clientes/.test(pintor), 'cada pestaña dice cuántos tiene');
-af(/CONTRATO-CLIENTE-1/.test(pintor) && /fases reales/.test(pintor), 'la pestaña Clientes vacía dice POR QUÉ (decisión B, no un hueco)');
+// [AUD-3DIAS-1 · 29-oct-2026] La aserción vieja exigía el letrero de la
+// decisión B («fases reales», CONTRATO-CLIENTE-1) en el VACÍO de Clientes —
+// y CTR-RECUERDA-1 lo SUPERÓ a propósito: hoy esa pestaña tiene arriba el
+// bloque «📜 Contratos de viajeros», así que la tabla de abajo es SOLO
+// giveaway y su vacío dice la verdad nueva: dónde viven los de los viajeros.
+// El espíritu se conserva: un vacío no es mudo — dice por qué y a dónde ir.
+af(/Sin contratos de giveaway/.test(pintor) && /bloque de arriba/.test(pintor), 'la pestaña Clientes vacía dice POR QUÉ (manda al bloque de contratos de viajeros — verdad de CTR-RECUERDA-1)');
 
 console.log('\n[D] las alertas son DE SU PESTAÑA');
 const alerta = fn('_ctrAlertaPintar').replace(/\/\/[^\n]*/g, '');

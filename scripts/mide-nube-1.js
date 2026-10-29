@@ -305,7 +305,14 @@ function recortarPagina(html, id) {
     });
     return { res, d: JSON.parse(res.body || '{}'), metodos };
   };
-  const a1 = await correrAdmin({ accion: 'cotizar', modo: 'bus', precio_pp: 2650, vigente_hasta: iso(HOY + 6 * 864e5) });
+  // [AUD-3DIAS-1 · 29-oct-2026] Aquí estaba LA MISMA bomba que este careo ya
+  // nombró arriba (línea ~224) y que mató a mide:nube-4: el handler REAL valida
+  // «ya pasó» contra el reloj REAL, y estas vigencias iban sobre el HOY
+  // CONGELADO (19-oct). HOY+6d = 25-oct: el careo pasó en verde hasta esa fecha
+  // y se puso rojo solo el 26 — un fixture vencido con mecha. Todo lo que pasa
+  // por el handler real va RELATIVO a Date.now(); el HOY congelado es para el
+  // lib, que recibe el instante.
+  const a1 = await correrAdmin({ accion: 'cotizar', modo: 'bus', precio_pp: 2650, vigente_hasta: iso(Date.now() + 6 * 864e5) });
   console.log('    métodos contra la tabla: ' + JSON.stringify(a1.metodos));
   af(a1.res.statusCode === 200 && a1.d.ok === true, 'cotizar no guardó: ' + a1.res.body);
   af(a1.metodos.some((m) => m.startsWith('POST nube_cotizaciones')), 'no salió ningún INSERT');
@@ -322,16 +329,16 @@ function recortarPagina(html, id) {
      '🔴 `capturado_por` no salió del token: ' + JSON.stringify(a1.metodos.enviado && a1.metodos.enviado.capturado_por)
      + '. El payload de verify-admin trae `correo` — NO `nombre` ni `email`');
   const a1b = await correrAdmin(
-    { accion: 'cotizar', modo: 'bus', precio_pp: 100, vigente_hasta: iso(HOY + 864e5), capturado_por: 'me firmo como Memo' },
+    { accion: 'cotizar', modo: 'bus', precio_pp: 100, vigente_hasta: iso(Date.now() + 864e5), capturado_por: 'me firmo como Memo' },
     { id: 'u9', correo: 'milk@conectareynosa.mx', rol: 'milk' });
   af(a1b.metodos.enviado && a1b.metodos.enviado.capturado_por === 'milk@conectareynosa.mx',
      '🔴 el body pudo FIRMAR la captura con otro nombre: ' + JSON.stringify(a1b.metodos.enviado.capturado_por));
   // Las guardas del guardado, que NO son decorativas: cada una se alcanza.
   for (const [etq, body, pedazo] of [
-    ['sin modo',         { accion: 'cotizar', precio_pp: 100, vigente_hasta: iso(HOY + 864e5) }, /bus.*avion/i],
-    ['modo inventado',   { accion: 'cotizar', modo: 'tren', precio_pp: 100, vigente_hasta: iso(HOY + 864e5) }, /bus.*avion/i],
-    ['sin precio',       { accion: 'cotizar', modo: 'bus', vigente_hasta: iso(HOY + 864e5) }, /precio/i],
-    ['precio en cero',   { accion: 'cotizar', modo: 'bus', precio_pp: 0, vigente_hasta: iso(HOY + 864e5) }, /precio/i],
+    ['sin modo',         { accion: 'cotizar', precio_pp: 100, vigente_hasta: iso(Date.now() + 864e5) }, /bus.*avion/i],
+    ['modo inventado',   { accion: 'cotizar', modo: 'tren', precio_pp: 100, vigente_hasta: iso(Date.now() + 864e5) }, /bus.*avion/i],
+    ['sin precio',       { accion: 'cotizar', modo: 'bus', vigente_hasta: iso(Date.now() + 864e5) }, /precio/i],
+    ['precio en cero',   { accion: 'cotizar', modo: 'bus', precio_pp: 0, vigente_hasta: iso(Date.now() + 864e5) }, /precio/i],
     ['sin vigencia',     { accion: 'cotizar', modo: 'bus', precio_pp: 100 }, /rige/i],
     // El servidor compara contra el ahora REAL (no contra el reloj congelado),
     // así que «pasada» tiene que ser pasada de verdad.

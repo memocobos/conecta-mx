@@ -209,8 +209,22 @@ let EVENTOS_REALES = [];
      'CANDADO DE CARDINALIDAD: la lista derivada trae ' + EVENTOS_REALES.length + ' eventos. Con un puñado, '
      + 'las aserciones de abajo pasarían en vacío');
   af(EVENTOS_REALES.includes('edc27'), 'edc27 (CDMX, vivo) no está en la lista derivada: ' + JSON.stringify(EVENTOS_REALES.slice(0, 10)));
-  af(EVENTOS_REALES.includes('vaiven') && EVENTOS_REALES.includes('coronacapital'),
-     '`noBus` NO debe excluir: esos eventos siguen usando el paso del transporte, con avión solamente');
+  // [AUD-3DIAS-1 · 29-oct-2026] «vaiven» TECLEADO murió por calendario: su
+  // evento pasó el 17-oct y la lista derivada es de VIVOS, así que la aserción
+  // acusaba al código sano (la familia del rojo de mide:tira-agotados). El
+  // ejemplar ya no se teclea: se DERIVA del MISMO index que el handler lee —
+  // todo noBus de CDMX con fecha futura tiene que estar en la lista. Y si un
+  // día no hay NINGUNO vivo, esto se pone ROJO diciendo que no se puede probar:
+  // pasar en vacío escondería una exclusión real el día que vuelva a haber uno.
+  const EVnb = require(path.join(h.dir, 'netlify/functions/_lib/catalogo-index.js'))
+    ._parseEV(fs.readFileSync(path.join(h.dir, 'index.html'), 'utf8'));
+  const hoyNb = new Date(); hoyNb.setHours(0, 0, 0, 0);
+  const noBusVivos = EVnb.filter((e) => e.noBus && e.ds && new Date(e.ds + 'T12:00:00') >= hoyNb).map((e) => e.id);
+  af(noBusVivos.length > 0,
+     'hay al menos un noBus VIVO en el catálogo para probar la no-exclusión (hoy: '
+     + (noBusVivos.join(', ') || 'NINGUNO') + ') — sin ninguno, esta aserción no se puede probar y lo dice');
+  af(noBusVivos.length > 0 && noBusVivos.every((id) => EVENTOS_REALES.includes(id)),
+     '`noBus` NO debe excluir (' + noBusVivos.join(', ') + '): esos eventos siguen usando el paso del transporte, con avión solamente');
   // Un evento de MONTERREY no puede estar: la nube es de CDMX.
   const mty = ['frontera', 'youngmiko', 'soad'].filter((x) => EVENTOS_REALES.includes(x));
   af(mty.length === 0, 'la lista trae eventos que NO son de CDMX: ' + JSON.stringify(mty));

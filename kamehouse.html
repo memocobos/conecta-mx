@@ -1246,6 +1246,11 @@
           </div>
           <div class="vj2-cnt" id="cc-kh-count">0</div>
          </div>
+         <!-- [CAPSULE-UX-1] El buscador vive en el HTML (no en el innerHTML que
+              se repinta): así el foco no se pierde al filtrar. Los chips los
+              pinta _vjChipsPintar y SIEMPRE cuentan el evento completo. -->
+         <input type="text" id="cc-vj-buscar" placeholder="Buscar viajero: nombre, correo, celular, zona, paquete o nota…" autocomplete="off" oninput="vjBuscar(this.value)" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px;margin:0 0 8px">
+         <div id="cc-vj-chips" style="margin:0 0 10px"></div>
          <!-- [GRUPO-WA-1] El link del grupo de WhatsApp del evento. Privado: sale
               en el correo de confirmación y en el Portal del viajero, jamás en
               la página pública. -->

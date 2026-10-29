@@ -453,7 +453,9 @@ function filtrarCapsule() {
   const lista = qn
     ? _ccEventosCache.filter(e => {
         const r = e._res || {};
-        const hay = [e.nombre, e.ciudad].concat((r.equipo || []).map(p => p.nombre), (r.creadoras || []).map(c => c.nombre + ' ' + (c.acompanante || ''))).map(n).join(' | ');
+        // [CAPSULE-UX-1] También por SLUG y artista: el equipo nombra los tours
+        // por su llave («edc27», «fuerzaregida») tanto como por su nombre público.
+        const hay = [e.nombre, e.id, e.artista, e.ciudad].concat((r.equipo || []).map(p => p.nombre), (r.creadoras || []).map(c => c.nombre + ' ' + (c.acompanante || ''))).map(n).join(' | ');
         return hay.includes(qn);
       })
     : _ccEventosCache;

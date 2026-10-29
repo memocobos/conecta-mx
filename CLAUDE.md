@@ -188,6 +188,111 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🧭⏳ **CAPSULE-UX-1 (29-oct-2026, en main local): CAPSULE SE PUEDE BUSCAR —
+  eventos en parrilla con buscador por slug, y la lista real con buscador +
+  contadores por paquete/boletos.** Palabra de Memo, citada: *«es complicado
+  encontrar los eventos, al entrar en eventos es complicado encontrar a los
+  viajeros, saber qué boletos tienen, qué tipo de paquete, tal vez tener unos
+  contadores extras por tipo de paquete y boletos y otro global»*.
+  `mide:capsule-ux-1` **52** (vigilante vivo del árbol; probado con DOS
+  sabotajes con sha1 careado — filtro muerto y etiqueta pelada → ROJO — y
+  restaurado byte a byte). **Pantalla solamente: cero servidor, cero SQL.**
+  - **Eventos:** la parrilla pasa a GRID de columnas (CSS `#cc-eventos-grid`,
+    1 columna en celular) con el conteo de lo visible («N tours») — encontrar
+    un tour entre 60 ya no es un muro a una columna. `filtrarCapsule` aprende
+    **SLUG y artista** («edc27» encuentra el tour), conservando coordi/creadora
+    sin acentos de CC-CARDS-1 (careado con el buscador REAL en vm).
+  - **Viajeros del evento (la lista real):** buscador `cc-vj-buscar` **en el
+    HTML** (el foco no se pierde al repintar; debounce 120 ms) sobre nombre /
+    correo / celular / zona / paquete / talla / notas, sin acentos — más
+    **CHIPS-contadores clickeables**: global (👥 viajeros · 🎟 lugares), por
+    paquete, staff, bajas, y «🎫 boletos por zona» plegable. Clic en un chip =
+    filtrar la tabla por ese montón; segundo clic lo quita.
+  - 🔒 **Los contadores van SIEMPRE sobre el universo completo del evento** —
+    el buscador y los chips filtran la TABLA, jamás los contadores ni el
+    dinero (las DOS sumas de dinero siguen sobre `_vj2Filas`, careado): un
+    contador que cambiara con el filtro diría «3 PLUS» cuando el evento tiene
+    40. El filtro DICE «Mostrando X de Y» y el vacío-con-filtro dice los
+    números en vez de verse como evento vacío.
+  - 🔒 **La etiqueta la pone su DUEÑO** (`khPaqueteTexto`): los de la preventa
+    cuentan como PREVENTA A CIEGAS, no como CHEAP — careado con las DOS ramas
+    del dueño (zona + lista de eventos) y el control de que un CHEAP normal
+    (karolg) se queda en CHEAP. La baja del careo (boletos 0, sin zona) se
+    cuenta APARTE y no suma lugares; por default la tabla sigue enseñando
+    todo, como siempre.
+  - **`_vj2Cargar` se partió en cargar/pintar** (`_vj2Pintar`, SÍNCRONA y sin
+    fetch: **filtrar jamás cuesta una consulta**; `_vj2Ctx` guarda lo cargado).
+    Al cambiar de EVENTO el filtro se limpia (uno heredado escondería viajeros
+    del evento nuevo); tras un abono/edición del MISMO evento se conserva. El
+    orden por grupos corre sobre lo VISIBLE con el mapa de grupos COMPLETO:
+    «viaja con» nombra a todos aunque el filtro esconda a alguno, y un filtro
+    jamás pinta filas que no pidió.
+  - **El aterrizaje:** `CC_SUB_POR_ROL` gana `maestro_roshi → viajeros`. Su
+    costumbre «no se había medido» (la razón escrita de FLUJO-UX-9b) — y su
+    palabra del 29-oct ES la medición que faltaba. Bulma/Milk ya estaban.
+  - 🔒 **El bloque [G] del careo EJECUTA el pintor real con DOM falso** (no
+    solo lo lee): con «sofia» la tabla pinta 1 de 7 filas y los chips siguen
+    en 6·7. Y ya pagó su boleto en la primera corrida: cazó que al sandbox le
+    faltaba `KH_CONTRATO_PRUEBA_CORREOS` (dependencia de `_vjCtrPuede` que un
+    grep del fuente jamás habría visto) — *probar el camino, no la función*.
+  - ⏳ Push de Memo → prueba humana: buscar «edc27» en la lista de eventos,
+    abrir juniorh (168 filas) y encontrar a alguien tecleando su nombre, y
+    filtrar con un chip de paquete.
+
+- 🩺✅ **AUD-3DIAS-1 (29-oct-2026): AUDITORÍA DE LOS ÚLTIMOS 3 DÍAS — ~75
+  careos corridos, 4 arneses podridos curados, 1 defecto real cazado por la
+  curación, y el deploy verificado.** Encargo de Memo: *«revisa todo lo que
+  hemos hecho en los últimos 3 días con ese modelo para ver si hay algo que
+  haya quedado raro»*.
+  - ✅ **La suite node-based completa salió en VERDE, al peso con sus actas**
+    (muestra): plan-pagos-1 81 · viajero-edita-1 63 · careo-dup-fecha-1 52 ·
+    portal-solo-1 89 · rechazo-1 60 · chatarra-regla-1 26 · cuadre-total 160 ·
+    cuadre-aplicar 110 · careo-zona-1 87 · concilia-1 83 · sorteo-rondas 1294 ·
+    kaio-cabina-1 88 · genkidama-1 49 · excel-ag-2 95 · mas-alla-1 73 ·
+    preventa-pn27 62 · req-b1 52 · acomp-1 67 — y ~45 más.
+  - ✅ **Deploy verificado POR EL DEPLOY PUBLICADO de Netlify** (commit_ref
+    `14ab810`): el push de Memo entró y producción ya corre el candado de
+    CAREO-DUP-FECHA-1 — el «aplicar» global de Corona volvió a ser seguro.
+  - 🔴 **4 ARNESES PODRIDOS, CURADOS A LA VERDAD NUEVA (ninguno era el
+    código):**
+    (1) **`mide:capsule-comp-1`** — su «=== 2» TECLEADO murió cuando
+    VIAJERO-EDITA-1 agregó tres caras al renglón plegable (5 limpiezas contra
+    un 2 de fábrica). Hoy DERIVA: aperturas de cara == limpiezas, con piso de
+    2. **Y la derivación cazó un DEFECTO REAL que el 2 escondía:** `_vjCtrIne`
+    (la cara de la INE, de CONTRATO-CLIENTE-2) era la ÚNICA de 6 que abría SIN
+    barrer los demás renglones — dos paneles abiertos sobre dos personas.
+    Arreglado con la forma exacta de `_vjPagosVer`. 16 verdes.
+    (2) **`mide:ctr-tabs-1`** — exigía el letrero de la decisión B («fases
+    reales») en el vacío de Clientes, y CTR-RECUERDA-1 lo SUPERÓ a propósito:
+    hoy exige la verdad nueva (ese vacío manda al bloque de contratos de
+    viajeros de arriba). 32 verdes.
+    (3) **`mide:nube-1` — EL FIXTURE VENCIDO CON MECHA:** su bloque de captura
+    pasa por el handler REAL (reloj real) y llevaba las vigencias sobre el HOY
+    CONGELADO (19-oct): HOY+6d = 25-oct, así que **el careo estuvo verde hasta
+    el 25 y se puso rojo solo el 26** — la bomba exacta de NUBE4-ARNES-1, que
+    el PROPIO arnés documentaba 80 líneas arriba («el reloj congelado es para
+    el lib»). Todo lo que toca el handler real va relativo a `Date.now()`.
+    60 verdes (su bloque [5] es Playwright).
+    (4) **`mide:nube-4`** — el ejemplar «vaiven» tecleado murió por calendario
+    (su evento pasó el 17-oct y la lista derivada es de VIVOS). Hoy el ejemplar
+    noBus se **DERIVA del mismo index que lee el handler**; si un día no hay
+    NINGUNO vivo, se pone ROJO diciéndolo (la forma de tira-agotados: no pasa
+    en vacío). 74 verdes.
+  - ⚠️ **Los careos Playwright NO CORREN EN ESTE SANDBOX** (faltan libs de
+    Chromium y no hay root — limitación conocida desde PN27): stock-vivo,
+    nube-2/3/5, num-bus-1, tira-agotados, card-*, ganador-*, giveaway-karolg…
+    **Se corren en la Mac de Memo.** Sus «ARNÉS CAÍDO» de hoy son del entorno,
+    no del código — queda dicho para que nadie los triage como rojos reales.
+  - **Estado operativo, medido en la base:** bandejas en CERO (0 requisiciones
+    pendientes · 0 revisiones del Portal · 0 cambios de viajero — el equipo va
+    al día) · **2 solicitudes del Más Allá pendientes** de atender · padrón
+    **2,808** viajeros · revisados para el Portal 87 → **105** · **1,246
+    viajeros activos con total en 0/NULL** (bajando desde 1,303; el ✏️ de
+    VIAJERO-EDITA-1 es el camino) · `contratos_cliente` sigue en 1 (la prueba
+    de Memo; el interruptor sigue apagado).
+  - **nsqkmty está VENDIENDO:** el publish de hoy (14ab810) agotó a mano 8 de
+    sus 15 zonas — un día después de salir a la venta.
+
 - 💳⏳ **PLAN-PAGOS-1 (28-oct-2026, en main local): EL CLIENTE VE SU ROL DE PAGOS
   EN EL PORTAL — y la fórmula de las quincenas gana UN DUEÑO.** Palabra de Memo,
   citada: *«el cliente debe de poder ver su rol de pagos basado en la fórmula que
@@ -396,8 +501,10 @@ está caduco antes de escribirse.
     dice la base)?** Y sus montos **no coinciden entre las dos fuentes** (Alexis:
     Excel 9,500/8,780 contra base 13,745/7,340). Hasta que eso se resuelva, el
     careo las va a seguir nombrando cada vez — que es justo lo que debe hacer.
-  - ⏳ **Push de Memo.** Hasta el deploy, **nadie debe apretar el «aplicar» global
-    de Corona**: el candado vive en el código que todavía no está arriba.
+  - ✅ **PUSHEADO Y DESPLEGADO (29-oct):** producción corre `14ab810` (leído del
+    deploy publicado de Netlify, no supuesto) — el candado ya vive arriba y el
+    «aplicar» global de Corona volvió a ser seguro. 🔴⏳ La pregunta de las 7
+    personas (día suelto vs pase de 3 días) sigue abierta y es de Memo.
 
 - 🔴✏️⏳ **VIAJERO-EDITA-1 + VIAJERO-MUDAR-1 (28-oct-2026, en main local): HOY NO
   SE PODÍA CORREGIR EL TOTAL DE NADIE — y mover de fecha era SQL de Jane.**

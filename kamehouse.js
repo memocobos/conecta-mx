@@ -5030,16 +5030,18 @@ function showCCTab(tab, btn) {
 // visita a CADA evento. Hecho firmado por Memo (3-sep): bulma/milk van primero
 // a Viajeros, y luego a Rooming.
 //
-// 🔒 ROSHI SE QUEDA EN «equipo», y no por descuido: **su costumbre no se midió,
-// y un default que nadie midió es un dato inventado** — el defecto de
-// `kmt-prov`, que mandó 3 compras a «Hotel» porque el orden de la lista eligió
-// por alguien. Este mapa solo tiene a quien tiene el hecho firmado.
+// 🔒 ROSHI SE QUEDABA EN «equipo» porque su costumbre no se había medido — y
+// el 29-oct-2026 llegó el hecho firmado, palabra de Memo: «al entrar en
+// eventos es complicado encontrar a los viajeros». Ésa es la medición que
+// faltaba: hoy los TRES roles del dinero aterrizan en Viajeros. (El principio
+// sigue vivo: este mapa solo tiene a quien tiene el hecho firmado — el defecto
+// de `kmt-prov` era el default que nadie pidió, no el default a secas.)
 //
 // ⚠️ Se LEE EN CADA LLAMADA, no al cargar el archivo. Es lo contrario de
 // `ATAJOS_HOME`, que evalúa su lista al cargar y por eso su constante tuvo que
 // subir 4,700 líneas en UX-8. Aquí el orden no muerde, pero se dice para que
 // nadie deduzca la regla equivocada del ejemplo de al lado.
-const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros' };
+const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros', maestro_roshi: 'viajeros' };
 function _ccSubDefault() {
   return (currentUser && CC_SUB_POR_ROL[currentUser.rol]) || 'equipo';
 }
@@ -5280,11 +5282,14 @@ function renderCCEventos(lista, filtro) {
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Ningún tour con este filtro.</div>';
     return;
   }
-  grid.innerHTML = filtrada.map(e => {
+  // [CAPSULE-UX-1] El conteo de lo que se está viendo (la verdad del filtro)
+  // + tarjetas en PARRILLA de columnas (CSS de #cc-eventos-grid): encontrar
+  // un tour entre 60 ya no es un muro de tarjetas a una sola columna.
+  grid.innerHTML = `<div class="cc-ev-cnt">${filtrada.length} tour${filtrada.length === 1 ? '' : 's'}</div>` + filtrada.map(e => {
     const fecha = new Date(e.fecha+'T12:00:00');
     const pasado = fecha < hoy;
     const tipoLabel = TIPOS_EVENTO[e.tipo_evento] || e.tipo_tour || 'Concierto';
-    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${pasado?'var(--border)':'var(--orange)'};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:border-color .2s" onclick="abrirDetalleEvento('${e.id}')" onmouseenter="this.style.borderColor='var(--orange)'" onmouseleave="this.style.borderColor='${pasado?'var(--border)':'var(--orange)'}'"">
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${pasado?'var(--border)':'var(--orange)'};border-radius:var(--radius);padding:16px 20px;cursor:pointer;transition:border-color .2s" onclick="abrirDetalleEvento('${e.id}')" onmouseenter="this.style.borderColor='var(--orange)'" onmouseleave="this.style.borderColor='${pasado?'var(--border)':'var(--orange)'}'"">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;margin-bottom:2px">${_esfEsc(e.nombre)}</div>
@@ -6032,7 +6037,13 @@ async function _vjCtrIne(viajeroId, contratoId, nombre) {
   const fila = document.getElementById(`vj-ab-${viajeroId}`);
   if (!fila) return;
   const td = fila.querySelector('td');
-  if (fila.style.display !== 'none' && fila.dataset.modo === 'ine') { fila.style.display = 'none'; return; }
+  // [AUD-3DIAS-1] Era la ÚNICA cara del renglón compartido que abría SIN cerrar
+  // los demás renglones (las otras 5 sí barren): se podía quedar con dos paneles
+  // abiertos sobre dos personas. Misma forma que _vjPagosVer: toggle primero,
+  // barrida después. Lo cazó la aserción derivada de mide:capsule-comp-1.
+  const abierto = fila.style.display !== 'none' && fila.dataset.modo === 'ine';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
   fila.dataset.modo = 'ine'; fila.style.display = '';
   td.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando la INE…</div>';
   try {
@@ -6073,6 +6084,102 @@ async function _vjCtrVerificar(viajeroId, contratoId) {
   } catch (e) { showToast('No se pudo marcar: ' + _esfEsc(e.message), 'error'); }
 }
 
+// ═══ [CAPSULE-UX-1 · 29-oct-2026] BUSCAR Y CONTAR EN LA LISTA REAL ═══════════
+// Palabra de Memo, citada: «al entrar en eventos es complicado encontrar a los
+// viajeros, saber qué boletos tienen, qué tipo de paquete, tal vez tener unos
+// contadores extras por tipo de paquete y boletos y otro global».
+// 🔒 Los contadores se DERIVAN de las mismas filas que la tabla pinta (cero
+// fórmula nueva: «lugares» es la suma de la columna `boletos` que la tabla ya
+// enseña) y van SIEMPRE sobre el universo completo del evento — el buscador y
+// los chips filtran la TABLA, jamás los contadores: un contador que cambiara
+// con el filtro diría «3 PLUS» cuando el evento tiene 40.
+// 🔒 La etiqueta del paquete la pone su DUEÑO (khPaqueteTexto): los de la
+// preventa cuentan como «PREVENTA A CIEGAS», no como CHEAP.
+// 🔒 La baja del careo (boletos 0 y sin zona) se cuenta APARTE y no suma
+// lugares — meterla a los activos inflaría el conteo con cancelados.
+let _vj2Q = '';          // texto del buscador de viajeros
+let _vj2Chip = null;     // chip activo: etiqueta de paquete | '__staff' | '__bajas' | null
+let _vj2Ctx = null;      // lo que _vj2Cargar dejó listo para repintar SIN refetch
+
+const _vjNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function _vjEsBaja(v) { return Number(v.boletos) === 0 && !v.zona_boleto; }
+
+// El resumen del evento (puro): filas activas, lugares, por paquete, por zona,
+// staff y bajas. Una fila sin boletos capturados cuenta 1 lugar (el suyo),
+// igual que el `capsule_resumen` del servidor.
+function _vjResumenDe(filas) {
+  const r = { filas: 0, lugares: 0, staff: 0, bajas: 0, paquetes: {}, zonas: {} };
+  (filas || []).forEach((v) => {
+    if (_vjEsBaja(v)) { r.bajas++; return; }
+    const lug = Number(v.boletos) > 0 ? Number(v.boletos) : 1;
+    r.filas++; r.lugares += lug;
+    if (_esStaff(v)) r.staff++;
+    const paq = khPaqueteTexto(v) || '—';
+    const p = (r.paquetes[paq] = r.paquetes[paq] || { filas: 0, lugares: 0 });
+    p.filas++; p.lugares += lug;
+    if (v.zona_boleto) r.zonas[v.zona_boleto] = (r.zonas[v.zona_boleto] || 0) + lug;
+  });
+  return r;
+}
+
+// El filtro (puro): texto sin acentos sobre nombre/correo/celular/zona/paquete/
+// talla/notas, combinable con un chip (paquete exacto, staff o bajas).
+function _vjFiltraFilas(filas, q, chip) {
+  const qn = _vjNorm(q).trim();
+  return (filas || []).filter((v) => {
+    if (chip === '__bajas') { if (!_vjEsBaja(v)) return false; }
+    else if (chip === '__staff') { if (_vjEsBaja(v) || !_esStaff(v)) return false; }
+    else if (chip) { if (_vjEsBaja(v) || (khPaqueteTexto(v) || '—') !== chip) return false; }
+    if (!qn) return true;
+    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.notas]
+      .filter(Boolean).join(' | '));
+    return hay.includes(qn);
+  });
+}
+
+// El buscador vive en el HTML (no en el innerHTML que se repinta): el foco no
+// se pierde al filtrar. Debounce corto para no reconstruir la tabla por tecla.
+function vjBuscar(q) {
+  _vj2Q = String(q || '');
+  clearTimeout(window.__vjBuscaT);
+  window.__vjBuscaT = setTimeout(() => { if (_vj2Ctx) _vj2Pintar(); }, 120);
+}
+function vjChip(etq) {
+  _vj2Chip = (_vj2Chip === etq) ? null : etq;
+  if (_vj2Ctx) _vj2Pintar();
+}
+function vjFiltroLimpiar() {
+  _vj2Q = ''; _vj2Chip = null;
+  const bq = document.getElementById('cc-vj-buscar');
+  if (bq) bq.value = '';
+  if (_vj2Ctx) _vj2Pintar();
+}
+
+// Pinta los chips (fuera de #cc-kh-list, para que el repintado de la tabla no
+// los toque). Clic en un chip = filtrar la tabla por ese montón.
+function _vjChipsPintar(res) {
+  const box = document.getElementById('cc-vj-chips');
+  if (!box) return;
+  if (!res || !(res.filas + res.bajas)) { box.innerHTML = ''; return; }
+  const on = (etq) => (_vj2Chip === etq ? ' vj-chip-on' : '');
+  const chip = (etq, html, title) =>
+    `<button type="button" class="vj-chip${on(etq)}" title="${_esfEsc(title)}" onclick="vjChip('${_attrJs(etq)}')">${html}</button>`;
+  const paqs = Object.entries(res.paquetes).sort((a, b) => b[1].lugares - a[1].lugares)
+    .map(([p, x]) => chip(p, `${_esfEsc(p)} <b>${x.filas}</b> · ${x.lugares}🎟`,
+      `${p}: ${x.filas} viajero(s) · ${x.lugares} lugar(es)/boleto(s). Clic para ver solo este paquete en la tabla.`)).join('');
+  const zonas = Object.entries(res.zonas).sort((a, b) => b[1] - a[1]);
+  const zonasHtml = zonas.length
+    ? `<details class="vj-chip-zonas"><summary>🎫 boletos por zona (${zonas.length} zona${zonas.length === 1 ? '' : 's'})</summary><div>${
+        zonas.map(([z, m]) => `<span class="vj-chip vj-chip-z">${_esfEsc(z)} <b>${m}</b></span>`).join('')}</div></details>`
+    : '';
+  box.innerHTML = `<div class="vj-chips">
+      <span class="vj-chip vj-chip-g" title="El universo completo del evento (no cambia con el buscador): ${res.filas} viajeros activos · ${res.lugares} lugares/boletos">👥 <b>${res.filas}</b> viajeros · 🎟 <b>${res.lugares}</b> lugares</span>
+      ${paqs}
+      ${res.staff ? chip('__staff', `staff <b>${res.staff}</b>`, 'Filas del equipo (coordis, creadoras). Clic para verlas solas.') : ''}
+      ${res.bajas ? chip('__bajas', `bajas <b>${res.bajas}</b>`, 'Cancelados (boletos en 0): no suman lugares. Clic para verlos.') : ''}
+    </div>${zonasHtml}`;
+}
+
 async function _vj2Cargar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
@@ -6091,11 +6198,13 @@ async function _vj2Cargar() {
   } catch (e) {
     list.innerHTML = `<div class="alert alert-error">No se pudo cargar la lista de viajeros: ${_esfEsc(e.message)}</div>`;
     if (cnt) cnt.textContent = '—';
+    _vjChipsPintar(null);   // [CAPSULE-UX-1] sin lista no hay contadores — unos viejos mentirían
     return;
   }
   if (!_vj2Filas.length) {
     if (cnt) cnt.textContent = '0';
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aún — captúralos con «+ Registrar cliente»</div>';
+    _vjChipsPintar(null);   // [CAPSULE-UX-1]
     return;
   }
 
@@ -6117,6 +6226,32 @@ async function _vj2Cargar() {
     catch (_) { _ctrMapa = null; }
   }
   window.__vjCtr = _ctrMapa || {};
+
+  // [CAPSULE-UX-1] Lo cargado queda en el contexto del repintado: el buscador
+  // y los chips repintan SIN volver a pedir nada. Al cambiar de EVENTO el
+  // filtro se limpia (uno heredado escondería viajeros del evento nuevo sin
+  // que nadie lo pidiera); al recargar el MISMO evento (tras un abono o una
+  // edición) se conserva — quien filtró sigue donde estaba.
+  if (!_vj2Ctx || _vj2Ctx.evento !== _ccEventoActual) {
+    _vj2Q = ''; _vj2Chip = null;
+    const bq = document.getElementById('cc-vj-buscar');
+    if (bq) bq.value = '';
+  }
+  _vj2Ctx = { evento: _ccEventoActual, porViajero, ctrMapa: _ctrMapa };
+  _vj2Pintar();
+}
+
+// [CAPSULE-UX-1] Pinta la lista real desde lo YA cargado (_vj2Filas + _vj2Ctx):
+// el dinero y los contadores salen del universo COMPLETO; el buscador y el
+// chip solo deciden qué filas entran a la tabla. Cero fetch aquí a propósito —
+// filtrar no puede costar una consulta.
+function _vj2Pintar() {
+  const wrap = document.getElementById('cc-kh-wrap');
+  const list = document.getElementById('cc-kh-list');
+  const cnt = document.getElementById('cc-kh-count');
+  if (!wrap || !list || !_vj2Ctx) return;
+  const porViajero = _vj2Ctx.porViajero || {};
+  const _ctrMapa = _vj2Ctx.ctrMapa;
 
   const n = _vj2Filas.length;
   if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
@@ -6153,18 +6288,36 @@ async function _vj2Cargar() {
       <span class="vj3-tot-i vj3-tot-neto">Neto <b>${_vj3Money(deuda - favor)}</b><i>cobrar − a favor</i></span>
     </div>` : '';
 
+  // [CAPSULE-UX-1] Los contadores del evento (universo completo, fuera de la
+  // lista para que el repintado no los toque) y el filtro de la TABLA.
+  _vjChipsPintar(_vjResumenDe(_vj2Filas));
+  const visibles = _vjFiltraFilas(_vj2Filas, _vj2Q, _vj2Chip);
+  const _hayFiltro = !!(_vjNorm(_vj2Q).trim() || _vj2Chip);
+  const filtroNota = _hayFiltro
+    ? `<div class="vj-filtro-nota">Mostrando <b>${visibles.length}</b> de ${n} viajeros` +
+      `${_vjNorm(_vj2Q).trim() ? ` con «${_esfEsc(_vj2Q.trim())}»` : ''}` +
+      `${_vj2Chip ? ` · ${_esfEsc(_vj2Chip === '__staff' ? 'solo staff' : _vj2Chip === '__bajas' ? 'solo bajas' : _vj2Chip)}` : ''}` +
+      ` — <a href="#" onclick="vjFiltroLimpiar();return false">quitar filtro</a></div>`
+    : '';
+
   // [GRUPO-VIAJE-1] Quien viaja junto se pinta JUNTO: el grupo entra a la
   // lista donde cae su primer integrante (por nombre) y se lleva a los demás.
   // Cada grupo con su color, para que Bulma/Milk lo vean sin leer notas.
+  // [CAPSULE-UX-1] El ORDEN corre sobre las filas VISIBLES (las del filtro);
+  // el mapa de grupos sigue siendo el COMPLETO, para que «viaja con» nombre a
+  // todos los compañeros aunque el filtro esconda a alguno — y para que un
+  // filtro jamás pinte filas que no pidió.
   const _grp = {};
   _vj2Filas.forEach((v) => { if (v.grupo_viaje) (_grp[v.grupo_viaje] = _grp[v.grupo_viaje] || []).push(v); });
   const _grpColor = {}; let _gi = 0;
   const _GRP_PAL = ['var(--blue)', 'var(--yellow)', 'var(--green)', 'var(--red)', '#b388ff', '#4dd0e1', '#ffb74d'];
+  const _visSet = new Set(visibles.map((x) => x.id));
   const _filasOrden = []; const _vistos = new Set();
-  _vj2Filas.forEach((v) => {
+  visibles.forEach((v) => {
     if (_vistos.has(v.id)) return;
-    const miembros = (v.grupo_viaje && _grp[v.grupo_viaje] && _grp[v.grupo_viaje].length > 1) ? _grp[v.grupo_viaje] : [v];
-    if (miembros.length > 1 && !(v.grupo_viaje in _grpColor)) _grpColor[v.grupo_viaje] = _GRP_PAL[_gi++ % _GRP_PAL.length];
+    const grupoCompleto = (v.grupo_viaje && _grp[v.grupo_viaje] && _grp[v.grupo_viaje].length > 1) ? _grp[v.grupo_viaje] : [v];
+    const miembros = grupoCompleto.filter((m) => _visSet.has(m.id));
+    if (grupoCompleto.length > 1 && !(v.grupo_viaje in _grpColor)) _grpColor[v.grupo_viaje] = _GRP_PAL[_gi++ % _GRP_PAL.length];
     miembros.forEach((m) => { if (!_vistos.has(m.id)) { _vistos.add(m.id); _filasOrden.push(m); } });
   });
   const _puedeAgrupar = _vjPuedeEliminar();
@@ -6176,7 +6329,16 @@ async function _vj2Cargar() {
       <span id="vj-grp-msg" style="color:var(--red)"></span>
     </div>` : '';
 
-  list.innerHTML = dineroHtml + grupoBarra + `<div class="vj2-wrap"><table class="vj2-tabla">
+  // [CAPSULE-UX-1] Un filtro sin resultados lo DICE con los números (el dinero
+  // del evento se queda a la vista: es del universo completo, no del filtro).
+  if (_hayFiltro && !visibles.length) {
+    list.innerHTML = dineroHtml + filtroNota +
+      `<div class="empty-state"><div class="empty-icon">·</div>Ninguno de los ${n} viajeros coincide con el filtro.</div>`;
+    wrap.style.display = '';
+    return;
+  }
+
+  list.innerHTML = dineroHtml + grupoBarra + filtroNota + `<div class="vj2-wrap"><table class="vj2-tabla">
     <thead><tr>
       ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
       ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}

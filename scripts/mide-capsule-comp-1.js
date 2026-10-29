@@ -32,8 +32,18 @@ af(/\(viajero_id && foto_path\) \? await _firmarAbono/.test(srv), 'y firma foto_
 console.log('[D] las dos caras del renglón plegable no se pisan');
 af(/dataset\.modo = 'pagos'/.test(js) && /dataset\.modo = 'abono'/.test(js), 'cada cara marca su modo en el renglón');
 af(/tr\.dataset\.modo !== 'pagos'/.test(js), 'el ➕ Abono sobre un renglón en modo pagos CAMBIA de cara (no cierra en falso)');
+// [AUD-3DIAS-1 · 29-oct-2026] El «=== 2» tecleado se PUDRIÓ cuando
+// VIAJERO-EDITA-1 agregó tres caras nuevas al mismo renglón (editar · mudar ·
+// elegir): 5 limpiezas contra un 2 de fábrica — el careo acusaba al código
+// sano. La verdad ya no se teclea: se DERIVA. Cada cara que PONE un modo
+// (dataset.modo = '<algo>') tiene que venir con su limpieza de los demás
+// renglones, así que aperturas y limpiezas se cuentan POR SEPARADO del mismo
+// archivo y se exige que casen — con piso de 2 (las dos caras originales),
+// para que un refactor que borre TODO no pase en vacío con 0 === 0.
+const abreCara = (js.match(/dataset\.modo = '[a-z]+'/g) || []).length;
 const cierraTodo = (js.match(/x\.style\.display = 'none'; x\.dataset\.modo = '';/g) || []).length;
-af(cierraTodo === 2, 'los DOS caminos limpian el modo al cerrar los demás renglones (' + cierraTodo + ' de 2)');
+af(abreCara >= 2, 'hay al menos las dos caras originales (' + abreCara + ' caras)');
+af(cierraTodo === abreCara, 'CADA cara limpia el modo al cerrar los demás renglones (' + cierraTodo + ' limpiezas para ' + abreCara + ' caras)');
 
 console.log('[E] control positivo del instrumento');
 af(!/📎 PagosQueNoExiste/.test(js), 'el detector distingue (un literal inventado no aparece)');

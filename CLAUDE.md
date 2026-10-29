@@ -239,6 +239,36 @@ está caduco antes de escribirse.
     sin el botón de fecha cerrado). Tras el publish: la card dice las 4 fechas
     y el selector pinta 15/16 «↻ Próximamente».
 
+- ✅ **FR-CHIPS-1 (30-oct-2026, MEDIDO en producción, cero código): «no salen
+  los letreros de últimos lugares» en Fuerza Regida — y el sistema estaba
+  FUNCIONANDO.** Reporte de Memo: *«se supone que ya teníamos cargado el pedido
+  de boletos de fuerza regida de las 2 primeras fechas, y no están apareciendo
+  los letreros de últimos lugares»*. Verificado punta a punta por la puerta del
+  cliente en navegador real contra producción:
+  - ✅ **El 12-ene SÍ pinta sus chips AHORA MISMO**: Luneta $2,900 «¡Últimos 5!»
+    y Balcón $2,200 «¡Últimos 4!» — el endpoint contesta `gestionado:true` con
+    `zonas_pocas {Luneta:5, Barrera:4, Balcón:4}` y el pintor los pone.
+  - ✅ **El 11-ene sin chips es CORRECTO, no un defecto:** sus zonas abiertas
+    tienen 6+ lugares (Cancha VIP 6 · Banco Azteca 7 · Megacable 8 · Luneta 12 ·
+    Coke Studio 16) y el chip solo sale con ≤5 A PROPÓSITO (STOCK-VIVO-1: no se
+    publica abundancia). La única escasa (Barrera, 1 libre real) está **agotada
+    A MANO en la ficha** — y el ag manual manda (OVERLAY-DIR-1).
+  - 🔴 **La corrección de acta que esto dejó:** STOCK-CIEGO-1c prometía que
+    Barrera «se reabriría sola» — FALSO; ver su (c) corregido. El inventario
+    solo APAGA y pone chips sobre zonas que la ficha tiene abiertas.
+  - ⚠️ **La pastilla «ÚLTIMOS LUGARES» de la TARJETA del catálogo es OTRA
+    cosa:** es el `st:'ultimos'` manual de Esferas — NO se deriva del
+    inventario. El inventario solo gobierna chips por zona y agotados dentro
+    de la ficha. Si algún día se quiere derivar la pastilla, es tuerca propia.
+  - **El dato de hoy (restantes reales):** #0 → Barrera 1 (ag a mano) · CanchaVIP
+    6 · Oro 7 (ag a mano) · BancoAzteca 7 · Megacable 8 · Luneta 12 · CokeStudio
+    16 · Doritos −3 (3 vendidos sin compra, conocido). #1 → Butaca 0 (agotada
+    REAL, coincide con la ficha) · Barrera 4 (ag a mano) · Balcón 4 · Luneta 5 ·
+    CokeStudio 10 · BancoAzteca 10 · CanchaVIP 18.
+  - ⏳ **Para vender las Barreras** (1 del 11-ene · 4 del 12-ene): Reabrir en
+    Esferas + publish — el Palacio las cierra solo al llegar a 0 y pinta su chip.
+    Decisión de Memo, no del código.
+
 - 🎸⏳ **FR-FECHAS-1 (29-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
   de Memo): FUERZA REGIDA GANA EL 15 Y 16 DE ENERO, todas las zonas abiertas,
   separo $300.** ⚠️ *Actualizada el MISMO día por FR-PROX-1 (arriba): el 15/16
@@ -1242,11 +1272,16 @@ está caduco antes de escribirse.
     (b) **Doritos del 11-ene tiene 3 boletos VENDIDOS y tampoco viene en el
     pedido** → o se compraron aparte o son sobreventa (está cerrada a mano, así
     que no sangra más, pero los 3 existen);
-    (c) 🔒 **Barrera del 11-ene se va a REABRIR sola con 1 lugar.** Está marcada
-    agotada a mano y el pedido dice 6 contra 5 vendidos — y el index **ignora el
-    `ag` manual cuando el Palacio manda** («Gestionada y con disponible →
-    encender»). Si ese lugar de verdad ya no existe, se cierra subiendo
-    `vendidos_fuera` en Kamisama; si existe, el sitio ya lo está ofreciendo.
+    (c) ⚰️🔒 **«Barrera del 11-ene se va a REABRIR sola» ERA FALSO — corregido
+    por FR-CHIPS-1 (30-oct), midiendo el pintor en producción.** El `ag` manual
+    de la ficha MANDA: `buildZonaButtons` aplica OVERLAY-DIR-1 («el overlay SOLO
+    APAGA, nunca enciende» — la regla que cerró las 18 reaberturas del 1-sep), así
+    que una zona agotada a mano NO se reabre ni pinta su chip aunque el inventario
+    tenga lugar. La frase «el index ignora el ag manual» venía del comentario del
+    `map` en `loadDisponibilidad`, que solo gobierna el CHIP de pocas, no el
+    encendido. Hoy: Barrera #0 (1 libre real) y Barrera #1 (4 libres reales)
+    siguen agotadas a mano — venderlas = **Reabrir en Esferas + publish** (el
+    Palacio las cierra solo al llegar a 0); si ya no existen, `vendidos_fuera`.
   - ⏳ **Los otros 60 eventos siguen ciegos.** No es código: es dato. Cargar el
     pedido por zona enciende el automático sin tocar una línea.
   - ⚠️ **Hallazgo vecino NOMBRADO sin tocar:** `requisicion-crear` y el aprobar

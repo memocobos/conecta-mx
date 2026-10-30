@@ -188,6 +188,66 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎫⏳ **TICKET-CIRCUITO · REQ-LINK-1 + ABONO-FOTO-2 + PORTAL-TICKET-1
+  (30-oct-2026, en main local): el circuito del ticket se cierra por las tres
+  puertas — y el aprobar ya no inventa dinero.** Nació del CASO DANIELA
+  (30-oct, reporte de Memo): una requisición **`link_pago`** —que por diseño
+  nace SIN comprobante: el cliente paga DESPUÉS en el link— se aprobó con el
+  monto PRELLENADO y nació un **abono de $300 que nadie pagó**, con nota
+  *«comprobante verificado al aprobar»* — una verificación que no ocurrió,
+  firmada. `mide:ticket-circuito-1` **32** (sin ancla — árbol; sabotaje a
+  `sinComprobante` mordido con sha1 careado → 3 rojos con nombre → restaurado
+  byte a byte `581b472f`).
+  - ✅ **El dato de Daniela se corrigió el mismo día (palabra de Memo):** su
+    abono quedó en **$0** con el rastro ANEXADO (id `c8b71bb8…`, careo en query
+    fresca); su lugar (FR 16-ene PLUS Cancha VIP $7,860), contrato y sello
+    quedaron intactos — el pago real entra como abono nuevo cuando llegue.
+    El $7,860 es correcto: ella eligió habitación INDIVIDUAL (+$1,960).
+  - 🔴 **REQ-LINK-1 · el aprobar:** `sinComprobante = !req.comprobante_path` —
+    sin comprobante el monto puede ir VACÍO/0 y entonces **no nace NINGÚN
+    abono** (el POST se salta explícito, jamás un arreglo vacío a PostgREST);
+    el viajero nace debiendo todo y la respuesta lo DICE (`sin_abono`). Con
+    monto tecleado sin comprobante, el abono nace pero la nota dice **«sin
+    comprobante adjunto (forma) — monto confirmado por quien»** — jamás
+    «verificado». CON comprobante todo sigue EXACTO como antes (regresión
+    careada: monto obligatorio, nota de siempre, foto_path heredado).
+    **Bandeja:** letrero rojo «⚠️ SIN COMPROBANTE … deja el monto vacío», el
+    monto **NO se prellena** (el prellenado parió a Daniela), confirm explícito
+    al aprobar sin monto, y el toast dice «SIN ABONO» con todas sus letras.
+    **Correo:** con $0 la fila dice «Tu pago: pendiente», no «Recibimos $0».
+  - 📎 **ABONO-FOTO-2 · Capsule:** el ➕ Abono de la lista de viajeros gana
+    campo **COMPROBANTE (opcional)** — el lector es `_vj3LeerFoto` (el MISMO de
+    la caja de Cobranza, cero segundo lector) y el endpoint ya lo aceptaba: era
+    pura pantalla. El ticket que el cliente mande por WhatsApp se sube donde ya
+    estás mirando al viajero y queda pegado al abono (📎 Pagos).
+  - 👁 **PORTAL-TICKET-1 · el cliente ve SUS tickets** (palabra de Memo: «que
+    ellos en portal, como nosotros en kamehouse, puedan ver sus tickets y
+    tengan su propio control»). `portal-mi-plan-migrado` manda `id` +
+    `tiene_foto` por abono (🔒 el PATH jamás viaja al navegador);
+    `portal-viajero` gana `abono_foto`: tras el portero de SIEMPRE (correo
+    verificado · suyo · sellado · no-equipo), lee el abono con **DOBLE filtro**
+    (id + viajero_id) — ajeno contesta 404 igual que inexistente—, firma el
+    path **DE LA FILA** (uno tecleado en el cuerpo se IGNORA, careado) por 10
+    min, y «sin comprobante digital» se DICE (los abonos migrados no traen foto
+    y esa es la verdad). El historial del Portal pinta «📎 ver comprobante»
+    solo donde `tiene_foto`; la pestaña se abre ANTES del fetch (el bloqueador
+    de ventanas emergentes).
+  - **El careo** entra por los DOS handlers reales (admin-requisiciones y
+    portal-viajero) con red falsa de estado+filtros que modela el storage
+    (firmar un objeto inexistente es 404) + las tres pantallas EJECUTADAS en vm
+    (el panel ➕ con DOM falso — ⚠️ mordida del instrumento: el tr real NACE
+    `display:none` y sin eso el toggle se sale sin pintar—, `_migPagosHtml`
+    real con fixture, `_reqBdjMontoInicial` en los dos brazos). Contador de
+    abonos con control positivo (una inserción inyectada se ve). ⚠️ jwtSign
+    EXIGE ttl — el 401 de la primera corrida era el candado de ses-1
+    trabajando, no el código (la lección de req-b1, pagada otra vez).
+    Vecinos verdes: req-b1 52 · pagos-portal-2 38 · portal-solo-1 89 ·
+    portal-edit-1 28 · plan-pagos-1 81 · capsule-comp-1 16 · capsule-ux-2 46 ·
+    confirma-1 28 · acomp-1 67 · acomp-2 43 · rechazo-1 60 ·
+    cambio-rechazo-1 36 · fecha-correo-1 39 · preventa-portal-1 33.
+  - ⏳ Push de Memo → prueba humana: capturar el abono real de Daniela con su
+    ticket desde ➕ Abono, y que ella toque «📎 ver comprobante» en su Portal.
+
 - 📅⏳ **FECHA-CORREO-1 (30-oct-2026, en main local): los correos de un
   MULTIFECHA dicen SOLO la fecha del #N — las 4 de Fuerza Regida ya no salen
   juntas.** Palabra de Memo, citada: *«al rechazar un evento, en el correo dice

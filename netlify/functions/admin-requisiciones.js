@@ -457,8 +457,15 @@ exports.handler = async (event) => {
     }
 
     // 2 · El dinero, tecleado por el humano que vio el comprobante.
-    const monto = Math.round(Number(body.monto));
-    if (!(monto > 0)) return j(400, headers, { error: 'El monto del abono va en pesos y mayor a cero — es lo que dice el comprobante que verificaste' });
+    // [REQ-LINK-1] Sin comprobante NO se inventa dinero (el caso Daniela,
+    // 30-oct: una requisición `link_pago` —que por diseño nace sin comprobante,
+    // el cliente paga DESPUÉS en el link— se aprobó y nació un abono de $300
+    // que nadie pagó). Con comprobante el monto sigue siendo OBLIGATORIO; sin
+    // él, monto 0/omitido = aprobar SIN abono: el viajero nace debiendo todo y
+    // el pago real se captura como abono cuando de verdad llegue.
+    const sinComprobante = !req.comprobante_path;
+    const monto = Math.round(Number(body.monto)) || 0;
+    if (!(monto > 0) && !sinComprobante) return j(400, headers, { error: 'El monto del abono va en pesos y mayor a cero — es lo que dice el comprobante que verificaste' });
     const total_contrato = (body.total_contrato != null && body.total_contrato !== '')
       ? Math.round(Number(body.total_contrato))
       : (req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null);
@@ -603,21 +610,30 @@ exports.handler = async (event) => {
     // Repartidos igual que el contrato: cada viajero ve su lugar cubierto, y
     // la nota dice QUIÉN pagó (un abono de $300 a nombre del acompañante sin
     // esa nota se leería como dinero que él puso).
+    // [REQ-LINK-1] La nota ya no miente: «comprobante verificado» SOLO cuando
+    // HAY comprobante. Un monto tecleado sin comprobante (pago verificado por
+    // otro canal) lo dice con su nombre — una nota que afirma una verificación
+    // que no ocurrió es un candado de papel (la nota de Daniela lo decía).
     const filasA = nacidos.map((v, i) => ({
       viajero_id: v.id,
       monto: montos[i],
-      nota: `Requisición ${req.folio} · comprobante verificado al aprobar`
+      nota: `Requisición ${req.folio} · ` + (req.comprobante_path
+        ? 'comprobante verificado al aprobar'
+        : `sin comprobante adjunto (${req.forma_pago || 'pago'}) — monto confirmado por ${quien}`)
         + (N > 1 ? (desgloseUsado
           ? ` · su parte del pago del grupo según el desglose confirmado por ${quien} (${i + 1} de ${N}, total $${monto}, comprobante enviado por ${req.nombre})`
           : ` · pagado por ${req.nombre} (${i + 1} de ${N}, total $${monto})`) : ''),
       foto_path: req.comprobante_path || null,
       capturado_por: quien,
     })).filter((a) => a.monto > 0);
-    const rA = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
+    // [REQ-LINK-1] Con monto 0 no hay nada que insertar: el POST se salta
+    // EXPLÍCITO (no se le manda un arreglo vacío a PostgREST para depender de
+    // cómo lo tome) y la respuesta le dice a la bandeja que no nació abono.
+    const rA = filasA.length ? await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
       method: 'POST',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
       body: JSON.stringify(filasA),
-    });
+    }) : { ok: true, json: async () => [] };
     if (!rA.ok) {
       const det = (await rA.text().catch(() => '')).slice(0, 300);
       // Los viajeros YA nacieron — no se borran (datos de gente). Instrucción exacta:
@@ -669,6 +685,11 @@ exports.handler = async (event) => {
       zona: zonaFinal,
       total_contrato,
       monto,
+      // [REQ-LINK-1] La bandeja DICE cuando no nació abono — un silencio aquí
+      // se leería como «el abono quedó», que es justo lo que este caso cura.
+      sin_abono: filasA.length === 0
+        ? 'Sin comprobante y sin monto: NO se registró ningún abono — el viajero nace debiendo todo. Captura el pago cuando llegue (➕ Abono o el comprobante que suba por su Portal).'
+        : undefined,
       enlace_registrado: enlaceOk,
       portal,
     });

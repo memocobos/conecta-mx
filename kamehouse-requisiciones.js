@@ -359,9 +359,10 @@ function _reqBdjAprobarUI(id) {
   const rch = document.getElementById('req-rch-' + id); if (rch) rch.style.display = 'none';
   const esRide = r.paquete === 'ride';
   box.innerHTML = `
-    <h4>Al aprobar nace el viajero con su abono</h4>
+    <h4>Al aprobar nace el viajero${r.comprobante_path ? ' con su abono' : ''}</h4>
+    ${r.comprobante_path ? '' : `<div style="margin:0 0 8px;padding:8px 10px;border:1px solid var(--red);border-radius:8px;font-size:12px;color:var(--red)">⚠️ <b>SIN COMPROBANTE</b> (${_reqBdjEsc(r.forma_pago === 'link_pago' ? 'pidió link de pago: todavía no paga' : 'no subió comprobante')}). Si aún no hay pago, <b>deja el monto vacío</b>: el viajero nace SIN abono, debiendo todo, y el pago se captura cuando llegue. Solo teclea un monto si verificaste el pago por otro lado.</div>`}
     <div class="rq-grid">
-      <label class="rq-field">Abono verificado (lo que dice el comprobante) *<input type="number" id="req-apr-monto-${id}" value="${_reqBdjMontoInicial(r)}" min="1" step="1" oninput="_reqBdjDesgloseSuma('${id}')"></label>
+      <label class="rq-field">${r.comprobante_path ? 'Abono verificado (lo que dice el comprobante) *' : 'Abono (vacío = sin pago todavía)'}<input type="number" id="req-apr-monto-${id}" value="${_reqBdjMontoInicial(r)}" min="0" step="1" oninput="_reqBdjDesgloseSuma('${id}')"></label>
       <label class="rq-field">Total del contrato *<input type="number" id="req-apr-total-${id}" value="${r.total_sistema != null ? Math.round(Number(r.total_sistema)) : ''}" min="1" step="1"></label>
       ${esRide ? '' : `<label class="rq-field">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}"></label>`}
     </div>
@@ -386,6 +387,11 @@ function _reqBdjAprobarUI(id) {
 // desglose) y, sin desglose, con el separo del sistema. Bulma lo carea contra
 // el comprobante: el prellenado es ayuda, no verdad.
 function _reqBdjMontoInicial(r) {
+  // [REQ-LINK-1] Sin comprobante NO se prellena nada: el prellenado del separo
+  // fue exactamente cómo nació el abono fantasma de Daniela (link_pago, 30-oct)
+  // — un número ya puesto se acepta sin mirar. El monto lo teclea quien tenga
+  // el pago enfrente; si aún no hay pago, se aprueba con el campo VACÍO.
+  if (!r.comprobante_path) return '';
   const ps = _reqBdjPersonas(r);
   if (ps && Array.isArray(r.desglose) && r.desglose.length === ps.length) {
     const s = r.desglose.reduce((a, b) => a + (Math.round(Number(b)) || 0), 0);
@@ -438,7 +444,15 @@ async function _reqBdjAprobar(id) {
   const total = Math.round(Number(($('total') || {}).value));
   const zonaEl = $('zona');
   const nota = (($('nota') || {}).value || '').trim();
-  if (!(monto > 0)) { if (msg) { msg.textContent = 'El abono va en pesos, mayor a cero.'; msg.style.color = 'var(--red)'; } return; }
+  // [REQ-LINK-1] Sin comprobante se puede aprobar SIN abono (monto vacío/0) —
+  // con confirm explícito: el viajero nace debiendo todo y el pago se captura
+  // cuando llegue. CON comprobante el monto sigue siendo obligatorio.
+  const rFila = _reqBdjRows.find((x) => x.id === id);
+  const sinComp = !(rFila && rFila.comprobante_path);
+  if (!(monto > 0)) {
+    if (!sinComp) { if (msg) { msg.textContent = 'El abono va en pesos, mayor a cero.'; msg.style.color = 'var(--red)'; } return; }
+    if (!confirm('SIN COMPROBANTE Y SIN MONTO: el viajero nace SIN ningún abono, debiendo el total completo. El pago se captura cuando llegue (➕ Abono o su Portal).\n\n¿Aprobar así?')) return;
+  }
   if (!(total > 0)) { if (msg) { msg.textContent = 'Falta el total del contrato.'; msg.style.color = 'var(--red)'; } return; }
   const btn = $('go');
   if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
@@ -468,7 +482,10 @@ async function _reqBdjAprobar(id) {
   if (j && j.ok) {
     // [ACOMP-1] Cuántos viajeros nacieron y qué pasó con el Portal — dicho, no supuesto.
     const nv = Array.isArray(j.viajeros) ? j.viajeros.length : 1;
-    let txt = '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' con ' + _reqBdjMxn(j.monto) + ' cobrados. Confírmale al cliente por WhatsApp.';
+    // [REQ-LINK-1] Sin abono se DICE con todas sus letras, no «$0 cobrados».
+    let txt = j.sin_abono
+      ? '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' SIN ABONO (sin comprobante): debe el total completo. Captura el pago cuando llegue.'
+      : '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' con ' + _reqBdjMxn(j.monto) + ' cobrados. Confírmale al cliente por WhatsApp.';
     const pt = j.portal;
     // [CONFIRMA-1] el correo único: confirmación + invitación al Portal adentro.
     if (pt && (pt.enviados || []).length) txt += ' · Correo de confirmación enviado (' + pt.enviados.length + ')' + ((pt.invitados || []).length ? ', con invitación al Portal' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '') + (pt.aviso ? ' · ⚠️ ' + pt.aviso : '');

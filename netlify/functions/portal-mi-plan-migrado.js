@@ -191,8 +191,11 @@ exports.handler = async (event) => {
 
     // Los abonos de ESOS viajeros. Se filtra en el servidor por sus ids.
     const ids = viajeros.map((v) => '"' + v.id + '"').join(',');
+    // [PORTAL-TICKET-1] `id` y `foto_path` viajan hasta aquí para derivar
+    // `tiene_foto`; el PATH jamás sale al navegador (la URL se firma al clic
+    // en portal-viajero `abono_foto`, con los filtros de siempre).
     const aR = await fetch(`${KH_URL}/rest/v1/abonos_viajero?viajero_id=in.(${encodeURIComponent(ids)})`
-      + '&select=viajero_id,monto,fecha&limit=5000', { headers: hKH });
+      + '&select=id,viajero_id,monto,fecha,foto_path&limit=5000', { headers: hKH });
     if (!aR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus abonos', detail: await aR.text() }) };
     const abonos = await aR.json();
     const porViajero = {};
@@ -285,7 +288,9 @@ exports.handler = async (event) => {
         // de la cosecha traen la fecha del careo, no la del pago: el Portal lo
         // dice con palabras en vez de presentarlas como fecha de pago.
         abonos: (porViajero[v.id] || [])
-          .map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null }))
+          // [PORTAL-TICKET-1] tiene_foto le dice al cliente qué pagos traen su
+          // comprobante digital; el id es para pedir la URL firmada al clic.
+          .map((a) => ({ id: a.id, monto: Number(a.monto) || 0, fecha: a.fecha || null, tiene_foto: !!a.foto_path }))
           .sort((x, y) => String(x.fecha || '').localeCompare(String(y.fecha || ''))),
       };
     });

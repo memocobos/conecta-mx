@@ -118,6 +118,7 @@
     "mide:rechazo-1": "node scripts/mide-rechazo-1.js",
     "mide:cambio-rechazo-1": "node scripts/mide-cambio-rechazo-1.js",
     "mide:fecha-correo-1": "node scripts/mide-fecha-correo-1.js",
+    "mide:ticket-circuito-1": "node scripts/mide-ticket-circuito-1.js",
     "mide:chatarra-regla-1": "node scripts/mide-chatarra-regla-1.js",
     "mide:plan-pagos-1": "node scripts/mide-plan-pagos-1.js",
     "mide:viajero-edita-1": "node scripts/mide-viajero-edita-1.js",

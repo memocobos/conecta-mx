@@ -59,7 +59,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (_) { return json(400, headers, { ok: false, error: 'Cuerpo inválido' }); }
   const accion = String(body.accion || '');
-  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete', 'subir_pago'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
+  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete', 'subir_pago', 'abono_foto'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
   const viajero_id = String(body.viajero_id || '');
   if (!UUID_RE.test(viajero_id)) return json(400, headers, { ok: false, error: 'Viajero inválido' });
 
@@ -207,6 +207,41 @@ exports.handler = async (event) => {
   // es un AVISO con foto, exactamente como la requisición (el rumbo del
   // 12-oct: nada automático decide dinero). El monto que el cliente DECLARA
   // viaja como TEXTO en el detalle, jamás como número que alguien sume.
+  // ── 3t · [PORTAL-TICKET-1] VER MI COMPROBANTE ────────────────────────────
+  // Palabra de Memo (30-oct): «la idea es que ellos en portal, como nosotros en
+  // kamehouse, puedan ver sus tickets para que tengan su propio control». El
+  // cliente pide la foto de UN abono SUYO y se le firma una URL corta.
+  // 🔒 El abono se lee con DOBLE filtro (id + viajero_id ya validado como suyo
+  //    por el portero de arriba): un abono ajeno contesta 404, igual que una
+  //    fila ajena. Y se firma el path DE LA FILA, jamás uno tecleado — un path
+  //    del cuerpo podría firmar cualquier objeto del bucket (ley de
+  //    PAGOS-PORTAL-2, cara del cliente).
+  // 🔒 «Sin comprobante» se DICE, no se confunde con un error: los abonos
+  //    migrados del Excel no traen foto y eso es la verdad, no una falla.
+  if (accion === 'abono_foto') {
+    const abono_id = String(body.abono_id || '');
+    if (!UUID_RE.test(abono_id)) return json(400, headers, { ok: false, error: 'Abono inválido' });
+    let ab;
+    try {
+      const r = await fetch(`${KH_URL}/rest/v1/abonos_viajero?id=eq.${abono_id}&viajero_id=eq.${viajero_id}&select=id,foto_path&limit=1`, { headers: hKH });
+      if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu pago' });
+      ab = (await r.json())[0];
+    } catch (_) { return json(502, headers, { ok: false, error: 'No pude leer tu pago' }); }
+    if (!ab) return json(404, headers, { ok: false, error: 'No encontramos ese pago en tu cuenta' });
+    if (!ab.foto_path) return json(404, headers, { ok: false, error: 'Este pago no tiene comprobante digital (se registró directo con el equipo)' });
+    try {
+      const r = await fetch(`${KH_URL}/storage/v1/object/sign/abonos-viajeros/${encodeURI(ab.foto_path)}`, {
+        method: 'POST',
+        headers: { ...hKH, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 600 }),   // 10 min: se pide al clic, no se guarda
+      });
+      if (!r.ok) return json(502, headers, { ok: false, error: 'No pude abrir tu comprobante, inténtalo otra vez' });
+      const j = await r.json();
+      if (!j || !j.signedURL) return json(502, headers, { ok: false, error: 'No pude abrir tu comprobante, inténtalo otra vez' });
+      return json(200, headers, { ok: true, url: `${KH_URL}/storage/v1${j.signedURL}` });
+    } catch (_) { return json(502, headers, { ok: false, error: 'No pude abrir tu comprobante, inténtalo otra vez' }); }
+  }
+
   if (accion === 'subir_pago') {
     // El comprobante — la MISMA forma que requisicion-crear: base64 → bytes →
     // magia (jpg/png/webp + PDF: los bancos dan PDF) → bucket PRIVADO

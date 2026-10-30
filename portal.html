@@ -3530,8 +3530,15 @@ function _migPagosHtml(t){
         + '<span style="opacity:.8">Pagos anteriores</span><span><b>' + money(previo) + '</b></span></div>';
     }
     abonos.forEach((a) => {
+      // [PORTAL-TICKET-1] El pago que trae comprobante digital lo ENSEÑA: el
+      // cliente lleva su propio control con sus tickets (palabra de Memo,
+      // 30-oct). La URL se firma AL CLIC en el servidor — aquí solo viaja el
+      // id del abono, jamás un path.
+      const foto = (a.tiene_foto && a.id)
+        ? ' <button type="button" data-mig-act="abono-foto" data-mig-id="' + escapeHtml(String(t.viajero_id || '')) + '" data-mig-abono="' + escapeHtml(String(a.id)) + '" style="background:none;border:none;color:#88ea4e;cursor:pointer;font-size:12px;padding:0" title="Ver el comprobante de este pago">📎 ver comprobante</button>'
+        : '';
       filas += '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px">'
-        + '<span style="opacity:.8">Abono' + escapeHtml(fmtF(a.fecha)) + '</span><span><b>' + money(a.monto) + '</b></span></div>';
+        + '<span style="opacity:.8">Abono' + escapeHtml(fmtF(a.fecha)) + foto + '</span><span><b>' + money(a.monto) + '</b></span></div>';
     });
     hist = '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;opacity:.85">Tus pagos registrados ('
       + (abonos.length + (previo > 0 ? 1 : 0)) + ')</summary>'
@@ -3928,7 +3935,24 @@ document.addEventListener('click', (ev) => {
   else if (act === 'radio') { const p = document.getElementById('rcp-play'); if (p) p.click(); }
   // [PAGOS-PORTAL-2] Subir el comprobante de un pago.
   else if (act === 'pago-subir') _migPagoSubir(id, b);
+  // [PORTAL-TICKET-1] Ver el comprobante de un pago ya registrado.
+  else if (act === 'abono-foto') _migAbonoFoto(id, b.getAttribute('data-mig-abono'), b);
 });
+
+// [PORTAL-TICKET-1] La URL firmada se pide AL CLIC (caduca en 10 min, jamás se
+// guarda — la lección de las URLs firmadas del sorteo). La pestaña se abre
+// ANTES del fetch para no pelear con el bloqueador de ventanas emergentes.
+async function _migAbonoFoto(viajeroId, abonoId, btn){
+  const txt = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Abriendo…'; }
+  const w = window.open('about:blank', '_blank');
+  try {
+    const j = await _migPost({ accion: 'abono_foto', viajero_id: viajeroId, abono_id: abonoId });
+    if (j && j.ok && j.url) { if (w) w.location = j.url; else window.open(j.url, '_blank', 'noopener'); }
+    else { if (w) w.close(); alert((j && j.error) || 'No se pudo abrir tu comprobante'); }
+  } catch (_) { if (w) w.close(); alert('No se pudo abrir tu comprobante, inténtalo otra vez'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = txt; } }
+}
 
 // [PAGOS-PORTAL-2] El comprobante: foto o PDF → portal-viajero `subir_pago` →
 // bandeja de KameHouse. 🔒 La foto viaja por FileReader→canvas (JAMÁS blob: —

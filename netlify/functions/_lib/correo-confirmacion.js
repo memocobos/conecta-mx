@@ -102,7 +102,9 @@ function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, to
   // heredan el color del div (salían negro sobre negro — cazado en la captura).
   const fila = (a, b, estilo) => `<tr><td style="padding:6px 0;color:#b3b3b3">${a}</td><td style="padding:6px 0;text-align:right;font-weight:800;color:${estilo === 'amarillo' ? '#e8ff4c' : estilo === 'verde' ? '#88ea4e' : '#ffffff'}">${b}</td></tr>`;
   const cuentas = '<table style="width:100%;border-collapse:collapse;font-size:15px;margin:0 0 16px">'
-    + fila('Recibimos', mxn(recibido), 'amarillo')
+    // [REQ-LINK-1] Una reserva aprobada SIN pago todavía (link_pago) no dice
+    // «Recibimos $0» — dice la verdad: el pago está pendiente.
+    + (Number(recibido) > 0 ? fila('Recibimos', mxn(recibido), 'amarillo') : fila('Tu pago', 'pendiente', 'amarillo'))
     + (total != null ? fila('Total de tu viaje', mxn(total)) : '')
     + (resta != null ? fila(liquidado ? 'Te falta' : 'Te falta por pagar', liquidado ? '$0 · ¡pagado!' : mxn(resta), liquidado ? 'verde' : 'amarillo') : '')
     + '</table>';

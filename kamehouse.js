@@ -6625,6 +6625,7 @@ function _vjAbonoAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)">MONTO<br><input class="cot-input" id="vja-m-${_esfEsc(id)}" type="number" min="0" step="0.01" placeholder="0.00" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)">FECHA<br><input class="cot-input" id="vja-f-${_esfEsc(id)}" type="date" value="${_esfEsc(_mxFechaStr ? _mxFechaStr() : '')}" style="width:140px"></label>
       <label style="font-size:10px;color:var(--ts);flex:1;min-width:160px">NOTA<br><input class="cot-input" id="vja-n-${_esfEsc(id)}" placeholder="ej. transferencia BBVA · link de pago" maxlength="500" style="width:100%"></label>
+      <label style="font-size:10px;color:var(--ts)" title="[ABONO-FOTO-2] Opcional: el ticket que mandó el cliente. Queda pegado al abono (📎 Pagos) y el cliente lo ve en su Portal.">COMPROBANTE (opcional)<br><input class="cot-input" id="vja-ft-${_esfEsc(id)}" type="file" accept="image/*" style="width:180px"></label>
       <button class="btn btn-primary btn-sm" id="vja-b-${_esfEsc(id)}" onclick="_vjAbonoGuardar('${_attrJs(id)}')">Guardar abono</button>
       <button class="btn btn-ghost btn-sm" onclick="_vjAbonoAbrir('${_attrJs(id)}')">Cancelar</button>
       <div id="vja-e-${_esfEsc(id)}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
@@ -6942,10 +6943,13 @@ async function _vjAbonoGuardar(id) {
   if (!Number.isFinite(monto) || monto <= 0) { if (err) err.textContent = 'El monto tiene que ser mayor que cero.'; return; }
   const fecha = String((document.getElementById(`vja-f-${id}`) || {}).value || '').trim();
   const nota = String((document.getElementById(`vja-n-${id}`) || {}).value || '').trim();
+  // [ABONO-FOTO-2] El ticket, opcional — el MISMO lector de la caja de
+  // Cobranza (_vj3LeerFoto): un segundo lector sería otra lista que diverge.
+  const foto = await _vj3LeerFoto(document.getElementById(`vja-ft-${id}`));
   const btn = document.getElementById(`vja-b-${id}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    const rAb = await khViajeros.abonoCrear({ viajero_id: id, monto, fecha: fecha || undefined, nota: nota || undefined });   // [sec-coordi]
+    const rAb = await khViajeros.abonoCrear({ viajero_id: id, monto, fecha: fecha || undefined, nota: nota || undefined, foto: foto || undefined });   // [sec-coordi]
     showToast(`Abono de ${_spFmtMxn(monto)} registrado${_abonoCorreoTxt(rAb && rAb.correo)}`, 'success');
     // Se RECARGA del servidor: la resta que queda en pantalla sale de los
     // datos, no de restar aquí y confiar (la decisión de VJ-3 y de la caja).

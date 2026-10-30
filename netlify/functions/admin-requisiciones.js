@@ -506,6 +506,20 @@ exports.handler = async (event) => {
     if (!claimed.length) return j(409, headers, { error: 'Alguien más la revisó primero — refresca la bandeja' });
 
     const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+    // [VJ-HAB-1] El tipo de habitación elegido al reservar pasa a COLUMNA
+    // (`hotel_tipo`), no solo a la nota: Milk/Bulma lo ven y editan en Capsule
+    // y el rooming se arma de ahí. Se NORMALIZA a los 4 tipos del rooming KH
+    // («Compartida (4 personas)» → Compartida — medido: era el único crudo
+    // extra en 59 filas reales); lo que no case queda null Y en la nota, que
+    // sigue llevando el crudo completo — nada se pierde, solo se estructura.
+    const hotelTipo = (() => {
+      const h = String(req.hotel || '').trim().toLowerCase();
+      if (h.startsWith('compartida')) return 'Compartida';
+      if (h.startsWith('doble')) return 'Doble';
+      if (h.startsWith('triple')) return 'Triple';
+      if (h.startsWith('individual')) return 'Individual';
+      return null;
+    })();
     const notaViajero = [
       `Requisición ${req.folio} · ${req.forma_pago}${req.transporte ? ' · ' + req.transporte : ''}${req.hotel ? ' · hotel: ' + req.hotel : ''}`,
       `aprobada por ${quien} ${hoyMX}${zonaConfesion || ''}`,
@@ -548,6 +562,7 @@ exports.handler = async (event) => {
           evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
           talla_playera: p.talla_playera, num_emergencia: p.num_emergencia,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: 1,
+          hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato: contratos[i], abonado_previo: 0,
           notas: notaViajero + (p.titular ? ` · titular de ${N} lugares` : ` · acompañante de ${req.nombre}`),
         }))
@@ -555,6 +570,7 @@ exports.handler = async (event) => {
           evento_id: req.evento_id, nombre: req.nombre, celular: req.celular, correo: req.correo,
           talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null,
           tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: req.num_personas,
+          hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato, abonado_previo: 0, notas: notaViajero,
         }]).map((f) => Object.assign(f, sello));
     const rV = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {

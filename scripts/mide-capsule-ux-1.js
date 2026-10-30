@@ -109,9 +109,13 @@ const pintar = sinCom(fn(js, '_vj2Pintar'));
 const cargar = sinCom(fn(js, '_vj2Cargar'));
 af(/^function _vj2Pintar\(\)/.test(fn(js, '_vj2Pintar')), '_vj2Pintar es SÍNCRONA (pintar no espera a nadie)');
 af(!/khViajeros\.|khAdminFetch|await /.test(pintar), '_vj2Pintar NO hace fetch: filtrar jamás cuesta una consulta');
-af(/_vjChipsPintar\(_vjResumenDe\(_vj2Filas\)\)/.test(pintar),
+// [CAPSULE-UX-2 · 30-oct-2026] Las firmas ganaron el mapa de contratos
+// (_ctrMapa, para las alertas 📜/🪪): la aserción se actualiza a la verdad
+// nueva — lo que vigila NO cambió: los chips siguen saliendo del UNIVERSO
+// (_vj2Filas) y la tabla del filtro. No se silenció, se re-anchó la firma.
+af(/_vjChipsPintar\(_vjResumenDe\(_vj2Filas, _ctrMapa\)\)/.test(pintar),
    'los chips se calculan del UNIVERSO (_vj2Filas), no de lo filtrado');
-af(/_vjFiltraFilas\(_vj2Filas, _vj2Q, _vj2Chip\)/.test(pintar), 'la tabla sale del filtro (visibles)');
+af(/_vjFiltraFilas\(_vj2Filas, _vj2Q, _vj2Chip, _ctrMapa\)/.test(pintar), 'la tabla sale del filtro (visibles)');
 af(/visibles\.forEach/.test(pintar) && /Mostrando/.test(pintar),
    'el orden por grupos corre sobre lo VISIBLE y el filtro DICE «Mostrando X de Y»');
 // El dinero del evento se suma sobre _vj2Filas (universo), no sobre visibles:

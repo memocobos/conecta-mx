@@ -122,6 +122,9 @@ const ACCIONES = {
   // [VJ-3] Dinero de los migrados. Mismos roles que editar: quien captura los
   // datos captura los abonos.
   abono_crear: ROLES_EDITA_VIAJERO,
+  // [ABONO-EDITA-1] Corregir el MONTO/fecha de un abono capturado mal (el
+  // separo erróneo — palabra de Memo, 30-oct). Mismos roles que capturarlo.
+  abono_editar: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
@@ -191,7 +194,9 @@ const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 // Whitelist ESTRICTA de `viajeros_evento` (PII) — solo lo que la descarga usa.
 // [GRUPO-VIAJE-1] + boletos (un titular de 3 lugares se lee distinto que uno
 // de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
+// [VJ-HAB-1] hotel_tipo viaja a la lista: es el tipo de habitación elegido
+// (Compartida/Doble/Triple/Individual) — ni dinero ni PII nueva.
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,hotel_tipo,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -1538,11 +1543,11 @@ ${entregables}
       if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
       const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
       if (!campos) return bad(headers, 'campos inválido');
-      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo'];
+      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo', 'hotel_tipo'];
       const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
       if (ajenos.length) return bad(headers, 'campo no editable aquí: ' + ajenos.join(', ') + ' (el contacto va por «Editar datos»; el evento, por «Mover de fecha»)');
 
-      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,hotel_tipo,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
       if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
       const v = (await pre.json())[0];
       if (!v) return bad(headers, 'ese viajero no existe');
@@ -1589,6 +1594,19 @@ ${entregables}
         const b = Number(campos.boletos);
         if (!Number.isInteger(b) || b < 1 || b > 20) return bad(headers, 'lugares inválidos (1 a 20)');
         if (b !== (Number(v.boletos) || 1)) { patch.boletos = b; cambios.push(`lugares ${v.boletos || 1} → ${b}`); }
+      }
+      // [VJ-HAB-1] El tipo de habitación: lista CERRADA (el CHECK de la base
+      // la respalda). Vacío = quitarlo, y quitar SIEMPRE se permite (la regla
+      // de viajero_habitacion: un dato mal puesto se tiene que poder limpiar);
+      // PONER uno exige un paquete que duerma — un hotel en un CHEAP/RIDE
+      // sería un dato sin cama detrás, y el rooming lo contaría.
+      if ('hotel_tipo' in campos) {
+        const HOTELES = ['Compartida', 'Doble', 'Triple', 'Individual'];
+        const crudo = String(campos.hotel_tipo || '').trim();
+        const h = crudo ? HOTELES.find((x) => x.toLowerCase() === crudo.toLowerCase()) : null;
+        if (crudo && !h) return bad(headers, 'habitación inválida: ' + HOTELES.join(', ') + ' (o vacío para quitarla)');
+        if (h && !duerme(paqFinal)) return bad(headers, motivoNoDuerme(paqFinal));
+        if (!igual(h, v.hotel_tipo)) { patch.hotel_tipo = h; cambios.push(`habitación ${v.hotel_tipo || '—'} → ${h || '—'}`); }
       }
       for (const k of ['total_contrato', 'abonado_previo']) {
         if (!(k in campos)) continue;
@@ -2280,6 +2298,67 @@ ${entregables}
     }
 
     // ── abonos_viajero: listar los de un viajero (admin) ─────────────────
+    // ═══ [ABONO-EDITA-1] (30-oct-2026) CORREGIR UN ABONO CAPTURADO MAL ═══════
+    // Palabra de Memo (reporte de Milk/Bulma): «poder editar el separo por si
+    // por error aceptan algo erróneo». Es DINERO, así que los candados de la
+    // casa completos:
+    //  · solo el MONTO y la FECHA — la foto, la nota original y el viajero no
+    //    se tocan (mover un abono a OTRA persona no es una corrección: es un
+    //    movimiento que pide su propia tuerca con su propio rastro);
+    //  · monto > 0 estricto, como abono_crear: un $0 es una ANULACIÓN y ésa es
+    //    decisión aparte (la forma firmada de CORR-DOBLE-1, con palabra de
+    //    Memo caso por caso) — este editor corrige números, no borra pagos;
+    //  · 🔒 VALOR ESPERADO en el PATCH (monto y fecha viejos como filtro): si
+    //    alguien lo movió entre la lectura y el clic, cero filas → 409 — el
+    //    doble clic no re-escribe y una carrera no pisa en silencio;
+    //  · la nota ANEXA el rastro «[EDITA fecha] $a→$b · quien» — la nota
+    //    original es la PROCEDENCIA y jamás se pisa (la ley de los sellos);
+    //  · CERO correos: es una corrección interna. El abono ya avisó al nacer
+    //    (si su evento manda correo); corregir $300→$350 no es un pago nuevo.
+    if (accion === 'abono_editar') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes corregir abonos' }) };
+      }
+      const abono_id = String(body.abono_id || '').trim();
+      if (!UUID_RE.test(abono_id)) return bad(headers, 'abono_id inválido');
+
+      const baseAB = `${env.KH_SB_URL}/rest/v1/abonos_viajero`;
+      const pre = await fetch(`${baseAB}?id=eq.${abono_id}&select=id,viajero_id,monto,fecha,nota&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const ab = (await pre.json())[0];
+      if (!ab) return bad(headers, 'ese abono no existe');
+
+      const patch = {}, cambios = [];
+      if ('monto' in body) {
+        const m = Number(body.monto);
+        if (!Number.isFinite(m) || m <= 0) return bad(headers, 'El monto tiene que ser mayor que cero (anular un abono es otra cosa y pide palabra de Memo)');
+        if (m > 1000000) return bad(headers, 'Monto fuera de rango');
+        if (m !== Number(ab.monto)) { patch.monto = m; cambios.push(`monto $${Number(ab.monto)} → $${m}`); }
+      }
+      if ('fecha' in body && String(body.fecha || '').trim()) {
+        const f = String(body.fecha).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return bad(headers, 'Fecha inválida (AAAA-MM-DD)');
+        if (f !== String(ab.fecha || '').slice(0, 10)) { patch.fecha = f; cambios.push(`fecha ${String(ab.fecha || '—').slice(0, 10)} → ${f}`); }
+      }
+      if (!cambios.length) return bad(headers, 'no cambiaste nada');
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      patch.nota = ((ab.nota ? ab.nota + ' · ' : '') + `[EDITA ${hoyMx}] ${cambios.join('; ')} · ${quien}`).slice(0, 1000);
+      // 🔒 Valor esperado POR CADA campo que cambia (la forma de editar_full).
+      const filtro = Object.keys(patch).filter((k) => k !== 'nota')
+        .map((k) => (ab[k] == null ? `${k}=is.null` : `${k}=eq.${encodeURIComponent(ab[k])}`)).join('&');
+      const r = await fetch(`${baseAB}?id=eq.${abono_id}${filtro ? '&' + filtro : ''}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien movió este abono mientras lo corregías. Recarga y vuelve a intentar.', ya: true }) };
+      return ok(headers, { abono: filas[0], cambios });
+    }
+
     if (accion === 'abonos_listar') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes ver los abonos' }) };

@@ -123,6 +123,7 @@
     "mide:capsule-ux-1": "node scripts/mide-capsule-ux-1.js",
     "mide:portal-vivo-1": "node scripts/mide-portal-vivo-1.js",
     "mide:pagos-portal-2": "node scripts/mide-pagos-portal-2.js",
-    "mide:fr-prox-1": "node scripts/mide-fr-prox-1.js"
+    "mide:fr-prox-1": "node scripts/mide-fr-prox-1.js",
+    "mide:capsule-ux-2": "node scripts/mide-capsule-ux-2.js"
   }
 }

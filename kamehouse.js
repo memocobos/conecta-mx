@@ -2193,6 +2193,8 @@ const khViajeros = {
   abonosDe(viajero_id) { return this._call({ accion: 'abonos_listar', viajero_id }).then(j => j.abonos || []); },
   abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
+  // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
+  abonoEditar(abono_id, campos) { return this._call(Object.assign({ accion: 'abono_editar', abono_id }, campos || {})); },
   // [VJ-5] poner/quitar cuarto a un migrado
   habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
   // [MIG-1a] alta de un viajero del Excel, y la búsqueda de parecidos previa
@@ -6119,8 +6121,8 @@ function _vjEsBaja(v) { return Number(v.boletos) === 0 && !v.zona_boleto; }
 // El resumen del evento (puro): filas activas, lugares, por paquete, por zona,
 // staff y bajas. Una fila sin boletos capturados cuenta 1 lugar (el suyo),
 // igual que el `capsule_resumen` del servidor.
-function _vjResumenDe(filas) {
-  const r = { filas: 0, lugares: 0, staff: 0, bajas: 0, paquetes: {}, zonas: {} };
+function _vjResumenDe(filas, ctrMapa) {
+  const r = { filas: 0, lugares: 0, staff: 0, bajas: 0, paquetes: {}, zonas: {}, habitaciones: {}, ctr_sin: 0, prv_sin: 0 };
   (filas || []).forEach((v) => {
     if (_vjEsBaja(v)) { r.bajas++; return; }
     const lug = Number(v.boletos) > 0 ? Number(v.boletos) : 1;
@@ -6130,20 +6132,45 @@ function _vjResumenDe(filas) {
     const p = (r.paquetes[paq] = r.paquetes[paq] || { filas: 0, lugares: 0 });
     p.filas++; p.lugares += lug;
     if (v.zona_boleto) r.zonas[v.zona_boleto] = (r.zonas[v.zona_boleto] || 0) + lug;
+    // [VJ-HAB-1] Para armar el rooming: cuántos eligieron cada tipo de cuarto.
+    // Se cuentan LUGARES (una fila de 3 lugares en Doble son 3 camas, no 1).
+    if (v.hotel_tipo) r.habitaciones[v.hotel_tipo] = (r.habitaciones[v.hotel_tipo] || 0) + lug;
+    // [VJ-CARD-1] Las dos ALERTAS: contrato sin firmar y Portal sin revisar —
+    // con los MISMOS predicados de sus chips (_vjCtrPuede / prvChip), para que
+    // el contador diga lo que las filas enseñan.
+    if (ctrMapa && typeof _vjCtrPuede === 'function' && _vjCtrPuede(v)) {
+      const c = ctrMapa[v.id];
+      if (!c || c.estado !== 'firmado') r.ctr_sin++;
+    }
+    if (('portal_revisado_at' in v) && !v.portal_revisado_at && !v.usuario_id && !_esStaff(v)) r.prv_sin++;
   });
   return r;
 }
 
 // El filtro (puro): texto sin acentos sobre nombre/correo/celular/zona/paquete/
 // talla/notas, combinable con un chip (paquete exacto, staff o bajas).
-function _vjFiltraFilas(filas, q, chip) {
+function _vjFiltraFilas(filas, q, chip, ctrMapa) {
   const qn = _vjNorm(q).trim();
   return (filas || []).filter((v) => {
     if (chip === '__bajas') { if (!_vjEsBaja(v)) return false; }
     else if (chip === '__staff') { if (_vjEsBaja(v) || !_esStaff(v)) return false; }
+    // [VJ-CARD-1] Chips nuevos, todos sobre filas ACTIVAS (las bajas tienen su
+    // propio chip): el grupo que viaja junto, una zona, un tipo de habitación,
+    // y las dos ALERTAS (contrato sin firmar · Portal sin revisar) con los
+    // MISMOS predicados que sus chips de fila — un filtro con otro criterio
+    // enseñaría filas que el chip no marca.
+    else if (chip && chip.startsWith('__grp:')) { if (_vjEsBaja(v) || String(v.grupo_viaje || '') !== chip.slice(6)) return false; }
+    else if (chip && chip.startsWith('__zona:')) { if (_vjEsBaja(v) || String(v.zona_boleto || '') !== chip.slice(7)) return false; }
+    else if (chip && chip.startsWith('__hab:')) { if (_vjEsBaja(v) || String(v.hotel_tipo || '') !== chip.slice(6)) return false; }
+    else if (chip === '__ctr_sin') {
+      if (_vjEsBaja(v) || typeof _vjCtrPuede !== 'function' || !_vjCtrPuede(v)) return false;
+      const c = (ctrMapa || {})[v.id];
+      if (c && c.estado === 'firmado') return false;
+    }
+    else if (chip === '__prv_sin') { if (_vjEsBaja(v) || !('portal_revisado_at' in v) || v.portal_revisado_at || v.usuario_id || _esStaff(v)) return false; }
     else if (chip) { if (_vjEsBaja(v) || (khPaqueteTexto(v) || '—') !== chip) return false; }
     if (!qn) return true;
-    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.notas]
+    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.hotel_tipo, v.emergencia_nombre, v.num_emergencia, v.notas]
       .filter(Boolean).join(' | '));
     return hay.includes(qn);
   });
@@ -6201,12 +6228,21 @@ function _vjChipsPintar(res) {
     ? `<details class="vj-chip-zonas"><summary>🎫 boletos por zona (${zonas.length} zona${zonas.length === 1 ? '' : 's'})</summary><div>${
         zonas.map(([z, m]) => `<span class="vj-chip vj-chip-z">${_esfEsc(z)} <b>${m}</b></span>`).join('')}</div></details>`
     : '';
+  // [VJ-HAB-1] El desglose para armar el rooming: cuántas camas pide cada tipo
+  // (clic = ver a esas personas). Se calla si nadie eligió habitación.
+  const habs = Object.entries(res.habitaciones || {}).sort((a, b) => b[1] - a[1]);
+  const habsHtml = habs.length
+    ? `<details class="vj-chip-zonas"><summary>🛏 por habitación (${habs.map(([h, m]) => `${h} ${m}`).join(' · ')})</summary><div>${
+        habs.map(([h, m]) => chip('__hab:' + h, `🛏 ${_esfEsc(h)} <b>${m}</b>`, `${m} lugar(es) en habitación ${h}. Clic para ver quiénes — de aquí se arma el rooming.`)).join('')}</div></details>`
+    : '';
   box.innerHTML = `<div class="vj-chips">
       <span class="vj-chip vj-chip-g" title="El universo completo del evento (no cambia con el buscador): ${res.filas} viajeros activos · ${res.lugares} lugares/boletos">👥 <b>${res.filas}</b> viajeros · 🎟 <b>${res.lugares}</b> lugares</span>
       ${paqs}
       ${res.staff ? chip('__staff', `staff <b>${res.staff}</b>`, 'Filas del equipo (coordis, creadoras). Clic para verlas solas.') : ''}
       ${res.bajas ? chip('__bajas', `bajas <b>${res.bajas}</b>`, 'Cancelados (boletos en 0): no suman lugares. Clic para verlos.') : ''}
-    </div>${zonasHtml}`;
+      ${res.ctr_sin ? chip('__ctr_sin', `📜 sin firmar <b>${res.ctr_sin}</b>`, '[VJ-CARD-1] Viajeros con contrato pendiente de firma (o sin contrato emitido). Clic para verlos y recordarles.') : ''}
+      ${res.prv_sin ? chip('__prv_sin', `🪪 sin revisar <b>${res.prv_sin}</b>`, '[VJ-CARD-1] Nadie ha revisado sus números para el Portal: si entran verán «estamos revisando tu viaje». Clic para verlos.') : ''}
+    </div>${habsHtml}${zonasHtml}`;
 }
 
 async function _vj2Cargar() {
@@ -6319,13 +6355,21 @@ function _vj2Pintar() {
 
   // [CAPSULE-UX-1] Los contadores del evento (universo completo, fuera de la
   // lista para que el repintado no los toque) y el filtro de la TABLA.
-  _vjChipsPintar(_vjResumenDe(_vj2Filas));
-  const visibles = _vjFiltraFilas(_vj2Filas, _vj2Q, _vj2Chip);
+  _vjChipsPintar(_vjResumenDe(_vj2Filas, _ctrMapa));
+  const visibles = _vjFiltraFilas(_vj2Filas, _vj2Q, _vj2Chip, _ctrMapa);
   const _hayFiltro = !!(_vjNorm(_vj2Q).trim() || _vj2Chip);
+  // [VJ-CARD-1] La etiqueta LEGIBLE del chip: «__grp:uuid» en la nota del
+  // filtro mandaría a leer un uuid.
+  const _chipEtq = (c) => !c ? '' :
+    c === '__staff' ? 'solo staff' : c === '__bajas' ? 'solo bajas' :
+    c === '__ctr_sin' ? '📜 contrato sin firmar' : c === '__prv_sin' ? '🪪 Portal sin revisar' :
+    c.startsWith('__grp:') ? '👥 un grupo que viaja junto' :
+    c.startsWith('__zona:') ? `zona «${c.slice(7)}»` :
+    c.startsWith('__hab:') ? `🛏 ${c.slice(6)}` : c;
   const filtroNota = _hayFiltro
     ? `<div class="vj-filtro-nota">Mostrando <b>${visibles.length}</b> de ${n} viajeros` +
       `${_vjNorm(_vj2Q).trim() ? ` con «${_esfEsc(_vj2Q.trim())}»` : ''}` +
-      `${_vj2Chip ? ` · ${_esfEsc(_vj2Chip === '__staff' ? 'solo staff' : _vj2Chip === '__bajas' ? 'solo bajas' : _vj2Chip)}` : ''}` +
+      `${_vj2Chip ? ` · ${_esfEsc(_chipEtq(_vj2Chip))}` : ''}` +
       ` — <a href="#" onclick="vjFiltroLimpiar();return false">quitar filtro</a></div>`
     : '';
 
@@ -6375,7 +6419,7 @@ function _vj2Pintar() {
 
   list.innerHTML = dineroHtml + grupoBarra + filtroNota + `<div class="vj2-wrap"><table class="vj2-tabla">
     <thead><tr>
-      ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
+      ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th title="[VJ-HAB-1] Tipo de habitación elegida — se corrige con ✏️">Hab.</th><th>Talla</th><th>Contacto</th>
       ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}
       <th>Notas</th>${_vjPuedeEliminar() ? '<th></th>' : ''}
     </tr></thead>
@@ -6400,9 +6444,20 @@ function _vj2Pintar() {
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
         <td><b>${_esfEsc(v.nombre || '—')}</b>
             <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}
-            ${gCol ? `<div style="font-size:11px;margin-top:3px;color:${gCol}">👥 viaja con: ${compas.map(_esfEsc).join(', ')}${_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : ''}</div>` : ''}</td>
-        <td>${_esfEsc(khPaqueteTexto(v) || '—')}</td>
-        <td>${_esfEsc(v.zona_boleto || '—')}</td>
+            ${gCol ? (() => {
+              // [VJ-CARD-1] «Viaja con» COMPACTO: el reporte de Milk/Bulma fue
+              // que listar los nombres ESTIRA el card. Hoy: un renglón corto
+              // con el conteo; los nombres viven en el title y el clic filtra
+              // la tabla al grupo (chip __grp:) — se ven juntos sin estirar.
+              const nG = compas.length + 1;
+              return `<div style="font-size:11px;margin-top:3px;color:${gCol};white-space:nowrap">`
+                + `<a href="#" title="Viaja con: ${_esfEsc(compas.join(', '))}. Clic para ver al grupo completo en la tabla." style="color:${gCol};text-decoration:none" onclick="vjChip('__grp:${_attrJs(v.grupo_viaje)}');return false">👥 grupo de ${nG}</a>`
+                + (_puedeAgrupar ? ` · <a href="#" onclick="vjGrupoSeparar('${_attrJs(v.id)}','${_attrJs(v.nombre || '')}');return false" style="color:var(--ts)">separar</a>` : '')
+                + '</div>';
+            })() : ''}</td>
+        <td><a href="#" style="color:inherit;text-decoration:none" title="Clic: ver solo este paquete" onclick="vjChip('${_attrJs(khPaqueteTexto(v) || '—')}');return false">${_esfEsc(khPaqueteTexto(v) || '—')}</a></td>
+        <td>${v.zona_boleto ? `<a href="#" style="color:inherit;text-decoration:none" title="Clic: ver solo esta zona" onclick="vjChip('__zona:${_attrJs(v.zona_boleto)}');return false">${_esfEsc(v.zona_boleto)}</a>` : '—'}</td>
+        <td>${v.hotel_tipo ? `<a href="#" style="color:inherit;text-decoration:none" title="Habitación ${_esfEsc(v.hotel_tipo)} — clic: ver solo este tipo. Se corrige con ✏️" onclick="vjChip('__hab:${_attrJs(v.hotel_tipo)}');return false">🛏 ${_esfEsc(v.hotel_tipo)}</a>` : '<span class="vj2-vacio">—</span>'}</td>
         <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
         <td>${contacto}${emerg ? `<div class="vj2-emerg">SOS ${_esfEsc(emerg)}</div>` : ''}</td>
         ${(() => {
@@ -6518,11 +6573,37 @@ async function _vjPagosVer(id, nombre) {
             ? `<a href="${_esfEsc(a.foto_url)}" target="_blank" rel="noopener" style="color:var(--green)">📎 ver comprobante</a>`
             : '<span style="color:var(--ts)">sin comprobante</span>'}
           <span style="flex:1;color:var(--ts)">${a.nota ? _esfEsc(a.nota) : ''}${a.capturado_por ? ` · ${_esfEsc(a.capturado_por)}` : ''}</span>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--yellow);border-color:var(--yellow)"
+            title="[ABONO-EDITA-1] Corregir el monto o la fecha de este abono (si se aceptó algo erróneo). El rastro queda en su nota."
+            onclick="_vjAbonoEditar('${_attrJs(a.id)}','${_attrJs(id)}','${_attrJs(nombre)}',${Number(a.monto) || 0},'${_attrJs(String(a.fecha || '').slice(0, 10))}')">✏️</button>
         </div>`).join('')}
     </div>`;
   } catch (e) {
     celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudieron leer los pagos: ${_esfEsc(e.message)}</div>`;
   }
+}
+
+// ═══ [ABONO-EDITA-1] ✏️ CORREGIR UN ABONO CAPTURADO MAL ═════════════════════
+// Palabra de Memo (30-oct, reporte de Milk/Bulma): «poder editar el separo por
+// si por error aceptan algo erróneo». La pantalla NO decide nada: pide el
+// monto (y la fecha) y el SERVIDOR valida con valor esperado — el doble clic y
+// la carrera contestan 409, y el rastro queda ANEXADO en la nota del abono.
+// Un monto en $0 se rechaza allá: anular un abono es decisión aparte.
+async function _vjAbonoEditar(abonoId, viajeroId, nombre, montoActual, fechaActual) {
+  const m = prompt(`Corregir el abono de ${nombre || 'este viajero'}\n\nMonto actual: $${montoActual}\nTeclea el monto CORRECTO:`, String(montoActual));
+  if (m === null) return;
+  const monto = Number(String(m).replace(/[$,\s]/g, ''));
+  if (!Number.isFinite(monto) || monto <= 0) { showToast('El monto tiene que ser un número mayor que cero', 'error'); return; }
+  const f = prompt(`Fecha del abono (AAAA-MM-DD) — déjala igual si solo corriges el monto:`, fechaActual || '');
+  if (f === null) return;
+  try {
+    const j = await khViajeros.abonoEditar(abonoId, { monto, fecha: String(f || '').trim() });
+    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo corregir');
+    showToast('✓ ' + (j.cambios || []).join('; '), 'success');
+    // Refresca la lista (el saldo cambió) y reabre el panel de pagos de la persona.
+    await _vj2Cargar();
+    _vjPagosVer(viajeroId, nombre);
+  } catch (e) { showToast('No se pudo corregir el abono: ' + ((e && e.message) || ''), 'error'); }
 }
 
 function _vjAbonoAbrir(id, nombre) {
@@ -6593,6 +6674,8 @@ function _vjEditarAbrir(id, nombre) {
         ${opt('plus', 'PLUS')}${opt('stay', 'STAY')}${opt('cheap', 'CHEAP')}${opt('ride', 'RIDE')}</select></label>
       <label style="font-size:10px;color:var(--ts)">ZONA<br><input class="cot-input" id="vjx-z-${e}" value="${_esfEsc(v.zona_boleto || '')}" placeholder="como en la ficha" style="width:150px"></label>
       <label style="font-size:10px;color:var(--ts)">LUGARES<br><input class="cot-input" id="vjx-b-${e}" type="number" min="1" max="20" step="1" value="${Number(v.boletos) || 1}" style="width:70px"></label>
+      <label style="font-size:10px;color:var(--ts)" title="[VJ-HAB-1] El tipo de habitación que eligió — de aquí se arma el rooming. Solo PLUS/STAY/RIDE duermen; en CHEAP déjalo vacío.">HABITACIÓN<br><select class="cot-input" id="vjx-h-${e}">
+        ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)">PAGADO ANTES<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px"></label>
       <button class="btn btn-primary btn-sm" id="vjx-b2-${e}" onclick="_vjEditarGuardar('${_attrJs(id)}')">Guardar corrección</button>
@@ -6617,6 +6700,8 @@ async function _vjEditarGuardar(id) {
     tipo_paquete: String(g('p').value || ''),
     zona_boleto: String(g('z').value || '').trim(),
     boletos: Number(g('b').value),
+    hotel_tipo: String(g('h').value || ''),   // [VJ-HAB-1] '' = quitarla
+
     // Vacío viaja como null: «sin capturar» y «$0» son cosas distintas y el
     // servidor las distingue (un total vacío se rechaza, un pagado-antes vacío
     // es cero). Mandar '' las aplastaría en una sola.

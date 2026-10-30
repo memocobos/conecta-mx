@@ -188,6 +188,73 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🛏⏳ **CAPSULE-UX-2 · VJ-HAB-1 + VJ-CARD-1 + ABONO-EDITA-1 (30-oct-2026, en
+  main local; la BASE ya escrita): la lista de viajeros gana HABITACIÓN
+  visible/editable, card compacto con alertas clickeables, y el separo erróneo
+  se corrige.** Palabra de Memo (reporte de Milk/Bulma), citada: *«quieren ver
+  el tipo de habitación que escogieron y editar en caso de cambio para poder
+  hacer el rooming list en automático … la información de con quién duerme
+  estira mucho el card … todo más clickeable y con más opciones de búsqueda …
+  ver su contrato, si ya firmó alerta, si ya está en el portal … poder editar
+  el separo por si por error aceptan algo erróneo»*. `mide:capsule-ux-2` **46**
+  (sin ancla — árbol; sabotaje al valor esperado de abono_editar mordido con
+  sha1 careado → 2 rojos con nombre → restaurado byte a byte).
+  - 🔴 **LO MEDIDO ANTES: el tipo de habitación NO ERA UN DATO.** Vivía solo
+    como texto en la nota («· hotel: Compartida (4 personas) ·»);
+    `requisiciones.hotel` sí lo guarda estructurado pero el aprobar lo tiraba a
+    la nota; `habitacion_id` (el cuarto del rooming) tiene **0 usos**; y NO
+    existía ningún editor de abonos — el separo mal capturado era intocable.
+  - **VJ-HAB-1 · la base** (acta `migraciones/VJ-HAB-1.sql`, YA CORRIDA,
+    CHECK mordido con 23514 ✓): columna `viajeros_evento.hotel_tipo` con CHECK
+    de los 4 tipos del rooming KH (Compartida/Doble/Triple/Individual) +
+    **backfill de 59 filas desde la nota** (careado antes: 46·10·3, cero
+    ambiguas; el crudo completo SIGUE en la nota — nada se pierde).
+  - **VJ-HAB-1 · el circuito:** el APROBAR de la bandeja escribe `hotel_tipo`
+    NORMALIZADO («Compartida (4 personas)» → Compartida; sin casar → null y el
+    crudo en la nota) · `viajero_editar_full` lo edita (lista CERRADA; 🔒 un
+    paquete que NO duerme rebota con `motivoNoDuerme` — el rooming no cuenta
+    camas falsas; QUITAR siempre se puede) · columna **Hab.** en la tabla
+    (clickeable → filtra) · select en el ✏️ Corregir · desglose plegable
+    **«🛏 por habitación»** en los chips (camas por tipo, en LUGARES, sobre el
+    UNIVERSO) — el insumo del rooming.
+  - **VJ-CARD-1 · el card deja de estirarse:** el «viaja con» ya NO lista
+    nombres — dice **«👥 grupo de N»** (los nombres en el title) y el clic
+    filtra al grupo (chip `__grp:`). Paquete, zona y habitación CLICKEABLES
+    (filtran). La búsqueda aprende habitación y contacto de emergencia. Y las
+    DOS ALERTAS pedidas, como chips-contadores clickeables sobre el universo:
+    **«📜 sin firmar N»** (contrato pendiente o sin emitir — mismo predicado
+    que el chip de fila) y **«🪪 sin revisar N»** (sin sello del Portal). La
+    nota del filtro es LEGIBLE («un grupo que viaja junto», jamás el uuid).
+  - **ABONO-EDITA-1 · el separo erróneo** (`abono_editar`, roles de siempre):
+    corrige MONTO y FECHA de un abono con **valor esperado en el PATCH**
+    (carrera/2º clic → 409 — careado con sabotaje), rastro «[EDITA fecha]
+    $a→$b · quien» **ANEXADO** (la procedencia jamás se pisa), **$0 REBOTA**
+    (anular es la forma de CORR-DOBLE-1, con palabra de Memo caso por caso),
+    **CERO correos** (corrección interna) y cero escrituras a viajeros. UI: ✏️
+    por abono dentro del panel 📎 Pagos.
+  - ✅ **Careado por los handlers REALES** (coordi + bandeja con red falsa que
+    respeta filtros — la carrera se simula con COPIA congelada de la lectura,
+    porque la red falsa devuelve referencias vivas y sin la copia el 409 no se
+    puede medir: lección del instrumento, escrita en el arnés) + la pantalla
+    REAL en vm con DOM falso (46 verdes). Vecinos verdes: capsule-ux-1 **67**
+    (sus 2 anclas de firma se actualizaron a la verdad nueva — _vjResumenDe y
+    _vjFiltraFilas ganaron el mapa de contratos) · viajero-edita-1 63 ·
+    req-b1 52 · capsule-comp-1 16 · paq-preventa-1 8 · portal-solo-1 89 ·
+    rechazo-1 60 · acomp-1 67 · confirma-1 28.
+  - ⚠️ **Lo que queda NOMBRADO sin construir, y pide palabra de Memo:**
+    (a) el **ARMADO AUTOMÁTICO del rooming** desde este acomodo — el dato ya
+    existe (hotel_tipo + grupo_viaje); armar cuartos solo pide las REGLAS
+    (¿grupos juntos siempre? ¿quién comparte una Compartida de 4? ¿separar por
+    género?) — tuerca propia con su firma; (b) el chip **«ya está en el
+    Portal»** como REGISTRO con cuenta es un cruce cross-base (KH↔Portal por
+    correo) en la ruta caliente de la lista — hoy el chip dice
+    revisado/sin-revisar (el sello), que es lo que gobierna lo que el cliente
+    ve; (c) los ~1,180 viajeros viejos sin hotel en la nota siguen con
+    hotel_tipo null — se completan con el ✏️, no se adivinan.
+  - ⏳ Push de Memo → prueba humana de Milk/Bulma: abrir un evento, filtrar
+    por «🛏 Doble», corregir una habitación con ✏️, tocar «📜 sin firmar» y
+    corregir un separo desde 📎 Pagos.
+
 - 🎸⏳ **FR-VENTA-1 (30-oct-2026, BASE YA ESCRITA — el encendido es el PUBLISH
   de Memo): EL 15 Y 16 DE FUERZA REGIDA SALEN A LA VENTA con su pedido cargado
   y lo no mencionado agotado.** Palabra de Memo, citada: *«carga el pedido de

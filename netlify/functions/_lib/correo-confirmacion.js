@@ -82,12 +82,16 @@ function esc(s) {
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
 // Devuelve { subject, html, to } | { error }.
-function renderConfirmacion({ tipo, correo, ev, nombres, recibido, total, resta, portal, grupo }) {
+function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, total, resta, portal, grupo }) {
   const k = llaveCorreo(correo);
   if (!k) return { error: 'sin correo usable' };
   if (!ev || !ev.id) return { error: 'no se pudo leer el evento en el catálogo: no se manda un correo sin decir a qué viaje' };
   const artista = String(ev.a || ev.id);
-  const detalle = [String(ev.f || '').trim(), String(ev.v || '').trim()].filter(Boolean).join(' · ');
+  // [FECHA-CORREO-1] la fecha del #N confirmado, no el `f` global del
+  // multifecha (las 4 fechas confunden — palabra de Memo, 30-oct). Sin
+  // evento_id (llamador viejo) el dueño devuelve `ev.f`, como siempre.
+  const { fechaDeEventoId } = require('./fecha-evento');
+  const detalle = [fechaDeEventoId(ev, evento_id), String(ev.v || '').trim()].filter(Boolean).join(' · ');
   const lista = (Array.isArray(nombres) ? nombres : []).filter(Boolean);
   const primer = (String(lista[0] || '').trim().split(/\s+/)[0]) || 'Hola';
   const esReserva = tipo === 'reserva';
@@ -207,7 +211,7 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
     for (const g of grupos.values()) {
       let portal = null;
       if (portalListo && ya && g.portal_cliente_id) portal = ya.has(g.correo) ? 'existente' : 'nuevo';
-      const r = renderConfirmacion({ tipo, correo: g.correo, ev, nombres: g.nombres, recibido: g.recibido,
+      const r = renderConfirmacion({ tipo, correo: g.correo, ev, evento_id, nombres: g.nombres, recibido: g.recibido,
         total: g.sinPlan ? null : g.total, resta: g.sinPlan ? null : g.resta, portal, grupo: g.grupo });
       if (r.error) { errores.push({ correo: g.correo, paso: 'render', detail: r.error }); continue; }
       const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });

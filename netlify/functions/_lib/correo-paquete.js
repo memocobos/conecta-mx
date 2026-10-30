@@ -84,7 +84,9 @@ async function avisarPaquete({ cambio, KH_URL, KH_KEY }) {
     if (!RESEND_KEY) return Object.assign(out, { aviso: 'falta RESEND_API_KEY: avísale por WhatsApp' });
     const r = renderPaquete({
       estado: cambio.estado, nombre: (v && v.nombre) || cambio.nombre, correo,
-      evento: ev.a || ev.id, fecha: ev.f || '',
+      // [FECHA-CORREO-1] la fecha de SU #N — en un multifecha el `f` global
+      // trae TODAS las fechas y confunde (palabra de Memo, 30-oct).
+      evento: ev.a || ev.id, fecha: require('./fecha-evento').fechaDeEventoId(ev, (v && v.evento_id) || cambio.evento_id),
       paquete: (v && v.tipo_paquete) || cambio.paquete_pedido, zona: (v && v.zona_boleto) || cambio.zona_pedida,
       hotel: cambio.hotel_pedido, cuenta, motivo: cambio.respuesta, contratoVivo: CONTRATO_CLIENTE_VIVO,
     });

@@ -102,7 +102,9 @@ async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, KH_URL, KH_KEY
       const { fetchEventosRaw } = require('./catalogo-index');
       const EV = await fetchEventosRaw();
       const ev = Array.isArray(EV) ? EV.find((e) => e && e.id === String(v.evento_id).split('#')[0]) : null;
-      if (ev) { evNombre = ev.a || ev.id; evFecha = ev.f || ''; }
+      // [FECHA-CORREO-1] la fecha de SU #N (en mudanza, la del DESTINO — que es
+      // justo el cambio), no el `f` global con todas las fechas del multifecha.
+      if (ev) { evNombre = ev.a || ev.id; evFecha = require('./fecha-evento').fechaDeEventoId(ev, v.evento_id); }
     } catch (_) { /* fail-soft: queda el slug */ }
     if (modo === 'mudanza' && !evFecha && !fechaAntes) {
       return Object.assign(out, { aviso: 'no pude leer las fechas del catálogo: no se mandó el correo de la mudanza' });

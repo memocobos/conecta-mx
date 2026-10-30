@@ -98,7 +98,11 @@ function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, pa
 
   const artista = String((ev && ev.a) || evento_nombre || '').trim();
   if (!artista) return { error: 'no se pudo saber de qué viaje es: no se manda un correo que no diga a qué evento' };
-  const detalle = ev ? [String(ev.f || '').trim(), String(ev.v || '').trim()].filter(Boolean).join(' · ') : '';
+  // [FECHA-CORREO-1] La fecha es la del #N rechazado, NO el `f` global del
+  // evento: en un multifecha (fuerzaregida = 4 fechas) decir las cuatro
+  // confunde — palabra de Memo, 30-oct. El dueño del «#N → fecha» decide.
+  const { fechaDeEventoId } = require('./fecha-evento');
+  const detalle = ev ? [fechaDeEventoId(ev, evento_id), String(ev.v || '').trim()].filter(Boolean).join(' · ') : '';
   const primer = (String(nombre || '').trim().split(/\s+/)[0]) || 'Hola';
   const n = Math.max(1, parseInt(personas, 10) || 1);
 

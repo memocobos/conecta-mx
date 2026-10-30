@@ -145,7 +145,7 @@ exports.handler = async (event) => {
 
     // ── 5. EL RENDER, que es lo que Memo y Jane ven antes del primer envío ─
     const muestraPara = quien.invitar[0] || { nombre: 'Nombre Ejemplo', correo: 'ejemplo@correo.com' };
-    const render = renderInvitacion({ nombre: muestraPara.nombre, correo: muestraPara.correo, ev });
+    const render = renderInvitacion({ nombre: muestraPara.nombre, correo: muestraPara.correo, ev, evento_id });
 
     const resumen = {
       evento_id,

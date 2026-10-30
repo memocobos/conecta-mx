@@ -120,7 +120,7 @@ function escapeHtml(s) {
 
 // Devuelve { subject, html } | { error } — el error es para que el caller lo
 // DIGA, no para que mande un correo a medias.
-function renderInvitacion({ nombre, correo, ev }) {
+function renderInvitacion({ nombre, correo, ev, evento_id }) {
   const k = llaveCorreo(correo);
   if (!k) return { error: 'sin un correo usable no hay invitación que mandar' };
   // 🔒 SIN CATÁLOGO NO SE MANDA. El evento es el ÚNICO motivo por el que esta
@@ -131,9 +131,11 @@ function renderInvitacion({ nombre, correo, ev }) {
       + 'se refiere — un «tu viaje» a secas se lee como spam' };
   }
   const artista = String(ev.a || ev.id);
-  // La fecha LARGA si el catálogo la trae, y la corta si no. Las dos salen de
-  // la ficha: aquí no se formatea una fecha que el catálogo no dio.
-  const cuando = String(ev.f || '').trim();
+  // [FECHA-CORREO-1] La fecha del #N del invitado, no el `f` global: en un
+  // multifecha (fuerzaregida = 4 fechas) decir las cuatro confunde — palabra
+  // de Memo, 30-oct. Sin evento_id (llamador viejo) el dueño devuelve `ev.f`.
+  const { fechaDeEventoId } = require('./fecha-evento');
+  const cuando = fechaDeEventoId(ev, evento_id);
   const donde = String(ev.v || '').trim();
   const primerNombre = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
   const subject = `Tu plan de ${artista} ya está en línea`;
@@ -188,7 +190,7 @@ async function enviarInvitaciones({ lista, ev, evento_id, KH_URL, KH_KEY, RESEND
   const quien = { invitar: Array.isArray(lista) ? lista : [] };
   const enviados = [], errores = [];
   for (const p of quien.invitar) {
-    const r = renderInvitacion({ nombre: p.nombre, correo: p.correo, ev });
+    const r = renderInvitacion({ nombre: p.nombre, correo: p.correo, ev, evento_id });
     if (r.error) { errores.push({ correo: p.correo, paso: 'render', detail: r.error }); continue; }
     // ⚠️ El desvío de modo prueba se aplica JUSTO antes del body, sobre el
     // destinatario ya resuelto — como en todos los emisores de la casa.

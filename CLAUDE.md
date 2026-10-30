@@ -188,6 +188,50 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📅⏳ **FECHA-CORREO-1 (30-oct-2026, en main local): los correos de un
+  MULTIFECHA dicen SOLO la fecha del #N — las 4 de Fuerza Regida ya no salen
+  juntas.** Palabra de Memo, citada: *«al rechazar un evento, en el correo dice
+  cuando y por ejemplo en eventos como fuerza regida que son 4 fechas le salen
+  las 4 pero solo debería de salir la fecha del día que le estamos rechazando …
+  para que no sea confuso»*. Medido: **los SEIS correos de `_lib`** (rechazo ·
+  cambio · paquete · ajuste · confirmación · invitación) pintaban `ev.f` — el
+  texto GLOBAL («11, 12, 15 y 16 ene 2027») — aunque todos tienen el
+  `evento_id` con su `#N` a la mano. `mide:fecha-correo-1` **39** (sin ancla —
+  árbol; sabotaje al dueño mordido con sha1 careado → 19 rojos con nombre →
+  restaurado byte a byte).
+  - 🔒 **`_lib/fecha-evento` es el DUEÑO** (`fechaDeEventoId(ev, eventoId)`):
+    evento multifecha + #N → la fecha de ESA entrada, estilo de la casa
+    («12 ene 2027», parseo TEXTUAL del ds — cero Date, cero huso); un pase
+    multidía conserva su etiqueta («Vie + Sáb · 2 días · desde el 20 nov
+    2026»); un **#N que la ficha no tiene → '' SIN fecha** (ley PLAN-PAGOS-1:
+    jamás las fechas de todos); sin #N o evento de UNA fecha → `ev.f` tal
+    cual. El «#N → ds» se le pregunta a `dsDeEvento` de plan-pagos, su dueño.
+  - 🔒 **El candado de PN27, cerrado por delante:** en un evento de una fecha
+    NO se deriva del `ds` — palnorte tapa su fecha con `f_texto='Por
+    confirmar'` mientras `ds` guarda 2027-03-26; derivar a lo bruto FUGARÍA la
+    fecha escondida. Careado: `palnorte#0` devuelve exacto su `f` público.
+  - **Los 6 cableos**: correo-rechazo (el que Memo vio) · correo-cambio ·
+    correo-paquete · correo-ajuste (en mudanza = la fecha del DESTINO, que es
+    el cambio) · correo-confirmacion (render gana param `evento_id`; sin él,
+    llamador viejo, sigue `ev.f` — compat careada) · invitacion-portal (ídem,
+    + admin-portal-invitar pasa el id). ⚠️ `renderPaquete` solo pinta fecha en
+    la rama ATENDIDA — la rechazada no lleva fecha, y eso es de antes, no de
+    aquí.
+  - **El careo** mide tres pisos: el dueño contra el CATÁLOGO REAL del árbol
+    (FR 4 fechas · corona combos · evento simple con #0 · palnorte) + los 3
+    renders puros ejecutados de verdad + los 3 emisores por el HECHO (red
+    falsa con el index real servido + Resend capturado: el HTML QUE SALIÓ
+    dice «12 ene 2027» y no las 4; contador con control — 3 envíos vistos, los
+    3 desviados por el guard de prueba). Control por construcción: `ev.f` de
+    FR contiene las 4. ⚠️ **Dos rojos de la primera corrida, los dos MI
+    expectativa:** renderPaquete rechazado no pinta fecha (correcto de
+    antes), y el desvío de prueba va a `reynosa@conectamexico.mx`, no al
+    correo de Memo. Vecinos verdes: rechazo-1 60 · cambio-rechazo-1 36 ·
+    confirma-1 28 · preventa-portal-1 33 · viajero-edita-1 63 · acomp-1 67 ·
+    req-b1 52 · mig-1d-ii 46.
+  - ⏳ Push de Memo → prueba humana: rechazar una requisición de fuerzaregida
+    #1 o #2 y ver que el correo dice solo esa fecha.
+
 - 📨✏️⏳ **CAMBIO-RECHAZO-1 + RECHAZO-EDITA-1 (30-oct-2026, en main local): el
   «No procede» de un cambio AVISA por correo, y el motivo de rechazo por fin se
   puede ESCRIBIR a mano.** Dos preguntas de Memo el mismo día: *«¿qué pasa

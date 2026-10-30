@@ -79,9 +79,15 @@ async function avisarCambioRechazado({ cambio, KH_URL, KH_KEY }) {
     try {
       const { fetchEventosRaw } = require('./catalogo-index');
       const EV = await fetchEventosRaw();
-      const base = String((v && v.evento_id) || cambio.evento_id || '').split('#')[0];
-      const ev = Array.isArray(EV) ? EV.find((e) => e && e.id === base) : null;
-      if (ev) { evNombre = ev.a || ev.id; evFecha = ev.f || ''; }
+      const idCompleto = String((v && v.evento_id) || cambio.evento_id || '');
+      const ev = Array.isArray(EV) ? EV.find((e) => e && e.id === idCompleto.split('#')[0]) : null;
+      if (ev) {
+        evNombre = ev.a || ev.id;
+        // [FECHA-CORREO-1] la fecha de SU #N, no el `f` global con todas las
+        // fechas del multifecha — el dueño decide (y '' si el #N no resuelve).
+        const { fechaDeEventoId } = require('./fecha-evento');
+        evFecha = fechaDeEventoId(ev, idCompleto);
+      }
     } catch (e) { /* fail-soft con el catálogo: sale sin nombre ni fecha */ }
     const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
     if (!RESEND_KEY) return Object.assign(out, { aviso: 'falta RESEND_API_KEY: avísale por WhatsApp' });

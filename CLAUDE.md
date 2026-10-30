@@ -986,8 +986,22 @@ está caduco antes de escribirse.
     careo las va a seguir nombrando cada vez — que es justo lo que debe hacer.
   - ✅ **PUSHEADO Y DESPLEGADO (29-oct):** producción corre `14ab810` (leído del
     deploy publicado de Netlify, no supuesto) — el candado ya vive arriba y el
-    «aplicar» global de Corona volvió a ser seguro. 🔴⏳ La pregunta de las 7
-    personas (día suelto vs pase de 3 días) sigue abierta y es de Memo.
+    «aplicar» global de Corona volvió a ser seguro.
+  - ✅ **LA PREGUNTA DE LOS 7 QUEDÓ CERRADA (30-oct, MUDANZA-CORONA-SABADO-1):
+    MANDA EL EXCEL — los 6 compraron el SÁBADO** (Frida ya estaba resuelta).
+    Acta `migraciones/MUDANZA-CORONA-SABADO-1.sql` (YA CORRIDA, 6/6 con valor
+    esperado en el WHERE; candados de entrada: habitación y grupo NULL, zona
+    «General» en la ficha de #1). Totales por palabra de Memo: Daniel/Magnolia/
+    Rogelio $3,900 sin cambio · Ilse y Reynaldo $8,145→$3,900 · **Alexis
+    $13,745→$9,500 ($3,900 sábado + $5,600 vuelos)**. 🔒 El dinero viajó
+    intacto (abonos careados antes/después). **Y el inventario confirmó al
+    Excel al peso:** sábado 19−22 = **−3**, exacto el «Restan −3» que su
+    pestaña declara desde EXCEL-AG-1 — la sobreventa conocida ya se ve y el
+    candado cierra la zona; el pase libera (17−10 = 7). ⚠️ Los pagados
+    Excel-vs-base (Ilse $3,457 vs $3,161 · Reynaldo $3,590 vs $3,280 · Alexis
+    «completo y pagado» vs $8,780 de $9,500 = **$720 por capturar/carear**) NO
+    se tocaron: el careo de #1 los nombra ahora que viven en su padrón y
+    Bulma/Milk capturan. El careo deja de proponerlos como altas.
 
 - 🔴✏️⏳ **VIAJERO-EDITA-1 + VIAJERO-MUDAR-1 (28-oct-2026, en main local): HOY NO
   SE PODÍA CORREGIR EL TOTAL DE NADIE — y mover de fecha era SQL de Jane.**

@@ -188,6 +188,57 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔄✅ **ACTUALIZA-KH-1 (30-oct-2026, EJECUTADO): el Palacio al día con Conecta
+  2026, Numerología, PAGOS CONECTA y el Efectivo.** Encargo de Memo: *«actualiza
+  el kamehouse con conecta 6 numerologia pagos conecta, efectivo etc para ver
+  como estamos ya terminé los reembolsos de tito doble p ya voy a empezar con
+  los de natanael»*. Cuatro tandas, todas con careo de duplicados por
+  monto+fecha(+evento) antes de escribir:
+  - **CAREO GLOBAL APLICADO** (72 eventos, vista previa primero → aplicar, por
+    `khExcelRecorrer` con la sesión de Memo en Chrome): **70 abonos ($72,132) ·
+    10 totales · 6 altas · 2 bajas por fila roja (siddharta) · 2 chatarra de
+    karolg#0 (Poniente Baja 1→0 · Poniente Alta 0→2)**. Los **14 dups** salieron
+    NOMBRADOS sin aplicarse (el candado CAREO-DUP-FECHA-1 trabajando) — y los 6
+    de Corona mudados el 30-oct **ya casan como personas**: dejaron de
+    proponerse. ⚠️ **4 altas REBOTARON por la puerta de zonas** y son captura
+    manual de Bulma/Milk: Luis padilla (corona #0, zona del Excel «General
+    Viernes» → es «General», $3,000/$3,000) · Brian Eliud Gutiérrez (#1,
+    «General Sabado» → «General», $3,900/$3,900) · Nancy Adriana Murillo
+    (karolg#0) y Jorge Miguel Esparza (karolg#1), los dos con zona «Club Seat»
+    que la ficha parte en Poniente/Oriente — falta saber cuál.
+  - **PAGOS-MATRIZ-6 (la carpeta):** 8 comprobantes nuevos del 13-oct en
+    adelante = $158,513.86. Hoteles Soy Luna $21,503.24 · Kevin Kaarl $9,655 ·
+    Tiesto/Bad Gyal $7,170 y Taemin/Aitana $12,001.62 (50/50, palabra de Memo) ·
+    kits Vaivén $200 · **autobuses Transpais $104,864 con el desglose EXACTO de
+    Memo** (karolg#0 $43,732 · karolg#1 $42,746 · omar#1 $18,386) ·
+    **Romeo Santos: abono a Matriz $13,320 + gasto gemelo FIN-1a** — palabra de
+    Memo: **aún se deben $4,560** (pedido $17,880). El hotel Vaivén del 15-oct
+    ya estaba (PAGOS-MATRIZ-5, dedup lo cazó).
+  - **EFECTIVO-2 (libro Banamex, cosechado por `admin-excel-cosechar`
+    fuente:numerologia pestaña «Efectivo» — ya no hace falta PDF):** del 13-oct
+    al 29-oct, **49 gastos $190,286** (`jane-efectivo-2`, cuenta Banamex, fecha
+    real: los pre-21-oct pesan solo en utilidad — el re-ancla del 21 ya los
+    traía en el banco— y los post-21 también en caja) **+ 23 entradas $48,409.68
+    como ingresos** (solo caja; la utilidad vive en abonos_viajero — sin esto el
+    visor de Banamex pintaba **−$4,109**, un falso). 🔒 Los 6 renglones
+    «Reembolso … tito doble p» del libro ($29,834) NO se capturaron: son los
+    MISMOS $29,834 de los 14 gastos ligados por Yamcha — careado al peso.
+    Repartos 50/50 de hoteles/vans compartidos (tiesto/badgyal · taemi/aitana)
+    con el criterio que Memo firmó hoy para los SPEI.
+  - **Reembolsos:** titodoble **CERRADO** (14 transferidos $29,834, los 14 con
+    gasto ligado + 2 traspasados a palnorte $6,100) · **natanael en cola: 57
+    pendientes · $298,638** — ojo: Banamex trae ~$44k; si salen de ahí, no
+    alcanza sin mover de BBVA.
+  - **Caja (ancla 21-oct, medida fresca):** BBVA $241,280.74 · Banamex
+    $44,301.09 · Efectivo $40,000 = **$325,582**. **Deuda de boletos:
+    $4,147,871** (Matriz $4,098,316 · Leura $24,000 · directa $23,423 · Saltillo
+    $2,132) — subió por los pedidos de FR ($819,524 las 4 fechas, 0 abonado,
+    vence ~4-ene).
+  - ⚠️ **Nombrado sin decidir:** «Hotel/Airbnb Saltillo Rodeo» ($3,470, 14-oct)
+    quedó SIN evento — no hay ficha de rodeo/Saltillo en el catálogo; «gastos
+    vuelos» $11,965 (20-oct) sin evento en el libro; «entrega de boletos»
+    $1,300 ídem. Se reasignan con palabra de Memo.
+
 - 🛏⏳ **CAPSULE-UX-2 · VJ-HAB-1 + VJ-CARD-1 + ABONO-EDITA-1 (30-oct-2026, en
   main local; la BASE ya escrita): la lista de viajeros gana HABITACIÓN
   visible/editable, card compacto con alertas clickeables, y el separo erróneo

@@ -1558,7 +1558,11 @@ ${entregables}
       let zonaAviso = null, stockAviso = null;
 
       if ('nombre' in campos) {
-        const n = _normNombre(campos.nombre);
+        // [NOMBRE-CRUDO-1] Se GUARDA como se tecleó (solo espacios colapsados).
+        // `_normNombre` es la LLAVE de comparación (minúsculas, sin acentos) y
+        // guardarla le quitaba mayúsculas y la Ñ a cada viajero que se corregía,
+        // aunque nadie tocara su nombre (caso Danna Sofia Salinas Acuña, 30-oct).
+        const n = String(campos.nombre || '').replace(/\s+/g, ' ').trim();
         if (!n || n.length < 2 || n.length > 120) return bad(headers, 'nombre inválido (2 a 120)');
         if (!igual(n, v.nombre)) { patch.nombre = n; cambios.push(`nombre «${v.nombre || ''}» → «${n}»`); }
       }

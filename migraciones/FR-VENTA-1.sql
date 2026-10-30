@@ -72,3 +72,27 @@ select coalesce(a.evento_id,p.evento_id) ev, coalesce(a.zona,p.zona) zona,
 from abiertas a full outer join pedido p using (evento_id, zona)
 order by 1, 2;
 -- Esperado: 7 renglones, todos simetria_ok = true, cantidades 30·10·4·4 / 30·10·8.
+
+-- =============================================================================
+-- FR-COSTO-1 (30-oct-2026) · EL COSTO DEL 15/16 ENTRÓ — palabra de Memo: «si»
+-- (mismo costo que el 11/12). YA CORRIÓ: 7/7 filas con WHERE costo_unitario=0
+-- como valor esperado (una fila ya con costo no se pisa; re-correr escribe 0)
+-- y nota ANEXADA. Careo fresco de salida:
+--   fuerzaregida#2 · 48 boletos · inversión $153,310.28 · sin_costo 0
+--   fuerzaregida#3 · 48 boletos · inversión $155,347.88 · sin_costo 0
+--   TOTAL 15/16    · 96 boletos · $308,658.16
+--   deuda Matriz fuerzaregida (4 fechas) = $819,524.45 en compras, 0 abonos.
+-- ⚠️ La estimación «~$276,961» del acta de arriba estaba CORTA: el número lo
+-- imprime la medición (30×3,590.01 ×2 + 20×2,936.87 + 12×2,284.86 + 4×1,775.46).
+-- =============================================================================
+update public.compras set
+  costo_unitario = case zona
+    when 'Oro' then 3590.01 when 'Cancha VIP' then 2936.87
+    when 'Butaca' then 2284.86 when 'Luneta' then 1775.46 end,
+  nota = coalesce(nota,'') || ' · [COSTO 30-oct-2026] confirmado por Memo: mismo costo que el 11/12 (patrón STOCK-CIEGO-1b)'
+where evento_id in ('fuerzaregida#2','fuerzaregida#3')
+  and costo_unitario = 0
+  and zona in ('Oro','Cancha VIP','Butaca','Luneta');
+-- Careo: select evento_id, count(*) filter (where costo_unitario=0) sin_costo,
+--   sum(cantidad*costo_unitario) inversion from compras
+--   where evento_id like 'fuerzaregida#%' group by 1;

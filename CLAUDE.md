@@ -242,10 +242,15 @@ está caduco antes de escribirse.
     req-b1 52 · capsule-comp-1 16 · paq-preventa-1 8 · portal-solo-1 89 ·
     rechazo-1 60 · acomp-1 67 · confirma-1 28.
   - ⚠️ **Lo que queda NOMBRADO sin construir, y pide palabra de Memo:**
-    (a) el **ARMADO AUTOMÁTICO del rooming** desde este acomodo — el dato ya
-    existe (hotel_tipo + grupo_viaje); armar cuartos solo pide las REGLAS
-    (¿grupos juntos siempre? ¿quién comparte una Compartida de 4? ¿separar por
-    género?) — tuerca propia con su firma; (b) el chip **«ya está en el
+    (a) el **ARMADO AUTOMÁTICO del rooming** — ✅ **REGLAS FIRMADAS por Memo
+    (30-oct, citadas):** *«los grupos siempre juntos; a menos que haya grupos
+    más extensos [que el cuarto] dejar pregunta en rooming para bulma y milk o
+    forma de editar grupos para que puedan acomodarlo; siempre separar por
+    género las Compartidas (hombres con hombres, mujeres con mujeres);
+    excepción: parejas hombre-mujer que se sepa que van juntos pero que no
+    pagaron doble»*. ⚠️ El GÉNERO no es un dato hoy (cero columnas) — la
+    tuerca ROOMING-AUTO lo trae (editable por Bulma/Milk; una inferencia por
+    nombre solo PROPONE, jamás decide). Tuerca propia, en cola; (b) el chip **«ya está en el
     Portal»** como REGISTRO con cuenta es un cruce cross-base (KH↔Portal por
     correo) en la ruta caliente de la lista — hoy el chip dice
     revisado/sin-revisar (el sello), que es lo que gobierna lo que el cliente
@@ -307,12 +312,18 @@ está caduco antes de escribirse.
     agotada» pasaban por la razón FALSA: se re-midió exigiendo el MOTIVO;
     (c) el EV compilado se evalúa con las constantes del PROPIO index
     (BANCO_*, HOTEL_*), no inventadas.
-  - ⏳ **ENCENDER = Memo publica desde Esferas** (la venta no pide push:
-    FR-PROX-1 ya está en origin y sin prox en la ficha el compilador viejo y
-    el nuevo emiten lo mismo) → verificar en el sitio: el selector ofrece
-    15/16 vivos con 4/3 zonas y Butaca/Luneta del 15 con «¡Últimos 4!».
-    🔴⏳ **Pregunta abierta de dinero:** ¿el costo del 15/16 es el mismo del
-    11/12? Con su sí, se escriben los 7 costos (deuda Matriz +~$277k).
+  - ✅ **ENCENDIDA (30-oct): Memo pusheó Y publicó** — verificado en el index
+    del publish (ccc1873, traído por su pull): `f` con las 4 fechas, #2 abre
+    Oro·CanchaVIP·Butaca·Luneta y #3 Oro·CanchaVIP·Butaca, sin prox, exacto
+    el pedido.
+    ✅ **Y EL COSTO ENTRÓ EL MISMO DÍA (FR-COSTO-1, palabra de Memo: «si» —
+    mismo costo que el 11/12).** 7/7 filas con `WHERE costo_unitario=0` como
+    valor esperado + nota anexada (registro al pie de `migraciones/
+    FR-VENTA-1.sql`). Careo fresco: `sin_costo 0` · inversión 15/16
+    **$308,658.16** (#2 $153,310.28 · #3 $155,347.88) · deuda Matriz de
+    fuerzaregida (4 fechas) **$819,524.45**, 0 abonos — entra al calendario
+    de caja ~4-ene-2027 (semana previa, regla de la casa). ⚠️ El «~$277k»
+    estimado arriba estaba CORTO: el número lo imprimió la medición.
 
 - ↻⏳ **FR-PROX-1 (29-oct-2026, en main local + base YA ESCRITA): LAS FECHAS
   DEL MULTIFECHA GANAN «PRÓXIMAMENTE» — ⚰️ y el dato «15/16 de FR en prox»

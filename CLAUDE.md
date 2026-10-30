@@ -188,6 +188,71 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🛏⚡⏳ **ROOMING-AUTO-1 + GENERO-1 (30-oct-2026, en main local): EL ROOMING SE
+  ARMA SOLO — el sistema PROPONE los cuartos con las reglas firmadas y
+  Bulma/Milk revisan, confirman géneros y aplican.** Encargo de Memo: «que
+  falta de construir para que de una vez le des» — era la tuerca nombrada en
+  CAPSULE-UX-2 con sus reglas YA firmadas (30-oct, citadas): *«los grupos
+  siempre juntos; grupos más extensos [que el cuarto] → pregunta para
+  bulma/milk; siempre separar por género las Compartidas; excepción: parejas
+  H-M que se sepa que van juntos pero que no pagaron doble»*.
+  `mide:rooming-auto-1` **66** (sin ancla — árbol; sabotaje a la separación
+  por género mordido con sha1 careado `c6f0a0a7→b3598a77` → 4 rojos con
+  nombre → restaurado byte a byte).
+  - 🔴 **LO MEDIDO ANTES, y cambió el diseño:** en los eventos que VIENEN
+    (karolg 6/7-nov · omar 6/7-nov) **CERO viajeros traen hotel_tipo,
+    grupo_viaje o habitacion_id** — su verdad vive en la NOTA de migración
+    («Hab Cuadruple · con Leila Rodríguez»: 142 con tipo · 40 con «· con »).
+    Por eso el armador DERIVA tipo y compañero de la nota cuando la columna no
+    habla, ROTULADOS con su origen — derivar no es escribir: hotel_tipo y
+    grupo_viaje no se tocan. El «con X» se resuelve con `parecido` de
+    `_lib/misma-persona` (el dueño); irresoluble → pregunta, jamás grupo
+    inventado.
+  - **GENERO-1 · la base** (acta `migraciones/GENERO-1.sql`, YA CORRIDA,
+    CHECK mordido 23514 ✓): columna `viajeros_evento.genero` CHECK ('H','M'),
+    nace VACÍA (0 de 2,860). La llenan HUMANOS: el ✏️ Corregir gana select
+    GÉNERO (`viajero_editar_full` + pantalla) y el armador trae chips
+    H/M prellenados con la inferencia por nombre **rotulada «sugerido»**
+    (borde punteado) — se guarda solo lo confirmado, por `genero_guardar`
+    (lista cerrada, tope 200, PATCH solo-genero — careado por el hecho).
+    Nombres ambiguos (Guadalupe) → null a propósito.
+  - **ROOMING-AUTO-1 · el armador:** `_lib/rooming-auto` es el dueño PURO
+    (recibe viajeros+ocupados, devuelve {cuartos, preguntas, sin_tipo,
+    fuera} — cero escrituras). Universo: `duerme()` de paquete-viaje (el
+    dueño), menos BAJAS (boletos 0 + zona null en paquete con boleto; un RIDE
+    así es normal y entra) y menos quien YA tiene cuarto. Reglas: grupos
+    (grupo_viaje + lazos de nota, union-find) SIEMPRE juntos · grupo >
+    capacidad → PREGUNTA con nombres (no se parte solo) · grupo exacto →
+    cuarto directo (un grupo lleno va junto aunque mezcle género: pagaron
+    juntos) · pareja/grupo mixto chico en Compartida → cuarto propio con
+    hueco + pregunta de completarlo (la excepción firmada) · sueltos: first-
+    fit por género SIN partir bloques (H con H, M con M — también en
+    dobles/triples sueltas: al combinar DESCONOCIDOS el lado seguro es no
+    mezclar) · sin género → cuarto PENDIENTE que NO se crea + pregunta.
+    Mapeo hotel_tipo↔cuarto: Compartida→cuadruple(4)·Doble(2)·Triple(3)·
+    Individual(1) — capacidades careadas IGUALES en lib, admin-rooming y front.
+  - **El circuito:** botón **«⚡ Armar automático»** junto a «+ Habitación»
+    (Rooming de Capsule) → `armar_propuesta` (admin-rooming, SOLO LEE —
+    careado por el hecho con control positivo del contador) → panel con los
+    cuartos, chips de género, ✕ por persona y las PREGUNTAS en amarillo →
+    «Crear N cuartos» con confirm → los géneros confirmados van por
+    `genero_guardar` y los cuartos por **los escritores de SIEMPRE**
+    (khRooming.crear + khViajeros.habitacion — cero segundo camino; el campo
+    es `hab`, la lección de VJ-5 ya aplicada). Cuartos pendientes no se crean.
+  - **El careo** mide el dueño con fixture que ejercita CADA regla (grupo
+    exacto · grupo de 5 · pareja H-M · «con X» resuelto e irresoluble ·
+    sueltos sin mezclar género · bloque no partido · baja/cheap/ya-asignado
+    fuera con motivo) + los DOS handlers reales con red falsa (armar_propuesta
+    0 escrituras · genero_guardar solo-genero · editar_full genero
+    guarda/rebota/quita) + la pantalla real (vm: _vjEditarGuardar manda
+    genero; roomingAutoAplicar reusa los dueños). ⚠️ Un rojo de la primera
+    corrida era MI expectativa (`_vjEditarAbrir` no es async). Vecinos
+    verdes: viajero-edita-1 63 · capsule-ux-2 46 · capsule-ux-1 67 ·
+    req-b1 52 · portal-solo-1 89 · ticket-circuito-1 32 · plan-pagos-1 81.
+  - ⏳ Push de Memo → prueba humana de Bulma/Milk: abrir Rooming de karolg#0,
+    «⚡ Armar automático», confirmar los chips de género, aplicar — y
+    reacomodar a mano lo que las preguntas nombren.
+
 - 🎤⏳ **OMAR-ACTIVA-1 (30-oct-2026, base YA ESCRITA — el encendido es ESFERAS
   + publish de Memo): Omar Courtz listo para REACTIVAR, con el Excel y el
   Palacio cuadrados AL PESO.** Encargo de Memo: «hay nuevos boletos y zonas

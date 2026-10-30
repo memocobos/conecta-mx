@@ -1228,6 +1228,10 @@ const khRooming = {
   crear(body) { return this._call(Object.assign({ accion: 'crear' }, body || {})); },
   actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+  // [ROOMING-AUTO-1] La propuesta del armador (solo lee) y el guardado de los
+  // géneros que el humano CONFIRMÓ en los chips.
+  armar(eventoId) { return this._call({ accion: 'armar_propuesta', evento_id: eventoId }); },
+  generoGuardar(cambios) { return this._call({ accion: 'genero_guardar', cambios }); },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -6677,6 +6681,8 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)">LUGARES<br><input class="cot-input" id="vjx-b-${e}" type="number" min="1" max="20" step="1" value="${Number(v.boletos) || 1}" style="width:70px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[VJ-HAB-1] El tipo de habitación que eligió — de aquí se arma el rooming. Solo PLUS/STAY/RIDE duermen; en CHEAP déjalo vacío.">HABITACIÓN<br><select class="cot-input" id="vjx-h-${e}">
         ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
+      <label style="font-size:10px;color:var(--ts)" title="[GENERO-1] El insumo de las Compartidas del rooming (H con H, M con M — regla firmada). Vacío = no se sabe.">GÉNERO<br><select class="cot-input" id="vjx-g-${e}" style="width:70px">
+        ${[['', '—'], ['M', 'M'], ['H', 'H']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)">PAGADO ANTES<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px"></label>
       <button class="btn btn-primary btn-sm" id="vjx-b2-${e}" onclick="_vjEditarGuardar('${_attrJs(id)}')">Guardar corrección</button>
@@ -6702,6 +6708,7 @@ async function _vjEditarGuardar(id) {
     zona_boleto: String(g('z').value || '').trim(),
     boletos: Number(g('b').value),
     hotel_tipo: String(g('h').value || ''),   // [VJ-HAB-1] '' = quitarla
+    genero: String(g('g').value || ''),       // [GENERO-1] '' = quitarlo
 
     // Vacío viaja como null: «sin capturar» y «$0» son cosas distintas y el
     // servidor las distingue (un total vacío se rechaza, un pagado-antes vacío
@@ -7460,8 +7467,139 @@ async function eliminarHabitacion(id) {
   catch(e) { alert(e.message); }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [ROOMING-AUTO-1] ⚡ ARMAR AUTOMÁTICO — el servidor PROPONE cuartos (reglas
+// firmadas por Memo 30-oct: grupos juntos · Compartidas por género · excepción
+// parejas · lo que no cabe es PREGUNTA) y aquí Bulma/Milk revisan, confirman
+// géneros con chips y APLICAN. Nada se escribe hasta su clic, y el aplicar
+// reusa los escritores de SIEMPRE: khRooming.crear + khViajeros.habitacion —
+// cero segundo camino de escritura.
+// ═══════════════════════════════════════════════════════════════════════════
+let _raProp = null;          // la propuesta viva (del servidor, mutada por los ✕/chips)
 
+function _raPanelDiv() {
+  let d = document.getElementById('ra-panel');
+  if (!d) {
+    const list = document.getElementById('cc-rooming-list');
+    if (!list) return null;
+    d = document.createElement('div');
+    d.id = 'ra-panel';
+    list.parentNode.insertBefore(d, list);
+  }
+  return d;
+}
 
+async function roomingAutoArmar() {
+  const d = _raPanelDiv();
+  if (!d || !_ccEventoActual) return;
+  d.innerHTML = '<div style="padding:10px;color:var(--ts);font-size:12px">⚡ Armando propuesta…</div>';
+  try {
+    const j = await khRooming.armar(_ccEventoActual); // [sec-sensibles] solo LEE
+    _raProp = j;
+    _raPintar();
+  } catch (e) { d.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message)}</div>`; }
+}
+
+function _raPintar() {
+  const d = _raPanelDiv();
+  if (!d || !_raProp) return;
+  const p = _raProp;
+  const cuartos = (p.cuartos || []).filter((c) => (c.ocupantes || []).length);
+  const chipG = (o, ci, oi) => {
+    const sug = o.genero_origen === 'sugerido';
+    return `<select class="cot-input" style="width:52px;padding:2px 4px;font-size:11px;${sug ? 'border:1px dashed var(--yellow)' : ''}"
+      title="${sug ? 'Género SUGERIDO por el nombre — confírmalo o corrígelo' : (o.genero_origen === 'dato' ? 'Género capturado' : 'Sin género: elígelo')}"
+      onchange="_raGenero(${ci},${oi},this.value)">
+      ${[['', '—'], ['M', 'M'], ['H', 'H']].map(([v, et]) => `<option value="${v}"${(o.genero || '') === v ? ' selected' : ''}>${et}${v && sug ? '?' : ''}</option>`).join('')}
+    </select>`;
+  };
+  const html = `
+    <div style="background:var(--bg2);border:1px solid var(--yellow);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-family:'Zen Dots',sans-serif;font-size:13px">⚡ PROPUESTA DE ROOMING</span>
+        <span style="font-size:11px;color:var(--ts)">${cuartos.filter((c) => !c.pendiente).length} cuartos listos · nada se crea hasta que aprietes Aplicar</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ra-panel').innerHTML='';_raProp=null">✕ Descartar</button>
+        <button class="btn btn-primary btn-sm" id="ra-aplicar" onclick="roomingAutoAplicar()">Crear ${cuartos.filter((c) => !c.pendiente).length} cuartos</button>
+      </div>
+      ${(p.preguntas || []).length ? `<div style="border:1px dashed var(--yellow);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px">
+        <b style="color:var(--yellow)">⚠️ Para ti (no se arma solo):</b>
+        ${p.preguntas.map((q) => `<div style="margin-top:4px">· ${_esfEsc(q)}</div>`).join('')}</div>` : ''}
+      ${cuartos.map((c, ci) => `
+        <div style="border:1px solid var(--border);${c.pendiente ? 'border-style:dashed;opacity:.75;' : ''}border-radius:8px;padding:8px 12px;margin-bottom:6px">
+          <div style="font-size:11px;color:var(--ts);margin-bottom:4px"><b style="color:var(--text)">${_esfEsc(TIPO_LABELS[c.tipo] || c.tipo)}</b> · ${_esfEsc(c.etiqueta || '')}${c.pendiente ? ' · <b style="color:var(--yellow)">NO se crea así</b>' : ''}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${(c.ocupantes || []).map((o, oi) => `
+              <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-size:12px">
+                ${_esfEsc(o.nombre)}
+                ${o.tipo_origen === 'nota' ? '<span style="font-size:9px;color:var(--ts)" title="El tipo de cuarto salió de su nota de migración">nota</span>' : ''}
+                ${chipG(o, ci, oi)}
+                <button type="button" style="background:none;border:none;color:var(--ts);cursor:pointer" title="Sacarlo de la propuesta (lo acomodas a mano después)" onclick="_raQuitar(${ci},${oi})">✕</button>
+              </span>`).join('')}
+          </div>
+        </div>`).join('')}
+      ${(p.sin_tipo || []).length ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">🛏 Sin tipo de habitación en ningún lado (se completan con ✏️ Corregir): ${p.sin_tipo.map(_esfEsc).join(' · ')}</div>` : ''}
+      <details style="margin-top:6px"><summary style="font-size:11px;color:var(--ts);cursor:pointer">Quedaron fuera (${(p.fuera || []).length}) — con su motivo</summary>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px">${(p.fuera || []).map((f) => `${_esfEsc(f.nombre)} <i>(${_esfEsc(f.motivo)})</i>`).join(' · ') || '—'}</div>
+      </details>
+    </div>`;
+  d.innerHTML = html;
+}
+
+function _raGenero(ci, oi, val) {
+  const o = _raProp?.cuartos?.[ci]?.ocupantes?.[oi];
+  if (!o) return;
+  o.genero = val || null;
+  o.genero_origen = val ? 'confirmado' : null;  // lo tocó un humano: ya es dato
+  o._tocado = true;
+}
+
+function _raQuitar(ci, oi) {
+  const c = _raProp?.cuartos?.[ci];
+  if (!c) return;
+  c.ocupantes.splice(oi, 1);
+  _raPintar();
+}
+
+async function roomingAutoAplicar() {
+  if (!_raProp || !_ccEventoActual) return;
+  const btn = document.getElementById('ra-aplicar');
+  const cuartos = (_raProp.cuartos || []).filter((c) => !c.pendiente && (c.ocupantes || []).length);
+  if (!cuartos.length) { alert('No hay cuartos listos que crear.'); return; }
+  if (!confirm(`Se van a crear ${cuartos.length} cuartos con ${cuartos.reduce((s, c) => s + c.ocupantes.length, 0)} personas. ¿Aplicar la propuesta?`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+  try {
+    // 1 · Géneros CONFIRMADOS por el humano (chips tocados o sugeridos que dejó
+    // puestos al aplicar — aplicar ES la confirmación, con el chip enfrente).
+    const cambios = [];
+    for (const c of (_raProp.cuartos || [])) for (const o of (c.ocupantes || [])) {
+      if (o.genero && o.genero_origen !== 'dato') cambios.push({ id: o.id, genero: o.genero });
+    }
+    if (cambios.length) { try { await khRooming.generoGuardar(cambios); } catch (e) { console.warn('[RA] géneros:', e.message); } }
+    // 2 · Los cuartos, por los escritores de SIEMPRE.
+    let orden = (_ccHabitaciones || []).length;
+    let creados = 0; const errores = [];
+    for (const c of cuartos) {
+      orden += 1;
+      try {
+        const creado = await khRooming.crear({
+          evento_id: _ccEventoActual, tipo: c.tipo, orden, numero_hab: String(orden),
+          ocupantes: JSON.stringify(c.ocupantes.map((o) => o.nombre)),
+          hotel_nombre: _ccHotelInfo?.nombre || null, hotel_direccion: _ccHotelInfo?.direccion || null,
+          incluye_desayuno: _ccHotelInfo?.incluye_desayuno || false,
+        });
+        const habId = creado && creado.hab?.id; // el campo es `hab` (la lección de VJ-5/CAP-FIX-1)
+        if (habId) for (const o of c.ocupantes) { try { await khViajeros.habitacion(o.id, habId); } catch (e) { console.warn('[RA]', e.message); } }
+        creados++;
+      } catch (e) { errores.push(`cuarto ${orden} (${c.tipo}): ${e.message}`); }
+    }
+    showToast(`Rooming: ${creados} cuartos creados${errores.length ? ' · ' + errores.length + ' fallaron' : ''}`, errores.length ? 'error' : 'success');
+    if (errores.length) alert('Fallaron:\n' + errores.join('\n'));
+    const panel = document.getElementById('ra-panel'); if (panel) panel.innerHTML = '';
+    _raProp = null;
+    await loadRooming();
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Aplicar'; } }
+}
 
 
 let _reportesFiltroActual = 'todos';

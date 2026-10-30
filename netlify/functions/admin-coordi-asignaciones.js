@@ -196,7 +196,7 @@ const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 // de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
 // [VJ-HAB-1] hotel_tipo viaja a la lista: es el tipo de habitación elegido
 // (Compartida/Doble/Triple/Individual) — ni dinero ni PII nueva.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,hotel_tipo,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,hotel_tipo,genero,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -1543,11 +1543,11 @@ ${entregables}
       if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
       const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
       if (!campos) return bad(headers, 'campos inválido');
-      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo', 'hotel_tipo'];
+      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo', 'hotel_tipo', 'genero'];
       const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
       if (ajenos.length) return bad(headers, 'campo no editable aquí: ' + ajenos.join(', ') + ' (el contacto va por «Editar datos»; el evento, por «Mover de fecha»)');
 
-      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,hotel_tipo,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,hotel_tipo,genero,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
       if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
       const v = (await pre.json())[0];
       if (!v) return bad(headers, 'ese viajero no existe');
@@ -1607,6 +1607,14 @@ ${entregables}
         if (crudo && !h) return bad(headers, 'habitación inválida: ' + HOTELES.join(', ') + ' (o vacío para quitarla)');
         if (h && !duerme(paqFinal)) return bad(headers, motivoNoDuerme(paqFinal));
         if (!igual(h, v.hotel_tipo)) { patch.hotel_tipo = h; cambios.push(`habitación ${v.hotel_tipo || '—'} → ${h || '—'}`); }
+      }
+      // [GENERO-1] El género — lista cerrada H/M, vacío lo QUITA. Es el insumo
+      // de las Compartidas del rooming (regla firmada 30-oct: H con H, M con M).
+      if ('genero' in campos) {
+        const crudo = String(campos.genero || '').trim().toUpperCase();
+        const g = crudo === 'H' || crudo === 'M' ? crudo : (crudo ? undefined : null);
+        if (g === undefined) return bad(headers, 'género inválido: H, M o vacío');
+        if (!igual(g, v.genero)) { patch.genero = g; cambios.push(`género ${v.genero || '—'} → ${g || '—'}`); }
       }
       for (const k of ['total_contrato', 'abonado_previo']) {
         if (!(k in campos)) continue;

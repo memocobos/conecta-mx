@@ -26,7 +26,10 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 const SLUG_RE = /^[a-zA-Z0-9_#-]{1,80}$/; // [CC-FECHAS-1] acepta slug#idx (una fecha de un multifecha)
 const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 
-const ACCIONES = { listar: ROLES, crear: ROLES, actualizar: ROLES, eliminar: ROLES };
+// [ROOMING-AUTO-1] armar_propuesta SOLO LEE (viajeros + cuartos → propuesta);
+// genero_guardar escribe únicamente la columna `genero` (H/M/null, GENERO-1) —
+// lo que el humano CONFIRMÓ en los chips, jamás la inferencia sola.
+const ACCIONES = { listar: ROLES, crear: ROLES, actualizar: ROLES, eliminar: ROLES, armar_propuesta: ROLES, genero_guardar: ROLES };
 
 // [CAP-FIX-1] LA COLUMNA POR LA QUE SE LLAVEA ES `evento_slug`, NO `evento_id`.
 //
@@ -185,6 +188,54 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó el delete', detail }) };
       }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    // ── [ROOMING-AUTO-1] La PROPUESTA: viajeros + cuartos → el armador puro.
+    // Cero escrituras: el dueño (_lib/rooming-auto) propone y la pantalla aplica
+    // con los escritores de SIEMPRE (crear + viajero_habitacion) tras revisión.
+    if (accion === 'armar_propuesta') {
+      const eventoId = String(body.evento_id || '').trim();
+      if (!SLUG_RE.test(eventoId)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'evento_id inválido' }) };
+      }
+      const { armarPropuesta } = require('./_lib/rooming-auto');
+      const baseVE = `${env.KH_SB_URL}/rest/v1/viajeros_evento`;
+      const [rV, rH] = await Promise.all([
+        fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,nombre,tipo_paquete,boletos,zona_boleto,hotel_tipo,genero,grupo_viaje,habitacion_id,notas&limit=1000`, { headers: sbHeaders }),
+        fetch(`${base}?evento_slug=eq.${encodeURIComponent(eventoId)}&select=id,ocupantes`, { headers: sbHeaders }),
+      ]);
+      if (!rV.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta de viajeros', detail: await rV.text() }) };
+      if (!rH.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta de cuartos', detail: await rH.text() }) };
+      const viajeros = await rV.json();
+      const habs = await rH.json();
+      const ocupadosNombres = new Set(
+        (Array.isArray(habs) ? habs : []).flatMap((h) => parseOcupantes(h.ocupantes) || []).filter((n) => n && n !== 'Chofer')
+      );
+      const prop = armarPropuesta({ viajeros, ocupadosNombres });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_id: eventoId, ...prop }) };
+    }
+
+    // ── [GENERO-1] Guardar géneros CONFIRMADOS por el humano en los chips.
+    // Lista cerrada H/M/null; tope 200 por clic; solo la columna genero.
+    if (accion === 'genero_guardar') {
+      const cambios = Array.isArray(body.cambios) ? body.cambios : null;
+      if (!cambios || !cambios.length) return { statusCode: 400, headers, body: JSON.stringify({ error: 'cambios vacío' }) };
+      if (cambios.length > 200) return { statusCode: 400, headers, body: JSON.stringify({ error: 'máximo 200 por clic' }) };
+      const baseVE = `${env.KH_SB_URL}/rest/v1/viajeros_evento`;
+      let ok = 0; const errores = [];
+      for (const c of cambios) {
+        const id = String(c.id || '').trim();
+        const g = c.genero == null || c.genero === '' ? null : String(c.genero).trim().toUpperCase();
+        if (!UUID_RE.test(id)) { errores.push(`id inválido: ${id.slice(0, 12)}`); continue; }
+        if (g !== null && g !== 'H' && g !== 'M') { errores.push(`género inválido para ${id.slice(0, 8)}: ${g}`); continue; }
+        const r = await fetch(`${baseVE}?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ genero: g }),
+        });
+        if (r.ok) ok++; else errores.push(`${id.slice(0, 8)}: ${(await r.text()).slice(0, 80)}`);
+      }
+      return { statusCode: errores.length && !ok ? 502 : 200, headers, body: JSON.stringify({ ok: true, guardados: ok, errores }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };

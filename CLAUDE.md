@@ -188,6 +188,42 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎤⏳ **OMAR-ACTIVA-1 (30-oct-2026, base YA ESCRITA — el encendido es ESFERAS
+  + publish de Memo): Omar Courtz listo para REACTIVAR, con el Excel y el
+  Palacio cuadrados AL PESO.** Encargo de Memo: «hay nuevos boletos y zonas
+  disponibles para ver si activamos omar courtz», y sus respuestas zona por
+  zona cerraron los tres desniveles. Acta `migraciones/OMAR-ACTIVA-1.sql`
+  (registro: YA CORRIÓ con valor esperado en cada WHERE).
+  - **Lo nuevo:** el Excel subió el pedido de **Beyond Pit 7-nov de 20 a 27**
+    (+7 boletos, mismo costo $2,327 — palabra de Memo — = $16,289 más de deuda
+    a Matriz). Compra cargada por INSERT…SELECT de la existente.
+  - 🔴 **Los «errores» que Memo preguntó eran TRES personas con fila en la
+    FECHA EQUIVOCADA** (la familia de Corona), cazadas careando nombre por
+    nombre contra las DOS pestañas cosechadas frescas:
+    **Paolette** (el Excel: 2 Platino en el 6-nov, 0 en el 7 — su fila de #1
+    se MUDÓ a #0; ⚠️ sus pagos traen $8,666 en CADA fila, idéntico: careo vs
+    libro PENDIENTE) · **oscar jared** y **Ana Cristina Romero** (el Excel
+    solo los trae en el 7-nov, liquidados; sus filas del 6-nov eran duplicado
+    con el MISMO contrato → boletos 0, zona NULL, dinero INTACTO pendiente de
+    careo) · **Reyna Luz Prado** (desapareció de las dos pestañas → boletos
+    retirados POR AHORA, dinero $2,550 y contrato intactos — ⏳ **pendiente
+    investigar**, palabra de Memo; NO se aplicó saldo-0: no es cancelación
+    confirmada).
+  - ✅ **Careo de salida al peso contra el Excel**: #0 BeyondPit 0 · Platino 1
+    · PlatinoB 1 · Perfil 0 · PerfilC 0; #1 BeyondPit 3 · PlatinoB 2 ·
+    Platino 0. ⚠️ Único desnivel: **Perfil #1 KH 1 libre vs Excel 0** (1 venta
+    por casar) — la zona está agotada en ficha, no muerde.
+  - ⚠️ **DOS TRAMPAS NOMBRADAS:** (a) el careo de omar#1 propone el alta
+    «Anahí Álvarez Báez» — **ES DUPLICADO de «Álvarez Báez Anahí»** (migrada
+    30-ago, nombre INVERTIDO: el dedup por nombre normalizado no lo ve). **NO
+    aplicarla.** (b) 3 abonos del careo sin aplicar (Rosie $775 · Esmeralda
+    $1,100 · Miroslava $2,050) — van por careo/➕ Abono de Bulma/Milk.
+  - ⏳ **ENCENDER = Memo en Esferas:** quitar `st:'agotado'` de omar · 6-nov:
+    reabrir Platino (1) y Platino B si quiere (1) + 🔴 **AGOTAR Perfil C**
+    (está ABIERTA en ficha con restan 0 — ganadoras de la promo de Yami) ·
+    7-nov: reabrir Beyond Pit (3; Platino B ya abierta) · publish. Con pedido
+    + ag_activa el Palacio gobierna chips y cierres solo.
+
 - 🎫⏳ **TICKET-CIRCUITO · REQ-LINK-1 + ABONO-FOTO-2 + PORTAL-TICKET-1
   (30-oct-2026, en main local): el circuito del ticket se cierra por las tres
   puertas — y el aprobar ya no inventa dinero.** Nació del CASO DANIELA

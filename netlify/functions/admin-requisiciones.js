@@ -168,10 +168,18 @@ exports.handler = async (event) => {
     if (!rows.length) return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la cerró' });
     // [PREVENTA-PORTAL-2] La respuesta a «Elegir mi paquete» va por CORREO (palabra
     // de Memo). Sale DESPUÉS de cerrar y jamás tumba el cierre: si falla, se DICE.
+    // [CAMBIO-RECHAZO-1] Y el «No procede» de los DEMÁS tipos (hotel/zona/fecha/
+    // otro/pago) también avisa: medido el 30-oct, el motivo que tecleaba el equipo
+    // moría en la columna `respuesta` sin que el cliente se enterara jamás —
+    // el mismo hueco que RECHAZO-AVISO-1 cerró en requisiciones. Solo el RECHAZO
+    // manda correo aquí: lo atendido se ve en su plan (y el paquete tiene el suyo).
     let correo = null;
     if (rows[0].tipo === 'paquete') {
       const { avisarPaquete } = require('./_lib/correo-paquete');
       correo = await avisarPaquete({ cambio: rows[0], KH_URL: SB_URL, KH_KEY: SB_KEY });
+    } else if (nuevo === 'rechazada') {
+      const { avisarCambioRechazado } = require('./_lib/correo-cambio');
+      correo = await avisarCambioRechazado({ cambio: rows[0], KH_URL: SB_URL, KH_KEY: SB_KEY });
     }
     return j(200, headers, { ok: true, cambio: rows[0], correo });
   }

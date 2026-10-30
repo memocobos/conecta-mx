@@ -253,7 +253,7 @@ function _reqCambioCerrar(id, estado) {
   const no = estado === 'rechazada';
   const esPaq = ((_reqCambiosRows || []).find((x) => x.id === id) || {}).tipo === 'paquete';
   box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
-    <label class="rq-field">${no ? (esPaq ? '¿Por qué no procede? (le llega TAL CUAL por correo y en su Portal) *' : '¿Por qué no procede? (el cliente lo va a preguntar) *') : 'Nota opcional: qué se cambió'}
+    <label class="rq-field">${no ? ('¿Por qué no procede? (le llega TAL CUAL por correo' + (esPaq ? ' y en su Portal' : '') + ') *') : 'Nota opcional: qué se cambió'}
       <input type="text" id="rq-cambio-txt-${id}" maxlength="300" placeholder="${no ? 'Ej. ya no hay habitaciones dobles' : 'Ej. pasó a habitación doble'}"></label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="rq-btn ${no ? 'dan full' : 'pri'}" id="rq-cambio-go-${id}" onclick="_reqCambioCerrarGo('${id}','${estado}')">${no ? 'Cerrar como «no procede»' : 'Cerrar como atendida'}</button>
@@ -518,6 +518,10 @@ async function _reqBdjArchivarPrueba(id, folio, estado) {
 //    que es su dueño. Dos listas acabarían diciendo cosas distintas, y ésta es
 //    la que el cliente lee.
 const _reqMotivos = {};   // id → [motivos]  (lo que contestó el servidor)
+// [RECHAZO-EDITA-1] La clave del chip elegido vive AQUÍ, no en el DOM: leerla
+// del `.rq-chip.on` por su texto era frágil y obligaba a repintar los chips
+// para recordarla — y ese repintado era el que borraba el mensaje manual.
+const _reqClaveSel = {};  // id → clave elegida (null = ninguna / texto manual)
 function _reqBdjRechazar(id) {
   const box = document.getElementById('req-rch-' + id);
   if (!box) return;
@@ -525,6 +529,7 @@ function _reqBdjRechazar(id) {
   const apr = document.getElementById('req-apr-' + id); if (apr) apr.style.display = 'none';
   box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Abriendo…</div>';
   box.style.display = 'block';
+  _reqClaveSel[id] = null;
   _reqBdjRchPintar(id, null);
 }
 async function _reqBdjRchPintar(id, clave) {
@@ -539,28 +544,17 @@ async function _reqBdjRchPintar(id, clave) {
   }
   _reqMotivos[id] = j.motivos || [];
   const sel = (j.motivos || []).find((m) => m.clave === clave) || null;
-  // Al elegir un motivo se PRELLENA su texto; si ya había algo escrito a mano
-  // se respeta. 🔒 Lo que viaja es el textarea, nunca la plantilla.
-  const texto = txtPrevio != null && txtPrevio !== '' && clave === null ? txtPrevio : (sel ? sel.texto : (txtPrevio || ''));
+  // [RECHAZO-EDITA-1] LO TECLEADO MANDA, SIEMPRE. La versión vieja decía «si hay
+  // chip elegido → el texto de la plantilla», así que el repintado de los 700 ms
+  // REVERTÍA el mensaje personal de Memo a la plantilla — el comentario prometía
+  // respetar lo escrito a mano y el código no lo hacía. El prellenado del chip
+  // sigue existiendo, pero vive en _reqBdjRchElegir (que pone el texto ANTES de
+  // llegar aquí): este render jamás decide pisar al humano.
+  const texto = (txtPrevio != null && txtPrevio !== '') ? txtPrevio : (sel ? sel.texto : '');
   const chips = (j.motivos || []).map((m) => `<button type="button" class="rq-chip${m.clave === clave ? ' on' : ''}"`
     + ` style="${m.clave === clave ? 'background:var(--red);color:#fff;border-color:var(--red)' : ''}"`
     + ` onclick="_reqBdjRchElegir('${id}','${m.clave}')">${_reqBdjEsc(m.etiqueta)}</button>`).join('');
-  const p = j.preview || {};
-  let previa;
-  if (!p.avisa) {
-    previa = `<div class="rq-note" style="border-left:3px solid var(--ts)">💬 <b>Este motivo no manda correo.</b> ${_reqBdjEsc(p.razon || '')}</div>`;
-  } else if (p.error) {
-    previa = `<div class="rq-note no">⚠️ <b>No se le puede mandar correo:</b> ${_reqBdjEsc(p.razon)}.`
-      + (j.wa ? ` <a href="${_reqBdjEsc(j.wa)}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avísale por WhatsApp →</a>` : '')
-      + '</div>';
-  } else {
-    previa = `<details open style="margin-top:10px">
-        <summary style="cursor:pointer;color:#e8ff4c;font-weight:700;font-size:12px">👁 Así le va a llegar — para: ${_reqBdjEsc(p.to)}</summary>
-        <div style="font-size:11px;color:var(--ts);margin:6px 0 4px">Asunto: <b style="color:var(--text)">${_reqBdjEsc(p.subject)}</b></div>
-        <iframe srcdoc="${_reqBdjEsc(p.html)}" style="width:100%;height:380px;border:1px solid var(--border);border-radius:8px;background:#000"></iframe>
-        ${p.catalogo_ok === false ? '<div style="font-size:11px;color:#ffb020;margin-top:4px">No se pudo leer el catálogo: el correo sale sin la fecha ni el link del evento. Se manda igual.</div>' : ''}
-      </details>`;
-  }
+  const previa = _reqBdjRchPreviaHtml(j);
   // [RECHAZO-AVISO-1b] El aviso se calla si esta persona YA viaja: decirle «no
   // pudimos confirmar tu lugar» a quien lo tiene es asustarla sin razón. Pasó
   // con una clienta el 28-oct, y la causa NO fue el envío a mano: aprobar la
@@ -571,6 +565,7 @@ async function _reqBdjRchPintar(id, clave) {
     : (ya.comprobado === false
       ? `<div class="rq-note" style="border-left:3px solid #ffb020">⚠️ No se pudo revisar si ya viaja (${_reqBdjEsc(ya.razon || 'el padrón no respondió')}). El correo SÍ sale — revisa que no tenga ya su lugar en otra fecha.</div>`
       : '');
+  const p = j.preview || {};
   const puedeAvisar = !!(p.avisa && !p.error && !ya.viaja);
   box.innerHTML = `
     <h4 style="color:var(--red)">Rechazar la solicitud</h4>
@@ -581,34 +576,79 @@ async function _reqBdjRchPintar(id, clave) {
         oninput="_reqBdjRchRefrescar('${id}')" style="width:100%;box-sizing:border-box;resize:vertical">${_reqBdjEsc(texto)}</textarea></label>
     ${avisoYaViaja}
     ${j.pago && !ya.viaja ? '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>' : ''}
-    ${ya.viaja ? '' : previa}
+    <div id="req-rch-prev-${id}">${ya.viaja ? '' : previa}</div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="rq-btn dan full" id="req-rch-go-${id}" onclick="_reqBdjRechazarGo('${id}')">${puedeAvisar ? 'Rechazar y avisar' : 'Rechazar (sin correo)'}</button>
       <button class="rq-btn quiet" onclick="document.getElementById('req-rch-${id}').style.display='none'">Cancelar</button>
     </div>
     <div id="req-rch-msg-${id}" class="rq-msg"></div>`;
 }
+// [RECHAZO-EDITA-1] El HTML de la vista previa tiene UN dueño: lo piden el
+// render completo (abrir / tocar un chip) y el refresco de tecleo. Dos copias
+// habrían sido dos listas que todavía no divergen.
+function _reqBdjRchPreviaHtml(j) {
+  const p = j.preview || {};
+  if (!p.avisa) {
+    return `<div class="rq-note" style="border-left:3px solid var(--ts)">💬 <b>Este motivo no manda correo.</b> ${_reqBdjEsc(p.razon || '')}</div>`;
+  }
+  if (p.error) {
+    return `<div class="rq-note no">⚠️ <b>No se le puede mandar correo:</b> ${_reqBdjEsc(p.razon)}.`
+      + (j.wa ? ` <a href="${_reqBdjEsc(j.wa)}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avísale por WhatsApp →</a>` : '')
+      + '</div>';
+  }
+  return `<details open style="margin-top:10px">
+      <summary style="cursor:pointer;color:#e8ff4c;font-weight:700;font-size:12px">👁 Así le va a llegar — para: ${_reqBdjEsc(p.to)}</summary>
+      <div style="font-size:11px;color:var(--ts);margin:6px 0 4px">Asunto: <b style="color:var(--text)">${_reqBdjEsc(p.subject)}</b></div>
+      <iframe srcdoc="${_reqBdjEsc(p.html)}" style="width:100%;height:380px;border:1px solid var(--border);border-radius:8px;background:#000"></iframe>
+      ${p.catalogo_ok === false ? '<div style="font-size:11px;color:#ffb020;margin-top:4px">No se pudo leer el catálogo: el correo sale sin la fecha ni el link del evento. Se manda igual.</div>' : ''}
+    </details>`;
+}
 function _reqBdjRchElegir(id, clave) {
+  _reqClaveSel[id] = clave;
   const t = document.getElementById('req-rch-txt-' + id);
   const m = (_reqMotivos[id] || []).find((x) => x.clave === clave);
-  if (t && m) t.value = m.texto;          // prellena; sigue siendo editable
+  // Tocar un chip PRELLENA su plantilla a propósito (es el gesto de «dame el
+  // texto de la casa»); de ahí en adelante lo tecleado manda y nadie lo pisa.
+  if (t && m) t.value = m.texto;
   _reqBdjRchPintar(id, clave);
 }
 // Mientras teclea no se le pide al servidor en cada letra: se espera a que pare.
 let _reqRchTimer = null;
 function _reqBdjRchRefrescar(id) {
   clearTimeout(_reqRchTimer);
-  const clave = ((_reqMotivos[id] || []).find((m) => {
-    const b = document.querySelector('#req-rch-' + id + ' .rq-chip.on'); return b && b.textContent.trim() === m.etiqueta;
-  }) || {}).clave || null;
-  _reqRchTimer = setTimeout(() => _reqBdjRchPintar(id, clave), 700);
+  _reqRchTimer = setTimeout(() => _reqBdjRchPreview(id), 700);
+}
+// [RECHAZO-EDITA-1] El refresco de tecleo actualiza SOLO la vista previa.
+// La versión vieja repintaba el box ENTERO (_reqBdjRchPintar) a los 700 ms:
+// destruía el textarea a media frase (el foco se iba) y, con chip elegido,
+// re-decidía el texto desde la plantilla — el mensaje personal de Memo se
+// borraba solo. La familia de «una bandera sobre un nodo que se repinta»
+// (PS-EVENTOS-1), cara de textarea.
+async function _reqBdjRchPreview(id) {
+  const prev = document.getElementById('req-rch-prev-' + id);
+  const t = document.getElementById('req-rch-txt-' + id);
+  if (!prev || !t) return;
+  const texto = t.value || '';
+  const clave = _reqClaveSel[id] || null;
+  const j = await _reqBdjCall({ accion: 'rechazo_preview', id, motivo_clave: clave, motivo: texto })
+    .catch(() => null);
+  // Falló la previa → se queda la anterior; lo que VIAJA al rechazar es el
+  // textarea, nunca la vista previa, así que no se pierde nada.
+  if (!j || !j.ok) return;
+  // Carrera: si siguió tecleando mientras el servidor contestaba, esta previa
+  // ya habla de un texto viejo — la pasada que viene pinta la buena.
+  const t2 = document.getElementById('req-rch-txt-' + id);
+  if (!t2 || (t2.value || '') !== texto) return;
+  if (Array.isArray(j.motivos) && j.motivos.length) _reqMotivos[id] = j.motivos;
+  const ya = j.ya_viaja || {};
+  prev.innerHTML = ya.viaja ? '' : _reqBdjRchPreviaHtml(j);
 }
 async function _reqBdjRechazarGo(id) {
   const motivo = ((document.getElementById('req-rch-txt-' + id) || {}).value || '').trim();
   const msg = document.getElementById('req-rch-msg-' + id);
   if (motivo.length < 3) { if (msg) { msg.textContent = 'Escribe qué va a leer el cliente.'; msg.style.color = 'var(--red)'; } return; }
-  const chipOn = document.querySelector('#req-rch-' + id + ' .rq-chip.on');
-  const clave = chipOn ? ((_reqMotivos[id] || []).find((m) => m.etiqueta === chipOn.textContent.trim()) || {}).clave || null : null;
+  // [RECHAZO-EDITA-1] La clave sale del store, no de leer el chip por su texto.
+  const clave = _reqClaveSel[id] || null;
   const btn = document.getElementById('req-rch-go-' + id); if (btn) { btn.disabled = true; btn.textContent = 'Rechazando…'; }
   const j = await _reqBdjCall({ accion: 'rechazar', id, motivo, motivo_clave: clave }).catch((e) => ({ error: e.message }));
   if (j && j.ok) {

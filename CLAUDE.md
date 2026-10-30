@@ -188,6 +188,51 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📨✏️⏳ **CAMBIO-RECHAZO-1 + RECHAZO-EDITA-1 (30-oct-2026, en main local): el
+  «No procede» de un cambio AVISA por correo, y el motivo de rechazo por fin se
+  puede ESCRIBIR a mano.** Dos preguntas de Memo el mismo día: *«¿qué pasa
+  cuando un viajero quiere cambiar de lugar y yo le digo que no? ¿recibe un
+  correo o algo?»* (medido: NO recibía NADA — el motivo moría en
+  `cambios_viajero.respuesta`) y *«cuando quiero editar el porqué a un mensaje
+  personal no me deja escribir»*. `mide:cambio-rechazo-1` **36** (sin ancla —
+  árbol; sabotaje al cableado mordido con sha1 careado → 14 rojos con nombre →
+  restaurado byte a byte).
+  - 🔴 **RECHAZO-EDITA-1 · el editor BORRABA el mensaje personal.** El refresco
+    de tecleo (700 ms) repintaba el box ENTERO (`box.innerHTML`) — el textarea
+    se destruía a media frase (foco perdido) — y con chip elegido la línea del
+    texto decía «plantilla manda»: **la edición manual se revertía sola a la
+    plantilla**. El comentario prometía «lo escrito a mano se respeta» y el
+    código no lo hacía — un candado prometido en un comentario, otra vez.
+    Hoy: el tecleo refresca SOLO la vista previa (`req-rch-prev`, contenedor
+    propio; `_reqBdjRchPreviaHtml` es el dueño único de ese HTML), **lo
+    tecleado MANDA siempre** (hasta en un repintado completo), la clave del
+    chip vive en un STORE (`_reqClaveSel`) y no en leer el `.on` del DOM, y la
+    previa que llega tarde se descarta si el humano siguió tecleando (guarda de
+    carrera). Familia de PS-EVENTOS-1: una decisión sobre un nodo que se
+    repinta es una promesa sobre un nodo que ya no existe.
+  - 📨 **CAMBIO-RECHAZO-1 · `_lib/correo-cambio` es el dueño**
+    (`avisarCambioRechazado`, misma forma/respuesta que `avisarPaquete` — la
+    bandeja los pinta con el mismo `_reqCorreoTxt`). Sale desde `cambio_cerrar`
+    SOLO al rechazar tipos no-paquete (hotel/zona/fecha/otro → «Sobre tu
+    solicitud de cambio»; pago → «Sobre tu comprobante de pago»); lo atendido
+    sigue sin correo y el paquete sigue con el suyo (PREVENTA-PORTAL-2,
+    regresión careada). El MOTIVO viaja TAL CUAL (la etiqueta de la bandeja
+    ahora lo dice para TODOS los tipos) + «tu lugar sigue tal como estaba» +
+    botón al Portal + WhatsApp. 🔒 Jamás tumba el cierre (Resend caído →
+    cerrada igual y la bandeja lo DICE) · fail-soft CON el catálogo (la forma
+    de RECHAZO-AVISO-1 — no promete nada derivado; sin catálogo sale sin
+    nombre y SIN fugar el slug crudo, ley CAPSULE-WA-1) · cifras de dinero NO
+    se mencionan (nadie las tecleó) · 2º clic 409 sin correo repetido · cero
+    escrituras a dinero, medido POR EL HECHO con control positivo.
+  - **El careo** entra por el handler REAL con red falsa + la pantalla REAL en
+    vm con DOM falso que registra IDENTIDAD de nodos — «el textarea no se
+    destruyó» se mide por referencia, y el control por construcción demuestra
+    que la línea vieja revertía a la plantilla. Vecinos verdes: rechazo-1 60 ·
+    preventa-portal-1 33 · portal-edit-1 28 · req-b1 52 · pagos-portal-2 38.
+  - ⏳ Push de Memo → prueba humana: rechazar una requisición editando el
+    motivo a un mensaje personal (ya no se borra), y cerrar un cambio del
+    Portal con «No procede» y ver el correo llegar.
+
 - 🔄✅ **ACTUALIZA-KH-1 (30-oct-2026, EJECUTADO): el Palacio al día con Conecta
   2026, Numerología, PAGOS CONECTA y el Efectivo.** Encargo de Memo: *«actualiza
   el kamehouse con conecta 6 numerologia pagos conecta, efectivo etc para ver

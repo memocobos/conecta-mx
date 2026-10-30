@@ -6249,6 +6249,62 @@ function _vjChipsPintar(res) {
     </div>${habsHtml}${zonasHtml}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [CAPSULE-DISPO-1] CUÁNTOS BOLETOS QUEDAN POR ZONA, AQUÍ MISMO.
+// Palabra de Memo (30-oct): «poder ver cuántos boletos quedan por zona … en
+// nsqk no tenemos 2 McCormick: entrar a Capsule, contactar al cliente, hacer
+// el cambio de zona ahí mismo y ver cómo el marcador se actualiza, sin ir al
+// Palacio». 🔒 El número NO se calcula aquí: se le pide al SEMÁFORO del Palacio
+// (admin-compras · semaforo → desgloseZona, el dueño). Se repinta cada vez que
+// la lista se recarga — o sea tras cada ✏️ Corregir, 📅 Mover, ⛔ Cancelar.
+// Zona sin pedido cargado se DICE («sin pedido»), jamás un 0 ni un negativo.
+// ═══════════════════════════════════════════════════════════════════════════
+let _vjInv = null;   // { evento, zonas:[{zona, disponibles, estado, compradas,...}] }
+async function _vjInvCargar(evId) {
+  const box = document.getElementById('cc-vj-inv');
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:11px;color:var(--ts)">🎟 midiendo boletos por zona…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST', body: JSON.stringify({ accion: 'semaforo', evento_id: evId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (evId !== _ccEventoActual) return;   // el usuario ya cambió de evento: no pintar ajeno
+    if (r.status === 403) { box.innerHTML = ''; _vjInv = null; return; }   // permiso, no dato
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('semáforo ' + r.status));
+    _vjInv = { evento: evId, gestionado: !!j.gestionado, zonas: Array.isArray(j.zonas) ? j.zonas : [] };
+    _vjInvPintar();
+  } catch (e) {
+    if (evId !== _ccEventoActual) return;
+    _vjInv = null;
+    box.innerHTML = `<div style="font-size:11px;color:var(--red)">🎟 No se pudo leer el inventario por zona (${_esfEsc(e.message)}). Los lugares de abajo siguen siendo verdad; el «quedan» no.</div>`;
+  }
+}
+function _vjInvPintar() {
+  const box = document.getElementById('cc-vj-inv');
+  if (!box) return;
+  const inv = _vjInv;
+  if (!inv || !inv.zonas.length) {
+    box.innerHTML = '<div style="font-size:11px;color:var(--ts)">🎟 Este evento no tiene pedido de boletos cargado en el Palacio: no hay «quedan» que decir.</div>';
+    return;
+  }
+  const col = { verde: 'var(--green)', amarillo: 'var(--yellow)', rojo: 'var(--red)', negativo: 'var(--red)', 'sin-stock': 'var(--ts)' };
+  const chips = inv.zonas.slice().sort((a, b) => {
+    const da = a.disponibles == null ? 1e9 : a.disponibles, db = b.disponibles == null ? 1e9 : b.disponibles;
+    return da - db;
+  }).map((z) => {
+    const c = col[z.estado] || 'var(--ts)';
+    const vend = (z.fuera || 0) + (z.seguras || 0) + (z.apartadas || 0) + (z.migrados || 0);
+    const num = z.disponibles == null ? 'sin pedido'
+      : (z.disponibles < 0 ? `${z.disponibles} ⚠️ sobrevendida` : (z.disponibles === 0 ? 'AGOTADA' : `quedan <b>${z.disponibles}</b>`));
+    const title = z.disponibles == null
+      ? `${z.zona}: sin compra cargada en el Palacio — ${vend} vendidos.`
+      : `${z.zona}: compradas ${z.compradas} · vendidos ${vend} (fuera ${z.fuera || 0} + viajeros ${(z.migrados || 0) + (z.seguras || 0)} + apartados ${z.apartadas || 0}) · quedan ${z.disponibles}`;
+    return `<span class="vj-chip" style="border-color:${c};color:${c}" title="${_esfEsc(title)}">${_esfEsc(z.zona)} · ${num}</span>`;
+  }).join('');
+  box.innerHTML = `<div style="font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">🎟 BOLETOS POR ZONA — se actualiza solo al corregir, mover o cancelar</div><div class="vj-chips">${chips}</div>`;
+}
+
 async function _vj2Cargar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
@@ -6261,6 +6317,7 @@ async function _vj2Cargar() {
   // la pantalla en blanco sin una palabra (la ley del cero falso, en UI).
   wrap.style.display = '';
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  _vjInvCargar(_ccEventoActual);   // [CAPSULE-DISPO-1] en paralelo: no frena la lista
 
   try {
     _vj2Filas = await khViajeros.listar(_ccEventoActual) || [];   // [sec-coordi]
@@ -6504,6 +6561,10 @@ function _vj2Pintar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Mover a ${_esfEsc(v.nombre || '')} a otra fecha de este mismo evento (su dinero viaja con ella)"
             onclick="_vjMudarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📅 Mover fecha</button>
+          ${(Number(v.boletos) === 0 && !v.zona_boleto) ? '' : `<!-- [CANCELAR-LUGAR-1] cancelar (jamás borrar): dinero a favor o con reembolso -->
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red);border-color:var(--red)"
+            title="Cancelar el lugar de ${_esfEsc(v.nombre || '')}: el boleto vuelve al inventario y la fila se queda como historial"
+            onclick="_vjCancelarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">⛔ Cancelar</button>`}
           <button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
           title="Eliminar a ${_esfEsc(v.nombre || '')} de este evento"
           onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button></td>` : ''}
@@ -6677,7 +6738,9 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)">NOMBRE<br><input class="cot-input" id="vjx-n-${e}" value="${_esfEsc(v.nombre || '')}" style="width:170px"></label>
       <label style="font-size:10px;color:var(--ts)">PAQUETE<br><select class="cot-input" id="vjx-p-${e}">
         ${opt('plus', 'PLUS')}${opt('stay', 'STAY')}${opt('cheap', 'CHEAP')}${opt('ride', 'RIDE')}</select></label>
-      <label style="font-size:10px;color:var(--ts)">ZONA<br><input class="cot-input" id="vjx-z-${e}" value="${_esfEsc(v.zona_boleto || '')}" placeholder="como en la ficha" style="width:150px"></label>
+      <label style="font-size:10px;color:var(--ts)" title="[CAPSULE-DISPO-1] Al escribir salen las zonas del evento con cuántas quedan">ZONA<br><input class="cot-input" id="vjx-z-${e}" list="vjx-zl-${e}" value="${_esfEsc(v.zona_boleto || '')}" placeholder="como en la ficha" style="width:150px">
+        <datalist id="vjx-zl-${e}">${(_vjInv && _vjInv.evento === _ccEventoActual ? _vjInv.zonas : []).map((z) =>
+          `<option value="${_esfEsc(z.zona)}">${z.disponibles == null ? 'sin pedido' : (z.disponibles <= 0 ? 'AGOTADA' : 'quedan ' + z.disponibles)}</option>`).join('')}</datalist></label>
       <label style="font-size:10px;color:var(--ts)">LUGARES<br><input class="cot-input" id="vjx-b-${e}" type="number" min="1" max="20" step="1" value="${Number(v.boletos) || 1}" style="width:70px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[VJ-HAB-1] El tipo de habitación que eligió — de aquí se arma el rooming. Solo PLUS/STAY/RIDE duermen; en CHEAP déjalo vacío.">HABITACIÓN<br><select class="cot-input" id="vjx-h-${e}">
         ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
@@ -6697,6 +6760,81 @@ function _vjEditarAbrir(id, nombre) {
       <div id="vjx-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
     </div>`;
 }
+// ═══ [CANCELAR-LUGAR-1] ⛔ Cancelar un lugar — jamás borrarlo ═════════════
+// Dos salidas firmadas por Memo (30-oct): el dinero se QUEDA (regla de la
+// casa: lo de un cancelado es ganancia) o se cancela CON REEMBOLSO (cae
+// pendiente a Yamcha, donde se transfiere y nace su gasto). En las dos el
+// boleto vuelve al inventario y el contrato queda en lo cobrado (saldo 0).
+// La aritmética del cobrado la hace el SERVIDOR (saldoMigrado); aquí solo se
+// enseña la cifra aproximada para prellenar el monto, rotulada como tal.
+function _vjCancelarAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'cancelar';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id));
+  if (!v) return;
+  const abs = ((_vj2Ctx && _vj2Ctx.porViajero) || {})[id] || [];
+  const cobrado = (Number(v.abonado_previo) || 0) + abs.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+  tr.style.display = '';
+  tr.dataset.modo = 'cancelar';
+  const e = _esfEsc(id);
+  tr.firstElementChild.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--red);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);min-width:170px"><b style="color:var(--text)">⛔ Cancelar a ${_esfEsc(nombre)}</b><br>
+        ${Number(v.boletos) || 1} lugar(es) · ${_esfEsc(v.zona_boleto || 'sin zona')}<br>
+        lleva pagado ≈ <b style="color:var(--text)">$${cobrado.toLocaleString('es-MX')}</b><br>
+        <i>la fila NO se borra: queda como historial</i></div>
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+        <label style="cursor:pointer"><input type="radio" name="vjc-m-${e}" value="ganancia" checked onchange="_vjCancelarModo('${_attrJs(id)}')"> 💰 El dinero se queda (no hay reembolso)</label>
+        <label style="cursor:pointer"><input type="radio" name="vjc-m-${e}" value="reembolso" onchange="_vjCancelarModo('${_attrJs(id)}')"> ↩️ Con reembolso (va a Yamcha como pendiente)</label>
+      </div>
+      <div id="vjc-r-${e}" style="display:none;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <label style="font-size:10px;color:var(--ts)">MONTO A DEVOLVER<br><input class="cot-input" id="vjc-monto-${e}" type="number" min="1" step="1" value="${cobrado || ''}" style="width:110px"></label>
+        <label style="font-size:10px;color:var(--ts)">DATOS BANCARIOS (opcional)<br><input class="cot-input" id="vjc-banco-${e}" placeholder="CLABE / tarjeta / titular" style="width:220px"></label>
+      </div>
+      <label style="font-size:10px;color:var(--ts)">MOTIVO *<br><input class="cot-input" id="vjc-mot-${e}" placeholder="ej. no hay McCormick y no aceptó otra zona" style="width:260px"></label>
+      <button class="btn btn-sm" id="vjc-b-${e}" style="background:var(--red);color:#fff" onclick="_vjCancelarGuardar('${_attrJs(id)}', '${_attrJs(nombre)}')">Cancelar lugar</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjCancelarAbrir('${_attrJs(id)}')">Cerrar</button>
+      <div id="vjc-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
+    </div>`;
+}
+function _vjCancelarModo(id) {
+  const m = (document.querySelector(`input[name="vjc-m-${id}"]:checked`) || {}).value;
+  const r = document.getElementById(`vjc-r-${id}`);
+  if (r) r.style.display = m === 'reembolso' ? 'flex' : 'none';
+}
+async function _vjCancelarGuardar(id, nombre) {
+  const er = document.getElementById(`vjc-e-${id}`);
+  const btn = document.getElementById(`vjc-b-${id}`);
+  if (er) er.textContent = '';
+  const modo = (document.querySelector(`input[name="vjc-m-${id}"]:checked`) || {}).value;
+  const motivo = String((document.getElementById(`vjc-mot-${id}`) || {}).value || '').trim();
+  if (motivo.length < 3) { if (er) er.textContent = 'Escribe el motivo.'; return; }
+  const payload = { accion: 'viajero_cancelar', id, modo, motivo, confirmar: true };
+  if (modo === 'reembolso') {
+    payload.monto = Number((document.getElementById(`vjc-monto-${id}`) || {}).value);
+    payload.datos_bancarios = String((document.getElementById(`vjc-banco-${id}`) || {}).value || '').trim();
+    if (!(payload.monto > 0)) { if (er) er.textContent = 'Escribe el monto a devolver.'; return; }
+  }
+  const frase = modo === 'reembolso'
+    ? `¿Cancelar el lugar de ${nombre} y registrar un reembolso PENDIENTE de $${payload.monto}?`
+    : `¿Cancelar el lugar de ${nombre}? Lo que pagó se queda a favor del negocio (sin reembolso).`;
+  if (!confirm(frase)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Cancelando…'; }
+  try {
+    const j = await khViajeros._call(payload);
+    const lib = j.libero && j.libero.boletos ? ` · ${j.libero.boletos} boleto(s) de ${j.libero.zona || 'sin zona'} vuelven al inventario` : '';
+    showToast(`Lugar cancelado${j.reembolso ? ' · reembolso pendiente en Yamcha' : ' · dinero a favor'}${lib}`, 'success');
+    if (j.aviso) alert(j.aviso);
+    await _vj2Cargar();   // repinta la lista Y el marcador de boletos por zona
+  } catch (e) {
+    if (er) er.textContent = (e && e.message) || 'No se pudo cancelar.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Cancelar lugar'; }
+  }
+}
+
 async function _vjEditarGuardar(id) {
   const g = (k) => (document.getElementById(`vjx-${k}-${id}`) || {});
   const er = document.getElementById(`vjx-e-${id}`), ok = document.getElementById(`vjx-s-${id}`);

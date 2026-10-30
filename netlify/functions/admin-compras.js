@@ -56,7 +56,10 @@ const ACCIONES = {
   listar: ROLES_PALACIO,
   crear: ROLES_PALACIO,
   eliminar: ROLES_PALACIO,
-  semaforo: ROLES_STOCK,        // FASE B t3: película de stock por zona (ADMIN, expone números)
+  // [CAPSULE-DISPO-1] Milk LEE el semáforo (solo leer: cuántos quedan por
+  // zona) porque opera Capsule y ahí se hace el cambio de zona. Capturar
+  // vendidos_fuera sigue siendo roshi/bulma.
+  semaforo: [...ROLES_STOCK, 'milk'],
   ajuste_guardar: ROLES_STOCK,  // FASE B t3: captura de vendidos_fuera (stock_ajustes)
 };
 

@@ -108,6 +108,7 @@ const ACCIONES = {
   // (hoy: 0 de 2,790 viajeros alcanzables). Ver la cabecera de la acción.
   viajero_editar_full: ROLES_EDITA_VIAJERO,
   viajero_mudar_fecha: ROLES_EDITA_VIAJERO,    // [VIAJERO-MUDAR-1]
+  viajero_cancelar: ROLES_EDITA_VIAJERO,       // [CANCELAR-LUGAR-1] baja (jamás borra) · ganancia o reembolso
   fechas_de_evento: ROLES_EDITA_VIAJERO,       // [VIAJERO-MUDAR-1] solo LEE el catálogo
   contrato_cliente_estado: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
@@ -1706,6 +1707,111 @@ ${entregables}
     // Bulma lo teclea: el catálogo cobra distinto por día (Frida: $3,900 por 1
     // día contra $6,300 por 2) pero un descuento negociado se perdería si el
     // precio nuevo se aplicara solo. Palabra de Memo: «propone, Bulma confirma».
+    // ── [CANCELAR-LUGAR-1] CANCELAR UN LUGAR (jamás borrarlo) ────────────────
+    // Palabra de Memo (30-oct): «cancelar (no eliminar) los lugares y que en
+    // automático ese dinero se queda para nosotros, o con reembolso en los que
+    // aplique». Es la MISMA forma de la baja del careo (CAREO-ZONA-1c), ahora
+    // con botón:
+    //   · boletos 0 + zona NULL  → el boleto vuelve al inventario solo
+    //   · total_contrato = lo COBRADO (previo + Σ abonos) → saldo 0
+    //   · modo 'ganancia'  → el dinero se queda (regla de la casa del 1-oct)
+    //   · modo 'reembolso' → además nace una fila PENDIENTE en `reembolsos`
+    //     (la derrota de Yamcha): al transferirla allá nace su gasto y la
+    //     utilidad baja por lo devuelto. Aquí NO se mueve un peso de caja.
+    // 🔒 El abonado NUNCA se toca (es lo que la persona PAGÓ). Cero DELETEs.
+    // 🔒 Valor esperado en el PATCH: solo se cancela una fila VIVA — el 2º clic
+    //    da 409 y no nace un segundo reembolso.
+    // 🔒 Se sueltan habitación (y su nombre sale del cuarto) y grupo, y se DICE.
+    if (accion === 'viajero_cancelar') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      const modo = String(body.modo || '');
+      if (modo !== 'ganancia' && modo !== 'reembolso') return bad(headers, 'modo inválido: ganancia o reembolso');
+      if (body.confirmar !== true) return bad(headers, 'falta confirmar: cancelar un lugar pide confirmación explícita');
+      const motivo = String(body.motivo || '').trim().slice(0, 300);
+      if (motivo.length < 3) return bad(headers, 'escribe el motivo de la cancelación');
+
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,notas,habitacion_id,grupo_viaje&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const v = (await pre.json())[0];
+      if (!v) return bad(headers, 'ese viajero no existe');
+      if (Number(v.boletos) === 0 && !v.zona_boleto) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ese lugar YA está cancelado. Nada cambió.', ya: true }) };
+      }
+
+      // Lo cobrado: se le pregunta a su dueño (saldoMigrado), no se re-suma aquí.
+      const baseAB = `${env.KH_SB_URL}/rest/v1/abonos_viajero`;
+      const ra = await fetch(`${baseAB}?viajero_id=eq.${id}&select=monto`, { headers: sbHeaders });
+      if (!ra.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer sus abonos: no cancelo a ciegas.' }) };
+      const sal = saldoMigrado({ ...v, total_contrato: v.total_contrato == null ? 0 : v.total_contrato }, await ra.json());
+      const cobrado = Math.round(((sal && sal.abonado) || 0) * 100) / 100;
+
+      let montoReemb = 0;
+      if (modo === 'reembolso') {
+        montoReemb = _numDinero(body.monto);
+        if (montoReemb === null || !Number.isFinite(montoReemb) || montoReemb <= 0) return bad(headers, 'monto de reembolso inválido');
+        if (montoReemb > cobrado) return bad(headers, `No se puede devolver más de lo cobrado ($${cobrado}).`);
+      }
+
+      // Foto de lo que había ANTES del PATCH (lo que se libera y el cuarto): se
+      // lee de aquí y no de `v` después de escribir.
+      const antes = { zona: v.zona_boleto || null, boletos: Number(v.boletos) || 0, hab: v.habitacion_id || null, nombre: String(v.nombre || '').trim() };
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const sueltos = [];
+      const patch = { boletos: 0, zona_boleto: null, total_contrato: cobrado };
+      if (v.habitacion_id) { patch.habitacion_id = null; sueltos.push('su habitación'); }
+      if (v.grupo_viaje) { patch.grupo_viaje = null; sueltos.push('su grupo «viaja con»'); }
+      patch.notas = ((v.notas ? v.notas + ' · ' : '')
+        + `[CANCELA ${hoyMx}] ${modo === 'ganancia' ? 'dinero A FAVOR del negocio' : 'con REEMBOLSO $' + montoReemb}`
+        + ` · era ${v.boletos} lugar(es) ${v.zona_boleto || '—'} · total $${v.total_contrato == null ? '—' : v.total_contrato} → $${cobrado} (saldo 0)`
+        + ` · motivo: ${motivo} · ${quien}`).slice(0, 4000);
+
+      const r = await fetch(`${baseVE}?id=eq.${id}&or=(boletos.neq.0,zona_boleto.not.is.null)`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' }, body: JSON.stringify(patch),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ese lugar ya estaba cancelado (otro clic llegó primero). Nada cambió.', ya: true }) };
+
+      // Su nombre sale del cuarto del rooming (el cuarto se queda).
+      if (antes.hab) {
+        try {
+          const baseRH = `${env.KH_SB_URL}/rest/v1/rooming_habitaciones`;
+          const rh = await fetch(`${baseRH}?id=eq.${antes.hab}&select=id,ocupantes&limit=1`, { headers: sbHeaders });
+          const hab = rh.ok ? (await rh.json())[0] : null;
+          if (hab) {
+            let occ = hab.ocupantes;
+            if (typeof occ === 'string') { try { occ = JSON.parse(occ); } catch (_) { occ = []; } }
+            const nuevos = (Array.isArray(occ) ? occ : []).filter((n) => String(n).trim() !== antes.nombre);
+            if (nuevos.length !== (occ || []).length) {
+              await fetch(`${baseRH}?id=eq.${hab.id}`, { method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ ocupantes: nuevos }) });
+            }
+          }
+        } catch (_) { sueltos.push('(revisa el cuarto en Rooming: no pude sacar su nombre)'); }
+      }
+
+      let reembolso = null;
+      if (modo === 'reembolso') {
+        const evBase = String(v.evento_id || '').split('#')[0];
+        const rr = await fetch(`${env.KH_SB_URL}/rest/v1/reembolsos`, {
+          method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({
+            evento_slug: evBase, evento_nombre: evBase, cliente_nombre: v.nombre || null,
+            cliente_correo: v.correo || null, monto: montoReemb, estado: 'pendiente',
+            datos_bancarios: String(body.datos_bancarios || '').trim().slice(0, 500) || null,
+            notas: `CANCELAR-LUGAR-1 ${hoyMx}: cancelación de lugar con reembolso (cobrado $${cobrado}, se devuelve $${montoReemb}). Viajero ${id} · ${v.evento_id} · motivo: ${motivo} · ${quien}`,
+          }),
+        });
+        if (!rr.ok) {
+          return { statusCode: 207, headers, body: JSON.stringify({ ok: true, viajero: filas[0], cobrado, sueltos, reembolso: null,
+            aviso: `El lugar SÍ quedó cancelado, pero el reembolso de $${montoReemb} NO se pudo registrar en Yamcha. Captúralo allá a mano.` }) };
+        }
+        reembolso = (await rr.json())[0] || null;
+      }
+      return ok(headers, { viajero: filas[0], cobrado, modo, reembolso, sueltos, libero: { zona: antes.zona, boletos: antes.boletos } });
+    }
+
     if (accion === 'viajero_mudar_fecha') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede mover un viaje de fecha' }) };

@@ -188,6 +188,53 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎟⛔⏳ **CAPSULE-DISPO-1 + CANCELAR-LUGAR-1 + KAMISAMA-SCROLL-1 (30-oct-2026,
+  en main local, cero SQL).** Palabra de Memo, citada: *«en capsule poder ver
+  cuántos boletos quedan por zona … en nsqk no tenemos 2 McCormick: contactar al
+  cliente, ahí mismo hacer el cambio de zona y ver cómo el marcador se
+  actualiza»* · *«opción de cancelar (no eliminar) los lugares y que en
+  automático ese dinero se queda para nosotros, o cancelar con reembolso»* ·
+  *«en Kamisama el scrolling está extraño»*. `mide:cancelar-lugar-1` **41**
+  (sin ancla — árbol; sabotaje al valor esperado del PATCH mordido con sha1
+  `07a1f2b0→c75fdce5` → 2 rojos con nombre → restaurado byte a byte).
+  - **CAPSULE-DISPO-1:** arriba de los chips de «Viajeros del evento», el
+    marcador **🎟 BOLETOS POR ZONA** («Oro · quedan 3», «McCormick · -2 ⚠️
+    sobrevendida», «sin pedido»), las más escasas primero. 🔒 El número NO se
+    calcula en la pantalla: se le pide al **semáforo del Palacio**
+    (`admin-compras · semaforo` → `desgloseZona`, el dueño). Se repinta en cada
+    recarga de la lista (✏️ Corregir · 📅 Mover · ⛔ Cancelar), y una respuesta
+    tardía de otro evento no se pinta. El ✏️ Corregir ofrece las zonas con
+    «quedan N» al escribir (datalist). **Milk ganó LEER el semáforo** (opera
+    Capsule); capturar vendidos_fuera sigue roshi/bulma. ⚠️ Va DENTRO del
+    evento, no en cada card de la parrilla: pintarlo en 60 cards serían 60
+    lecturas del inventario por cada vista.
+  - **CANCELAR-LUGAR-1 · `viajero_cancelar`** (roshi/bulma/milk, botón ⛔ por
+    fila, `confirmar:true` + motivo obligatorios EN EL SERVIDOR): la forma de la
+    baja del careo (CAREO-ZONA-1c) hecha botón — boletos 0 + zona NULL (el
+    boleto vuelve al inventario solo) · `total_contrato` = lo COBRADO por
+    `saldoMigrado` (saldo 0) · el abonado NUNCA se toca · cero DELETEs · suelta
+    habitación (su nombre sale del cuarto) y grupo · nota ANEXADA. Dos modos:
+    **💰 ganancia** (regla de la casa del 1-oct: lo de un cancelado se queda) y
+    **↩️ reembolso**: nace UNA fila **pendiente** en `reembolsos` (forma de
+    CANCEL-1, «Viajero <uuid>» en la nota) que se transfiere en Yamcha, donde
+    nace su gasto — la utilidad baja por lo devuelto solo al transferir; tope
+    = lo cobrado. Valor esperado `or=(boletos.neq.0,zona_boleto.not.is.null)`:
+    2º clic → 409 sin segundo reembolso. Reembolso que no se pudo asentar → 207
+    que lo DICE. ⚠️ El contrato de cliente (`contratos_cliente`) no se toca.
+  - **KAMISAMA-SCROLL-1:** el mando sticky se encogía al bajar (`kms-mando-mini`
+    pierde ~40 px) → todo lo de abajo subía → el sentinela volvía a entrar → el
+    mando crecía… el brinco en la frontera. Hoy el alto perdido se devuelve como
+    `margin-bottom` medido (no tecleado): el flujo no se mueve. ⚠️ **Diagnóstico
+    por lectura del código, no medido en vivo**: la sesión de KameHouse en el
+    Chrome había expirado y no inicio sesiones. Si tras el push sigue raro,
+    Memo dice dónde (qué sección / al hacer qué) y se mide.
+  - ⚠️ `mide:preventa-elegir-1` trae **1 rojo PREEXISTENTE** (idéntico en HEAD
+    limpio): «la lista principal pinta la etiqueta, no el paquete crudo». Su
+    propia chiquita, no de aquí.
+  - ⏳ Push de Memo → prueba humana: nsqkmty → ver «McCormick» en el marcador →
+    💬 al cliente → ✏️ cambiarle la zona → el marcador se mueve; y cancelar uno
+    de prueba en los dos modos (el de reembolso aparece en Yamcha).
+
 - 🛏⚡⏳ **ROOMING-AUTO-1 + GENERO-1 (30-oct-2026, en main local): EL ROOMING SE
   ARMA SOLO — el sistema PROPONE los cuartos con las reglas firmadas y
   Bulma/Milk revisan, confirman géneros y aplican.** Encargo de Memo: «que

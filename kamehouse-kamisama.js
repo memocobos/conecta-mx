@@ -138,8 +138,29 @@ function _kmsMandoSticky() {
   const mando = document.querySelector('.kms-mando');
   if (!sent || !mando || !('IntersectionObserver' in window)) return;
   if (_kmsMandoObs) _kmsMandoObs.disconnect();   // idempotente: una sola instancia por visita
+  // 🔴 [KAMISAMA-SCROLL-1] EL MANDO QUE SE ENCOGE MOVÍA LA PÁGINA.
+  // Al pasar a mini el mando pierde ~40 px (hint oculto, padding chico), todo
+  // lo de abajo SUBE esos px, el sentinela vuelve a entrar en pantalla, el
+  // mando crece otra vez, todo BAJA… y la página tiembla/brinca justo en la
+  // frontera — el «scrolling extraño». Es el bucle clásico de un sticky que
+  // cambia de alto. El remedio: el hueco que pierde el mando se devuelve como
+  // margin-bottom, así el flujo de abajo NO se mueve ni un píxel y el
+  // sentinela deja de oscilar. Se mide, no se teclea.
+  let _altoLleno = 0;
   _kmsMandoObs = new IntersectionObserver(
-    ([e]) => { mando.classList.toggle('kms-mando-mini', !e.isIntersecting); },
+    ([e]) => {
+      const mini = !e.isIntersecting;
+      if (mini === mando.classList.contains('kms-mando-mini')) return;
+      if (mini) {
+        _altoLleno = mando.offsetHeight;
+        mando.classList.add('kms-mando-mini');
+        const delta = Math.max(0, _altoLleno - mando.offsetHeight);
+        mando.style.marginBottom = delta ? `calc(${getComputedStyle(mando).marginBottom} + ${delta}px)` : '';
+      } else {
+        mando.style.marginBottom = '';
+        mando.classList.remove('kms-mando-mini');
+      }
+    },
     { threshold: 0 }
   );
   _kmsMandoObs.observe(sent);

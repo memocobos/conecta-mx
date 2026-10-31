@@ -889,7 +889,7 @@ main{
    se mueve, el espacio se mueve con él y no hay dos números que sincronizar.
    --rcp-zona-fab es el caso alto: en dashboard el pill sube para no chocar
    con el FAB "Agregar tour". */
-:root{ --rcp-zona:72px; --rcp-zona-fab:136px; }
+:root{ --rcp-zona:24px; --rcp-zona-fab:24px; }   /* [RADIO-ENTRADA-1] sin pill fijo: el footer ya no reserva su alto */
 .rcp{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
@@ -902,6 +902,26 @@ main{
 }
 .rcp.is-visible{display:flex}
 .rcp.rcp-oculto{display:none}
+/* [RADIO-ENTRADA-1] Palabra de Memo (30-oct): «lo de la radio que es parte del
+   scroll ya lo puedes quitar; en la entrada tener un acceso y dejar el botón en
+   el card». El pill FIJO estorbaba al hacer scroll. El elemento #rcp SIGUE
+   vivo (su <audio> vive fuera de las vistas para no cortarse al navegar) pero
+   ya NO se pinta: lo manejan la entrada del dashboard y el chip del card, que
+   DELEGAN en #rcp-play — un solo reproductor, cero segundo <audio>. */
+.rcp,.rcp.is-visible{display:none}
+.dash-radio{
+  display:flex;align-items:center;gap:10px;width:100%;margin:12px 0 12px;
+  padding:9px 10px 9px 14px;background:var(--yel);color:#000;border:none;
+  border-radius:var(--r-chip,999px);font:inherit;text-align:left;cursor:pointer;
+}
+.dash-radio .rcp-song{flex:1}
+.dash-radio .dr-play{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center}
+.dash-radio .dr-play svg{width:15px;height:15px;fill:var(--yel)}
+.dash-radio .dr-ic-pause{display:none}
+.dash-radio.is-on .dr-ic-play{display:none}
+.dash-radio.is-on .dr-ic-pause{display:block}
+.dash-radio.is-on .rcp-eq i{animation:rcpEq .9s ease-in-out infinite}
+.mig-chip.mig-radio.is-on{background:var(--yel);color:#000;border-color:var(--yel)}
 .rcp-eq{flex-shrink:0;display:flex;align-items:flex-end;gap:2px;width:14px;height:13px}
 .rcp-eq i{flex:1;background:#000;border-radius:var(--r-sm,8px);transform-origin:bottom;transform:scaleY(.32)}
 .rcp.rcp-playing .rcp-eq i{animation:rcpEq .9s ease-in-out infinite}
@@ -1623,6 +1643,17 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 
     <!-- [PP-2] Hero del próximo viaje. Vacío = sin tours próximos, y entonces
          no se pinta nada: el estado vacío de PP-1 ya invita. -->
+    <!-- [RADIO-ENTRADA-1] El acceso a Radio Conecta vive en la ENTRADA, no
+         flotando sobre el scroll. Delega en #rcp-play (el único reproductor). -->
+    <button type="button" class="dash-radio" id="dash-radio" aria-label="Reproducir Radio Conecta" aria-pressed="false">
+      <span class="rcp-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="rcp-brand"><span class="rcp-dot"></span>Radio Conecta</span>
+      <span class="rcp-song" id="dash-radio-song">EN VIVO</span>
+      <span class="dr-play" aria-hidden="true">
+        <svg class="dr-ic-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="dr-ic-pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </span>
+    </button>
     <div id="px-hero-wrap"></div>
 
     <!-- [portal-v1] Stats calculadas (total/próximos/pasados) — solo presentación -->
@@ -3242,9 +3273,12 @@ function _migMediaHtml(t) {
     + '<div class="mig-media-t">🎧 La música de tu tour</div>'
     + '<button type="button" class="mig-chip mig-play" data-mig-act="tunes" data-mig-artista="' + escapeHtml(artista) + '">▶ Escucha a ' + escapeHtml(artista) + '</button>'
     + '<a class="mig-chip mig-spot" href="https://open.spotify.com/search/' + encodeURIComponent(artista) + '" target="_blank" rel="noopener">Abrir en Spotify ↗</a>'
-    + '<button type="button" class="mig-chip" data-mig-act="radio" title="Enciende Radio Conecta (el reproductor de abajo)">📻 Radio</button>'
+    + '<button type="button" class="mig-chip mig-radio' + (_radioSonando() ? ' is-on' : '') + '" data-mig-act="radio" title="Radio Conecta en vivo">' + (_radioSonando() ? '❚❚ Radio Conecta' : '📻 Radio Conecta') + '</button>'
     + '</div>';
 }
+
+// [RADIO-ENTRADA-1] ¿Está sonando la radio? Se le pregunta a su dueño (#rcp).
+function _radioSonando(){ const r = document.getElementById('rcp'); return !!(r && r.classList.contains('rcp-playing')); }
 
 // Las fotos async DESPUÉS de pintar: UNA petición por evento base (dos viajes
 // al mismo evento comparten foto), con caché de módulo — jamás una por latido.
@@ -7142,7 +7176,28 @@ document.body.addEventListener('click', (e) => {
         var t = (s.title || '').trim(), a = (s.artist || '').trim();
         songEl.textContent = a ? (t ? t + ' — ' + a : a) : (t || 'EN VIVO');
       } else { songEl.textContent = 'EN VIVO'; }
-    }).catch(function(){ songEl.textContent = 'EN VIVO'; });
+      espejo();
+    }).catch(function(){ songEl.textContent = 'EN VIVO'; espejo(); });
+  }
+
+  // [RADIO-ENTRADA-1] La entrada del dashboard y los chips «Radio Conecta» de
+  // los cards son ESPEJOS del #rcp: leen su canción y su estado, nunca tienen
+  // su propio <audio>.
+  var dash = document.getElementById('dash-radio');
+  var dashSong = document.getElementById('dash-radio-song');
+  if (dash) dash.addEventListener('click', function(e){ e.preventDefault(); playBtn.click(); });
+  function espejo(){
+    var on = el.classList.contains('rcp-playing');
+    if (dashSong) dashSong.textContent = songEl.textContent;
+    if (dash){
+      dash.classList.toggle('is-on', on);
+      dash.setAttribute('aria-pressed', on ? 'true' : 'false');
+      dash.setAttribute('aria-label', on ? 'Pausar Radio Conecta' : 'Reproducir Radio Conecta');
+    }
+    document.querySelectorAll('.mig-chip.mig-radio').forEach(function(b){
+      b.classList.toggle('is-on', on);
+      b.textContent = on ? '❚❚ Radio Conecta' : '📻 Radio Conecta';
+    });
   }
 
   // El pill aparece cuando el shell ya está en pie (no encima del boot).
@@ -7170,16 +7225,19 @@ document.body.addEventListener('click', (e) => {
     el.classList.add('rcp-playing');
     playBtn.setAttribute('aria-pressed', 'true');
     playBtn.setAttribute('aria-label', 'Pausar Radio Conecta');
+    espejo();
   });
   audio.addEventListener('pause', function(){
     el.classList.remove('rcp-playing');
     playBtn.setAttribute('aria-pressed', 'false');
     playBtn.setAttribute('aria-label', 'Reproducir Radio Conecta');
+    espejo();
   });
-  audio.addEventListener('ended', function(){ el.classList.remove('rcp-playing'); });
+  audio.addEventListener('ended', function(){ el.classList.remove('rcp-playing'); espejo(); });
   audio.addEventListener('error', function(){
     el.classList.remove('rcp-playing');
     playBtn.setAttribute('aria-pressed', 'false');
+    espejo();
   });
 })();
 </script>

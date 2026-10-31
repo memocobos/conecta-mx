@@ -66,11 +66,15 @@ function rebanaPlana(txt, ancla) {
 function sandboxBase() {
   const sb = { console, EV: JSON.parse(JSON.stringify(EVFIX)), STATIC_IMGS: SIFIX };
   sb.window = sb;
+  // [RADIO-ENTRADA-1] el chip pregunta al #rcp si suena: aquí, un #rcp callado.
+  sb.__rcpOn = false;
+  sb.document = { getElementById: (id) => id === 'rcp' ? { classList: { contains: () => sb.__rcpOn } } : null };
   vm.createContext(sb);
   [rebanaPlana(PORTAL, 'function escapeHtml'),
    rebana(PORTAL, 'function _evBySlug(eventoId){'),
    rebana(PORTAL, 'function _artStaticDeEv(ev){'),
    rebana(PORTAL, 'function _migHeroHtml(t, titulo) {'),
+   rebana(PORTAL, 'function _radioSonando(){'),
    rebana(PORTAL, 'function _migMediaHtml(t) {')].forEach((c) => vm.runInContext(c, sb));
   return sb;
 }
@@ -105,7 +109,24 @@ try {
   af(vm.runInContext('_migMediaHtml({ evento_id: "sinartista" })', sb) === '', 'ficha sin artista → NADA');
   const cuerpoMedia = sinComentarios(rebana(PORTAL, 'function _migMediaHtml(t) {'));
   af(cuerpoMedia.indexOf('fetch(') === -1, 'el RENDER no pide nada a la red: la URL firmada de Deezer se pide AL CLIC');
+  af(/📻 Radio Conecta/.test(m1) && !/mig-radio is-on/.test(m1), '[RADIO-ENTRADA-1] el chip dice «Radio Conecta» y nace apagado si no suena');
+  sb.__rcpOn = true;
+  const m2 = vm.runInContext('_migMediaHtml({ evento_id: "frontera#1" })', sb);
+  af(/mig-radio is-on/.test(m2) && /❚❚ Radio Conecta/.test(m2), '[RADIO-ENTRADA-1] con la radio sonando, el chip nace encendido (se repinta sin mentir)');
 } catch (e) { af(false, '[B] reventó: ' + e.message); }
+
+// ═══ [RE] RADIO-ENTRADA-1: fuera el pill flotante, acceso en la entrada ══════
+console.log('\n[RE] la radio deja de estorbar el scroll');
+try {
+  const css = PORTAL.slice(PORTAL.indexOf('[RADIO-ENTRADA-1] Palabra de Memo'), PORTAL.indexOf('.mig-chip.mig-radio.is-on'));
+  af(/\.rcp,\.rcp\.is-visible\{display:none\}/.test(css), 'el pill fijo #rcp ya NO se pinta (ni con is-visible)');
+  af(/<audio id="rcp-audio"/.test(PORTAL), 'pero su <audio> sigue vivo fuera de las vistas (un solo reproductor)');
+  af(/<button type="button" class="dash-radio" id="dash-radio"/.test(PORTAL), 'la entrada del dashboard tiene su acceso «Radio Conecta»');
+  af(PORTAL.indexOf('id="dash-radio"') !== -1 && PORTAL.indexOf('id="dash-radio"') < PORTAL.indexOf('id="px-hero-wrap"'), 'y vive ARRIBA, en la entrada');
+  af(/dash\.addEventListener\('click', function\(e\)\{ e\.preventDefault\(\); playBtn\.click\(\); \}\)/.test(PORTAL), 'la entrada DELEGA en #rcp-play (cero segundo <audio>)');
+  af((PORTAL.match(/new Audio\(/g) || []).length === 1, 'el único new Audio() es el de la muestra de 30 s');
+  af(/--rcp-zona:24px; --rcp-zona-fab:24px;/.test(PORTAL), 'el footer ya no reserva el alto de un pill que no existe');
+} catch (e) { af(false, '[RE] reventó: ' + e.message); }
 
 // ═══ [C] el upgrade de fotos ═══════════════════════════════════════════════
 console.log('\n[C] _migFotosUpgrade · una petición por evento, y el prefijo no pinta al vecino');

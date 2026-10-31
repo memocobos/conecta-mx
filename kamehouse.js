@@ -84,14 +84,14 @@ const PERMISOS_TABS = {
   // [OPS-MIN-1 13-oct] Palabra de Memo: «minimizar pantallas». Fuera para los
   // admins: Inicio (su resumen es Resumen), Pagos y Por Evento (leían el Portal
   // vacío; la cobranza vive en Resumen y los números en Capsule → Números).
-  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','genkidama','emma'],
+  maestro_roshi: ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno','nube','genkidama','emma','cotizador'],
   // [NUBE-1] `nube` es la cotización semanal del transporte a CDMX: es SU
   // pluma, así que entra aquí. Sin este renglón la herramienta nace CERRADA
   // —`aplicarPermisosUI` deriva la lista del DOM— y el botón no se pinta.
   // [MAS-ALLA-1 · 26-oct] `waitlist` (hoy EL MÁS ALLÁ) entra para bulma y
   // milk — firmado por Memo: ellas atienden las solicitudes de agotados (la
   // misma gente de la bandeja de requisiciones).
-  bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist'],
+  bulma:         ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist','cotizador'],
   // [GZ-TOURS-1 · 14-oct] `tours`: su tour asignado con lista de viajeros y
   // rooming. Al coordinador `equipo` le queda SOLO para su Mi Perfil (sin
   // botón en el menú — ver NAV_SIN_BOTON): «no es necesario que vean la
@@ -102,7 +102,7 @@ const PERMISOS_TABS = {
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist']
+  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist','cotizador']
 };
 
 // [GZ-TOURS-1] Pantallas que el rol PUEDE abrir pero que no llevan botón en el
@@ -4874,6 +4874,10 @@ function showHerramienta(name) {
   // [EMMA-1] poner el botón no es poner la pantalla.
   if (name === 'emma') {
     loadEmma();
+  }
+  // [COTIZA-VEND-1] poner el botón no es poner la pantalla.
+  if (name === 'cotizador') {
+    loadCotizador();
   }
   // [NAV-MIN-2] Kaio-sama volvió a ser herramienta: su carga se mudó de loadPage.
   if (name === 'radio') {

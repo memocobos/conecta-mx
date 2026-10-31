@@ -2840,7 +2840,7 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
    (palabra de Memo: «uno al lado del otro para ahorrar espacio»): el par no
    se parte y cada chip no parte su texto — la columna se ensancha lo justo. */
 .vj2-par{display:inline-flex;gap:4px;flex-wrap:nowrap}
-.vj2-indica{margin-top:4px;font-size:11px;color:var(--yellow);white-space:normal;line-height:1.35}
+.vj2-indica{margin-top:4px;font-size:11px;color:var(--gold);white-space:normal;line-height:1.35}
 .vj2-tabla tbody tr:last-child td{border-bottom:0}
 .vj2-tag{
  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;

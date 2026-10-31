@@ -194,6 +194,8 @@
   <div class="nav-group" id="nav-dropdown-herramientas">
    <div class="nav-group-title" id="nav-herramientas" onclick="toggleNavGroup(this)" role="button" tabindex="0"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNavGroup(this)}">Herramientas</div>
+   <!-- [COTIZA-VEND-1 · 30-oct] El cotizador de vendedor (el «rol de pagos» hecho herramienta). -->
+   <button class="nav-dropdown-item" id="nav-cotizador" onclick="showHerramienta('cotizador')"><svg class="nav-ic"><use href="#ic-dinero"/></svg><span>Cotizador</span></button>
    <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')"><svg class="nav-ic"><use href="#ic-recibos"/></svg><span>Recibos</span></button>
    <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')"><svg class="nav-ic"><use href="#ic-contratos"/></svg><span>Contratos</span></button>
    <!-- [MAS-ALLA-1 · 26-oct] La Lista de espera se llama ahora EL MÁS ALLÁ
@@ -3215,6 +3217,26 @@
  </div>
 
  <!-- [EMMA-1] EMMA KAIOSAMA · el correo del sistema -->
+ <!-- [COTIZA-VEND-1 · 30-oct] 🧮 COTIZADOR DE VENDEDOR: todo lo pinta admin-cotizador. -->
+ <div class="page" id="page-cotizador">
+   <div class="page-hero">
+    <div>
+     <div class="page-title">COTIZADOR</div>
+     <div class="page-sub">// cotiza con lo que vende el sitio hoy y mándale al cliente su imagen con el rol de pagos</div>
+    </div>
+   </div>
+   <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:18px;max-width:720px">
+     <div class="form-group"><label>Evento</label>
+       <select id="ct-evento" class="cot-input" onchange="ctEventoCambia()"><option value="">— elige el evento —</option></select></div>
+     <div class="form-group" id="ct-fecha-wrap" style="display:none"><label>Fecha</label>
+       <select id="ct-fecha" class="cot-input" onchange="ctFechaCambia()"></select></div>
+     <div class="form-group"><label>¿Cuántas personas?</label>
+       <input id="ct-personas" class="cot-input" type="number" min="1" max="40" value="1" oninput="ctPersonasCambia()"></div>
+     <div id="ct-opciones"></div>
+     <div id="ct-resultado"></div>
+   </div>
+ </div>
+
  <div class="page" id="page-emma">
    <div class="page-hero">
     <div>
@@ -4647,6 +4669,7 @@
 <script src="kamehouse-nube.js"></script>
 <!-- [EMMA-1] Emma Kaiosama — antes del tronco, misma regla. -->
 <script src="kamehouse-emma.js"></script>
+<script src="kamehouse-cotizador.js"></script>
 <!-- [GENKIDAMA-1] El concentrado y las campañas — antes del tronco, misma regla. -->
 <script src="kamehouse-genkidama.js"></script>
 <script src="kamehouse-requisiciones.js"></script>

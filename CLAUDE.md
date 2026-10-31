@@ -188,6 +188,30 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🧮⏳ **COTIZA-VEND-1 (30-oct-2026, en main local, cero SQL): EL COTIZADOR DE
+  VENDEDOR — el «rol de pagos» se vuelve herramienta de KameHouse.** Palabra de
+  Memo, citada: *«que sea una herramienta para nosotros los vendedores para poder
+  cotizar en base a lo que hay de info en index, cargar los vuelos de nube
+  voladora, hotel etc y poderle bajar el card o el png al cliente»* → «si dale».
+  Herramientas → **🧮 Cotizador** (roshi/bulma/milk): evento → fecha (multifecha)
+  → personas → paquete → zona con precio de lista → habitación (solo las que
+  valen para ese número de personas) → transporte CDMX (🚌/✈️ de la Nube vigente,
+  ✍️ monto manual rotulado, o sin transporte) → total, separo y **rol de
+  quincenas** → **⬇️ PNG 1080** con la marca y **📋 texto para WhatsApp**.
+  🔒 **CERO regla de precio nueva:** `admin-cotizador` le pregunta TODO a los
+  dueños — `_opciones` (ganó `fechaIdx` OPCIONAL; sin él la respuesta es la de
+  siempre y el Portal sigue rebotando el multifecha, careado) · `_calcularPrecio`
+  · `_hotelLista` · `vigentes` de `_lib/nube` (herencia rotulada «tarifa general
+  CDMX») · `planDelViaje` con el separo como lo abonado. La pantalla no calcula un
+  peso. 🔒 **Cero escrituras** (medido). Sin catálogo → 502; sin Nube vigente
+  «autobús» → 409 (no se inventa). `mide:cotiza-vend-1` **38** (handler real +
+  index del árbol, total/separo/rol careados contra el dueño byte a byte;
+  sabotaje +$100 al total → 3 rojos → restaurado sha1 `ee53ab34`). Vecinos
+  verdes: preventa-portal-1 35 · plan-pagos-1 81 · req-b1 52 · portal-solo-1 89.
+  /rol NO se borró: sigue vivo por su link (ya salió del menú del index).
+  ⏳ Push de Memo → prueba humana: cotizar Karol G PLUS 2 personas Doble y un
+  CDMX con autobús, bajar el PNG y mandarlo por WhatsApp.
+
 - 🛏⏳ **CAPSULE-UX-3 · VJ-FILA-2 + VJ-CANCEL-OCULTO-1 + VJ-INDICA-1 + HOTEL-2-1
   + ROOMING-EQUIPO-1 + RA-AGREGAR-1 (30-oct-2026, en main local).** Lote de Memo:
   chips 📜/🪪 lado a lado y líneas entre personas un poco más gruesas · **los

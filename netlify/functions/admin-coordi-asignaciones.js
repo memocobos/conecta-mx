@@ -1687,12 +1687,19 @@ ${entregables}
       // que no dice lo que el correo prometió es el defecto que PRV-EDITA-1a
       // vino a curar — aquí se cierra por delante.
       let aviso = null;
-      if (body.avisar === true) {
+      // [ZONA-AVISO-1] Palabra de Memo (30-oct): cuando se corrige la ZONA el
+      // aviso sale SIEMPRE (sirve en preventas y ventas calientes). La pantalla
+      // trae la casilla marcada sola y se puede desmarcar: solo un `avisar:false`
+      // EXPLÍCITO lo apaga. El resto de correcciones sigue naciendo apagado.
+      const zonaCambio = 'zona_boleto' in patch && patch.zona_boleto
+        ? { de: v.zona_boleto || null, a: patch.zona_boleto, totalCambio: 'total_contrato' in patch } : null;
+      const quiereAvisar = body.avisar === true || (zonaCambio && body.avisar !== false);
+      if (quiereAvisar) {
         if (!v.portal_revisado_at) {
           aviso = { ok: false, aviso: 'No avisé: ese viaje todavía no está publicado en su Portal (el correo lo mandaría a «estamos revisando»). Publícalo primero o avísale por WhatsApp.' };
         } else {
           const { avisarAjuste } = require('./_lib/correo-ajuste');
-          aviso = await avisarAjuste({ v: filas[0], cambios, modo: 'ajuste', nota: String(body.nota_cliente || '').trim().slice(0, 300) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
+          aviso = await avisarAjuste({ v: filas[0], cambios, modo: 'ajuste', zona: zonaCambio, nota: String(body.nota_cliente || '').trim().slice(0, 300) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
         }
       }
       return ok(headers, { viajero: filas[0], cambios, zona_aviso: zonaAviso, stock_aviso: stockAviso, aviso, publicado: !!v.portal_revisado_at });

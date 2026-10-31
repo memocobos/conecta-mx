@@ -34,28 +34,45 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
 // `modo`: 'ajuste' (se corrigió algo de su viaje) · 'mudanza' (cambió de fecha).
-function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios, cuenta, nota }) {
+// [ZONA-AVISO-1] `zona` = { de, a, totalCambio } cuando el ajuste MOVIÓ su zona
+// (palabra de Memo, 30-oct: «establécelo para siempre que se corrija una zona …
+// en preventas o ventas calientes nos funciona mucho»). Las dos zonas las da el
+// editor (lo que el PATCH escribió), no se recalculan aquí.
+function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios, cuenta, nota, zona }) {
   const primer = (String(nombre || '').trim().split(/\s+/)[0]) || 'Hola';
   const esMudanza = modo === 'mudanza';
+  const esZona = !esMudanza && zona && zona.a;
   const subject = esMudanza
     ? `Tu viaje cambió de fecha · ${evento}`
-    : `Actualizamos tu viaje · ${evento}`;
+    : (esZona ? `Tu lugar cambió de zona · ${evento}` : `Actualizamos tu viaje · ${evento}`);
   const celda = 'padding:8px 10px;border-bottom:1px solid #333333;color:#ffffff;font-size:14px';
   const fila = (a, b) => `<tr><td style="${celda};color:#b3b3b3">${esc(a)}</td><td style="${celda};text-align:right"><b style="color:#ffffff">${b}</b></td></tr>`;
   // Los cambios, TAL CUAL los escribió el editor. Es la misma frase que quedó
   // ANEXADA en sus notas: lo que el cliente lee y lo que el equipo ve coinciden.
-  const lista = (Array.isArray(cambios) ? cambios : []).filter(Boolean);
+  // En el aviso de zona, la zona se dice en su propio recuadro: la frase cruda
+  // «zona «X» → «Y»» no se repite en la lista.
+  const lista = (Array.isArray(cambios) ? cambios : []).filter(Boolean)
+    .filter((c) => !(esZona && /^zona «/.test(c)));
   const bloqueCambios = lista.length
     ? `<ul style="margin:0 0 18px;padding-left:20px;color:#ffffff">${lista.map((c) => `<li style="margin:0 0 6px">${esc(c)}</li>`).join('')}</ul>`
     : '';
   const encabezado = esMudanza
     ? `<p style="margin:0 0 14px;color:#ffffff">Tu lugar en <b style="color:#e8ff4c">${esc(evento)}</b> se movió${fechaAntes ? ' de <b>' + esc(fechaAntes) + '</b>' : ''}${fecha ? ' a <b style="color:#e8ff4c">' + esc(fecha) + '</b>' : ''}. <b>Tu dinero se fue contigo completo</b>: no se perdió ningún pago.</p>`
-    : `<p style="margin:0 0 14px;color:#ffffff">Actualizamos los datos de tu viaje a <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Esto es lo que cambió:</p>`;
+    : esZona
+      ? `<p style="margin:0 0 14px;color:#ffffff">Hicimos un ajuste en tu lugar para <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Tu boleto ahora es en otra zona:</p>
+         <table style="width:100%;border-collapse:collapse;margin:0 0 16px"><tr>
+           ${zona.de ? `<td style="padding:14px;background:#1a1a1a;border:1px solid #333333;text-align:center;color:#b3b3b3;font-size:13px">Antes<br><span style="font-size:18px;color:#b3b3b3;text-decoration:line-through">${esc(zona.de)}</span></td>
+           <td style="padding:0 8px;text-align:center;color:#e8ff4c;font-size:22px">→</td>` : ''}
+           <td style="padding:14px;background:#1a1a1a;border:2px solid #e8ff4c;text-align:center;color:#ffffff;font-size:13px">Ahora<br><b style="font-size:20px;color:#e8ff4c">${esc(zona.a)}</b></td>
+         </tr></table>
+         ${zona.totalCambio ? '' : '<p style="margin:0 0 14px;color:#ffffff"><b>Tu paquete y tu precio siguen igual</b>: no tienes que pagar nada extra y tus pagos siguen contando completos.</p>'}
+         ${lista.length ? '<p style="margin:0 0 8px;color:#ffffff">También cambió:</p>' : ''}`
+      : `<p style="margin:0 0 14px;color:#ffffff">Actualizamos los datos de tu viaje a <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Esto es lo que cambió:</p>`;
   const html = `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000000;color:#ffffff">
         <div style="background:#e8ff4c;color:#000000;padding:18px 22px;border-bottom:4px solid #ff283b">
           <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#000000">Conecta Reynosa · ${esc(evento)}</div>
-          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, ${esMudanza ? 'tu viaje cambió de fecha' : 'actualizamos tu viaje'}</div>
+          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, ${esMudanza ? 'tu viaje cambió de fecha' : (esZona ? 'tu lugar cambió de zona' : 'actualizamos tu viaje')}</div>
         </div>
         <div style="padding:22px;font-size:15px;line-height:1.6;color:#ffffff">
           ${encabezado}
@@ -79,7 +96,7 @@ function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios
 //   cambios  : las frases que el editor acabó de anexar a sus notas
 //   modo     : 'ajuste' | 'mudanza'
 //   fechaAntes: solo en mudanza — el texto de la fecha de donde venía
-async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, KH_URL, KH_KEY }) {
+async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, zona, KH_URL, KH_KEY }) {
   const out = { ok: false, enviado: null, aviso: null };
   try {
     if (!v) return Object.assign(out, { aviso: 'sin viajero' });
@@ -113,7 +130,7 @@ async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, KH_URL, KH_KEY
     if (!RESEND_KEY) return Object.assign(out, { aviso: 'falta RESEND_API_KEY: avísale por WhatsApp' });
     const r = renderAjuste({
       modo, nombre: v.nombre, correo, evento: evNombre, fecha: evFecha, fechaAntes,
-      cambios, cuenta, nota,
+      cambios, cuenta, nota, zona,
     });
     const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
     const resp = await fetch('https://api.resend.com/emails', {

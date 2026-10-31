@@ -144,8 +144,8 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
   const corta = (decl) => { const i = kh.indexOf(decl); if (i < 0) return null; let d = 0; for (let k = kh.indexOf('{', i); k < kh.length; k++) { if (kh[k] === '{') d++; if (kh[k] === '}' && !--d) return kh.slice(i, k + 1); } return null; };
   const fPintar = corta('function _vjInvPintar(');
   const nodos = { 'cc-vj-inv': { innerHTML: '' } };
-  const ctx = { document: { getElementById: (x) => nodos[x] || null }, _esfEsc: (s) => String(s == null ? '' : s), _vjInv: null };
-  vm.createContext(ctx); vm.runInContext(fPintar + ';this._p=_vjInvPintar;', ctx);
+  const ctx = { document: { getElementById: (x) => nodos[x] || null }, _esfEsc: (s) => String(s == null ? '' : s), _attrJs: (s) => String(s), _vjInv: null };
+  vm.createContext(ctx); vm.runInContext('var _vj2Chip = null;' + fPintar + ';this._p=_vjInvPintar;', ctx);
   ctx._vjInv = { evento: 'nsqkmty', zonas: [
     { zona: 'McCormick', disponibles: -2, estado: 'negativo', compradas: 10, fuera: 0, migrados: 12 },
     { zona: 'Oro', disponibles: 3, estado: 'amarillo', compradas: 20, migrados: 17 },
@@ -154,6 +154,10 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
   const html = nodos['cc-vj-inv'].innerHTML;
   af(/McCormick · -2 ⚠️ sobrevendida/.test(html), 'una zona sobrevendida se DICE («-2 sobrevendida»)');
   af(/Oro · quedan <b>3<\/b>/.test(html), '«Oro · quedan 3»');
+  af(/onclick="vjChip\('__zona:Oro'\)"/.test(html), '[ZONA-FILTRO-1] tocar una zona filtra la tabla a esas personas (__zona:)');
+  vm.runInContext("_vj2Chip = '__zona:Oro'; _vjInvPintar();", ctx);
+  af(/class="vj-chip on"[^>]*__zona:Oro/.test(nodos['cc-vj-inv'].innerHTML), 'la zona que está filtrando se marca encendida');
+  vm.runInContext('_vj2Chip = null;', ctx);
   af(/Pista · sin pedido/.test(html) && !/Pista · quedan/.test(html), 'zona sin pedido dice «sin pedido», jamás un número');
   af(html.indexOf('McCormick') < html.indexOf('Oro'), 'las más escasas primero');
   ctx._vjInv = { evento: 'x', zonas: [] }; vm.runInContext('_vjInv = this._vjInv; _vjInvPintar();', ctx);
@@ -188,6 +192,22 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
   af(mando.style.marginBottom === 'calc(16px + 42px)', 'un 2º aviso igual no re-mide (no se acumula margen)');
   cb([{ isIntersecting: true }]);
   af(!clases.has('kms-mando-mini') && mando.style.marginBottom === '', 'al subir, vuelve lleno y sin margen extra');
+
+  // [ZONA-AVISO-1] El aviso de cambio de zona: render real + regla del handler.
+  console.log('\n[Z] aviso de cambio de zona');
+  delete require.cache[require.resolve(path.join(RAIZ, 'netlify/functions/_lib/correo-ajuste'))];
+  const { renderAjuste } = require(path.join(RAIZ, 'netlify/functions/_lib/correo-ajuste'));
+  const rz = renderAjuste({ modo: 'ajuste', nombre: 'Ana Pérez', correo: 'a@x.mx', evento: 'NSQK', fecha: '9 abr 2027', cambios: ['zona «Doritos» → «Coke Studio»'], cuenta: { total: 6200, abonado: 300, resta: 5900 }, zona: { de: 'Doritos', a: 'Coke Studio', totalCambio: false } });
+  af(/cambió de zona/.test(rz.subject) && /Doritos/.test(rz.html) && /Coke Studio/.test(rz.html), 'asunto «Tu lugar cambió de zona» con Antes → Ahora');
+  af(!/zona «Doritos» →/.test(rz.html), 'la frase cruda de la nota no se repite en el correo');
+  af(/siguen igual/.test(rz.html), 'sin cambio de total dice que el precio sigue igual');
+  const rz2 = renderAjuste({ modo: 'ajuste', nombre: 'Ana', correo: 'a@x.mx', evento: 'NSQK', fecha: '', cambios: ['zona «Doritos» → «Oro»', 'total $6200 → $5500'], cuenta: { total: 5500, abonado: 300, resta: 5200 }, zona: { de: 'Doritos', a: 'Oro', totalCambio: true } });
+  af(!/siguen igual/.test(rz2.html) && /total \$6200 → \$5500/.test(rz2.html), 'si el total cambió NO promete «sigue igual» y dice el cambio');
+  const rz3 = renderAjuste({ modo: 'ajuste', nombre: 'Ana', correo: 'a@x.mx', evento: 'NSQK', fecha: '', cambios: ['total $1 → $2'], cuenta: { total: 2, abonado: 0, resta: 2 } });
+  af(/Actualizamos tu viaje/.test(rz3.subject), 'sin cambio de zona sigue el correo de siempre');
+  const hz = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');
+  af(/body\.avisar === true \|\| \(zonaCambio && body\.avisar !== false\)/.test(hz), 'zona cambiada = aviso por default; solo avisar:false explícito lo apaga');
+  af(/!v\.portal_revisado_at/.test(hz.slice(hz.indexOf('const quiereAvisar'), hz.indexOf('const quiereAvisar') + 800)), 'sin publicar en el Portal no se manda (candado de siempre)');
 
   console.log(`\n${R ? '🔴' : '✅'} ${V} en verde · ${R} en rojo`);
   if (!V) console.log('NADA MEDIDO · esto NO es un verde');

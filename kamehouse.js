@@ -6207,12 +6207,14 @@ function vjBuscar(q) {
 function vjChip(etq) {
   _vj2Chip = (_vj2Chip === etq) ? null : etq;
   if (_vj2Ctx) _vj2Pintar();
+  if (typeof _vjInvPintar === 'function') _vjInvPintar();   // [ZONA-FILTRO-1] el marcador enseña cuál zona filtra
 }
 function vjFiltroLimpiar() {
   _vj2Q = ''; _vj2Chip = null;
   const bq = document.getElementById('cc-vj-buscar');
   if (bq) bq.value = '';
   if (_vj2Ctx) _vj2Pintar();
+  if (typeof _vjInvPintar === 'function') _vjInvPintar();
 }
 
 // Pinta los chips (fuera de #cc-kh-list, para que el repintado de la tabla no
@@ -6300,9 +6302,12 @@ function _vjInvPintar() {
     const title = z.disponibles == null
       ? `${z.zona}: sin compra cargada en el Palacio — ${vend} vendidos.`
       : `${z.zona}: compradas ${z.compradas} · vendidos ${vend} (fuera ${z.fuera || 0} + viajeros ${(z.migrados || 0) + (z.seguras || 0)} + apartados ${z.apartadas || 0}) · quedan ${z.disponibles}`;
-    return `<span class="vj-chip" style="border-color:${c};color:${c}" title="${_esfEsc(title)}">${_esfEsc(z.zona)} · ${num}</span>`;
+    // [ZONA-FILTRO-1] Clic = ver SOLO a las personas de esa zona (el mismo
+    // filtro `__zona:` de los chips de la tabla); segundo clic lo quita.
+    const on = _vj2Chip === '__zona:' + z.zona;
+    return `<span class="vj-chip${on ? ' on' : ''}" role="button" style="cursor:pointer;border-color:${c};color:${c}${on ? ';background:' + c + ';color:#000' : ''}" title="${_esfEsc(title)} · clic para ver solo a esas personas" onclick="vjChip('__zona:${_attrJs(z.zona)}')">${_esfEsc(z.zona)} · ${num}</span>`;
   }).join('');
-  box.innerHTML = `<div style="font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">🎟 BOLETOS POR ZONA — se actualiza solo al corregir, mover o cancelar</div><div class="vj-chips">${chips}</div>`;
+  box.innerHTML = `<div style="font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">🎟 BOLETOS POR ZONA — toca una zona para ver solo a esas personas · se actualiza solo al corregir, mover o cancelar</div><div class="vj-chips">${chips}</div>`;
 }
 
 async function _vj2Cargar() {
@@ -6768,7 +6773,7 @@ function _vjEditarAbrir(id, nombre) {
       <button class="btn btn-ghost btn-sm" onclick="_vjEditarAbrir('${_attrJs(id)}')">Cancelar</button>
       <div style="flex-basis:100%;font-size:11px;color:var(--ts);border-top:1px solid var(--line);padding-top:8px;margin-top:4px">
         ${pub
-          ? `<label style="cursor:pointer"><input type="checkbox" id="vjx-av-${e}"> Avisarle por correo lo que cambió</label>
+          ? `<label style="cursor:pointer"><input type="checkbox" id="vjx-av-${e}"> Avisarle por correo lo que cambió</label><b id="vjx-avz-${e}" style="color:var(--yellow)"></b>
              <span style="color:var(--ts)"> · su Portal ya muestra este viaje, así que el correo lo manda a su plan al día.</span>`
           : '🪪 <b>Sin publicar en su Portal</b>: no se puede avisar por correo (el cliente vería «estamos revisando tu viaje»). Publícalo primero o avísale por WhatsApp.'}
       </div>
@@ -6809,6 +6814,17 @@ async function _vjEditarZonas(id, v) {
   };
   sel.innerHTML = (String(v.tipo_paquete || '').toLowerCase() === 'ride' ? '<option value="">— sin zona (RIDE) —</option>' : '')
     + lista.map((n) => `<option value="${_esfEsc(n)}"${n === actual ? ' selected' : ''}>${etq(n)}</option>`).join('');
+  // [ZONA-AVISO-1] Cambiar la zona MARCA solo el aviso por correo (palabra de
+  // Memo: siempre que se corrija una zona). Se puede desmarcar; volver a la
+  // zona de antes lo desmarca.
+  sel.onchange = () => {
+    const av = document.getElementById(`vjx-av-${id}`);
+    if (!av) return;   // sin publicar: no hay casilla y la pantalla ya lo dice
+    const cambia = sel.value !== actual;
+    av.checked = cambia;
+    const lb = document.getElementById(`vjx-avz-${id}`);
+    if (lb) lb.textContent = cambia ? ` · 📨 cambió la zona: le llegará «Tu lugar cambió de zona» (${actual || '—'} → ${sel.value || '—'})` : '';
+  };
 }
 // ═══ [CANCELAR-LUGAR-1] ⛔ Cancelar un lugar — jamás borrarlo ═════════════
 // Dos salidas firmadas por Memo (30-oct): el dinero se QUEDA (regla de la

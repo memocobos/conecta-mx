@@ -209,9 +209,15 @@ está caduco antes de escribirse.
   `_evVeredicto`, la tarjeta del catálogo y `heroALaVenta` — un evento de UNA
   fecha pasa a pasado a su HORA de inicio (`_evHoraInicio`, 21:00 / 14:00
   festivales, −06:00), y al llegar a cero el hero marca `_past` y corre
-  `filterEvents()` (se va del listado sin recargar). ⚠️ MULTIFECHA sin cambio
-  (su `ds` es la PRIMERA fecha: sigue la regla de 23:59). mas-alla-1 73 ✅ (su
-  rebanada ahora trae los tres dueños).
+  `filterEvents()` (se va del listado sin recargar). mas-alla-1 73 ✅ (su
+  rebanada ahora trae los cinco dueños).
+  🔒 **MULTI-CERO-1 (mismo día, palabra de Memo: «los multifecha… al llegar a
+  ceros la primera fecha pasa a la segunda, a la tercera… y se elimina hasta el
+  cero de la última»):** `_evFechas(ev)` es el dueño de las fechas (ds + dsList
+  + multifecha[].ds, únicas y en orden — frontera trae un 18-dic que su dsList
+  no dice) y `_evYaArranco` mira la ÚLTIMA; el hero (`dsGrande`) recorre la
+  MISMA lista. Careado con el reloj congelado: FR sigue vivo hasta el 16-ene
+  21:00, frontera hasta el 18-dic, omar hasta el 7-nov.
 
 - 🧮⏳ **COTIZA-VEND-1 (30-oct-2026, en main local, cero SQL): EL COTIZADOR DE
   VENDEDOR — el «rol de pagos» se vuelve herramienta de KameHouse.** Palabra de

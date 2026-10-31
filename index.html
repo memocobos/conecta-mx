@@ -3993,11 +3993,30 @@ function _evHoraInicio(ev){
   var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
   return esFestival?'14:00':'21:00';
 }
+// [MULTI-CERO-1 · 30-oct, palabra de Memo] Un MULTIFECHA vive hasta que
+// arranca su ÚLTIMA fecha: llega a cero la primera → pasa a la segunda, a la
+// tercera… y se va del listado y de la portada solo al llegar a cero la
+// última. Las fechas se juntan de ds + dsList + multifecha[].ds (frontera trae
+// un 18-dic que su dsList no dice) — únicas y en orden. Una sola lista: la
+// leen el veredicto, la tarjeta, el hero y su reloj.
+function _evFechas(ev){
+  if(!ev)return [];
+  var vistas={},out=[];
+  function meter(d){ if(d&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&d!=='2027-12-31'&&!vistas[d]){vistas[d]=1;out.push(d);} }
+  meter(ev.ds);
+  (ev.dsList||[]).forEach(meter);
+  (ev.multifecha||[]).forEach(function(m){ if(m)meter(m.ds); });
+  return out.sort();
+}
+function _evArranque(ev,ds){
+  var t=new Date(ds+'T'+_evHoraInicio(ev)+':00-06:00').getTime();
+  return isNaN(t)?null:t;
+}
 function _evYaArranco(ev){
-  if(!ev||!ev.ds||ev.ds==='2027-12-31')return false;
-  if(ev.dsList&&ev.dsList.length>1){ return new Date(ev.ds+'T23:59:59')<new Date(); }
-  var t=new Date(ev.ds+'T'+_evHoraInicio(ev)+':00-06:00').getTime();
-  return !isNaN(t)&&Date.now()>=t;
+  var f=_evFechas(ev);
+  if(!f.length)return false;
+  var t=_evArranque(ev,f[f.length-1]);
+  return t!==null&&Date.now()>=t;
 }
 function _evVeredicto(ev){
   var isPast=_evYaArranco(ev);
@@ -4353,7 +4372,8 @@ var _landTick = null;
   // tick() volvía a ver cero y llamaba a construir()… en bucle, y la tira de
   // abajo (los más buscados) nunca llegaba a pintarse. Reporte de Memo.
   function dsGrande(ev){
-    var l=(ev.dsList&&ev.dsList.length)?ev.dsList:(ev.ds?[ev.ds]:[]);
+    // [MULTI-CERO-1] Las fechas las da su dueño (_evFechas), en orden.
+    var l=_evFechas(ev);
     var ahora=Date.now();
     for(var i=0;i<l.length;i++){ if(l[i]&&instanteEvento(ev,l[i])>ahora)return l[i]; }
     return '';

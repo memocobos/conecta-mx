@@ -79,7 +79,7 @@ function iifeDeepLink(src) {
   // [CARD-CERO-1] _evVeredicto ahora le pregunta «¿ya arrancó?» a su dueño
   // (_evYaArranco + _evHoraInicio): se rebanan juntos, los tres REALES.
   const _fv = funcionDe(idx, '_evVeredicto');
-  const fnVer = _fv ? [funcionDe(idx, '_evHoraInicio'), funcionDe(idx, '_evYaArranco'), _fv].join('\n') : null;
+  const fnVer = _fv ? [funcionDe(idx, '_evHoraInicio'), funcionDe(idx, '_evFechas'), funcionDe(idx, '_evArranque'), funcionDe(idx, '_evYaArranco'), _fv].join('\n') : null;
   const iife = iifeDeepLink(idx);
   af(!!fnVer, '_evVeredicto no se pudo rebanar del index');
   af(!!iife, 'el IIFE del deep-link no se pudo rebanar (¿se movió su comentario ancla?)');

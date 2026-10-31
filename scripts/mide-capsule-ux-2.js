@@ -264,7 +264,7 @@ const bandeja = (b) => llamar('admin-requisiciones.js', b);
     sb.document = { getElementById: (id) => nodo(id), querySelectorAll: () => [] };
     sb.currentUser = { rol: 'maestro_roshi' };
     [decl(js, 'KH_PREVENTA_EVENTOS'), fn(js, 'khEsPreventaCiegas'), fn(js, 'khPaqueteTexto'), fn(js, '_esStaff'),
-     decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'),
+     decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'), fn(js, '_vjEdad'), fn(js, '_vjPerfil'),
      fn(js, '_esfEsc'), fn(js, '_attrJs'), fn(js, '_vj3Saldo'), fn(js, '_vj3Money'),
      fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'),
      decl(js, 'VJ_ROLES_ELIMINAR'), fn(js, '_vjPuedeEliminar'), fn(js, '_vjCtrPuede'), fn(js, '_vjCtrChip'),

@@ -110,6 +110,7 @@ const ACCIONES = {
   viajero_mudar_fecha: ROLES_EDITA_VIAJERO,    // [VIAJERO-MUDAR-1]
   viajero_cancelar: ROLES_EDITA_VIAJERO,       // [CANCELAR-LUGAR-1] baja (jamás borra) · ganancia o reembolso
   fechas_de_evento: ROLES_EDITA_VIAJERO,       // [VIAJERO-MUDAR-1] solo LEE el catálogo
+  perfiles_portal: ROLES_EDITA_VIAJERO,        // [VJ-PERFIL-1] foto/edad/emergencia del Portal — solo LEE
   contrato_cliente_estado: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_enviar: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-1]
   contrato_cliente_ine: ROLES_EDITA_VIAJERO, // [CONTRATO-CLIENTE-2] ver la INE (URLs firmadas)
@@ -1172,7 +1173,7 @@ ${entregables}
         });
         return ok(headers, { viajeros, equipo, vista: 'coordi' });
       }
-      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo,portal_revisado_at,portal_revisado_por` : VE_READ_COLS; // [PORTAL-SOLO-1] el sello del Portal viaja solo a quien ve dinero
+      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo,portal_revisado_at,portal_revisado_por,fecha_nacimiento` : VE_READ_COLS; // [PORTAL-SOLO-1] el sello del Portal viaja solo a quien ve dinero
       const sp = new URLSearchParams();
       sp.set('select', cols);
       sp.append('evento_id', `eq.${evento_id}`);
@@ -1492,6 +1493,39 @@ ${entregables}
     // Solo LEE el catálogo servido. La lista se DERIVA de la ficha (multifecha),
     // jamás se teclea: un `slug#N` escrito a mano manda a alguien a una fecha
     // que la ficha no tiene, y de ahí nacen los huérfanos de zona.
+    // [VJ-PERFIL-1] (30-oct) Lo que el cliente capturó en SU perfil del Portal
+    // —foto, fecha de nacimiento, contacto de emergencia— para pintarlo en la
+    // lista de viajeros. Palabra de Memo: «falta ver el número de emergencia y
+    // nombre … la edad … y si llegan a tomarse foto de perfil incluir la foto».
+    // SOLO LEE (cross-base, casado por correo en minúsculas, tandas de 100 —
+    // la ley de CONCILIA-LOTE-1). Fail-soft: sin llaves o con el Portal caído
+    // contesta perfiles:null y la lista se pinta igual con lo de KameHouse.
+    if (accion === 'perfiles_portal') {
+      const evId = String(body.evento_id || '').trim();
+      if (!evId || !SLUG_RE.test(evId)) return bad(headers, 'evento_id inválido');
+      if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return ok(headers, { perfiles: null, motivo: 'sin llaves del Portal' });
+      const vr = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evId)}&correo=not.is.null&select=correo&limit=2000`, { headers: sbHeaders });
+      if (!vr.ok) return ok(headers, { perfiles: null, motivo: 'no se pudo leer el padrón' });
+      const correos = [...new Set((await vr.json()).map((x) => String(x.correo || '').trim().toLowerCase()).filter((c) => /^[^\s@,()]+@[^\s@,()]+$/.test(c)))];
+      const perfiles = {};
+      const hP = { apikey: env.PORTAL_SB_SERVICE, Authorization: 'Bearer ' + env.PORTAL_SB_SERVICE };
+      for (let i = 0; i < correos.length; i += 100) {
+        const lote = correos.slice(i, i + 100).map((c) => '"' + c.replace(/"/g, '') + '"').join(',');
+        const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/clientes?correo=in.(${encodeURIComponent(lote)})&select=correo,fecha_nacimiento,avatar_url,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion`, { headers: hP });
+        if (!r.ok) return ok(headers, { perfiles: null, motivo: 'no se pudo leer el Portal' });
+        (await r.json()).forEach((c) => {
+          perfiles[String(c.correo || '').toLowerCase()] = {
+            fecha_nacimiento: c.fecha_nacimiento || null,
+            avatar_url: /^https:\/\//.test(String(c.avatar_url || '')) ? c.avatar_url : null,
+            emergencia_nombre: c.contacto_emergencia_nombre || null,
+            emergencia_tel: c.contacto_emergencia_telefono || null,
+            emergencia_relacion: c.contacto_emergencia_relacion || null,
+          };
+        });
+      }
+      return ok(headers, { perfiles });
+    }
+
     if (accion === 'fechas_de_evento') {
       const evId = String(body.evento_id || '').trim();
       if (!evId || !SLUG_RE.test(evId)) return bad(headers, 'evento_id inválido');

@@ -121,7 +121,8 @@ af(/visibles\.forEach/.test(pintar) && /Mostrando/.test(pintar),
 // El dinero del evento se suma sobre _vj2Filas (universo), no sobre visibles:
 const sumasDinero = (pintar.match(/_vj2Filas\.forEach\(\(v\) => \{\s*const s = _vj3Saldo/g) || []).length;
 af(sumasDinero === 2, 'las DOS sumas de dinero (deuda/favor y total/abonado) van sobre _vj2Filas: ' + sumasDinero + ' de 2');
-af(/_vj2Ctx = \{ evento: _ccEventoActual, porViajero, ctrMapa: _ctrMapa \}/.test(cargar)
+// [VJ-PERFIL-1] el contexto ganó `perfiles` (foto/edad/emergencia del Portal): verdad nueva.
+af(/_vj2Ctx = \{ evento: _ccEventoActual, porViajero, ctrMapa: _ctrMapa, perfiles: _perfiles \}/.test(cargar)
    && /_vj2Pintar\(\)/.test(cargar), '_vj2Cargar guarda el contexto y delega el pintado');
 af(/_vj2Ctx\.evento !== _ccEventoActual/.test(cargar),
    'al cambiar de EVENTO el filtro se limpia (uno heredado escondería viajeros del evento nuevo)');
@@ -203,7 +204,7 @@ try {
    decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'),
    fn(js, '_esfEsc'), fn(js, '_attrJs'), fn(js, '_vj3Saldo'), fn(js, '_vj3Money'),
    // [CAPSULE-WA-1] el pintor ahora arma links de WhatsApp: sus tres dueños van al sandbox
-   fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'),
+   fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'), fn(js, '_vjEdad'), fn(js, '_vjPerfil'),
    decl(js, 'VJ_ROLES_ELIMINAR'), fn(js, '_vjPuedeEliminar'), fn(js, '_vjCtrPuede'), fn(js, '_vjCtrChip'),
    decl(js, 'KH_CONTRATO_CLIENTE_VIVO'), decl(js, 'KH_CONTRATO_PRUEBA_CORREOS'),
    'let _vj2Filas = []; let _vj2Q = ""; let _vj2Chip = null; let _vj2Ctx = null;',
@@ -229,6 +230,18 @@ try {
   const links = (tabla2.match(/class="vj2-wa"/g) || []).length;
   af(links === 4, 'el pintor arma 4 links de WhatsApp — los 4 celulares de 10 dígitos: ' + links);
   af(tabla2.indexOf('https://wa.me/528991112233?text=') !== -1, 'y el de María lleva SU número con el 52 delante');
+  // [VJ-PERFIL-1] foto · edad · emergencia del PERFIL del Portal + notas en desplegable.
+  vm.runInContext('_vj2Filas[0].correo = "Maria@X.mx"; _vj2Filas[0].notas = "nota larga de migración"; _vj2Filas[0].emergencia_nombre = null; _vj2Filas[0].num_emergencia = null;'
+    + '_vj2Ctx.perfiles = { "maria@x.mx": { fecha_nacimiento: "2000-01-01", avatar_url: "https://cdn.x/a.jpg", emergencia_nombre: "Lupe", emergencia_tel: "8990001111", emergencia_relacion: "mamá" } };'
+    + '_vj2Pintar();', sb5);
+  const t3 = nodos['cc-kh-list'].innerHTML;
+  const anioRey = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }).slice(0, 4));
+  af(t3.indexOf('<img src="https://cdn.x/a.jpg"') !== -1, '[VJ-PERFIL-1] la foto del perfil del Portal sale junto al nombre (casado por correo sin importar mayúsculas)');
+  af(t3.indexOf(`· ${anioRey - 2000} años`) !== -1, '[VJ-PERFIL-1] la edad sale de la fecha de nacimiento: ' + (anioRey - 2000));
+  af(/🆘 Lupe \(mamá\) · 8990001111/.test(t3), '[VJ-PERFIL-1] sin emergencia en KameHouse, se pinta la del perfil con nombre, parentesco y teléfono');
+  af(/<details class="vj2-nota"><summary[^>]*>📝 Notas<\/summary>[\s\S]*nota larga de migración/.test(t3) && !/<th>Notas<\/th>/.test(t3), '[VJ-PERFIL-1] las notas viven en un desplegable al final (ya no es columna)');
+  af(vm.runInContext('_vjEdad("2010-12-31")', sb5) === anioRey - 2011 || vm.runInContext('_vjEdad("2010-12-31")', sb5) === anioRey - 2010, 'la edad descuenta el cumpleaños que aún no llega');
+  af(vm.runInContext('_vjEdad("")', sb5) === null, 'sin fecha no se inventa edad');
 } catch (e) {
   af(false, 'EL PINTOR REVENTÓ al ejecutarse: ' + e.message);
 }

@@ -6368,7 +6368,15 @@ async function _vj2Cargar() {
     const bq = document.getElementById('cc-vj-buscar');
     if (bq) bq.value = '';
   }
-  _vj2Ctx = { evento: _ccEventoActual, porViajero, ctrMapa: _ctrMapa };
+  // [VJ-PERFIL-1] Foto, fecha de nacimiento y emergencia del PERFIL del
+  // Portal (lo que el cliente capturó), en UNA llamada por evento. Fail-soft:
+  // sin perfiles la lista se pinta con lo de KameHouse, como siempre.
+  let _perfiles = {};
+  if (_vjPuedeEliminar()) {
+    try { _perfiles = ((await khViajeros._call({ accion: 'perfiles_portal', evento_id: _ccEventoActual })) || {}).perfiles || {}; }
+    catch (_) { _perfiles = {}; }
+  }
+  _vj2Ctx = { evento: _ccEventoActual, porViajero, ctrMapa: _ctrMapa, perfiles: _perfiles };
   _vj2Pintar();
 }
 
@@ -6376,12 +6384,24 @@ async function _vj2Cargar() {
 // el dinero y los contadores salen del universo COMPLETO; el buscador y el
 // chip solo deciden qué filas entran a la tabla. Cero fetch aquí a propósito —
 // filtrar no puede costar una consulta.
+// [VJ-PERFIL-1] La edad, contada en el día de REYNOSA (no el de Greenwich).
+function _vjEdad(fnac) {
+  const m = String(fnac || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }).split('-').map(Number);
+  let e = hoy[0] - Number(m[1]);
+  if (hoy[1] < Number(m[2]) || (hoy[1] === Number(m[2]) && hoy[2] < Number(m[3]))) e--;
+  return e >= 0 && e < 120 ? e : null;
+}
+// El perfil del Portal de esta fila (por correo en minúsculas) — o vacío.
+function _vjPerfil(v, perf) { return (perf || {})[String(v.correo || '').trim().toLowerCase()] || {}; }
 function _vj2Pintar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
   const cnt = document.getElementById('cc-kh-count');
   if (!wrap || !list || !_vj2Ctx) return;
   const porViajero = _vj2Ctx.porViajero || {};
+  const _perf = _vj2Ctx.perfiles || {};
   const _ctrMapa = _vj2Ctx.ctrMapa;
 
   const n = _vj2Filas.length;
@@ -6487,7 +6507,7 @@ function _vj2Pintar() {
     <thead><tr>
       ${_puedeAgrupar ? '<th></th>' : ''}<th>Nombre</th><th>Paquete</th><th>Zona</th><th title="[VJ-HAB-1] Tipo de habitación elegida — se corrige con ✏️">Hab.</th><th>Talla</th><th>Contacto</th>
       ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}
-      <th>Notas</th>${_vjPuedeEliminar() ? '<th></th>' : ''}
+      ${_vjPuedeEliminar() ? '<th></th>' : '<th>Notas</th>'}
     </tr></thead>
     <tbody>${_filasOrden.map((v) => {
       // El origen, visible por fila: `tipo_viajero` lo pone el alta de staff;
@@ -6502,13 +6522,23 @@ function _vj2Pintar() {
         ? (_wa ? `<a href="${_wa}" target="_blank" rel="noopener" class="vj2-wa" title="Abrir WhatsApp con ${_esfEsc(v.nombre || '')}">💬 ${_esfEsc(v.celular)}</a>` : _esfEsc(v.celular))
         : '';
       const contacto = [_cel, v.correo ? _esfEsc(v.correo) : ''].filter(Boolean).join('<br>') || '<span class="vj2-vacio">—</span>';
-      const emerg = [v.emergencia_nombre, v.num_emergencia].filter(Boolean).join(' · ');
+      // [VJ-PERFIL-1] Emergencia: lo de KameHouse manda; si falta, lo que el
+      // cliente capturó en su perfil del Portal. Edad: su fecha de nacimiento
+      // (la del contrato en KameHouse o la del perfil). Foto: la del perfil.
+      const pf = _vjPerfil(v, _perf);
+      const emNom = v.emergencia_nombre || pf.emergencia_nombre || '';
+      const emRel = v.emergencia_parentesco || pf.emergencia_relacion || '';
+      const emTel = v.num_emergencia || pf.emergencia_tel || '';
+      const emerg = [emNom ? emNom + (emRel ? ` (${emRel})` : '') : '', emTel].filter(Boolean).join(' · ');
+      const edad = _vjEdad(v.fecha_nacimiento || pf.fecha_nacimiento);
+      const foto = pf.avatar_url ? `<img src="${_esfEsc(pf.avatar_url)}" alt="" loading="lazy" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;border:1px solid var(--border)">` : '';
+      const notasHtml = v.notas ? `<details class="vj2-nota"><summary title="Ver las notas de ${_esfEsc(v.nombre || '')}">📝 Notas</summary><div class="vj2-notas" style="margin-top:4px;font-size:11px;color:var(--ts);white-space:normal">${_esfEsc(v.notas)}</div></details>` : '';
       const gCol = v.grupo_viaje && _grpColor[v.grupo_viaje];
       const compas = gCol ? _grp[v.grupo_viaje].filter((x) => x.id !== v.id).map((x) => x.nombre || '—') : [];
       const lugares = Number(v.boletos) > 1 ? `<span class="vj2-tag" title="Esta fila trae ${Number(v.boletos)} lugares: sus acompañantes aún no tienen ficha propia">${Number(v.boletos)} lugares</span>` : '';
       return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
-        <td><b>${_esfEsc(v.nombre || '—')}</b>
+        <td>${foto}<b>${_esfEsc(v.nombre || '—')}</b>${edad != null ? ` <span style="font-size:11px;color:var(--ts)" title="Edad hoy (fecha de nacimiento del contrato o de su perfil del Portal)">· ${edad} años</span>` : ''}
             <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}
             ${gCol ? (() => {
               // [VJ-CARD-1] «Viaja con» COMPACTO: el reporte de Milk/Bulma fue
@@ -6525,7 +6555,7 @@ function _vj2Pintar() {
         <td>${v.zona_boleto ? `<a href="#" style="color:inherit;text-decoration:none" title="Clic: ver solo esta zona" onclick="vjChip('__zona:${_attrJs(v.zona_boleto)}');return false">${_esfEsc(v.zona_boleto)}</a>` : '—'}</td>
         <td>${v.hotel_tipo ? `<a href="#" style="color:inherit;text-decoration:none" title="Habitación ${_esfEsc(v.hotel_tipo)} — clic: ver solo este tipo. Se corrige con ✏️" onclick="vjChip('__hab:${_attrJs(v.hotel_tipo)}');return false">🛏 ${_esfEsc(v.hotel_tipo)}</a>` : '<span class="vj2-vacio">—</span>'}</td>
         <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
-        <td>${contacto}${emerg ? `<div class="vj2-emerg">SOS ${_esfEsc(emerg)}</div>` : ''}</td>
+        <td>${contacto}${emerg ? `<div class="vj2-emerg" title="Contacto de emergencia">🆘 ${_esfEsc(emerg)}</div>` : '<div class="vj2-emerg vj2-vacio" title="Sin contacto de emergencia">🆘 —</div>'}</td>
         ${(() => {
           // [VJ-3] Las columnas de dinero solo EXISTEN si el payload trae
           // dinero. A un coordi el servidor no le manda total_contrato, así que
@@ -6541,7 +6571,7 @@ function _vj2Pintar() {
                   <td class="vj3-col vj3-ok">${_vj3Money(s.abonado)}</td>
                   <td class="vj3-col ${s.aFavor ? 'vj3-favor' : (s.resta > 0 ? 'vj3-debe' : '')}">${_vj3Money(s.resta)}${s.aFavor ? '<i class="vj3-af"> a favor</i>' : ''}</td>`;
         })()}
-        <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
+        ${_vjPuedeEliminar() ? '' : `<td>${notasHtml || '<span class="vj2-vacio">—</span>'}</td>`}
         ${_vjPuedeEliminar() ? `<td style="white-space:nowrap">
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Ver los pagos de ${_esfEsc(v.nombre || '')} con sus comprobantes"
@@ -6572,7 +6602,7 @@ function _vj2Pintar() {
             onclick="_vjCancelarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">⛔ Cancelar</button>`}
           <button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
           title="Eliminar a ${_esfEsc(v.nombre || '')} de este evento"
-          onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button></td>` : ''}
+          onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button>${notasHtml}</td>` : ''}
       </tr><tr id="vj-ab-${_esfEsc(v.id)}" style="display:none"><td colspan="20"></td></tr>`;
     }).join('')}</tbody>
   </table></div>`;

@@ -4333,9 +4333,21 @@ var _landTick = null;
   function abrir(id){ if(typeof showDetail==='function') showDetail(id); }
 
   // ── El universo del hero, una sola vez ──
+  // [HERO-CERO-1 · 30-oct-2026] La tarjeta grande corre hacia la PRÓXIMA fecha
+  // que todavía no arranca. Antes usaba la primera fecha del evento y
+  // heroALaVenta lo dejaba vivo hasta las 23:59 de ese día: a las 21:00 de
+  // Kevin Kaarl el reloj llegó a cero, construir() volvía a elegir a Kevin,
+  // tick() volvía a ver cero y llamaba a construir()… en bucle, y la tira de
+  // abajo (los más buscados) nunca llegaba a pintarse. Reporte de Memo.
+  function dsGrande(ev){
+    var l=(ev.dsList&&ev.dsList.length)?ev.dsList:(ev.ds?[ev.ds]:[]);
+    var ahora=Date.now();
+    for(var i=0;i<l.length;i++){ if(l[i]&&instanteEvento(ev,l[i])>ahora)return l[i]; }
+    return '';
+  }
   function aLaVentaPorFecha(){
-    return EV.filter(function(e){return heroALaVenta(e)&&dsEfectivo(e);})
-             .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
+    return EV.filter(function(e){return heroALaVenta(e)&&dsGrande(e);})
+             .sort(function(a,b){return dsGrande(a).localeCompare(dsGrande(b));});
   }
 
   var _destino=0;   // el instante al que corre el cronómetro
@@ -4357,7 +4369,11 @@ var _landTick = null;
     if(dif<=0){
       // El evento arrancó: se recalcula el hero entero, que elegirá el
       // siguiente. Sin esto el contador se quedaría en 00:00:00:00.
-      construir();
+      // 🔒 [HERO-CERO-1] Se apaga el destino ANTES de reconstruir: si por lo
+      // que sea volviera a salir el mismo instante vencido, no hay recursión.
+      _destino=0;
+      if(_landTick){clearInterval(_landTick);_landTick=null;}
+      setTimeout(construir,0);
       return;
     }
     var s=Math.floor(dif/1000);
@@ -4532,7 +4548,7 @@ var _landTick = null;
     var univ=proximosPorFecha();
     var ev=venta[0]||null;
     var grandeId=ev?ev.id:'';
-    var dsGrande=ev?dsEfectivo(ev):'';   // [LAND-2b] el tope de la ventana de agotados
+    var dsTope=ev?dsGrande(ev):'';   // [LAND-2b] el tope de la ventana de agotados
 
     // [LAND-2] LA TIRA SOBREVIVE A LA TARJETA GRANDE. Antes, sin nada a la
     // venta, este `return` apagaba las dos. Ahora el universo de la tira no
@@ -4547,7 +4563,7 @@ var _landTick = null;
     wrap.style.display='';
 
     // ── La tarjeta grande: el más cercano a la venta ──
-    var ds=dsEfectivo(ev);
+    var ds=dsGrande(ev);
     var media=document.createElement('div'); media.className='hn-media';
     var body=document.createElement('div'); body.className='hn-body';
     body.innerHTML=
@@ -4567,7 +4583,7 @@ var _landTick = null;
     }
 
     // ── La tira ──
-    var el=elegirTira(univ,grandeId,dsGrande);
+    var el=elegirTira(univ,grandeId,dsTope);
     strip.innerHTML='';
     strip.setAttribute('data-fuente',el.fuente);
     if(!el.items.length){strip.style.display='none';return;}

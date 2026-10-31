@@ -188,6 +188,22 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴⏳ **HERO-CERO-1 + PORTAL-SIN-RESERVAR-1 (30-oct-2026, en main local).**
+  Reporte de Memo: *«el card de kevin kaarl al llegar a ceros no cambió al
+  siguiente evento, y ya no sale el top 10 que salía en el main»*. Medido en
+  producción a las 21:43: la tarjeta grande en 00:00:00:00 y la tira VACÍA
+  (sin `data-fuente`). **Una sola causa:** `heroALaVenta` deja vivo el evento
+  hasta las 23:59 de su día, así que al llegar a cero `tick()` llamaba a
+  `construir()`, que volvía a elegir a Kevin, que volvía a llamar a `tick()`…
+  recursión hasta tronar — y la tira, que se pinta DESPUÉS, nunca se pintó.
+  Hoy la tarjeta grande corre a la PRÓXIMA fecha que todavía no arranca
+  (`dsGrande`, también en multifecha) y al llegar a cero se apaga el reloj
+  antes de reconstruir (sin recursión posible). Careado con el catálogo real
+  y el reloj congelado: 20:00 → kevin · 21:43 → dimitri. ⚠️ Los careos
+  Playwright del hero (`mide:tira-agotados`) se corren en la Mac.
+  **Portal:** fuera el botón «Reservar otro viaje →» (palabra de Memo: el
+  Portal es para ver su viaje). ⏳ Push de Memo → recargar la portada.
+
 - 🧮⏳ **COTIZA-VEND-1 (30-oct-2026, en main local, cero SQL): EL COTIZADOR DE
   VENDEDOR — el «rol de pagos» se vuelve herramienta de KameHouse.** Palabra de
   Memo, citada: *«que sea una herramienta para nosotros los vendedores para poder

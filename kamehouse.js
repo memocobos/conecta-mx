@@ -6553,7 +6553,7 @@ function _vj2Pintar() {
         <td>${foto}<b>${_esfEsc(v.nombre || '—')}</b>${edad != null ? ` <span style="font-size:11px;color:var(--ts)" title="Edad hoy (fecha de nacimiento del contrato o de su perfil del Portal)">· ${edad} años</span>` : ''}
             <!-- [VJ-FILA-2] Las etiquetas en SU renglón, una al lado de la otra
                  (palabra de Memo: contrato y Portal juntos se leen mejor). -->
-            <div class="vj2-tags">${_vjEsBaja(v) ? '<span class="vj2-tag" style="color:var(--red);border-color:var(--red)">⛔ cancelado</span>' : ''}<span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}</div>
+            <div class="vj2-tags">${_vjEsBaja(v) ? '<span class="vj2-tag" style="color:var(--red);border-color:var(--red)">⛔ cancelado</span>' : ''}<span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}<span class="vj2-par">${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}</span></div>
             ${v.indicaciones ? `<div class="vj2-indica" title="Indicaciones de ${_esfEsc(v.nombre || '')} (se corrigen con ✏️)">📌 ${_esfEsc(v.indicaciones)}</div>` : ''}
             ${gCol ? (() => {
               // [VJ-CARD-1] «Viaja con» COMPACTO: el reporte de Milk/Bulma fue

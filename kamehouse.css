@@ -2835,7 +2835,11 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
    plegable de cada viajero (vj-ab-*) nace oculta y no suma línea. */
 .vj2-tabla tbody td{border-bottom:2px solid rgba(255,255,255,.13)}
 .vj2-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.vj2-tags .vj2-tag{margin-left:0}
+.vj2-tags .vj2-tag{margin-left:0;white-space:nowrap}
+/* [VJ-FILA-2b] 📜 contrato y 🪪 Portal van SIEMPRE juntos en un renglón
+   (palabra de Memo: «uno al lado del otro para ahorrar espacio»): el par no
+   se parte y cada chip no parte su texto — la columna se ensancha lo justo. */
+.vj2-par{display:inline-flex;gap:4px;flex-wrap:nowrap}
 .vj2-indica{margin-top:4px;font-size:11px;color:var(--yellow);white-space:normal;line-height:1.35}
 .vj2-tabla tbody tr:last-child td{border-bottom:0}
 .vj2-tag{

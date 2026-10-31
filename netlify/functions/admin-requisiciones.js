@@ -158,6 +158,25 @@ exports.handler = async (event) => {
     if (nuevo !== 'atendida' && nuevo !== 'rechazada') return j(400, headers, { error: 'Estado inválido' });
     const respuesta = String(body.respuesta || '').trim().slice(0, 500);
     if (nuevo === 'rechazada' && respuesta.length < 3) return j(400, headers, { error: 'Di por qué no procede (el cliente lo va a preguntar)' });
+    // [PAQ-SOLO-APLICAR-1] Una elección de paquete solo se cierra de DOS formas
+    // (palabra de Memo, 30-oct): «✓ Aplicar paquete» o «No procede» con motivo.
+    // Medido: el 28-oct los 3 de la preventa de nsqkmty se cerraron «atendida»
+    // SIN aplicar el paquete — siguieron en preventa a ciegas ($300) y el cierre
+    // les mandó «tu paquete quedó confirmado». Hoy, cerrar como atendida exige
+    // que el viajero YA no esté en la preventa (el «Aplicar» lo saca primero y
+    // después cierra; un cierre suelto rebota 409 sin escribir ni mandar nada).
+    if (nuevo === 'atendida') {
+      const pr = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=tipo,viajero_id&limit=1`, { headers: sbH });
+      if (!pr.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
+      const c0 = (await pr.json())[0];
+      if (c0 && c0.tipo === 'paquete') {
+        const vr = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${c0.viajero_id}&select=zona_boleto&limit=1`, { headers: sbH });
+        if (!vr.ok) return j(502, headers, { error: 'No se pudo leer al viajero' });
+        const v0 = (await vr.json())[0];
+        const enPreventa = !v0 || /preventa a ciegas/i.test(String(v0.zona_boleto || ''));
+        if (enPreventa) return j(409, headers, { error: 'Esa persona sigue en preventa a ciegas: usa «✓ Aplicar paquete» (o «No procede» con motivo). Cerrarla sin aplicar la dejaría atorada.' });
+      }
+    }
     const r = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&estado=eq.pendiente`, {
       method: 'PATCH',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),

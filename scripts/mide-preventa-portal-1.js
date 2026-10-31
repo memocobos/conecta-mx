@@ -52,6 +52,7 @@ global.fetch = async (url, init) => {
       const fila = Object.assign({ id: U(900 + DB.c.length), estado: 'pendiente' }, b); DB.c.push(fila); return resp(201, [fila]);
     }
     let f = DB.c.slice();
+    const idf = eq(u, 'id'); if (idf) f = f.filter((c) => c.id === idf);   // [PAQ-SOLO-APLICAR-1] un GET por id trae ESA fila, como PostgREST
     const vid = eq(u, 'viajero_id'); if (vid) f = f.filter((c) => c.viajero_id === vid);
     const t = eq(u, 'tipo'); if (t) f = f.filter((c) => c.tipo === t);
     const e = eq(u, 'estado'); if (e) f = f.filter((c) => c.estado === e);
@@ -132,6 +133,16 @@ const llamar = async (b) => { const r = await H({ httpMethod: 'POST', headers: {
   USER = { email: 'otra@x.mx', email_confirmed_at: 'x' };
   r = await llamar({ accion: 'opciones_paquete', viajero_id: U(3) });
   af(r.s === 200 && r.j.rechazada && /Platino ya no tiene lugar/.test(r.j.rechazada.respuesta) && r.j.paquetes.length, 'el Portal recibe la elección rechazada CON su motivo y vuelve a ofrecer opciones');
+  // [PAQ-SOLO-APLICAR-1] El caso de Monserrat (28-oct): cerrar «atendida» una
+  // elección de paquete SIN aplicarla. Con el viajero aún en preventa → 409,
+  // la solicitud sigue pendiente y NO sale el «tu paquete quedó confirmado».
+  Object.assign(DB.v[2], { tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' });
+  DB.c.push({ id: U(952), viajero_id: U(3), evento_id: 'nsqkmty', correo: 'otra@x.mx', nombre: 'Otra', tipo: 'paquete', detalle: 'x', estado: 'pendiente', paquete_pedido: 'plus', zona_pedida: 'General' });
+  DB.correos = [];
+  r = await bandeja({ accion: 'cambio_cerrar', id: U(952), estado: 'atendida', respuesta: 'paso a habitacion cuadruple' });
+  af(r.s === 409 && DB.correos.length === 0 && DB.c.find((c) => c.id === U(952)).estado === 'pendiente', () => 'paquete sin aplicar NO se cierra como atendida (409, sigue pendiente, cero correos) · ' + r.s);
+  r = await bandeja({ accion: 'cambio_cerrar', id: U(952), estado: 'rechazada', respuesta: 'Ya no hay General, elige otra zona' });
+  af(r.s === 200, '«No procede» con motivo sí cierra una elección sin aplicar');
   DB.correos = [];
   DB.c.push({ id: U(951), viajero_id: U(3), evento_id: 'nsqkmty', correo: 'otra@x.mx', tipo: 'zona', detalle: 'cambio de zona', estado: 'pendiente' });
   r = await bandeja({ accion: 'cambio_cerrar', id: U(951), estado: 'atendida' });

@@ -126,6 +126,11 @@ function armarPropuesta({ viajeros, ocupadosNombres }) {
     const tc = tipoCuartoDe(v);
     const gen = v.genero || null;
     universo.push({
+      // [ROOMING-EQUIPO-1] el staff (coordinadora, auxiliar…) se marca: sin
+      // tipo de cuarto no se queda fuera, va al cuarto del EQUIPO (abajo).
+      staff: !!(v.tipo_viajero && String(v.tipo_viajero) !== 'cliente'),
+      tipo_viajero: v.tipo_viajero || null,
+      indicaciones: v.indicaciones || null,
       id: v.id, nombre: v.nombre,
       tipo: tc.tipo, tipo_origen: tc.origen,
       genero: gen || generoSugerido(v.nombre),
@@ -165,11 +170,21 @@ function armarPropuesta({ viajeros, ocupadosNombres }) {
   // 3 · Cuartos.
   const cuartos = [];
   const sueltosPorTipo = { cuadruple: [], doble: [], triple: [] };
+  const sinTipoPersonas = [];
+  const equipo = [];
 
   for (const miembros of grupos.values()) {
     // El tipo del grupo: el que diga la mayoría con dato; sin ninguno → sin_tipo.
     const tipos = miembros.map((m) => m.tipo).filter(Boolean);
-    if (!tipos.length) { sinTipo.push(...miembros.map((m) => m.nombre)); continue; }
+    if (!tipos.length) {
+      // [ROOMING-EQUIPO-1] Palabra de Memo (30-oct): «acomodas todo menos a la
+      // coordinadora». El staff no elige habitación (no compra paquete), así
+      // que sin tipo NO es un hueco: va al cuarto del equipo.
+      if (miembros.every((m) => m.staff)) { equipo.push(...miembros); continue; }
+      sinTipo.push(...miembros.map((m) => m.nombre));
+      sinTipoPersonas.push(...miembros);
+      continue;
+    }
     const tipo = tipos.sort((a, b) =>
       tipos.filter((t) => t === b).length - tipos.filter((t) => t === a).length)[0];
     if (new Set(tipos).size > 1) {
@@ -250,7 +265,27 @@ function armarPropuesta({ viajeros, ocupadosNombres }) {
     }
   }
 
-  return { cuartos, preguntas, sin_tipo: sinTipo, fuera };
+  // 5 · [ROOMING-EQUIPO-1] El cuarto del EQUIPO: por género (la misma regla
+  // de desconocidos: no se mezcla), de hasta 4; el tipo sale del tamaño
+  // (1 individual · 2 doble · 3 triple · 4 cuádruple). Sin género → pendiente.
+  if (equipo.length) {
+    const TIPO_POR_N = { 1: 'individual', 2: 'doble', 3: 'triple', 4: 'cuadruple' };
+    const porG = { M: [], H: [], '?': [] };
+    for (const m of equipo) porG[m.genero === 'M' || m.genero === 'H' ? m.genero : '?'].push(m);
+    for (const g of ['M', 'H']) {
+      for (let i = 0; i < porG[g].length; i += 4) {
+        const trozo = porG[g].slice(i, i + 4);
+        cuartos.push({ tipo: TIPO_POR_N[trozo.length], ocupantes: trozo, etiqueta: 'equipo (coordinación) · ' + (g === 'M' ? 'mujeres' : 'hombres') });
+      }
+    }
+    if (porG['?'].length) {
+      preguntas.push(`Equipo sin género (confírmalo con los chips): ${porG['?'].map((m) => m.nombre).join(' · ')}.`);
+      cuartos.push({ tipo: TIPO_POR_N[Math.min(4, porG['?'].length)], ocupantes: porG['?'], etiqueta: 'equipo SIN GÉNERO — confirma los chips y re-arma', pendiente: true });
+    }
+    preguntas.push(`Equipo del tour (${equipo.map((m) => m.nombre).join(' · ')}): no eligen habitación, así que se les propone cuarto de equipo. Si alguien duerme con el grupo, sácalo con ✕ y agrégalo a ese cuarto.`);
+  }
+
+  return { cuartos, preguntas, sin_tipo: sinTipo, sin_tipo_personas: sinTipoPersonas, fuera };
 }
 
 module.exports = { armarPropuesta, tipoCuartoDe, conQuienDe, generoSugerido, esBaja, CAPACIDAD, HOTEL_A_CUARTO };

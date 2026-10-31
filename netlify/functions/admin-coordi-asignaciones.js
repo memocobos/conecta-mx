@@ -198,7 +198,7 @@ const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 // de 1) y grupo_viaje (quién viaja con quién). Ninguno es dinero ni PII nueva.
 // [VJ-HAB-1] hotel_tipo viaja a la lista: es el tipo de habitación elegido
 // (Compartida/Doble/Triple/Individual) — ni dinero ni PII nueva.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,hotel_tipo,genero,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,hotel_tipo,genero,indicaciones,notas,tipo_viajero,usuario_id,created_at:creado_en,boletos,grupo_viaje,sin_boleto';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -1112,7 +1112,7 @@ ${entregables}
       // Y aparte, el EQUIPO: coordis asignados (con su estado) y las creadoras
       // con cortesía, diciendo si viajan con el tour o solo van al concierto.
       if (!puedeDinero) {
-        const COLS_COORDI = 'id,nombre,zona_boleto,tipo_paquete,tipo_viajero,talla_playera,emergencia_nombre,emergencia_parentesco,num_emergencia,boletos,grupo_viaje,usuario_id';
+        const COLS_COORDI = 'id,nombre,zona_boleto,tipo_paquete,tipo_viajero,talla_playera,emergencia_nombre,emergencia_parentesco,num_emergencia,boletos,grupo_viaje,usuario_id,indicaciones'; // [VJ-INDICA-1] la coordinadora ve las indicaciones
         const spc = new URLSearchParams();
         spc.set('select', COLS_COORDI);
         spc.append('evento_id', `eq.${evento_id}`);
@@ -1578,11 +1578,11 @@ ${entregables}
       if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
       const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
       if (!campos) return bad(headers, 'campos inválido');
-      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo', 'hotel_tipo', 'genero'];
+      const PERMITIDOS = ['nombre', 'tipo_paquete', 'zona_boleto', 'boletos', 'total_contrato', 'abonado_previo', 'hotel_tipo', 'genero', 'indicaciones'];
       const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
       if (ajenos.length) return bad(headers, 'campo no editable aquí: ' + ajenos.join(', ') + ' (el contacto va por «Editar datos»; el evento, por «Mover de fecha»)');
 
-      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,hotel_tipo,genero,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,correo,tipo_paquete,zona_boleto,boletos,total_contrato,abonado_previo,hotel_tipo,genero,indicaciones,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
       if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
       const v = (await pre.json())[0];
       if (!v) return bad(headers, 'ese viajero no existe');
@@ -1654,6 +1654,15 @@ ${entregables}
         const g = crudo === 'H' || crudo === 'M' ? crudo : (crudo ? undefined : null);
         if (g === undefined) return bad(headers, 'género inválido: H, M o vacío');
         if (!igual(g, v.genero)) { patch.genero = g; cambios.push(`género ${v.genero || '—'} → ${g || '—'}`); }
+      }
+      // [VJ-INDICA-1] Indicaciones del cliente (cuarto especial, algo
+      // específico). Texto libre ≤500, vacío lo QUITA. Su propio campo: la
+      // nota de migración no se pisa.
+      if ('indicaciones' in campos) {
+        const ind = String(campos.indicaciones == null ? '' : campos.indicaciones).replace(/\s+/g, ' ').trim();
+        if (ind.length > 500) return bad(headers, 'indicaciones: máximo 500 caracteres');
+        const nv = ind || null;
+        if (!igual(nv, v.indicaciones)) { patch.indicaciones = nv; cambios.push(nv ? 'indicaciones actualizadas' : 'indicaciones quitadas'); }
       }
       for (const k of ['total_contrato', 'abonado_previo']) {
         if (!(k in campos)) continue;

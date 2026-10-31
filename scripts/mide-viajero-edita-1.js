@@ -77,7 +77,7 @@ global.fetch = async (url, init) => {
     // esperado del PATCH pasaría en vacío y «el 2º clic da 409» sería un verde
     // que no prueba nada — la base de mentira que miente hacia el lado cómodo.
     const id = eq(u, 'id'); if (id) f = f.filter((x) => x.id === id);
-    for (const campo of ['evento_id', 'tipo_paquete', 'zona_boleto', 'total_contrato', 'abonado_previo', 'boletos', 'nombre']) {
+    for (const campo of ['evento_id', 'tipo_paquete', 'zona_boleto', 'total_contrato', 'abonado_previo', 'boletos', 'nombre', 'indicaciones']) {
       const val = eq(u, campo);
       if (val !== null) f = f.filter((x) => String(x[campo] == null ? '' : x[campo]) === val);
       else if (esNull(u, campo)) f = f.filter((x) => x[campo] == null);
@@ -163,6 +163,16 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
     const r = await llamar({ accion: 'viajero_editar_full', id: U(1), campos: { total_contrato: 5985 } });
     af(r.s === 400 && /no cambiaste nada/i.test(r.j.error || ''), 'el 2º clic idéntico se rehúsa («no cambiaste nada»), no re-escribe: ' + r.s);
     af(DB.escrituras.length === antes, 'y escribió ' + (DB.escrituras.length - antes) + ' veces (debe ser 0)');
+  }
+  {
+    // [VJ-INDICA-1] Las indicaciones: su PROPIO campo, la nota no se pisa.
+    const r = await llamar({ accion: 'viajero_editar_full', id: U(1), campos: { indicaciones: '  planta   baja · cama matrimonial ' } });
+    af(r.s === 200 && de(1).indicaciones === 'planta baja · cama matrimonial', '[I] las indicaciones se guardan (espacios colapsados): ' + JSON.stringify(de(1).indicaciones));
+    af(/migrada 28-ago/.test(de(1).notas) && /indicaciones actualizadas/.test(de(1).notas), '[I] la nota de procedencia sigue y el rastro dice que cambiaron');
+    const r2 = await llamar({ accion: 'viajero_editar_full', id: U(1), campos: { indicaciones: 'x'.repeat(501) } });
+    af(r2.s === 400 && /500/.test(r2.j.error || ''), '[I] más de 500 caracteres rebota con su motivo');
+    const r3 = await llamar({ accion: 'viajero_editar_full', id: U(1), campos: { indicaciones: '' } });
+    af(r3.s === 200 && de(1).indicaciones === null, '[I] vacío las QUITA (null, no cadena vacía)');
   }
   {
     const r = await llamar({ accion: 'viajero_editar_full', id: U(1), campos: { zona_boleto: 'Zona Inventada' } });

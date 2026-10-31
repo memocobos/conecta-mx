@@ -2830,6 +2830,13 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
  padding:9px 10px;font-size:12px;color:var(--text);
  border-bottom:1px solid var(--border);vertical-align:top;
 }
+/* [VJ-FILA-2] Entre una persona y la siguiente, una línea un poco más gruesa
+   (palabra de Memo: «que se diferencien pero que no sea invasivo»). La fila
+   plegable de cada viajero (vj-ab-*) nace oculta y no suma línea. */
+.vj2-tabla tbody td{border-bottom:2px solid rgba(255,255,255,.13)}
+.vj2-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.vj2-tags .vj2-tag{margin-left:0}
+.vj2-indica{margin-top:4px;font-size:11px;color:var(--yellow);white-space:normal;line-height:1.35}
 .vj2-tabla tbody tr:last-child td{border-bottom:0}
 .vj2-tag{
  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;

@@ -121,18 +121,20 @@ exports.handler = async (event) => {
       return s === base || s.startsWith(base + '#');
     });
     let porHab = {};
+    const indPorHab = {};   // [VJ-INDICA-1] la coordinadora ve las indicaciones de cada ocupante
     if (habs.length) {
       const ids = habs.map((h) => h.id).join(',');
-      const vs = await get(`viajeros_evento?habitacion_id=in.(${ids})&select=nombre,habitacion_id,boletos,zona_boleto&limit=2000`);
+      const vs = await get(`viajeros_evento?habitacion_id=in.(${ids})&select=nombre,habitacion_id,boletos,zona_boleto,indicaciones&limit=2000`);
       vs.filter((v) => !(Number(v.boletos) === 0 && !v.zona_boleto)).forEach((v) => {
         (porHab[v.habitacion_id] = porHab[v.habitacion_id] || []).push(v.nombre);
+        if (v.indicaciones) (indPorHab[v.habitacion_id] = indPorHab[v.habitacion_id] || {})[v.nombre] = v.indicaciones;
       });
     }
     const rooming = habs.map((h) => {
       let ocp = h.ocupantes;
       if (typeof ocp === 'string') { try { ocp = JSON.parse(ocp); } catch { ocp = []; } }
       const nombres = [...new Set([...(porHab[h.id] || []), ...(Array.isArray(ocp) ? ocp : [])].map((x) => String(x || '').trim()).filter(Boolean))];
-      return { numero_hab: h.numero_hab, tipo: h.tipo, orden: h.orden, fecha: h.evento_slug, hotel_nombre: h.hotel_nombre, hotel_direccion: h.hotel_direccion, incluye_desayuno: !!h.incluye_desayuno, fecha_entrada: h.fecha_entrada, fecha_salida: h.fecha_salida, ocupantes: nombres };
+      return { numero_hab: h.numero_hab, tipo: h.tipo, orden: h.orden, fecha: h.evento_slug, hotel_nombre: h.hotel_nombre, hotel_direccion: h.hotel_direccion, incluye_desayuno: !!h.incluye_desayuno, fecha_entrada: h.fecha_entrada, fecha_salida: h.fecha_salida, ocupantes: nombres, indicaciones: indPorHab[h.id] || {} };
     });
     const grupos = await gruposDe([evento_id], { KH_URL: URL_, KH_KEY: KEY });
     return res(200, {

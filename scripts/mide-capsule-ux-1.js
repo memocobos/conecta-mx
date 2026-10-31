@@ -143,7 +143,7 @@ vm.runInContext('_vjChipsPintar(_vjResumenDe(' + JSON.stringify(FILAS) + '))', s
 af(/👥 <b>6<\/b> viajeros · 🎟 <b>7<\/b> lugares/.test(chipsHtml), 'el chip GLOBAL dice 6 viajeros · 7 lugares');
 af(/PREVENTA A CIEGAS <b>2<\/b> · 2🎟/.test(chipsHtml), 'el chip de la preventa dice 2 · 2🎟');
 af(/onclick="vjChip\('PLUS'\)"/.test(chipsHtml), 'los chips de paquete son BOTONES que filtran (vjChip)');
-af(/bajas <b>1<\/b>/.test(chipsHtml) && /staff <b>1<\/b>/.test(chipsHtml), 'bajas y staff tienen su chip aparte');
+af(/cancelados <b>1<\/b>/.test(chipsHtml) && /staff <b>1<\/b>/.test(chipsHtml), 'cancelados (bajas) y staff tienen su chip aparte');
 af(/boletos por zona \(3 zonas\)/.test(chipsHtml), 'el desplegable de zonas dice cuántas hay (3)');
 // Control positivo del instrumento: con chip activo, el chip se marca.
 vm.runInContext('_vj2Chip = "PLUS"; _vjChipsPintar(_vjResumenDe(' + JSON.stringify(FILAS) + '))', sb2);
@@ -219,12 +219,22 @@ try {
   af(/Mostrando <b>1<\/b> de 7 viajeros/.test(tabla), 'la nota dice la verdad: «Mostrando 1 de 7»');
   af(/👥 <b>6<\/b> viajeros · 🎟 <b>7<\/b> lugares/.test(nodos['cc-vj-chips'].innerHTML),
      'los chips siguen con el UNIVERSO (6·7) aunque la tabla esté filtrada');
-  // Sin filtro: las 7 filas (6 activas + 1 baja) se pintan como siempre.
+  // [VJ-CANCEL-OCULTO-1] Palabra de Memo (30-oct): «los cancelados deberían
+  // poderse quitar de la lista principal para solo ver los que sí van». La
+  // verdad VIEJA («la baja sigue a la vista por default») se retira con esta
+  // razón: sin filtro se pintan las 6 que van y la nota DICE el cancelado.
   vm.runInContext('_vj2Q = ""; _vj2Chip = null; _vj2Pintar();', sb5);
   const tabla2 = nodos['cc-kh-list'].innerHTML;
   const filas2 = (tabla2.match(/<tr(?![^>]*id="vj-ab-)[^>]*>\s*(<td><input|<td><b>)/g) || []).length;
-  af(filas2 === 7, 'sin filtro la tabla pinta las 7 filas de siempre (bajas incluidas): ' + filas2);
-  af(/Baja Prueba/.test(tabla2), 'la baja sigue a la vista por default (hoy no se esconde nada)');
+  af(filas2 === 6, 'sin filtro la tabla pinta SOLO las 6 que van (el cancelado fuera): ' + filas2);
+  af(!/Baja Prueba/.test(tabla2), 'el cancelado NO sale en la lista principal');
+  af(/1 cancelado fuera de la lista/.test(tabla2) && /vjChip\('__bajas'\)/.test(tabla2), 'y la nota DICE cuántos quedaron fuera, con el link para verlos');
+  vm.runInContext('_vj2Chip = "__bajas"; _vj2Pintar();', sb5);
+  const tablaB = nodos['cc-kh-list'].innerHTML;
+  af(/Baja Prueba/.test(tablaB) && /⛔ cancelado/.test(tablaB), 'con el chip «cancelados» sí aparece, rotulado ⛔ cancelado');
+  vm.runInContext('_vj2Q = "baja"; _vj2Chip = null; _vj2Pintar();', sb5);
+  af(!/Baja Prueba/.test(nodos['cc-kh-list'].innerHTML), 'el buscador tampoco lo saca a la lista principal (solo su chip)');
+  vm.runInContext('_vj2Q = ""; _vj2Chip = null; _vj2Pintar();', sb5);
   // [CAPSULE-WA-1] por el pintor REAL: 4 fixtures traen celular de 10 dígitos
   // (a,b,c,d) → 4 links; las 3 filas sin celular, ninguno.
   const links = (tabla2.match(/class="vj2-wa"/g) || []).length;

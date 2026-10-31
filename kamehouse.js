@@ -6156,6 +6156,9 @@ function _vjResumenDe(filas, ctrMapa) {
 function _vjFiltraFilas(filas, q, chip, ctrMapa) {
   const qn = _vjNorm(q).trim();
   return (filas || []).filter((v) => {
+    // [VJ-CANCEL-OCULTO-1] Un cancelado SOLO sale con su chip: ni la lista
+    // principal ni el buscador lo pintan — lo de la tabla es quién SÍ va.
+    if (chip !== '__bajas' && _vjEsBaja(v)) return false;
     if (chip === '__bajas') { if (!_vjEsBaja(v)) return false; }
     else if (chip === '__staff') { if (_vjEsBaja(v) || !_esStaff(v)) return false; }
     // [VJ-CARD-1] Chips nuevos, todos sobre filas ACTIVAS (las bajas tienen su
@@ -6174,7 +6177,7 @@ function _vjFiltraFilas(filas, q, chip, ctrMapa) {
     else if (chip === '__prv_sin') { if (_vjEsBaja(v) || !('portal_revisado_at' in v) || v.portal_revisado_at || v.usuario_id || _esStaff(v)) return false; }
     else if (chip) { if (_vjEsBaja(v) || (khPaqueteTexto(v) || '—') !== chip) return false; }
     if (!qn) return true;
-    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.hotel_tipo, v.emergencia_nombre, v.num_emergencia, v.notas]
+    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.hotel_tipo, v.emergencia_nombre, v.num_emergencia, v.indicaciones, v.notas]
       .filter(Boolean).join(' | '));
     return hay.includes(qn);
   });
@@ -6245,7 +6248,7 @@ function _vjChipsPintar(res) {
       <span class="vj-chip vj-chip-g" title="El universo completo del evento (no cambia con el buscador): ${res.filas} viajeros activos · ${res.lugares} lugares/boletos">👥 <b>${res.filas}</b> viajeros · 🎟 <b>${res.lugares}</b> lugares</span>
       ${paqs}
       ${res.staff ? chip('__staff', `staff <b>${res.staff}</b>`, 'Filas del equipo (coordis, creadoras). Clic para verlas solas.') : ''}
-      ${res.bajas ? chip('__bajas', `bajas <b>${res.bajas}</b>`, 'Cancelados (boletos en 0): no suman lugares. Clic para verlos.') : ''}
+      ${res.bajas ? chip('__bajas', `⛔ cancelados <b>${res.bajas}</b>`, 'Cancelados (boletos en 0): no suman lugares y no salen en la lista. Clic para verlos.') : ''}
       ${res.ctr_sin ? chip('__ctr_sin', `📜 sin firmar <b>${res.ctr_sin}</b>`, '[VJ-CARD-1] Viajeros con contrato pendiente de firma (o sin contrato emitido). Clic para verlos y recordarles.') : ''}
       ${res.prv_sin ? chip('__prv_sin', `🪪 sin revisar <b>${res.prv_sin}</b>`, '[VJ-CARD-1] Nadie ha revisado sus números para el Portal: si entran verán «estamos revisando tu viaje». Clic para verlos.') : ''}
     </div>${habsHtml}${zonasHtml}`;
@@ -6405,7 +6408,10 @@ function _vj2Pintar() {
   const _ctrMapa = _vj2Ctx.ctrMapa;
 
   const n = _vj2Filas.length;
-  if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
+  // [VJ-CANCEL-OCULTO-1] El conteo de arriba dice los que VAN; los cancelados aparte.
+  const _nBajas = _vj2Filas.filter(_vjEsBaja).length;
+  const _nVan = n - _nBajas;
+  if (cnt) cnt.textContent = `${_nVan} ${_nVan === 1 ? 'viajero' : 'viajeros'}${_nBajas ? ` · ${_nBajas} cancelado${_nBajas === 1 ? '' : 's'} oculto${_nBajas === 1 ? '' : 's'}` : ''}`;
   // (El contador de arriba lo escribe _vjConteoPintar, su único dueño.)
 
   // [VJ-3] El dinero del evento, separado en sus dos naturalezas.
@@ -6447,17 +6453,23 @@ function _vj2Pintar() {
   // [VJ-CARD-1] La etiqueta LEGIBLE del chip: «__grp:uuid» en la nota del
   // filtro mandaría a leer un uuid.
   const _chipEtq = (c) => !c ? '' :
-    c === '__staff' ? 'solo staff' : c === '__bajas' ? 'solo bajas' :
+    c === '__staff' ? 'solo staff' : c === '__bajas' ? 'solo cancelados' :
     c === '__ctr_sin' ? '📜 contrato sin firmar' : c === '__prv_sin' ? '🪪 Portal sin revisar' :
     c.startsWith('__grp:') ? '👥 un grupo que viaja junto' :
     c.startsWith('__zona:') ? `zona «${c.slice(7)}»` :
     c.startsWith('__hab:') ? `🛏 ${c.slice(6)}` : c;
+  // [VJ-CANCEL-OCULTO-1] Sin filtro, los cancelados NO se pintan (palabra de
+  // Memo: «solo ver los que sí van al tour»). Nada se borra: el chip
+  // «cancelados» los enseña, y aquí se DICE cuántos quedaron fuera.
+  const notaBajas = (!_hayFiltro && _nBajas)
+    ? `<div class="vj-filtro-nota">⛔ ${_nBajas} cancelado${_nBajas === 1 ? '' : 's'} fuera de la lista — <a href="#" onclick="vjChip('__bajas');return false">verlos</a></div>`
+    : '';
   const filtroNota = _hayFiltro
     ? `<div class="vj-filtro-nota">Mostrando <b>${visibles.length}</b> de ${n} viajeros` +
       `${_vjNorm(_vj2Q).trim() ? ` con «${_esfEsc(_vj2Q.trim())}»` : ''}` +
       `${_vj2Chip ? ` · ${_esfEsc(_chipEtq(_vj2Chip))}` : ''}` +
       ` — <a href="#" onclick="vjFiltroLimpiar();return false">quitar filtro</a></div>`
-    : '';
+    : notaBajas;
 
   // [GRUPO-VIAJE-1] Quien viaja junto se pinta JUNTO: el grupo entra a la
   // lista donde cae su primer integrante (por nombre) y se lleva a los demás.
@@ -6539,7 +6551,10 @@ function _vj2Pintar() {
       return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
         <td>${foto}<b>${_esfEsc(v.nombre || '—')}</b>${edad != null ? ` <span style="font-size:11px;color:var(--ts)" title="Edad hoy (fecha de nacimiento del contrato o de su perfil del Portal)">· ${edad} años</span>` : ''}
-            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}
+            <!-- [VJ-FILA-2] Las etiquetas en SU renglón, una al lado de la otra
+                 (palabra de Memo: contrato y Portal juntos se leen mejor). -->
+            <div class="vj2-tags">${_vjEsBaja(v) ? '<span class="vj2-tag" style="color:var(--red);border-color:var(--red)">⛔ cancelado</span>' : ''}<span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}</div>
+            ${v.indicaciones ? `<div class="vj2-indica" title="Indicaciones de ${_esfEsc(v.nombre || '')} (se corrigen con ✏️)">📌 ${_esfEsc(v.indicaciones)}</div>` : ''}
             ${gCol ? (() => {
               // [VJ-CARD-1] «Viaja con» COMPACTO: el reporte de Milk/Bulma fue
               // que listar los nombres ESTIRA el card. Hoy: un renglón corto
@@ -6796,6 +6811,7 @@ function _vjEditarAbrir(id, nombre) {
         ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts)" title="[GENERO-1] El insumo de las Compartidas del rooming (H con H, M con M — regla firmada). Vacío = no se sabe.">GÉNERO<br><select class="cot-input" id="vjx-g-${e}" style="width:70px">
         ${[['', '—'], ['M', 'M'], ['H', 'H']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
+      <label style="font-size:10px;color:var(--ts);flex-basis:100%" title="[VJ-INDICA-1] Lo que el equipo tiene que saber de esta persona: cuarto especial, planta baja, alergia, viaja con silla de ruedas… La ven el rooming y la coordinadora. Vacío = sin indicaciones.">📌 INDICACIONES (cuarto especial, algo específico)<br><input class="cot-input" id="vjx-i-${e}" maxlength="500" value="${_esfEsc(v.indicaciones || '')}" placeholder="Ej. cama matrimonial con su pareja · planta baja · alérgica a mariscos" style="width:100%"></label>
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[PAGADO-CLARO-1] Lo pagado FUERA del sistema. Los pagos capturados (📎 Pagos) se suman aparte: no los repitas aquí.">PAGADO ANTES (sin capturados)<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px" oninput="_vjPagadoPintar('${_attrJs(id)}')"></label>
       <div id="vjx-pt-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)">${_vjPagadoTxt(id, v.abonado_previo)}</div>
@@ -6943,6 +6959,7 @@ async function _vjEditarGuardar(id) {
     boletos: Number(g('b').value),
     hotel_tipo: String(g('h').value || ''),   // [VJ-HAB-1] '' = quitarla
     genero: String(g('g').value || ''),       // [GENERO-1] '' = quitarlo
+    indicaciones: String(g('i').value || '').trim(),   // [VJ-INDICA-1] '' = quitarlas
 
     // Vacío viaja como null: «sin capturar» y «$0» son cosas distintas y el
     // servidor las distingue (un total vacío se rechaza, un pagado-antes vacío
@@ -7334,7 +7351,13 @@ async function loadRooming() {
   // hotel_nombre en todas las filas). Como los cuartos nunca se cargaban, esto
   // ponía null a ciegas y lo capturado se perdía al volver a entrar. Se lee del
   // primer cuarto que lo traiga; sin cuartos, sigue vacío como antes.
-  const conHotel = (_ccHabitaciones || []).find(h => h.hotel_nombre) || null;
+  // [HOTEL-2-1] Puede haber DOS (o más) hoteles: el de los viajeros y, p. ej.,
+  // el de los choferes. El PRINCIPAL es el que trae la mayoría de los cuartos;
+  // los demás se pintan en su propio cuarto.
+  const _cuentaH = {};
+  (_ccHabitaciones || []).forEach(h => { if (h.hotel_nombre) _cuentaH[h.hotel_nombre] = (_cuentaH[h.hotel_nombre] || 0) + 1; });
+  const _hPrin = Object.keys(_cuentaH).sort((a, b) => _cuentaH[b] - _cuentaH[a])[0] || null;
+  const conHotel = (_ccHabitaciones || []).find(h => h.hotel_nombre && h.hotel_nombre === _hPrin) || null;
   _ccHotelInfo = conHotel ? {
     nombre: conHotel.hotel_nombre,
     direccion: conHotel.hotel_direccion || null,
@@ -7420,6 +7443,8 @@ function _capCuartosHtml(err) {
   // Nombre → migrado, para rotular sin adivinar por parecido de texto.
   const migPorNombre = new Map();
   (_vj5KH || []).forEach(v => { if (v.habitacion_id) migPorNombre.set(v.nombre, v.habitacion_id); });
+  const indPorNombre = new Map();
+  (_vj5KH || []).forEach(v => { if (v.indicaciones && !_vjEsBaja(v)) indPorNombre.set(v.nombre, v.indicaciones); });
 
   const filas = habs.map((h) => {
     const ocp = h.ocupantes ? (typeof h.ocupantes === 'string' ? JSON.parse(h.ocupantes) : h.ocupantes) : [];
@@ -7427,13 +7452,16 @@ function _capCuartosHtml(err) {
     const lleno = ocp.length >= cap;
     const chips = ocp.map(n => {
       const esMig = migPorNombre.get(n) === h.id;
-      return `<span class="cap-ocp${esMig ? ' cap-ocp-mig' : ''}">${_esfEsc(n)}${esMig ? '<span class="cap-mig">migrado</span>' : ''}</span>`;
+      // [VJ-INDICA-1] Las indicaciones del ocupante, a la vista en su cuarto.
+      const ind = (indPorNombre.get(n) || '');
+      return `<span class="cap-ocp${esMig ? ' cap-ocp-mig' : ''}">${_esfEsc(n)}${esMig ? '<span class="cap-mig">migrado</span>' : ''}${ind ? `<span style="display:block;font-size:10px;color:var(--yellow);white-space:normal">📌 ${_esfEsc(ind)}</span>` : ''}</span>`;
     }).join('');
     return `
       <div class="cap-cuarto">
         <div class="cap-cuarto-h">
           <span class="cap-cuarto-n">Habitación ${_esfEsc(h.numero_hab || h.orden || '')} · ${_esfEsc(TIPO_LABELS[h.tipo] || h.tipo || '')}</span>
           <span class="cap-cuarto-c${lleno ? ' cap-cuarto-lleno' : ''}">(${ocp.length}/${cap})</span>
+          ${h.hotel_nombre && _ccHotelInfo && h.hotel_nombre !== _ccHotelInfo.nombre ? `<span class="vj2-tag" style="color:var(--blue);border-color:var(--blue)" title="${_esfEsc(h.hotel_direccion || '')}">🏨 ${_esfEsc(h.hotel_nombre)}</span>` : ''}
           <span class="cap-cuarto-acc">
             <button type="button" onclick="abrirModalHabitacion('${_esfEsc(h.id)}')" title="Editar habitación"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
             <button type="button" onclick="eliminarHabitacion('${_esfEsc(h.id)}')" title="Eliminar habitación"><svg class="ic"><use href="#ic-basura"/></svg></button>
@@ -7472,7 +7500,13 @@ function renderHotelInfo() {
     <div style="font-size:11px;padding:4px 12px;border-radius:var(--r-card,16px);border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
       ${_ccHotelInfo.incluye_desayuno?'✓ Con desayuno':'✗ Sin desayuno'}
     </div>
-  </div>`;
+  </div>${(() => {
+    // [HOTEL-2-1] Los OTROS hoteles del evento (choferes/staff), con cuántos cuartos.
+    const otros = {};
+    (_ccHabitaciones || []).forEach(h => { if (h.hotel_nombre && h.hotel_nombre !== _ccHotelInfo.nombre) otros[h.hotel_nombre] = (otros[h.hotel_nombre] || 0) + 1; });
+    const ks = Object.keys(otros);
+    return ks.length ? `<div style="font-size:12px;color:var(--blue);margin-top:6px">También: ${ks.map(k => `🏨 <b>${_esfEsc(k)}</b> (${otros[k]} cuarto${otros[k] === 1 ? '' : 's'})`).join(' · ')} — se elige en cada cuarto.</div>` : '';
+  })()}`;
 }
 
 function abrirModalHotel() {
@@ -7509,12 +7543,15 @@ function abrirModalHotel() {
 async function guardarHotel() {
   const nombre = document.getElementById('hot-nombre')?.value.trim();
   if (!nombre) { document.getElementById('hot-alert').innerHTML='<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
+  const _prinViejo = _ccHotelInfo?.nombre || null;
   _ccHotelInfo = {
     nombre,
     direccion:        document.getElementById('hot-dir')?.value.trim()||null,
     incluye_desayuno: document.getElementById('hot-desayuno')?.checked||false,
   };
-  for (const h of _ccHabitaciones) {
+  // [HOTEL-2-1] Cambiar el hotel PRINCIPAL no pisa a los cuartos que están en
+  // OTRO hotel (choferes): solo a los del principal y a los que no traen hotel.
+  for (const h of _ccHabitaciones.filter(x => !x.hotel_nombre || x.hotel_nombre === _prinViejo)) {
     await khRooming.actualizar(h.id, { // [sec-sensibles]
       hotel_nombre:    _ccHotelInfo.nombre,
       hotel_direccion: _ccHotelInfo.direccion,
@@ -7565,9 +7602,14 @@ function _capSelectsHab(tipo, ocsActuales, habId) {
     // fila se escribe el cuarto.
     const libres = khDuermen.filter(v => !v.habitacion_id || v.habitacion_id === idRef);
     const grupoMigrados = libres.length
-      ? `<optgroup label="Migrados del Excel">${libres.map(v => {
-          const nota = v.notas ? ` — ${String(v.notas).slice(0, 70)}` : '';
-          return `<option value="kh:${_esfEsc(v.id)}" ${actual === ('kh:' + v.id) ? 'selected' : ''}>${_esfEsc(v.nombre)}${_esfEsc(nota)}</option>`;
+      ? `<optgroup label="Viajeros del evento (incluye al equipo)">${libres.map(v => {
+          // [ROOMING-EQUIPO-1] La coordinadora vive aquí: se rotula para que
+          // no se pierda entre los migrados. [VJ-INDICA-1] las indicaciones
+          // van primero (son lo que hay que respetar al acomodar).
+          const staff = v.tipo_viajero && String(v.tipo_viajero) !== 'cliente' ? ` (${v.tipo_viajero})` : '';
+          const ind = v.indicaciones ? ` 📌 ${String(v.indicaciones).slice(0, 60)}` : '';
+          const nota = !ind && v.notas ? ` — ${String(v.notas).slice(0, 70)}` : '';
+          return `<option value="kh:${_esfEsc(v.id)}" ${actual === ('kh:' + v.id) ? 'selected' : ''}>${_esfEsc(v.nombre)}${_esfEsc(staff)}${_esfEsc(ind)}${_esfEsc(nota)}</option>`;
         }).join('')}</optgroup>`
       : '';
     return `
@@ -7616,6 +7658,7 @@ function abrirModalHabitacion(id) {
           <div id="hab-ocupantes-container">${_capSelectsHab(tipoActual, ocupantes, id)}</div>
           ${!hayAQuienAsignar?'<div style="font-size:11px;color:var(--ts);margin-top:4px"><svg class="ic"><use href="#ic-alerta"/></svg> Agrega viajeros primero para poder asignarlos</div>':''}
         </div>
+        ${_habHotelHtml(h)}
         <div id="hab-alert"></div>
       </div>
       <div class="modal-footer">
@@ -7624,6 +7667,44 @@ function abrirModalHabitacion(id) {
       </div>
     </div>`;
   openModal('modal-habitacion');
+}
+
+// [HOTEL-2-1] El hotel DE ESTE CUARTO. Palabra de Memo (30-oct): «los
+// choferes a veces duermen en otro hotel, para que la coordinadora sepa dónde
+// duerme». Por default el principal; «otro hotel» abre nombre + dirección, y
+// los otros hoteles que ya existen en el evento se ofrecen para no reteclear.
+function _habHotelHtml(h) {
+  const prin = _ccHotelInfo?.nombre || '';
+  const otros = [...new Map((_ccHabitaciones || [])
+    .filter(x => x.hotel_nombre && x.hotel_nombre !== prin)
+    .map(x => [x.hotel_nombre, x])).values()];
+  const actual = h && h.hotel_nombre && h.hotel_nombre !== prin ? h.hotel_nombre : '';
+  return `<div class="form-group">
+    <label>Hotel de este cuarto</label>
+    <select class="cot-input" id="hab-hotel-sel" style="width:100%" onchange="document.getElementById('hab-hotel-otro').style.display=this.value==='__otro'?'':'none'">
+      <option value="">${prin ? 'Hotel principal · ' + _esfEsc(prin) : 'Hotel principal (aún sin capturar)'}</option>
+      ${otros.map(o => `<option value="${_esfEsc(o.hotel_nombre)}"${actual === o.hotel_nombre ? ' selected' : ''}>🏨 ${_esfEsc(o.hotel_nombre)}</option>`).join('')}
+      <option value="__otro">➕ Otro hotel… (choferes, staff)</option>
+    </select>
+    <div id="hab-hotel-otro" style="display:none;margin-top:6px">
+      <input class="cot-input" id="hab-hotel-n" placeholder="Nombre del otro hotel" style="width:100%;margin-bottom:6px">
+      <input class="cot-input" id="hab-hotel-d" placeholder="Dirección (opcional)" style="width:100%">
+    </div>
+  </div>`;
+}
+function _habHotelElegido() {
+  const sel = document.getElementById('hab-hotel-sel');
+  const v = sel ? sel.value : '';
+  if (v === '__otro') {
+    const n = (document.getElementById('hab-hotel-n')?.value || '').trim();
+    if (!n) return { error: 'Escribe el nombre del otro hotel' };
+    return { hotel_nombre: n, hotel_direccion: (document.getElementById('hab-hotel-d')?.value || '').trim() || null, incluye_desayuno: false };
+  }
+  if (v) {
+    const o = (_ccHabitaciones || []).find(x => x.hotel_nombre === v) || {};
+    return { hotel_nombre: v, hotel_direccion: o.hotel_direccion || null, incluye_desayuno: !!o.incluye_desayuno };
+  }
+  return { hotel_nombre: _ccHotelInfo?.nombre || null, hotel_direccion: _ccHotelInfo?.direccion || null, incluye_desayuno: _ccHotelInfo?.incluye_desayuno || false };
 }
 
 // Cambiar el tipo de cuarto RE-PINTA los lugares. Antes tenía su propia copia de
@@ -7658,14 +7739,16 @@ async function guardarHabitacion() {
     return;
   }
   const orden = id ? (_ccHabitaciones.find(h=>h.id===id)?.orden||0) : _ccHabitaciones.length + 1;
+  const hotel = _habHotelElegido();   // [HOTEL-2-1] el hotel de ESTE cuarto
+  if (hotel.error) { document.getElementById('hab-alert').innerHTML = `<div class="alert alert-error">${_esfEsc(hotel.error)}</div>`; return; }
   const body = {
     evento_id:       _ccEventoActual,
     tipo, orden,
     numero_hab:      String(id ? (_ccHabitaciones.find(h=>h.id===id)?.orden||orden) : orden),
     ocupantes:       JSON.stringify(ocupantes),
-    hotel_nombre:    _ccHotelInfo?.nombre||null,
-    hotel_direccion: _ccHotelInfo?.direccion||null,
-    incluye_desayuno:_ccHotelInfo?.incluye_desayuno||false,
+    hotel_nombre:    hotel.hotel_nombre,
+    hotel_direccion: hotel.hotel_direccion,
+    incluye_desayuno:hotel.incluye_desayuno,
   };
   try {
     let habId = id;
@@ -7731,6 +7814,9 @@ async function roomingAutoArmar() {
   d.innerHTML = '<div style="padding:10px;color:var(--ts);font-size:12px">⚡ Armando propuesta…</div>';
   try {
     const j = await khRooming.armar(_ccEventoActual); // [sec-sensibles] solo LEE
+    // [RA-AGREGAR-1] La BOLSA: quien quedó sin cuarto en la propuesta (sin tipo
+    // de habitación) y a quien se saque con ✕ — de aquí se AGREGA a un cuarto.
+    j.pool = (j.sin_tipo_personas || []).slice();
     _raProp = j;
     _raPintar();
   } catch (e) { d.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message)}</div>`; }
@@ -7767,14 +7853,25 @@ function _raPintar() {
           <div style="display:flex;flex-wrap:wrap;gap:6px">
             ${(c.ocupantes || []).map((o, oi) => `
               <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-size:12px">
-                ${_esfEsc(o.nombre)}
+                ${_esfEsc(o.nombre)}${o.staff ? ` <span style="font-size:9px;color:var(--green)">${_esfEsc(o.tipo_viajero || 'equipo')}</span>` : ''}${o.indicaciones ? ` <span title="📌 ${_esfEsc(o.indicaciones)}" style="cursor:help">📌</span>` : ''}
                 ${o.tipo_origen === 'nota' ? '<span style="font-size:9px;color:var(--ts)" title="El tipo de cuarto salió de su nota de migración">nota</span>' : ''}
                 ${chipG(o, ci, oi)}
                 <button type="button" style="background:none;border:none;color:var(--ts);cursor:pointer" title="Sacarlo de la propuesta (lo acomodas a mano después)" onclick="_raQuitar(${ci},${oi})">✕</button>
               </span>`).join('')}
+            ${(() => {
+              // [RA-AGREGAR-1] ➕ Agregar a este cuarto a alguien de la bolsa
+              // (sin tipo de cuarto o sacado con ✕) — mientras quepa.
+              const cap = CAPACIDAD_HAB[c.tipo] || 1;
+              const pool = (p.pool || []);
+              if (!pool.length || (c.ocupantes || []).length >= cap) return '';
+              return `<select class="cot-input" style="font-size:11px;padding:2px 6px;max-width:220px" onchange="_raAgregar(${ci}, this.value)">
+                <option value="">➕ agregar a este cuarto…</option>
+                ${pool.map((o, pi) => `<option value="${pi}">${_esfEsc(o.nombre)}${o.staff ? ' (' + _esfEsc(o.tipo_viajero || 'equipo') + ')' : ''}</option>`).join('')}
+              </select>`;
+            })()}
           </div>
         </div>`).join('')}
-      ${(p.sin_tipo || []).length ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">🛏 Sin tipo de habitación en ningún lado (se completan con ✏️ Corregir): ${p.sin_tipo.map(_esfEsc).join(' · ')}</div>` : ''}
+      ${(p.sin_tipo || []).length ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">🛏 Sin tipo de habitación en ningún lado (se completan con ✏️ Corregir, o agrégalos a un cuarto con «➕ agregar»): ${p.sin_tipo.map(_esfEsc).join(' · ')}</div>` : ''}
       <details style="margin-top:6px"><summary style="font-size:11px;color:var(--ts);cursor:pointer">Quedaron fuera (${(p.fuera || []).length}) — con su motivo</summary>
         <div style="font-size:11px;color:var(--ts);margin-top:4px">${(p.fuera || []).map((f) => `${_esfEsc(f.nombre)} <i>(${_esfEsc(f.motivo)})</i>`).join(' · ') || '—'}</div>
       </details>
@@ -7793,7 +7890,22 @@ function _raGenero(ci, oi, val) {
 function _raQuitar(ci, oi) {
   const c = _raProp?.cuartos?.[ci];
   if (!c) return;
-  c.ocupantes.splice(oi, 1);
+  const [fuera] = c.ocupantes.splice(oi, 1);
+  // [RA-AGREGAR-1] Quien se saca NO se pierde: va a la bolsa, de donde se
+  // agrega a otro cuarto (antes solo se podía acomodar a mano después).
+  if (fuera) (_raProp.pool = _raProp.pool || []).push(fuera);
+  _raPintar();
+}
+function _raAgregar(ci, pi) {
+  if (pi === '' || pi == null) return;
+  const c = _raProp?.cuartos?.[ci];
+  const pool = _raProp?.pool || [];
+  const o = pool[Number(pi)];
+  if (!c || !o) return;
+  const cap = CAPACIDAD_HAB[c.tipo] || 1;
+  if ((c.ocupantes || []).length >= cap) { showToast('Ese cuarto ya está lleno', 'error'); return; }
+  pool.splice(Number(pi), 1);
+  c.ocupantes.push(o);
   _raPintar();
 }
 

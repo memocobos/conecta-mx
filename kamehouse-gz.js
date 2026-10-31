@@ -534,7 +534,7 @@ async function gzTourAbrir(eventoId) {
       eq.forEach((p) => { if (!equipo.some((x) => x.nombre === p.nombre && x.papel === p.papel)) equipo.push(p); });
       const titulo = partes[k].titulo ? `<div style="font-weight:700;margin:10px 0 6px">${esc(partes[k].titulo)}</div>` : '';
       tablas += titulo + (j._err ? `<div class="alert alert-error">${esc(j._err)}</div>` : lista.length
-        ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Emergencia</th></tr></thead><tbody>${lista.map((v, i) => `<tr><td>${i + 1}</td><td><b>${esc(v.nombre || '')}</b>${Number(v.boletos) > 1 ? ` <span style="color:var(--ts)">(${v.boletos} lugares)</span>` : ''}</td><td>${esc(khPaqueteTexto(v) || '—')}</td><td>${esc(v.zona_boleto || '—')}</td><td>${esc(v.talla_playera || '—')}</td><td style="font-size:11px">${esc(v.emergencia_nombre || '—')}${v.emergencia_parentesco ? ' (' + esc(v.emergencia_parentesco) + ')' : ''}${v.num_emergencia ? '<br>' + esc(v.num_emergencia) : ''}</td></tr>`).join('')}</tbody></table></div>`
+        ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Emergencia</th></tr></thead><tbody>${lista.map((v, i) => `<tr><td>${i + 1}</td><td><b>${esc(v.nombre || '')}</b>${Number(v.boletos) > 1 ? ` <span style="color:var(--ts)">(${v.boletos} lugares)</span>` : ''}${v.indicaciones ? `<div style="font-size:11px;color:var(--yellow)">📌 ${esc(v.indicaciones)}</div>` : ''}</td><td>${esc(khPaqueteTexto(v) || '—')}</td><td>${esc(v.zona_boleto || '—')}</td><td>${esc(v.talla_playera || '—')}</td><td style="font-size:11px">${esc(v.emergencia_nombre || '—')}${v.emergencia_parentesco ? ' (' + esc(v.emergencia_parentesco) + ')' : ''}${v.num_emergencia ? '<br>' + esc(v.num_emergencia) : ''}</td></tr>`).join('')}</tbody></table></div>`
         : '<div style="font-size:12px;color:var(--ts)">Sin viajeros con paquete PLUS / STAY / RIDE todavía.</div>');
     });
     html += `<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);margin:6px 0">🧳 Lista de viajeros · ${total}</div>${tablas}`;
@@ -551,9 +551,12 @@ async function gzTourAbrir(eventoId) {
     else if (!tour || !tour.rooming || !tour.rooming.length) html += '<div style="font-size:12px;color:var(--ts)">Bulma y Milk todavía no arman el rooming de este tour. Aquí aparecerá en cuanto lo capturen.</div>';
     else {
       const T = { individual: 'Individual', doble: 'Doble', triple: 'Triple', cuadruple: 'Cuádruple' };
-      const h0 = tour.rooming[0];
-      html += `${h0.hotel_nombre ? `<div style="font-size:12px;margin-bottom:6px">🏨 <b>${esc(h0.hotel_nombre)}</b>${h0.hotel_direccion ? ' · ' + esc(h0.hotel_direccion) : ''}${h0.incluye_desayuno ? ' · ✓ desayuno' : ''}</div>` : ''}
-        <div class="table-wrap"><table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead><tbody>${tour.rooming.map((h, i) => `<tr><td>${esc(h.numero_hab || 'Hab. ' + (i + 1))}</td><td>${esc(T[h.tipo] || h.tipo || '—')}</td><td>${h.ocupantes.length ? h.ocupantes.map(esc).join('<br>') : '<span style="color:var(--ts)">—</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+      // [HOTEL-2-1] Puede haber más de un hotel (choferes en otro): se listan
+      // TODOS arriba y, si son varios, cada cuarto dice el suyo.
+      const hoteles = [...new Map(tour.rooming.filter((h) => h.hotel_nombre).map((h) => [h.hotel_nombre, h])).values()];
+      const varios = hoteles.length > 1;
+      html += hoteles.map((h0) => `<div style="font-size:12px;margin-bottom:6px">🏨 <b>${esc(h0.hotel_nombre)}</b>${h0.hotel_direccion ? ' · ' + esc(h0.hotel_direccion) : ''}${h0.incluye_desayuno ? ' · ✓ desayuno' : ''}</div>`).join('')
+        + `<div class="table-wrap"><table><thead><tr><th>Habitación</th><th>Tipo</th>${varios ? '<th>Hotel</th>' : ''}<th>Ocupantes</th></tr></thead><tbody>${tour.rooming.map((h, i) => `<tr><td>${esc(h.numero_hab || 'Hab. ' + (i + 1))}</td><td>${esc(T[h.tipo] || h.tipo || '—')}</td>${varios ? `<td>${esc(h.hotel_nombre || '—')}</td>` : ''}<td>${h.ocupantes.length ? h.ocupantes.map((n) => esc(n) + ((h.indicaciones || {})[n] ? `<div style="font-size:11px;color:var(--yellow)">📌 ${esc(h.indicaciones[n])}</div>` : '')).join('<br>') : '<span style="color:var(--ts)">—</span>'}</td></tr>`).join('')}</tbody></table></div>`;
     }
     html += '</div>';
     box.innerHTML = html;

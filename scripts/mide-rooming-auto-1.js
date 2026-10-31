@@ -298,6 +298,49 @@ console.log('\n[B] armar_propuesta por el handler REAL (cero escrituras)');
   af(/roomingAutoArmar\(\)/.test(html), 'el botón ⚡ Armar automático vive en el HTML');
   af(/armar\(eventoId\).*armar_propuesta/.test(kh.replace(/\n/g, ' ')), 'khRooming.armar pide armar_propuesta');
 
+  // ── [EQ] ROOMING-EQUIPO-1 + RA-AGREGAR-1 (30-oct): la coordinadora ya no
+  // se queda fuera, y lo que sale del cuarto se puede AGREGAR a otro.
+  console.log('\n[EQ] el equipo en el armado + la bolsa para agregar');
+  {
+    const fx = [
+      { id: 'c1', nombre: 'Laura Perez Montes', tipo_paquete: 'PLUS', tipo_viajero: 'coordinador', boletos: 1, zona_boleto: null, hotel_tipo: null },
+      { id: 'c2', nombre: 'Alexa Garza', tipo_paquete: 'PLUS', tipo_viajero: 'coordinador', boletos: 1, zona_boleto: null, hotel_tipo: null, indicaciones: 'planta baja' },
+      { id: 'c3', nombre: 'Axel Raul Garza', tipo_paquete: 'PLUS', tipo_viajero: 'coordinador', boletos: 1, zona_boleto: null, hotel_tipo: null },
+      { id: 'c4', nombre: 'Xyzq Nadie', tipo_paquete: 'PLUS', tipo_viajero: 'auxiliar', boletos: 1, zona_boleto: null, hotel_tipo: null },
+      { id: 'k1', nombre: 'Sofia Cliente', tipo_paquete: 'PLUS', tipo_viajero: 'cliente', boletos: 1, zona_boleto: 'Oro', hotel_tipo: null },
+    ];
+    const pr = RA.armarPropuesta({ viajeros: fx, ocupadosNombres: new Set() });
+    const eqM = pr.cuartos.find((c) => /equipo/.test(c.etiqueta) && /mujeres/.test(c.etiqueta));
+    const eqH = pr.cuartos.find((c) => /equipo/.test(c.etiqueta) && /hombres/.test(c.etiqueta));
+    af(eqM && eqM.tipo === 'doble' && eqM.ocupantes.map((o) => o.nombre).sort().join('|') === 'Alexa Garza|Laura Perez Montes', '[EQ] las 2 coordinadoras van JUNTAS en un cuarto de equipo doble (antes: fuera, sin tipo)');
+    af(eqH && eqH.tipo === 'individual' && eqH.ocupantes[0].nombre === 'Axel Raul Garza', '[EQ] el coordinador va aparte (por género), individual');
+    af(pr.cuartos.some((c) => c.pendiente && /equipo/.test(c.etiqueta) && c.ocupantes[0].nombre === 'Xyzq Nadie'), '[EQ] staff sin género → cuarto de equipo PENDIENTE (no se crea así)');
+    af(!pr.sin_tipo.includes('Laura Perez Montes') && pr.sin_tipo.includes('Sofia Cliente'), '[EQ] el staff ya no cae en «sin tipo»; un CLIENTE sin tipo sí');
+    af(Array.isArray(pr.sin_tipo_personas) && pr.sin_tipo_personas[0] && pr.sin_tipo_personas[0].id === 'k1', '[EQ] y viaja como PERSONA (con id) para poder agregarlo a un cuarto');
+    af(eqM && eqM.ocupantes.find((o) => o.nombre === 'Alexa Garza').indicaciones === 'planta baja', '[EQ] las indicaciones viajan con la persona hasta la propuesta');
+    af(pr.preguntas.some((q) => /Equipo del tour/.test(q)), '[EQ] y se DICE por qué el equipo va en su cuarto');
+    // control: sin el bloque del equipo, las coordinadoras caían en sin_tipo
+    af(RA.armarPropuesta({ viajeros: fx.map((v) => Object.assign({}, v, { tipo_viajero: 'cliente' })), ocupadosNombres: new Set() }).sin_tipo.includes('Laura Perez Montes'), '[EQ] control: como cliente, la misma persona SÍ queda sin tipo');
+
+    // La pantalla: ✕ manda a la bolsa y ➕ agrega respetando el cupo.
+    const fQ = corta(kh, 'function _raQuitar'); const fA = corta(kh, 'function _raAgregar');
+    const ctx2 = { CAPACIDAD_HAB: { individual: 1, doble: 2, triple: 3, cuadruple: 4 }, _raPintar: () => {}, showToast: (m) => { ctx2.toast = m; } };
+    vm.createContext(ctx2);
+    vm.runInContext(fQ + '\n' + fA, ctx2);
+    ctx2._raProp = { pool: [], cuartos: [{ tipo: 'doble', ocupantes: [{ nombre: 'A' }, { nombre: 'B' }] }, { tipo: 'individual', ocupantes: [] }] };
+    vm.runInContext('_raQuitar(0, 1)', ctx2);
+    af(ctx2._raProp.pool.length === 1 && ctx2._raProp.pool[0].nombre === 'B', '[EQ] ✕ ya no pierde a la persona: va a la bolsa');
+    vm.runInContext('_raAgregar(1, "0")', ctx2);
+    af(ctx2._raProp.cuartos[1].ocupantes[0].nombre === 'B' && ctx2._raProp.pool.length === 0, '[EQ] ➕ la agrega al cuarto elegido y sale de la bolsa');
+    ctx2._raProp.pool.push({ nombre: 'C' });
+    vm.runInContext('_raAgregar(1, "0")', ctx2);
+    af(ctx2._raProp.cuartos[1].ocupantes.length === 1 && ctx2._raProp.pool.length === 1 && /lleno/.test(ctx2.toast || ''), '[EQ] un cuarto lleno NO acepta a nadie más (y lo dice)');
+    const fArm = corta(kh, 'async function roomingAutoArmar');
+    af(/j\.pool = \(j\.sin_tipo_personas/.test(fArm), '[EQ] la bolsa nace con los que quedaron sin tipo');
+    const srvR = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-rooming.js'), 'utf8');
+    af(/select=id,nombre,tipo_paquete,tipo_viajero,[^`]*indicaciones/.test(srvR), '[EQ] armar_propuesta lee tipo_viajero e indicaciones');
+  }
+
   console.log(`\n${R ? '🔴' : '✅'} ${V} en verde · ${R} en rojo`);
   if (!V) console.log('NADA MEDIDO · esto NO es un verde');
   process.exit(R ? 1 : 0);

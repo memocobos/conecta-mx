@@ -188,6 +188,26 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🛏⏳ **CAPSULE-UX-3 · VJ-FILA-2 + VJ-CANCEL-OCULTO-1 + VJ-INDICA-1 + HOTEL-2-1
+  + ROOMING-EQUIPO-1 + RA-AGREGAR-1 (30-oct-2026, en main local).** Lote de Memo:
+  chips 📜/🪪 lado a lado y líneas entre personas un poco más gruesas · **los
+  cancelados SALEN de la lista principal** (ni el buscador los saca; el chip
+  «⛔ cancelados N» y la nota «N fuera de la lista — verlos» los enseñan; nada
+  se borra) · **📌 INDICACIONES por viajero** (columna `viajeros_evento.
+  indicaciones` ≤500, acta `migraciones/VJ-INDICA-1.sql` YA CORRIDA, CHECK
+  mordido 23514; se editan en ✏️ Corregir, campo PROPIO — la nota de migración
+  no se pisa) visibles en la lista, el rooming, la descarga y la Torre de la
+  coordinadora · **segundo hotel** (choferes): cada cuarto elige su hotel
+  («principal» = el de la mayoría; cambiar el principal ya no pisa los cuartos
+  de otro hotel; la Torre y la descarga dicen el hotel por cuarto) · **el
+  armado automático acomoda al EQUIPO** (staff sin tipo de cuarto → cuarto de
+  equipo por género; sin género → pendiente) y **✕ manda a una bolsa de donde
+  se «➕ agrega»** a cualquier cuarto con cupo. Careos: rooming-auto-1 **79**
+  (sabotaje al bloque del equipo → 7 rojos → restaurado sha1 `fb34e984`) ·
+  capsule-ux-1 **76** (la verdad vieja «la baja sigue a la vista» se retiró con
+  su razón) · viajero-edita-1 **67** ([I] indicaciones) · vecinos verdes.
+  ⏳ Push de Memo → prueba de Bulma/Milk.
+
 - 🎟⛔⏳ **CAPSULE-DISPO-1 + CANCELAR-LUGAR-1 + KAMISAMA-SCROLL-1 (30-oct-2026,
   en main local, cero SQL).** Palabra de Memo, citada: *«en capsule poder ver
   cuántos boletos quedan por zona … en nsqk no tenemos 2 McCormick: contactar al

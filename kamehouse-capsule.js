@@ -1288,15 +1288,20 @@ async function descargarRoomingList(eventoId) {
     ]);
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
     const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+    // [HOTEL-2-1] Con más de un hotel (choferes en otro), la lista lo dice por cuarto.
+    const varios = new Set(habs.map(h=>h.hotel_nombre||'')).size > 1;
+    // [VJ-INDICA-1] Las indicaciones de cada ocupante (fail-soft: sin ellas, la lista de siempre).
+    const ind = {};
+    try { (await khViajeros.listar(eventoId) || []).forEach(v => { if (v.indicaciones) ind[v.nombre] = v.indicaciones; }); } catch (_) {}
     const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
     const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
     <h2>${_esfEsc(titulo)}</h2>
     <p>${_esfEsc(habs[0]?.hotel_nombre||'')}${habs[0]?.hotel_direccion?' · '+_esfEsc(habs[0].hotel_direccion):''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
-    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
+    <table><thead><tr><th>Habitación</th><th>Tipo</th>${varios?'<th>Hotel</th>':''}<th>Ocupantes</th></tr></thead>
     <tbody>${habs.map((h,i)=>{
       const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
-      return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+      return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td>${varios?`<td>${_esfEsc(h.hotel_nombre||'—')}${h.hotel_direccion?'<br><small>'+_esfEsc(h.hotel_direccion)+'</small>':''}</td>`:''}<td>${ocp.map(n=>_esfEsc(n)+(ind[n]?'<br><small>📌 '+_esfEsc(ind[n])+'</small>':'')).join('<br>')||'—'}</td></tr>`;
     }).join('')}</tbody></table></body></html>`;
     _descargarHTML(`rooming-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }

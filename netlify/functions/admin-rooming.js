@@ -201,7 +201,7 @@ exports.handler = async (event) => {
       const { armarPropuesta } = require('./_lib/rooming-auto');
       const baseVE = `${env.KH_SB_URL}/rest/v1/viajeros_evento`;
       const [rV, rH] = await Promise.all([
-        fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,nombre,tipo_paquete,boletos,zona_boleto,hotel_tipo,genero,grupo_viaje,habitacion_id,notas&limit=1000`, { headers: sbHeaders }),
+        fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,nombre,tipo_paquete,tipo_viajero,boletos,zona_boleto,hotel_tipo,genero,grupo_viaje,habitacion_id,indicaciones,notas&limit=1000`, { headers: sbHeaders }),
         fetch(`${base}?evento_slug=eq.${encodeURIComponent(eventoId)}&select=id,ocupantes`, { headers: sbHeaders }),
       ]);
       if (!rV.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta de viajeros', detail: await rV.text() }) };

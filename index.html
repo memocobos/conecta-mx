@@ -844,6 +844,20 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .cli-card:hover .cca{transform:translateX(4px)}
 .cli-card.alt .cca{color:#0000cd}
 .cli-card:hover.alt .cca{color:#e8ff4c}
+/* [PORTAL-ENTRADA-1] ¿Cómo funciona? */
+.cf{margin-top:28px;border:1px solid rgba(255,255,255,.12);background:#000;padding:22px}
+.cf-t{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;line-height:1;text-transform:uppercase;color:#fff;margin-bottom:14px}
+.cf-pasos{list-style:none;counter-reset:cf;margin:0;padding:0;display:grid;gap:12px}
+@media(min-width:720px){.cf-pasos{grid-template-columns:1fr 1fr;column-gap:22px}}
+.cf-pasos li{counter-increment:cf;position:relative;padding-left:40px;font-size:13px;line-height:1.55;color:rgba(255,255,255,.78)}
+.cf-pasos li b{color:#fff}
+.cf-pasos li::before{content:counter(cf);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:#e8ff4c;color:#000;font-weight:900;font-family:'Barlow Condensed',sans-serif;font-size:17px;display:flex;align-items:center;justify-content:center}
+.cf-ojo{color:#e8ff4c;font-weight:700}
+.cf-pago{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:13px;line-height:1.6;color:rgba(255,255,255,.78)}
+.cf-pago b{color:#fff}
+.cf-pago a{color:#e8ff4c}
+.cf-st{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;text-transform:uppercase;color:#fff;margin-bottom:4px}
+.cf-mini{font-size:12px;color:rgba(255,255,255,.6);margin-top:6px}
 
 /* Footer v2 (FAQ-style) */
 .ftr-v2{
@@ -1112,6 +1126,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <symbol id="ic-avion" viewBox="0 0 24 24"><path d="M21 15.5v-2L13 9V4a1.5 1.5 0 0 0-3 0v5l-8 4.5v2l8-2.2V19l-2.2 1.5v1.5L11 21.7l3.2 1.3v-1.5L12 19v-3.7z"/></symbol>
   <symbol id="ic-pagos" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
   <symbol id="ic-portapapeles" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h4"/></symbol>
+  <symbol id="ic-usuario" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
   <symbol id="ic-campana" viewBox="0 0 24 24"><path d="M6 16c1-1 1-3 1-6a5 5 0 0 1 10 0c0 3 0 5 1 6z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
 </defs></svg>
 
@@ -1126,8 +1141,11 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
   <div class="nav-right" id="nav-right">
     <div class="nav-cli-links">
-      <a href="/rol" class="nav-cli-link" title="Mi plan de pagos">
-        <span class="nli"><svg class="ic"><use href="#ic-portapapeles"/></svg></span><span class="nlt">Mi Plan de Pagos</span>
+      <!-- [PORTAL-ENTRADA-1] La entrada del cliente es su PORTAL (plan de pagos,
+           comprobantes, contrato, tickets). /rol queda vivo por su link pero ya
+           no se anuncia: se vuelve herramienta del equipo en KameHouse. -->
+      <a href="/portal" class="nav-cli-link" title="Mi Portal: mi viaje, mis pagos y mi contrato">
+        <span class="nli"><svg class="ic"><use href="#ic-usuario"/></svg></span><span class="nlt">Mi Portal</span>
       </a>
       <span class="nav-cli-sep">•</span>
       <a href="/pagos" class="nav-cli-link" title="Datos bancarios">
@@ -1514,13 +1532,13 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <div class="cli-banner-wrap">
     <div class="cli-banner-eyebrow">Para clientes Conecta</div>
     <div class="cli-banner-title">¿Ya eres <span class="y">cliente</span>?</div>
-    <div class="cli-banner-sub">Consulta tu plan de pagos o pásate por los datos bancarios para hacer tu siguiente depósito.</div>
+    <div class="cli-banner-sub">Entra a tu Portal: ahí ves tu viaje, tu plan de pagos, subes tus comprobantes y firmas tu contrato.</div>
     <div class="cli-banner-grid">
-      <a href="/rol" class="cli-card">
-        <div class="cci"><svg class="ic"><use href="#ic-portapapeles"/></svg></div>
+      <a href="/portal" class="cli-card">
+        <div class="cci"><svg class="ic"><use href="#ic-usuario"/></svg></div>
         <div class="ccm">
-          <div class="cct">Ver mi plan de pagos</div>
-          <div class="ccs">Consulta cuándo te toca cada pago</div>
+          <div class="cct">Entrar a Mi Portal</div>
+          <div class="ccs">Tu viaje · tus pagos · tu contrato</div>
         </div>
         <span class="cca" aria-hidden="true">→</span>
       </a>
@@ -1532,6 +1550,26 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
         </div>
         <span class="cca" aria-hidden="true">→</span>
       </a>
+    </div>
+
+    <!-- [PORTAL-ENTRADA-1] «Tu Portal y tus pagos, paso a paso» (no «¿Cómo funciona?»: ese nombre ya es de /funciona, la guía del viaje) — los pasos REALES del circuito
+         (requisición → confirmación → registro con el MISMO correo → revisión →
+         Portal). Texto estático: no lee EV ni nada que se compile. -->
+    <div class="cf" id="portal-pasos">
+      <div class="cf-t">Tu Portal y tus pagos, paso a paso</div>
+      <ol class="cf-pasos">
+        <li><b>Aparta tu lugar.</b> Elige tu evento aquí en la página y aparta con tu separo, o escríbenos por WhatsApp. Manda tu comprobante.</li>
+        <li><b>Te confirmamos.</b> Revisamos tu pago y te avisamos por correo o WhatsApp que tu lugar quedó.</li>
+        <li><b>Regístrate en tu Portal.</b> <span class="cf-ojo">Usa el MISMO correo con el que reservaste</span> — con otro correo no vamos a encontrar tu viaje.</li>
+        <li><b>Ve tu viaje.</b> En cuanto revisamos tus datos, aparece tu viaje con tu plan de pagos: cuánto llevas, cuánto te falta y cuándo te toca cada pago (quincenas del 9 al 16 y del 24 al 1).</li>
+        <li><b>Paga y sube tu comprobante.</b> Desde tu Portal subes la foto de cada pago y en cuanto lo capturamos tu saldo se actualiza. Ahí mismo ves tus tickets.</li>
+        <li><b>Firma tu contrato.</b> Lo firmas en el Portal con tu INE (si eres menor de edad, firma mamá, papá o tutor).</li>
+      </ol>
+      <div class="cf-pago">
+        <div class="cf-st">¿Cómo pago?</div>
+        <p><b>PLUS, STAY y RIDE</b> → BBVA · <b>CHEAP</b> → Banamex (la <b>preventa a ciegas</b> va por BBVA). Puedes pagar por transferencia, depósito, OXXO o link de pago. <a href="/pagos">Ver los datos bancarios →</a></p>
+        <p class="cf-mini">¿No ves tu viaje en el Portal? Dentro del Portal toca «¿No ves uno de tus viajes? Pídelo aquí» o escríbenos por <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a>.</p>
+      </div>
     </div>
   </div>
 </section>

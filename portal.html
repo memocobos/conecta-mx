@@ -622,8 +622,18 @@ main{
    .mig-hero reusa .tc-hero (cero CSS gemelo) y solo neutraliza el cursor del
    acordeón, que en la card migrada no existe. */
 .mig-hero{cursor:default}
+/* [PORTAL-FOTO-1] Las fotos del catálogo son CUADRADAS (53 de 60) o verticales:
+   en una franja de 118 px solo se veía la parte de arriba (la pared detrás de
+   Scorpions). La card del viaje gana una portada de verdad: 4:3, con tope, y el
+   encuadre un poco abajo del borde superior, donde suelen estar las caras. */
+.tc-hero.mig-hero{height:auto;aspect-ratio:4/3;max-height:340px;background-position:center 30%}
+.tc-hero.mig-hero .tc-hero-name{font-size:30px;padding:14px 18px}
 .mig-body{padding:14px 18px 16px}
-.mig-media{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
+.mig-media{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 2px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.mig-media-t{width:100%;font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.6}
+.mig-chip.mig-play{background:var(--yel);color:#000;border-color:var(--yel)}
+.mig-chip.mig-spot{background:#1DB954;color:#000;border-color:#1DB954}
+.mig-chip.mig-spot:hover{border-color:#fff}
 .mig-chip{
   display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);
   background:rgba(255,255,255,.05);color:inherit;border-radius:var(--r-chip,999px);
@@ -3226,9 +3236,12 @@ function _migMediaHtml(t) {
   const ev = _evBySlug(t.evento_id);
   const artista = ev && (ev.img || ev.a);
   if (!artista) return '';
+  // [PORTAL-FOTO-1] La música gana su propio bloque con título: antes eran tres
+  // chips grises iguales y nadie encontraba «lo de Spotify».
   return '<div class="mig-media">'
-    + '<button type="button" class="mig-chip" data-mig-act="tunes" data-mig-artista="' + escapeHtml(artista) + '">▶ Escucha a ' + escapeHtml(artista) + '</button>'
-    + '<a class="mig-chip" href="https://open.spotify.com/search/' + encodeURIComponent(artista) + '" target="_blank" rel="noopener">Spotify ↗</a>'
+    + '<div class="mig-media-t">🎧 La música de tu tour</div>'
+    + '<button type="button" class="mig-chip mig-play" data-mig-act="tunes" data-mig-artista="' + escapeHtml(artista) + '">▶ Escucha a ' + escapeHtml(artista) + '</button>'
+    + '<a class="mig-chip mig-spot" href="https://open.spotify.com/search/' + encodeURIComponent(artista) + '" target="_blank" rel="noopener">Abrir en Spotify ↗</a>'
     + '<button type="button" class="mig-chip" data-mig-act="radio" title="Enciende Radio Conecta (el reproductor de abajo)">📻 Radio</button>'
     + '</div>';
 }
@@ -3327,6 +3340,11 @@ async function renderPlanMigrado(){
     cont.style.display = '';
     _migFotosUpgrade(j.tours);   // [PORTAL-VIVO-1] async, fail-soft: la card ya está pintada
     window.__migTours = j.tours;
+    // [STATS-REAL-1] Ya con los viajes reales: contadores y frase de bienvenida.
+    // Si la frase salió del montón «sin tours» y resulta que sí hay viaje, se
+    // repinta — «Tu asiento sigue disponible» encima de su viaje se leía raro.
+    _statsPintar();
+    if (window.__fraseTag === 'SIN' && _diasAlProximo() != null) _pintarFrase(window.__fraseNombre);
     // Quien solo tiene tours de KameHouse no debe ver «Sin solicitudes todavía /
     // Crea tu primer tour» debajo de su viaje: se lee como que no tiene nada.
     if (!(_toursCache || []).length) {
@@ -4112,6 +4130,27 @@ async function _migPedir(id){
   } catch (e) { _migMsg(p, 'No se pudo enviar. Revisa tu conexión.'); }
 }
 
+// [STATS-REAL-1] Los contadores de arriba (Tours · Próximos · Pasados) contaban
+// SOLO el flujo viejo de solicitudes (_toursCache, hoy vacío), así que un
+// cliente con su viaje publicado veía «0 tours» encima de su propia tarjeta.
+// Hoy suman las dos fuentes: el flujo viejo y los viajes reales que sirve
+// portal-mi-plan-migrado (window.__migTours, con su evento_ds por #N). Sin fecha
+// confiable cuenta como próximo — la misma convención de siempre.
+function _statsFechas(){
+  const viejos = (_toursCache || []).map((t) => _tourFechaISO(t));
+  const reales = (window.__migTours || []).map((t) => t.evento_ds || _tourFechaISO(t));
+  return viejos.concat(reales);
+}
+function _statsPintar(){
+  const hoy = _hoyISOmx();
+  const fechas = _statsFechas();
+  const pas = fechas.filter((iso) => iso && iso < hoy).length;
+  const put = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  put('stat-total', fechas.length);
+  put('stat-prox', fechas.length - pas);
+  put('stat-pas', pas);
+}
+
 // [portal-v1] Clasifica _toursCache en próximos/pasados, pinta stats + pestaña activa.
 function _renderToursUI(){
   const cont = $('#tours-list');
@@ -4125,9 +4164,7 @@ function _renderToursUI(){
   const pas  = conMeta.filter(x => x.esPasado);
 
   const setTxt = (sel, v) => { const el = $(sel); if (el) el.textContent = v; };
-  setTxt('#stat-total', _toursCache.length);
-  setTxt('#stat-prox', prox.length);
-  setTxt('#stat-pas', pas.length);
+  _statsPintar();   // [STATS-REAL-1] cuenta también los viajes reales (KameHouse)
   setTxt('#tab-cnt-prox', prox.length ? '(' + prox.length + ')' : '');
   setTxt('#tab-cnt-pas', pas.length ? '(' + pas.length + ')' : '');
 
@@ -6321,9 +6358,12 @@ function _recordarFrase(i){
 /** ¿Cuál es el viaje más cercano? Devuelve los días que faltan, o null.
  *  Usa EXACTAMENTE la misma fuente que el hero de PP-2: el EV cacheado. */
 function _diasAlProximo(){
+  // [STATS-REAL-1] También los viajes reales (KameHouse), con la fecha de SU #N.
+  const reales = (window.__migTours || []).map(t => t.evento_ds || (_evBySlug(t.evento_id) || {}).ds);
   const proximos = (_toursCache || [])
     .filter(t => t.estado !== 'cancelado')
     .map(t => (_evBySlug(t.evento_id) || {}).ds)
+    .concat(reales)
     .filter(Boolean)
     .map(ds => _diasFaltan(ds))
     .filter(d => d != null && d >= 0)
@@ -6358,7 +6398,9 @@ function _elegirFrase(){
 function _pintarFrase(nombre){
   const el = document.getElementById('dash-frase');
   if (!el) return;
+  window.__fraseNombre = nombre;
   const f = _elegirFrase();
+  window.__fraseTag = f ? f.tag : null;
   if (!f){ el.textContent = ''; return; }
   el.textContent = f.texto.replace('{nombre}', String(nombre || '').trim() || 'conectero');
 }

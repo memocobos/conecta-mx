@@ -1355,10 +1355,18 @@ async function _radarNubeAviso() {
 // pudo leer es EL DINERO: callarse se vería EXACTAMENTE igual que «todo cuadra»,
 // y esta casa ya pagó un «Cobrado $0» con $136,391 cobrados. El servidor
 // contesta 502 a propósito cuando un lado no se pudo leer, y el renglón lo DICE.
+// ⚰️ [CONCILIA-APAGA-1 · 30-oct-2026] APAGADO por palabra de Memo («la 2
+// apágala»). Desde SALDOS-CAJA-1 (12-oct) los pagos de clientes NO entran a la
+// caja a propósito (la caja arranca del saldo real del banco), así que este
+// careo nombraba CADA abono como «no está en caja» — un aviso permanente que ya
+// no distingue nada. El endpoint `admin-concilia` y su careo siguen vivos; solo
+// el renglón del Radar calla. Re-encender = poner esto en true.
+const RADAR_CONCILIA_VIVO = false;
 async function _radarConciliaAviso() {
   const caja = document.getElementById('rdr-concilia-aviso');
   if (!caja) return;
   const callar = () => { caja.style.display = 'none'; caja.innerHTML = ''; };
+  if (!RADAR_CONCILIA_VIVO) { callar(); return; }
   let d = null, noSePudo = null;
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-concilia', {

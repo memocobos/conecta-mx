@@ -128,6 +128,25 @@ function _prvToggle(box, clave, html) {
   box.dataset.abierto = clave; box.innerHTML = html;
 }
 
+// [PAGADO-CLARO-1] «Pagado antes» NO incluye los pagos capturados (➕ Pago),
+// y teclear ahí el pagado TOTAL lo cuenta dos veces (caso Mariana Santibáñez,
+// 30-oct: $5,000 + su abono de $500 = $5,500 y resta −$200). Se enseña en vivo
+// la cuenta que va a quedar, con la misma suma que pinta la tarjeta.
+function _prvPagadoTxt(v, previo) {
+  const caps = (v.abonos_lista || []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
+  const pre = Number(previo) || 0;
+  const tot = pre + caps;
+  const resta = v.total_contrato == null ? null : Number(v.total_contrato) - tot;
+  return `Va a quedar: <b>${_prvMxn(pre)}</b> antes + <b>${_prvMxn(caps)}</b> capturados = <b>pagado ${_prvMxn(tot)}</b>`
+    + (resta == null ? '' : ` · resta <b style="color:${resta < 0 ? 'var(--red)' : 'var(--text)'}">${_prvMxn(resta)}</b>`)
+    + (caps ? `<br><span style="color:var(--ts)">Si la clienta pagó ${_prvMxn(tot)} en total, aquí va solo lo que NO está en «Pagos capturados».</span>` : '');
+}
+function _prvPagadoPintar(revId, i) {
+  const { v } = _prvFila(revId, i); if (!v) return;
+  const el = document.getElementById(`pe-pt-${revId}-${i}`);
+  const inp = document.getElementById(`pe-pre-${revId}-${i}`);
+  if (el && inp) el.innerHTML = _prvPagadoTxt(v, inp.value);
+}
 function _prvEditarAbrir(revId, i) {
   const { v, box } = _prvFila(revId, i); if (!v || !box) return;
   const paq = String(v.tipo_paquete || '').toLowerCase();
@@ -139,7 +158,8 @@ function _prvEditarAbrir(revId, i) {
       <div><label style="${_prvLb}">Zona (como en la ficha)</label><input id="pe-zon-${revId}-${i}" style="${_prvIn}" value="${_prvEsc(v.zona_boleto || '')}"></div>
       <div><label style="${_prvLb}">Lugares</label><input id="pe-bol-${revId}-${i}" type="number" min="1" max="20" style="${_prvIn}" value="${Number(v.boletos) || 1}"></div>
       <div><label style="${_prvLb}">Total del contrato ($)</label><input id="pe-tot-${revId}-${i}" inputmode="decimal" style="${_prvIn}" value="${v.total_contrato == null ? '' : _prvEsc(v.total_contrato)}" placeholder="ej. 7200"></div>
-      <div style="grid-column:1/-1"><label style="${_prvLb}">Pagado ANTES del sistema ($, lo que traía el Excel)</label><input id="pe-pre-${revId}-${i}" inputmode="decimal" style="${_prvIn}" value="${v.abonado_previo == null ? '' : _prvEsc(v.abonado_previo)}" placeholder="0"></div>
+      <div style="grid-column:1/-1"><label style="${_prvLb}">Pagado ANTES del sistema ($) — <b>SIN contar los pagos capturados</b></label><input id="pe-pre-${revId}-${i}" inputmode="decimal" style="${_prvIn}" value="${v.abonado_previo == null ? '' : _prvEsc(v.abonado_previo)}" placeholder="0" oninput="_prvPagadoPintar('${revId}', ${i})"></div>
+      <div id="pe-pt-${revId}-${i}" style="grid-column:1/-1;font-size:12px;margin-top:4px">${_prvPagadoTxt(v, v.abonado_previo)}</div>
     </div>
     <div style="font-size:11px;color:var(--ts);margin:6px 0">Los pagos nuevos van con <b>➕ Pago</b> (con su fecha). Cada cambio queda anotado en la ficha.</div>
     <button class="rq-btn pri full" onclick="_prvEditarGo('${revId}', ${i})">Guardar cambios</button>

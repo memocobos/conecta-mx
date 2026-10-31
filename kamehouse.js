@@ -6715,6 +6715,23 @@ function _vjAbonoAbrir(id, nombre) {
 // se manda tal cual. La zona la valida la PUERTA en el servidor (el navegador
 // no decide si una zona existe) y el total se queda como lo teclee Bulma — la
 // regla de oro de VJ-3: lo que manda es lo que ella ve, no el catálogo.
+// [PAGADO-CLARO-1] La cuenta que va a quedar, en vivo: «pagado antes» + los
+// abonos capturados. Teclear el pagado TOTAL en «antes» lo cuenta dos veces.
+function _vjPagadoTxt(id, previo) {
+  const v = (_vj2Filas || []).find((x) => String(x.id) === String(id)) || {};
+  const abs = ((_vj2Ctx && _vj2Ctx.porViajero) || {})[id] || [];
+  const caps = abs.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+  const pre = Number(previo) || 0;
+  const tot = pre + caps;
+  const f = (n) => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('es-MX');
+  const resta = v.total_contrato == null ? null : Number(v.total_contrato) - tot;
+  return `Va a quedar: ${f(pre)} antes + ${f(caps)} capturados (${abs.length}) = <b style="color:var(--text)">pagado ${f(tot)}</b>`
+    + (resta == null ? '' : ` · resta <b style="color:${resta < 0 ? 'var(--red)' : 'var(--text)'}">${f(resta)}</b>`);
+}
+function _vjPagadoPintar(id) {
+  const el = document.getElementById(`vjx-pt-${id}`), inp = document.getElementById(`vjx-a-${id}`);
+  if (el && inp) el.innerHTML = _vjPagadoTxt(id, inp.value);
+}
 function _vjEditarAbrir(id, nombre) {
   const tr = document.getElementById(`vj-ab-${id}`);
   if (!tr) return;
@@ -6747,7 +6764,8 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)" title="[GENERO-1] El insumo de las Compartidas del rooming (H con H, M con M — regla firmada). Vacío = no se sabe.">GÉNERO<br><select class="cot-input" id="vjx-g-${e}" style="width:70px">
         ${[['', '—'], ['M', 'M'], ['H', 'H']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
-      <label style="font-size:10px;color:var(--ts)">PAGADO ANTES<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px"></label>
+      <label style="font-size:10px;color:var(--ts)" title="[PAGADO-CLARO-1] Lo pagado FUERA del sistema. Los pagos capturados (📎 Pagos) se suman aparte: no los repitas aquí.">PAGADO ANTES (sin capturados)<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px" oninput="_vjPagadoPintar('${_attrJs(id)}')"></label>
+      <div id="vjx-pt-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)">${_vjPagadoTxt(id, v.abonado_previo)}</div>
       <button class="btn btn-primary btn-sm" id="vjx-b2-${e}" onclick="_vjEditarGuardar('${_attrJs(id)}')">Guardar corrección</button>
       <button class="btn btn-ghost btn-sm" onclick="_vjEditarAbrir('${_attrJs(id)}')">Cancelar</button>
       <div style="flex-basis:100%;font-size:11px;color:var(--ts);border-top:1px solid var(--line);padding-top:8px;margin-top:4px">

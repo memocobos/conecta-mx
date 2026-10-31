@@ -160,7 +160,11 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
   af(/no tiene pedido de boletos cargado/.test(nodos['cc-vj-inv'].innerHTML), 'sin pedido en todo el evento: se dice, no queda en blanco');
   af(/_vjInvCargar\(_ccEventoActual\)/.test(corta('async function _vj2Cargar(') || ''), 'cada recarga de la lista (corregir/mover/cancelar) repinta el marcador');
   af(/evId !== _ccEventoActual\) return/.test(corta('async function _vjInvCargar(') || ''), 'una respuesta tardía de otro evento no se pinta');
-  af(/list="vjx-zl-/.test(corta('function _vjEditarAbrir(') || ''), 'el ✏️ Corregir ofrece las zonas con «quedan N» al escribir');
+  // [ZONA-SELECT-1] Actualizado a la verdad nueva: el datalist obligaba a
+  // TECLEAR (Chrome solo enseñaba la zona ya escrita); hoy es un <select> que
+  // llena el servidor (fechas_de_evento → zonasDeFecha) con «quedan N».
+  af(/_vjEditarZonas\(id, v\)/.test(corta('function _vjEditarAbrir(') || '') && /<select class="cot-input" id="vjx-z-/.test(corta('function _vjEditarAbrir(') || ''), 'el ✏️ Corregir ELIGE la zona de un select (no se teclea)');
+  af(/fechasDeEvento\(v\.evento_id\)/.test(corta('async function _vjEditarZonas(') || '') && /quedan \$\{d\}/.test(corta('async function _vjEditarZonas(') || ''), 'las zonas salen de la ficha de esa fecha con «quedan N»');
   af(/_vjCancelarAbrir\(/.test(kh) && /accion: 'viajero_cancelar'/.test(corta('async function _vjCancelarGuardar(') || ''), 'el botón ⛔ llama a viajero_cancelar');
   af(/confirm\(frase\)/.test(corta('async function _vjCancelarGuardar(') || '') && /await _vj2Cargar\(\)/.test(corta('async function _vjCancelarGuardar(') || ''), 'pide confirm y recarga lista + marcador');
   af(/id="cc-vj-inv"/.test(fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8')), 'el contenedor del marcador vive en el HTML');

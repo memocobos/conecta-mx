@@ -6755,9 +6755,7 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)">NOMBRE<br><input class="cot-input" id="vjx-n-${e}" value="${_esfEsc(v.nombre || '')}" style="width:170px"></label>
       <label style="font-size:10px;color:var(--ts)">PAQUETE<br><select class="cot-input" id="vjx-p-${e}">
         ${opt('plus', 'PLUS')}${opt('stay', 'STAY')}${opt('cheap', 'CHEAP')}${opt('ride', 'RIDE')}</select></label>
-      <label style="font-size:10px;color:var(--ts)" title="[CAPSULE-DISPO-1] Al escribir salen las zonas del evento con cuántas quedan">ZONA<br><input class="cot-input" id="vjx-z-${e}" list="vjx-zl-${e}" value="${_esfEsc(v.zona_boleto || '')}" placeholder="como en la ficha" style="width:150px">
-        <datalist id="vjx-zl-${e}">${(_vjInv && _vjInv.evento === _ccEventoActual ? _vjInv.zonas : []).map((z) =>
-          `<option value="${_esfEsc(z.zona)}">${z.disponibles == null ? 'sin pedido' : (z.disponibles <= 0 ? 'AGOTADA' : 'quedan ' + z.disponibles)}</option>`).join('')}</datalist></label>
+      <label style="font-size:10px;color:var(--ts)" title="[ZONA-SELECT-1] Las zonas de la ficha de ESTA fecha, con cuántas quedan">ZONA<br><span id="vjx-zw-${e}"><select class="cot-input" id="vjx-z-${e}" style="width:200px"><option value="${_esfEsc(v.zona_boleto || '')}">${_esfEsc(v.zona_boleto || '— sin zona —')}</option></select></span></label>
       <label style="font-size:10px;color:var(--ts)">LUGARES<br><input class="cot-input" id="vjx-b-${e}" type="number" min="1" max="20" step="1" value="${Number(v.boletos) || 1}" style="width:70px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[VJ-HAB-1] El tipo de habitación que eligió — de aquí se arma el rooming. Solo PLUS/STAY/RIDE duermen; en CHEAP déjalo vacío.">HABITACIÓN<br><select class="cot-input" id="vjx-h-${e}">
         ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
@@ -6777,6 +6775,40 @@ function _vjEditarAbrir(id, nombre) {
       <div id="vjx-s-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)"></div>
       <div id="vjx-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
     </div>`;
+  _vjEditarZonas(id, v);
+}
+// [ZONA-SELECT-1] La zona se ELIGE, no se teclea: el input con datalist solo
+// enseñaba la zona ya escrita (Chrome filtra por el valor) y obligaba a
+// escribir el nombre exacto — un dedazo rebotaba en la puerta de zonas.
+// Las zonas salen del servidor (`fechas_de_evento` → zonasDeFecha, el dueño)
+// para ESTA fecha, con «quedan N» del marcador. Si el catálogo no se lee, la
+// lista se queda con la zona actual y se DICE.
+async function _vjEditarZonas(id, v) {
+  let zonas = null;
+  try {
+    const j = await khViajeros.fechasDeEvento(v.evento_id);
+    const f = j && Array.isArray(j.fechas) ? j.fechas.find((x) => x.evento_id === v.evento_id) : null;
+    zonas = f ? (f.zonas || []) : null;
+  } catch (_) { zonas = null; }
+  const sel = document.getElementById(`vjx-z-${id}`);
+  if (!sel) return;   // el panel se cerró mientras llegaba
+  const actual = String(v.zona_boleto || '');
+  if (!zonas || !zonas.length) {
+    const er = document.getElementById(`vjx-e-${id}`);
+    if (er) er.textContent = 'No se pudieron leer las zonas de la ficha: la zona se queda como está.';
+    return;
+  }
+  const inv = {};
+  if (_vjInv && _vjInv.evento === _ccEventoActual) (_vjInv.zonas || []).forEach((z) => { inv[z.zona] = z.disponibles; });
+  const lista = zonas.slice();
+  if (actual && !lista.includes(actual)) lista.unshift(actual);   // una zona vieja no se pierde al abrir
+  const etq = (n) => {
+    const d = inv[n];
+    const t = d === undefined || d === null ? '' : (d <= 0 ? ' · AGOTADA' : ` · quedan ${d}`);
+    return _esfEsc(n) + t + (n === actual ? ' (actual)' : '');
+  };
+  sel.innerHTML = (String(v.tipo_paquete || '').toLowerCase() === 'ride' ? '<option value="">— sin zona (RIDE) —</option>' : '')
+    + lista.map((n) => `<option value="${_esfEsc(n)}"${n === actual ? ' selected' : ''}>${etq(n)}</option>`).join('');
 }
 // ═══ [CANCELAR-LUGAR-1] ⛔ Cancelar un lugar — jamás borrarlo ═════════════
 // Dos salidas firmadas por Memo (30-oct): el dinero se QUEDA (regla de la
@@ -6885,7 +6917,9 @@ async function _vjEditarGuardar(id) {
     showToast('Corrección guardada', 'success');
     await _vj2Cargar();
   } catch (e) {
-    if (er) er.textContent = (e && e.message) || 'No se pudo guardar.';
+    const msg = (e && e.message) || 'No se pudo guardar.';
+    if (er) er.textContent = msg;
+    showToast('No se guardó: ' + msg, 'error');   // el renglón rojo puede quedar fuera de vista
   } finally { if (btn) { btn.disabled = false; btn.textContent = 'Guardar corrección'; } }
 }
 

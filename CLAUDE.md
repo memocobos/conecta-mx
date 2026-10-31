@@ -203,6 +203,15 @@ está caduco antes de escribirse.
   Playwright del hero (`mide:tira-agotados`) se corren en la Mac.
   **Portal:** fuera el botón «Reservar otro viaje →» (palabra de Memo: el
   Portal es para ver su viaje). ⏳ Push de Memo → recargar la portada.
+  🔒 **CARD-CERO-1 (mismo día, palabra de Memo: «si ya lo quitaste de arriba,
+  el card de Kevin en automático también se debería ir del listado»):**
+  `_evYaArranco(ev)` es el DUEÑO de «¿ya arrancó?» y lo preguntan
+  `_evVeredicto`, la tarjeta del catálogo y `heroALaVenta` — un evento de UNA
+  fecha pasa a pasado a su HORA de inicio (`_evHoraInicio`, 21:00 / 14:00
+  festivales, −06:00), y al llegar a cero el hero marca `_past` y corre
+  `filterEvents()` (se va del listado sin recargar). ⚠️ MULTIFECHA sin cambio
+  (su `ds` es la PRIMERA fecha: sigue la regla de 23:59). mas-alla-1 73 ✅ (su
+  rebanada ahora trae los tres dueños).
 
 - 🧮⏳ **COTIZA-VEND-1 (30-oct-2026, en main local, cero SQL): EL COTIZADOR DE
   VENDEDOR — el «rol de pagos» se vuelve herramienta de KameHouse.** Palabra de

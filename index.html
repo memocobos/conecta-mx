@@ -3418,11 +3418,8 @@ function renderCatalog(){
     }
     if(ev.listOnly){continue;}  // handled separately below
     // Detect past events
-    var isPast=false;
-    if(ev.ds&&ev.ds!=='2027-12-31'){
-      var evDate=new Date(ev.ds+'T23:59:59');
-      isPast=evDate<new Date();
-    }
+    // [CARD-CERO-1] Lo decide el dueño, el mismo que el veredicto y el hero.
+    var isPast=_evYaArranco(ev);
     ev._past=isPast;
     var isAg=false,isSV=false,isProc=false,isPC2=false,hasZ=false;
     // [FIL-1] La tarjeta ya NO deriva su estado: lo PIDE. La misma llamada la
@@ -3979,9 +3976,31 @@ function _searchNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\
 // Es el caso del libro: dos listas iguales no existen, solo dos listas que
 // todavía no divergen. Ahora el veredicto se calcula AQUÍ y las dos caras lo
 // PIDEN. Si alguien cambia la regla, cambia para las dos a la vez.
+// 🔒 [CARD-CERO-1 · 30-oct-2026] ¿El evento YA ARRANCÓ? Palabra de Memo: «si ya
+// lo quitaste de arriba, el card de Kevin en automático también se debería ir
+// del listado». Antes un evento de UNA fecha seguía «Disponible» hasta las 23:59
+// de su día aunque el concierto ya hubiera empezado (el hero ya saltaba, el
+// listado no). Hoy el dueño es éste y lo preguntan el veredicto, la tarjeta y el
+// hero: una fecha → se va al ARRANCAR (hora del evento, zona de México).
+// ⚠️ MULTIFECHA NO SE TOCA a propósito: su `ds` es la PRIMERA fecha, y cortarlo
+// a la hora de arranque lo sacaría antes de lo que hoy sale (queda la regla de
+// siempre, 23:59 de su `ds`).
+function _evHoraInicio(ev){
+  if(!ev)return '21:00';
+  var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
+  var claves=['festival','fest','machaca','warped','edc','knotfest'];
+  var id=(ev.id||'').toLowerCase(), nom=(ev.a||'').toLowerCase();
+  var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
+  return esFestival?'14:00':'21:00';
+}
+function _evYaArranco(ev){
+  if(!ev||!ev.ds||ev.ds==='2027-12-31')return false;
+  if(ev.dsList&&ev.dsList.length>1){ return new Date(ev.ds+'T23:59:59')<new Date(); }
+  var t=new Date(ev.ds+'T'+_evHoraInicio(ev)+':00-06:00').getTime();
+  return !isNaN(t)&&Date.now()>=t;
+}
 function _evVeredicto(ev){
-  var isPast=false;
-  if(ev.ds&&ev.ds!=='2027-12-31'){ isPast=new Date(ev.ds+'T23:59:59')<new Date(); }
+  var isPast=_evYaArranco(ev);
   var st=ev.st;
   var isAg=st==='agotado'||!!ev.agotado;
   var isSV=st==='solo-viaje',isProc=st==='proceso',isPC2=st==='por-confirmar';
@@ -4262,7 +4281,7 @@ var _landTick = null;
   // evento. Si divergen, truena.
   function heroALaVenta(ev){
     if(!ev||ev.listOnly)return false;
-    if(ev.ds&&ev.ds!=='2027-12-31'&&new Date(ev.ds+'T23:59:59')<new Date())return false;
+    if(_evYaArranco(ev))return false;
     var st=ev.st;
     // 'ultimos' TAMBIÉN se vende. Excluirlo sería incoherente: un evento con
     // 39% de zonas libres ya entra por el auto-semáforo con st==='', así que
@@ -4282,14 +4301,8 @@ var _landTick = null;
 
   // La hora a la que arranca el evento, como la definía el countdown original:
   // los festivales abren de día, los conciertos de noche.
-  function horaEvento(ev){
-    if(!ev)return '21:00';
-    var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
-    var claves=['festival','fest','machaca','warped','edc','knotfest'];
-    var id=(ev.id||'').toLowerCase(), nom=(ev.a||'').toLowerCase();
-    var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
-    return esFestival?'14:00':'21:00';
-  }
+  // [CARD-CERO-1] La lista vive en su dueño global (_evHoraInicio): una sola.
+  function horaEvento(ev){ return _evHoraInicio(ev); }
 
   // ⚠️ EL INSTANTE SE ANCLA EN ZONA DE MÉXICO, no en la del navegador.
   // El countdown original hacía new Date(ds+'T21:00:00'), que es la hora LOCAL
@@ -4373,6 +4386,13 @@ var _landTick = null;
       // que sea volviera a salir el mismo instante vencido, no hay recursión.
       _destino=0;
       if(_landTick){clearInterval(_landTick);_landTick=null;}
+      // [CARD-CERO-1] Y el listado lo sigue sin recargar: el que ya arrancó
+      // pasa a «pasado» y el filtro lo saca (deja de verse como Disponible).
+      try{
+        var _cambio=false;
+        EV.forEach(function(e){ if(!e.listOnly&&!e._past&&_evYaArranco(e)){ e._past=true; _cambio=true; } });
+        if(_cambio&&typeof filterEvents==='function')filterEvents();
+      }catch(_e){}
       setTimeout(construir,0);
       return;
     }

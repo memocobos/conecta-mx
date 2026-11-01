@@ -52,6 +52,9 @@ const ACCIONES = {
   // [PRUEBA-ARCHIVO-1] Quitar una solicitud de PRUEBA (y lo que nació de ella).
   // Solo Memo: es la única acción que saca filas de dinero de la vista.
   archivar_prueba: ['maestro_roshi'],
+  // [REQ-CORRIGE-1] «🔁 Corregir y aprobar»: lo que SÍ hay para esta solicitud
+  // (fechas, paquetes, zonas con cupo, habitaciones) — SOLO LEE.
+  correccion_opciones: ROLES_BANDEJA,
 };
 // [CONFIRMA-1] Al aprobar sale UN correo: confirmación + invitación al Portal
 // (palabra de Memo: «correo único»). El dueño es _lib/correo-confirmacion; sus
@@ -61,6 +64,133 @@ const ACCIONES = {
 const { enviarCorreoPago } = require('./_lib/correo-confirmacion');
 const SIGN_EXPIRA = 60 * 60; // 1 hora, como admin-solicitud-comprobante
 const BUCKET = 'abonos-viajeros';
+
+// ═════════════════════════════════════════════════════════════════════════════
+// [REQ-CORRIGE-1 · 31-oct-2026] CORREGIR Y APROBAR
+// ═════════════════════════════════════════════════════════════════════════════
+// Palabra de Memo, citada: «hay gente que no puedo darles la zona y fecha que
+// quieren … cuando los contacto con whatsapp hago el cambio pero ellos tienen
+// que volver a meter la solicitud en el index … habrá forma que en
+// requisiciones me pongas un portal donde podamos corregir fecha y zona a lo
+// que sí tengo disponible, y al aceptar … les llegue el correo con el dato de
+// que no había en tal zona pero te pusimos en esta y todo lo demás normal».
+//
+// 🔒 AQUÍ NO VIVE NINGUNA REGLA DE PRECIO NI DE DISPONIBILIDAD. Se le pregunta
+// a los dueños: qué se vende → `_opciones` (opciones-paquete); a cuánto el
+// grupo → `_calcularPrecio`; qué habitaciones valen para N → `_hotelLista`;
+// qué fechas siguen vivas → `fechasVendibles`; cuántos boletos quedan →
+// `cargarDisponibilidad`/`evaluarZona` (el Palacio). El total SUGERIDO sale del
+// motor y quien aprueba lo puede teclear distinto (un descuento negociado por
+// WhatsApp es palabra humana), igual que en el aprobar de siempre.
+// 🔒 La solicitud ORIGINAL no se pisa: sus columnas siguen diciendo lo que el
+// cliente pidió y `correccion` guarda antes/después/motivo/quién/cuándo.
+// 🔒 Solo dentro del MISMO evento (otra fecha, otra zona, otro paquete, otra
+// habitación). Mandar a otro tour es otra venta, no una corrección.
+const { fetchEventosRaw, fetchHotelesGlobales } = require('./_lib/catalogo-index');
+const { _calcularPrecio, _hotelLista, esCDMX, hoyMx } = require('./_lib/precio-zona');
+const { _opciones, fechasVendibles, NOMBRES } = require('./_lib/opciones-paquete');
+const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
+
+// [VJ-HAB-1] El tipo de habitación del rooming KH, normalizado (un solo dueño
+// para la habitación pedida y la corregida).
+function normHotelTipo(raw) {
+  const h = String(raw || '').trim().toLowerCase();
+  if (h.startsWith('compartida')) return 'Compartida';
+  if (h.startsWith('doble')) return 'Doble';
+  if (h.startsWith('triple')) return 'Triple';
+  if (h.startsWith('individual')) return 'Individual';
+  return null;
+}
+
+// Resuelve lo vendible para la solicitud y, si `c` trae una elección
+// (paquete…), la VALIDA contra eso mismo. Jamás escribe.
+//   → { ok:false, status, error } | { ok:true, evento, fechas, paquetes,
+//       habitaciones, inventario_ok, eleccion|null, total_sugerido|null, avisos }
+async function resolverCorreccion(req, c, ctx) {
+  c = c || {};
+  const slug = String(req.evento_id || '').split('#')[0];
+  let lista;
+  try { lista = await fetchEventosRaw(); } catch (_) { lista = null; }
+  if (!Array.isArray(lista)) return { ok: false, status: 502, error: 'No se pudo leer el catálogo — sin él no se corrige a ciegas. Reintenta en un momento.' };
+  const ev = lista.find((x) => x && x.id === slug);
+  if (!ev) return { ok: false, status: 409, error: `El evento ${slug} ya no está en el catálogo` };
+  const hoyISO = hoyMx();
+  const fechas = fechasVendibles(ev, hoyISO);
+  if (!fechas.length) return { ok: false, status: 409, error: 'Ese evento ya no tiene fechas a la venta' };
+  const esMulti = Array.isArray(ev.multifecha) && ev.multifecha.length > 0;
+
+  // La fecha: la elegida, o la que pidió el cliente si sigue viva, o la primera.
+  let objetivo = c.evento_id ? String(c.evento_id) : null;
+  if (objetivo && objetivo.split('#')[0] !== slug) return { ok: false, status: 400, error: 'La corrección es dentro del MISMO evento — mandar a otro tour es otra venta' };
+  let f = objetivo ? fechas.find((x) => x.evento_id === objetivo) : (fechas.find((x) => x.evento_id === req.evento_id) || fechas[0]);
+  if (!f) return { ok: false, status: 409, error: 'Esa fecha ya pasó o no existe en la ficha' };
+  const fi = esMulti ? f.idx : 0;
+  const N = Math.max(1, Number(req.num_personas) || 1);
+  const cdmx = esCDMX(ev);
+  let hoteles = {};
+  try { hoteles = await fetchHotelesGlobales(); } catch (_) { hoteles = {}; }
+  const o = _opciones(ev, hoteles, fi);
+  if (!o.ok) return { ok: false, status: 409, error: o.motivo };
+
+  // El inventario del Palacio para ESA fecha. Ilegible → las zonas pasan con
+  // `quedan:null` y SE DICE (inventario_ok:false) — jamás un cero inventado.
+  let disp = null;
+  try {
+    disp = await cargarDisponibilidad({ khUrl: ctx.SB_URL, khKey: ctx.SB_KEY,
+      portalUrl: process.env.PORTAL_SUPABASE_URL, portalKey: process.env.PORTAL_SUPABASE_SERVICE_KEY, evento_id: f.evento_id });
+    if (disp && disp.error) disp = null;
+  } catch (_) { disp = null; }
+
+  // Habitaciones que valen para N personas (la lista del dueño).
+  const habsGrupo = (_hotelLista(ev, fi, cdmx, hoteles) || []).filter((h) => h && h.n && (!Array.isArray(h.viaj) || h.viaj.includes(N)))
+    .map((h) => ({ nombre: h.n, extra: Number(h.e) || 0 }));
+
+  const paquetes = o.paquetes.map((p) => ({
+    paquete: p.paquete, nombre: p.nombre, precio: p.precio != null ? p.precio : null,
+    duerme: (p.habitaciones || []).length > 0,
+    zonas: p.zonas ? p.zonas.map((z) => {
+      const ez = disp ? evaluarZona(disp, z.zona, N) : null;
+      return { zona: z.zona, precio: z.precio, quedan: ez && ez.gestionada ? ez.restante : null,
+        gestionada: !!(ez && ez.gestionada), sin_cupo: !!(ez && ez.gestionada && ez.sinCupo) };
+    }) : null,
+  }));
+  const evento = { evento_id: f.evento_id, nombre: ev.a || slug, fecha: f.lbl, ds: f.ds, cdmx };
+  const out = { ok: true, evento, fechas, paquetes, habitaciones: habsGrupo, inventario_ok: !!disp, eleccion: null, total_sugerido: null, avisos: [] };
+  if (!disp) out.avisos.push('No se pudo leer el inventario del Palacio: los «quedan» no se muestran — revisa el cupo antes de aprobar.');
+
+  if (!c.paquete) return out;
+
+  // ── Validar la elección ──
+  const paquete = String(c.paquete || '').toLowerCase();
+  const pq = paquetes.find((x) => x.paquete === paquete);
+  if (!pq) return { ok: false, status: 409, error: `El paquete ${NOMBRES[paquete] || paquete} no está a la venta en esa fecha` };
+  let zona = null;
+  if (pq.zonas) {
+    const zIn = String(c.zona || '').trim();
+    if (!zIn) return { ok: false, status: 400, error: 'Elige la zona' };
+    const hit = pq.zonas.find((z) => z.zona === zIn);
+    if (!hit) return { ok: false, status: 409, error: `La zona «${zIn}» no está a la venta en esa fecha para ${pq.nombre}` };
+    if (hit.sin_cupo) return { ok: false, status: 409, error: `«${zIn}» no tiene ${N} lugar(es) en el Palacio (quedan ${hit.quedan}). Elige otra.` };
+    zona = hit.zona;
+    if (!hit.gestionada && disp) out.avisos.push(`«${zona}» no tiene pedido cargado en Kamisama: no se pudo medir el cupo.`);
+  }
+  let hotel = null;
+  if (pq.duerme && habsGrupo.length) {
+    const hIn = String(c.hotel || '').trim();
+    if (!hIn) return { ok: false, status: 400, error: 'Elige la habitación' };
+    const hh = habsGrupo.find((h) => h.nombre === hIn);
+    if (!hh) return { ok: false, status: 409, error: `La habitación «${hIn}» no vale para ${N} persona(s) en esa fecha` };
+    hotel = hh.nombre;
+  }
+  const r = _calcularPrecio(ev, { hoteles, paquete, zona: zona || undefined, hotel_nombre: hotel || undefined,
+    num_personas: N, transporte_cost: 0, fecha_idx: fi, hoyISO });
+  if (!r || !r.ok) return { ok: false, status: 409, error: (r && r.motivo) || 'Esa combinación no se puede vender' };
+  if (r.requiere_hotel) return { ok: false, status: 400, error: 'Elige la habitación' };
+  if (cdmx && paquete !== 'cheap') out.avisos.push('Evento de CDMX: el total sugerido NO incluye el transporte — súmalo al total si va.');
+  out.eleccion = { evento_id: f.evento_id, paquete, zona, hotel, hotel_tipo: normHotelTipo(hotel), fecha: f.lbl };
+  out.total_sugerido = Math.round(Number(r.total)) || null;
+  return out;
+}
 
 function j(status, headers, body) { return { statusCode: status, headers, body: JSON.stringify(body) }; }
 
@@ -402,7 +532,7 @@ exports.handler = async (event) => {
       req = (await leer(`${base}?id=eq.${id}&select=*`))[0];
       if (!req) return j(404, headers, { error: 'Esa solicitud ya no existe' });
       if (req.estado === 'aprobada') {
-        const porNota = await leer(`${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${encodeURIComponent(req.evento_id)}&notas=like.${encodeURIComponent('Requisición ' + req.folio + '*')}&select=*`);
+        const porNota = await leer(`${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${encodeURIComponent((req.correccion && req.correccion.despues && req.correccion.despues.evento_id) || req.evento_id)}&notas=like.${encodeURIComponent('Requisición ' + req.folio + '*')}&select=*`);
         const ids = new Set(porNota.map((v) => v.id));
         if (req.viajero_id && !ids.has(req.viajero_id)) {
           const t = await leer(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${req.viajero_id}&select=*`);
@@ -444,6 +574,20 @@ exports.handler = async (event) => {
   }
 
   // ── aprobar: NACE el viajero ──────────────────────────────────────────────
+  // ── [REQ-CORRIGE-1] lo que SÍ hay para esta solicitud (SOLO LEE) ─────────
+  if (accion === 'correccion_opciones') {
+    const r0 = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
+    if (!r0.ok) return j(502, headers, { error: 'No se pudo leer la requisición' });
+    const rows0 = await r0.json();
+    if (!rows0.length) return j(404, headers, { error: 'Esa requisición no existe' });
+    const req = rows0[0];
+    if (req.estado !== 'pendiente') return j(409, headers, { error: `Ya está ${req.estado}` });
+    const c = { evento_id: body.evento_id, paquete: body.paquete, zona: body.zona, hotel: body.hotel };
+    const res = await resolverCorreccion(req, c, { SB_URL, SB_KEY });
+    if (!res.ok) return j(res.status, headers, { error: res.error });
+    return j(200, headers, Object.assign({ pidio: { evento_id: req.evento_id, paquete: req.paquete, zona: req.zona || null, hotel: req.hotel || null, num_personas: req.num_personas } }, res));
+  }
+
   if (accion === 'aprobar') {
     // 1 · Leer la fila (para armar el viajero con sus datos).
     const r0 = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
@@ -475,6 +619,31 @@ exports.handler = async (event) => {
       }
     }
 
+    // 1b · [REQ-CORRIGE-1] ¿Se aprueba CORREGIDA? La elección se valida contra
+    // lo vendible ANTES de reclamar (un 4xx después dejaría «aprobada» sin
+    // viajeros) y manda en todo lo que sigue: fecha, paquete, zona, habitación.
+    let corr = null;
+    if (body.correccion != null) {
+      const c = body.correccion;
+      if (typeof c !== 'object' || Array.isArray(c)) return j(400, headers, { error: 'La corrección viene mal formada' });
+      const motivo = String(c.motivo || '').trim().slice(0, 300);
+      if (motivo.length < 3) return j(400, headers, { error: 'Escribe por qué se corrigió (el cliente lo lee en su correo)' });
+      const res = await resolverCorreccion(req, c, { SB_URL, SB_KEY });
+      if (!res.ok) return j(res.status, headers, { error: res.error });
+      if (!res.eleccion) return j(400, headers, { error: 'Elige el paquete de la corrección' });
+      const e = res.eleccion;
+      const antes = { evento_id: req.evento_id, paquete: req.paquete, zona: req.zona || null, hotel: req.hotel || null, total: req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null };
+      const igual = e.evento_id === antes.evento_id && e.paquete === antes.paquete &&
+        String(e.zona || '') === String(antes.zona || '') && normHotelTipo(e.hotel) === normHotelTipo(antes.hotel);
+      if (igual) return j(400, headers, { error: 'La corrección es igual a lo que pidió el cliente — usa «Aprobar» normal' });
+      corr = { antes, despues: { evento_id: e.evento_id, paquete: e.paquete, zona: e.zona, hotel: e.hotel, total: null },
+        motivo, por: quien, at: new Date().toISOString(), total_sugerido: res.total_sugerido, avisos: res.avisos,
+        fecha_lbl: e.fecha, hotel_tipo: e.hotel_tipo };
+    }
+    const evEf = corr ? corr.despues.evento_id : req.evento_id;
+    const paqEf = corr ? corr.despues.paquete : req.paquete;
+    const hotelEf = corr ? corr.despues.hotel : req.hotel;
+
     // 2 · El dinero, tecleado por el humano que vio el comprobante.
     // [REQ-LINK-1] Sin comprobante NO se inventa dinero (el caso Daniela,
     // 30-oct: una requisición `link_pago` —que por diseño nace sin comprobante,
@@ -487,7 +656,8 @@ exports.handler = async (event) => {
     if (!(monto > 0) && !sinComprobante) return j(400, headers, { error: 'El monto del abono va en pesos y mayor a cero — es lo que dice el comprobante que verificaste' });
     const total_contrato = (body.total_contrato != null && body.total_contrato !== '')
       ? Math.round(Number(body.total_contrato))
-      : (req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null);
+      : (corr ? corr.total_sugerido : (req.total_sistema != null ? Math.round(Number(req.total_sistema)) : null));
+    if (corr) corr.despues.total = total_contrato;
     if (!(total_contrato > 0)) return j(400, headers, { error: 'Falta el total del contrato (el sistema no lo tiene para este caso — por ejemplo CDMX con transporte): captúralo' });
     // [DESGLOSE-1] Pagar DE MÁS se permite solo si quien aprueba lo dice
     // (`saldo_favor:true`): el excedente queda como saldo a favor del cliente.
@@ -497,7 +667,10 @@ exports.handler = async (event) => {
 
     // 3 · La zona, por la PUERTA. El staff puede corregirla al aprobar.
     let zonaFinal = null;
-    if (req.paquete !== 'ride') {
+    // [REQ-CORRIGE-1] Corregida: la zona ya salió de `_opciones` (la ortografía
+    // de la ficha, con cupo medido) — no hay nada que canonizar.
+    if (corr) zonaFinal = corr.despues.zona;
+    else if (req.paquete !== 'ride') {
       const capturada = String(body.zona != null && String(body.zona).trim() !== '' ? body.zona : (req.zona || '')).trim();
       if (!capturada) return j(400, headers, { error: 'Falta la zona del boleto' });
       let p;
@@ -533,7 +706,8 @@ exports.handler = async (event) => {
     const rClaim = await fetch(`${base}?id=eq.${id}&estado=eq.pendiente`, {
       method: 'PATCH',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify({ estado: 'aprobada', revisada_por: quien, revisada_at: new Date().toISOString(), nota_staff: notaStaff || null }),
+      body: JSON.stringify(Object.assign({ estado: 'aprobada', revisada_por: quien, revisada_at: new Date().toISOString(), nota_staff: notaStaff || null },
+        corr ? { correccion: { antes: corr.antes, despues: corr.despues, motivo: corr.motivo, por: corr.por, at: corr.at } } : {})),
     });
     if (!rClaim.ok) return j(502, headers, { error: 'No se pudo reclamar la requisición', detail: (await rClaim.text()).slice(0, 300) });
     const claimed = await rClaim.json();
@@ -546,17 +720,11 @@ exports.handler = async (event) => {
     // («Compartida (4 personas)» → Compartida — medido: era el único crudo
     // extra en 59 filas reales); lo que no case queda null Y en la nota, que
     // sigue llevando el crudo completo — nada se pierde, solo se estructura.
-    const hotelTipo = (() => {
-      const h = String(req.hotel || '').trim().toLowerCase();
-      if (h.startsWith('compartida')) return 'Compartida';
-      if (h.startsWith('doble')) return 'Doble';
-      if (h.startsWith('triple')) return 'Triple';
-      if (h.startsWith('individual')) return 'Individual';
-      return null;
-    })();
+    const hotelTipo = normHotelTipo(hotelEf);
     const notaViajero = [
-      `Requisición ${req.folio} · ${req.forma_pago}${req.transporte ? ' · ' + req.transporte : ''}${req.hotel ? ' · hotel: ' + req.hotel : ''}`,
+      `Requisición ${req.folio} · ${req.forma_pago}${req.transporte ? ' · ' + req.transporte : ''}${hotelEf ? ' · hotel: ' + hotelEf : ''}`,
       `aprobada por ${quien} ${hoyMX}${zonaConfesion || ''}`,
+      corr ? `🔁 CORREGIDA al aprobar: pidió ${corr.antes.evento_id} ${corr.antes.paquete}${corr.antes.zona ? ' ' + corr.antes.zona : ''}${corr.antes.hotel ? ' · ' + corr.antes.hotel : ''} → queda ${corr.despues.evento_id} ${corr.despues.paquete}${corr.despues.zona ? ' ' + corr.despues.zona : ''}${corr.despues.hotel ? ' · ' + corr.despues.hotel : ''} (${corr.motivo})` : '',
       notaStaff ? `nota: ${notaStaff}` : '',
     ].filter(Boolean).join(' · ');
 
@@ -593,17 +761,17 @@ exports.handler = async (event) => {
     const filasV = (personas
       ? personas.map((p, i) => ({
           grupo_viaje: grupoViaje,
-          evento_id: req.evento_id, nombre: p.nombre, celular: p.celular, correo: p.correo,
+          evento_id: evEf, nombre: p.nombre, celular: p.celular, correo: p.correo,
           talla_playera: p.talla_playera, num_emergencia: p.num_emergencia,
-          tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: 1,
+          tipo_paquete: paqEf, zona_boleto: zonaFinal, boletos: 1,
           hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato: contratos[i], abonado_previo: 0,
           notas: notaViajero + (p.titular ? ` · titular de ${N} lugares` : ` · acompañante de ${req.nombre}`),
         }))
       : [{
-          evento_id: req.evento_id, nombre: req.nombre, celular: req.celular, correo: req.correo,
+          evento_id: evEf, nombre: req.nombre, celular: req.celular, correo: req.correo,
           talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null,
-          tipo_paquete: req.paquete, zona_boleto: zonaFinal, boletos: req.num_personas,
+          tipo_paquete: paqEf, zona_boleto: zonaFinal, boletos: req.num_personas,
           hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato, abonado_previo: 0, notas: notaViajero,
         }]).map((f) => Object.assign(f, sello));
@@ -681,7 +849,10 @@ exports.handler = async (event) => {
     const recibidoPorViajero = {};
     nacidos.forEach((v, i) => { recibidoPorViajero[v.id] = N > 1 ? montos[i] : monto; });
     const portal = await enviarCorreoPago({
-      tipo: 'reserva', evento_id: req.evento_id, viajeroIds: nacidos.map((v) => v.id), recibidoPorViajero,
+      tipo: 'reserva', evento_id: evEf, viajeroIds: nacidos.map((v) => v.id), recibidoPorViajero,
+      // [REQ-CORRIGE-1] El correo de SIEMPRE, con un bloque que dice qué pidió,
+      // por qué no se pudo y dónde quedó. Sin corrección no viaja nada nuevo.
+      cambio: corr ? { antes: corr.antes, despues: corr.despues, motivo: corr.motivo } : undefined,
       enviado_por: auth.user && auth.user.correo, KH_URL: SB_URL, KH_KEY: SB_KEY,
     });
 
@@ -704,6 +875,7 @@ exports.handler = async (event) => {
       zona: zonaFinal,
       total_contrato,
       monto,
+      correccion: corr ? { antes: corr.antes, despues: corr.despues, motivo: corr.motivo, avisos: corr.avisos } : undefined,
       // [REQ-LINK-1] La bandeja DICE cuando no nació abono — un silencio aquí
       // se leería como «el abono quedó», que es justo lo que este caso cura.
       sin_abono: filasA.length === 0

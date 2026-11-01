@@ -188,6 +188,48 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔁⏳ **REQ-CORRIGE-1 (31-oct-2026, en main local; la BASE ya escrita): «🔁
+  CORREGIR Y APROBAR» en la bandeja de Requisiciones.** Palabra de Memo, citada:
+  *«hay gente que no puedo darles la zona y fecha que quieren … tienen que volver
+  a meter la solicitud en el index … ponme donde podamos corregir fecha y zona a
+  lo que sí tengo disponible, y al aceptar … les llegue el correo con el dato de
+  que no había en tal zona pero te pusimos en esta»*. `mide:req-corrige-1` **40**
+  (sin ancla — árbol; sabotaje al candado de cupo con sha1 careado → 1 rojo con
+  nombre → restaurado byte a byte `bd27fd71`).
+  - **La base** (acta `migraciones/REQ-CORRIGE-1.sql`, YA CORRIDA, CHECK mordido):
+    `requisiciones.correccion jsonb` = {antes, despues, motivo, por, at}. 🔒 Las
+    columnas de la solicitud **siguen diciendo lo que el cliente pidió** — no se
+    pisan; el viajero nace con lo corregido.
+  - **El panel de aprobar** gana «🔁 No hay lugar: cambiar fecha / zona / paquete»:
+    fecha (multifecha) → paquete → zona con precio y **«quedan N»** del Palacio
+    (sin cupo para el grupo = deshabilitada) → habitación (solo las que valen para
+    N) → «qué le decimos» (sale en su correo). El total SUGERIDO cae en «Total del
+    contrato» y sigue editable (un descuento negociado es palabra humana).
+  - 🔒 **Cero regla nueva:** `correccion_opciones` (SOLO LEE) le pregunta todo a
+    los dueños — `fechasVendibles` (se MUDÓ de admin-cotizador a
+    `_lib/opciones-paquete`: dos lectores, un dueño) · `_opciones` · `_hotelLista`
+    · `_calcularPrecio` · `cargarDisponibilidad`/`evaluarZona`. Inventario
+    ilegible → `quedan:null` y se DICE. 🔒 Solo dentro del MISMO evento (otro tour
+    es otra venta). El `aprobar` re-valida todo ANTES de reclamar: otro evento
+    400 · zona inexistente/agotada 409 · sin cupo 409 · habitación que no vale
+    409 · sin motivo 400 · igual a lo pedido 400 «usa Aprobar normal» — cero
+    escrituras en cada rebote (careado).
+  - **El correo de siempre** (`enviarCorreoPago` → `renderConfirmacion`) gana el
+    bloque **«Hubo un ajuste en tu reserva»**: el motivo, «Lo que pediste»
+    (tachado) y «Te confirmamos en» (las dos fechas solo si cambió). 🔒 Sin
+    `cambio` el render es **byte a byte el de HEAD** (careado contra git, con
+    control). Sale solo donde ya salía (EVENTOS_CORREO / 2027).
+  - La tarjeta aprobada pinta «🔁 Aprobada CORREGIDA: pidió X → quedó en Y».
+    ⚠️ archivar_prueba busca los viajeros en la fecha CORREGIDA (si no, una
+    prueba corregida dejaba sus viajeros vivos).
+  - ⚠️ **No verificado en navegador** (la sesión de KameHouse no la inicio yo):
+    la pantalla se careó en vm con DOM falso. Vecinos verdes: req-b1 52 ·
+    acomp-1 67 · confirma-1 28 · ticket-circuito-1 32 · fecha-correo-1 39 ·
+    rechazo-1 60 · cotiza-vend-1 38 · preventa-portal-1 35 · portal-solo-1 89 ·
+    acomp-2 43.
+  - ⏳ Push de Memo → prueba humana: una requisición pendiente con zona agotada →
+    «🔁 No hay lugar…» → elegir otra zona → aprobar → ver el correo.
+
 - 🔴⏳ **HERO-CERO-1 + PORTAL-SIN-RESERVAR-1 (30-oct-2026, en main local).**
   Reporte de Memo: *«el card de kevin kaarl al llegar a ceros no cambió al
   siguiente evento, y ya no sale el top 10 que salía en el main»*. Medido en

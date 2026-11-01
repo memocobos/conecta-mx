@@ -82,7 +82,7 @@ function esc(s) {
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
 // Devuelve { subject, html, to } | { error }.
-function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, total, resta, portal, grupo }) {
+function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, total, resta, portal, grupo, cambio }) {
   const k = llaveCorreo(correo);
   if (!k) return { error: 'sin correo usable' };
   if (!ev || !ev.id) return { error: 'no se pudo leer el evento en el catálogo: no se manda un correo sin decir a qué viaje' };
@@ -125,6 +125,10 @@ function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, to
           <p style="margin:0 0 12px;font-size:14px;color:#b3b3b3">Ahí mandamos los avisos, horarios y recordatorios de tu evento.</p>
           <p style="margin:0;text-align:center"><a href="${esc(grupo)}" style="display:inline-block;background:#25d366;color:#000000;font-weight:800;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px">Entrar al grupo de WhatsApp →</a></p>
         </div>` : '';
+  // [REQ-CORRIGE-1] Si la reserva se aprobó CORREGIDA (no había lugar en lo
+  // que pidió), el correo lo DICE: qué pidió, dónde quedó y por qué. Sin
+  // `cambio` (llamador de siempre) el correo sale byte a byte igual.
+  const bloqueCambio = renderCambio(ev, cambio);
   const html = `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff">
         <div style="background:#e8ff4c;color:#000;padding:18px 22px;border-bottom:4px solid #ff283b">
@@ -132,7 +136,7 @@ function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, to
           <div style="font-size:22px;font-weight:900;margin-top:4px">${esc(titulo)}</div>
         </div>
         <div style="padding:24px 22px;background:#0a0a0a;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9)">
-          ${detalle ? `<p style="margin:0 0 14px;color:#e8ff4c;font-weight:700">${esc(detalle)}</p>` : ''}
+          ${detalle ? `<p style="margin:0 0 14px;color:#e8ff4c;font-weight:700">${esc(detalle)}</p>` : ''}${bloqueCambio}
           ${cuentas}
           ${quienes}
           ${bloquePortal}
@@ -143,9 +147,29 @@ function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, to
   return { subject, html, to: k };
 }
 
+const PAQ_TXT = { plus: 'PLUS · todo incluido', stay: 'STAY · sin transporte', ride: 'RIDE · solo viaje', cheap: 'CHEAP · solo boleto' };
+function renderCambio(ev, cambio) {
+  if (!cambio || !cambio.antes || !cambio.despues) return '';
+  const { fechaDeEventoId } = require('./fecha-evento');
+  const a = cambio.antes, d = cambio.despues;
+  const fa = fechaDeEventoId(ev, a.evento_id), fd = fechaDeEventoId(ev, d.evento_id);
+  const mudoFecha = a.evento_id !== d.evento_id;
+  const txt = (x, f) => [mudoFecha ? f : '', PAQ_TXT[x.paquete] || String(x.paquete || '').toUpperCase(), x.zona || '', x.hotel ? 'habitación ' + x.hotel : '']
+    .filter(Boolean).map(esc).join(' · ');
+  const filaC = (et, v, color) => `<tr><td style="padding:4px 10px 4px 0;color:#b3b3b3;vertical-align:top;white-space:nowrap">${et}</td><td style="padding:4px 0;color:${color};font-weight:700">${v}</td></tr>`;
+  return `<div style="margin:0 0 18px;padding:14px 16px;border:1px solid #e8ff4c;border-radius:10px;background:#141500">
+          <p style="margin:0 0 8px;color:#e8ff4c;font-weight:800">Hubo un ajuste en tu reserva</p>
+          <p style="margin:0 0 10px;font-size:14px;color:#ffffff">${esc(cambio.motivo || 'No había lugar en lo que pediste.')}</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            ${filaC('Lo que pediste', `<span style="text-decoration:line-through">${txt(a, fa)}</span>`, '#b3b3b3')}
+            ${filaC('Te confirmamos en', txt(d, fd), '#88ea4e')}
+          </table>
+        </div>`;
+}
+
 // ── EL ENVÍO ────────────────────────────────────────────────────────────────
 // viajeroIds: los viajeros que este dinero tocó. recibidoPorViajero: { id: monto }.
-async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajero, enviado_por, KH_URL, KH_KEY }) {
+async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajero, enviado_por, KH_URL, KH_KEY, cambio }) {
   const PT_URL = process.env.PORTAL_SUPABASE_URL;
   const PT_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
   const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
@@ -214,7 +238,7 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
       let portal = null;
       if (portalListo && ya && g.portal_cliente_id) portal = ya.has(g.correo) ? 'existente' : 'nuevo';
       const r = renderConfirmacion({ tipo, correo: g.correo, ev, evento_id, nombres: g.nombres, recibido: g.recibido,
-        total: g.sinPlan ? null : g.total, resta: g.sinPlan ? null : g.resta, portal, grupo: g.grupo });
+        total: g.sinPlan ? null : g.total, resta: g.sinPlan ? null : g.resta, portal, grupo: g.grupo, cambio });
       if (r.error) { errores.push({ correo: g.correo, paso: 'render', detail: r.error }); continue; }
       const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
       let resp, data = {};

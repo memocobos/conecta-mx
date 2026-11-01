@@ -327,6 +327,7 @@ function _reqBdjCard(r) {
         : r.estado === 'rechazada' ? (r.aviso_at
         ? `<div style="font-size:11px;color:var(--green)">✓ Avisado por correo el ${_reqBdjEsc(_tsToDate(r.aviso_at).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}</div>`
         : `<div style="font-size:11px;color:#ffb020">⚠️ Sin avisar — este cliente no sabe que no se pudo${cel.length === 10 ? `. <a href="https://wa.me/52${cel}?text=${encodeURIComponent('Hola ' + (String(r.nombre || '').split(' ')[0]) + ', te escribimos de Conecta Reynosa por tu solicitud ' + r.folio + '. ' + (r.motivo_rechazo || 'No pudimos confirmar tu lugar.') + ' Tu pago queda a tu favor: dinos qué zona o fecha prefieres y lo aplicamos ahí.')}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">Avisarle por WhatsApp →</a>` : ''}</div>`) : ''}
+      ${r.correccion && r.correccion.despues ? `<div style="font-size:11px;color:var(--yellow,#e8ff4c)">🔁 Aprobada CORREGIDA: pidió ${_reqBdjEsc(_reqCorTxt(r.correccion.antes))} → quedó en <b>${_reqBdjEsc(_reqCorTxt(r.correccion.despues))}</b>${r.correccion.motivo ? ' · «' + _reqBdjEsc(r.correccion.motivo) + '»' : ''}</div>` : ''}
       ${r.estado !== 'pendiente' && r.revisada_por ? `<div style="font-size:11px">Revisada por ${_reqBdjEsc(r.revisada_por)}${r.nota_staff ? ' · ' + _reqBdjEsc(r.nota_staff) : ''}</div>` : ''}
     </div>
     <div class="rq-actions">
@@ -366,6 +367,10 @@ function _reqBdjAprobarUI(id) {
       <label class="rq-field">Total del contrato *<input type="number" id="req-apr-total-${id}" value="${r.total_sistema != null ? Math.round(Number(r.total_sistema)) : ''}" min="1" step="1"></label>
       ${esRide ? '' : `<label class="rq-field">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}"></label>`}
     </div>
+    <div style="margin:8px 0">
+      <button class="rq-btn" id="req-cor-btn-${id}" onclick="_reqCorAbrir('${id}')" title="Cuando no hay lugar en lo que pidió: elige lo que SÍ hay y el cliente recibe el correo con el ajuste">🔁 No hay lugar: cambiar fecha / zona / paquete</button>
+      <div id="req-cor-${id}" style="display:none"></div>
+    </div>
     ${_reqBdjDesgloseHtml(r, id)}
     <label class="rq-field">Nota (opcional)<input type="text" id="req-apr-nota-${id}" maxlength="500"></label>
     ${(r.transporte && r.total_sistema != null) ? '<div class="rq-tag warn" style="display:block;margin-top:8px">⚠️ El total del sistema NO incluye el transporte a CDMX — ajústalo si aplica (la cotización del cliente lo trae).</div>' : ''}
@@ -375,7 +380,103 @@ function _reqBdjAprobarUI(id) {
     </div>
     <div id="req-apr-msg-${id}" class="rq-msg"></div>`;
   box.style.display = 'block';
+  delete _reqCor[id];
   _reqBdjDesgloseSuma(id);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// [REQ-CORRIGE-1] «🔁 Corregir y aprobar» — palabra de Memo (31-oct): cuando
+// no hay lugar en la zona/fecha que pidió, se le acomoda en lo que SÍ hay sin
+// que tenga que volver a meter la solicitud, y le llega el correo de siempre
+// con el ajuste dicho. 🔒 Esta pantalla NO calcula un peso ni decide qué se
+// vende: todo lo contesta el servidor (`correccion_opciones`, los dueños del
+// precio y del inventario). El total sugerido se pone en «Total del contrato»
+// y sigue siendo EDITABLE (un descuento negociado es palabra humana).
+// ═════════════════════════════════════════════════════════════════════════════
+const _reqCor = {};
+const _REQ_PAQ_TXT = { plus: 'PLUS', stay: 'STAY', ride: 'RIDE', cheap: 'CHEAP' };
+function _reqCorTxt(x) {
+  if (!x) return '';
+  const f = String(x.evento_id || '').includes('#') ? 'fecha #' + (Number(String(x.evento_id).split('#')[1]) + 1) : '';
+  return [f, _REQ_PAQ_TXT[x.paquete] || x.paquete, x.zona, x.hotel].filter(Boolean).join(' · ');
+}
+function _reqCorZonaCampo(id, mostrar) {
+  const z = document.getElementById('req-apr-zona-' + id);
+  const lab = z && z.closest ? z.closest('label') : null;
+  if (lab) lab.style.display = mostrar ? '' : 'none';
+}
+async function _reqCorAbrir(id) {
+  const box = document.getElementById('req-cor-' + id);
+  const btn = document.getElementById('req-cor-btn-' + id);
+  if (!box) return;
+  if (_reqCor[id] && _reqCor[id].on) {
+    _reqCor[id].on = false; box.style.display = 'none';
+    if (btn) btn.textContent = '🔁 No hay lugar: cambiar fecha / zona / paquete';
+    _reqCorZonaCampo(id, true);
+    const r = _reqBdjRows.find((x) => x.id === id);
+    const t = document.getElementById('req-apr-total-' + id);
+    if (t && r) t.value = r.total_sistema != null ? Math.round(Number(r.total_sistema)) : '';
+    return;
+  }
+  _reqCor[id] = { on: true, sel: { evento_id: null, paquete: '', zona: '', hotel: '' },
+    motivo: 'Ya no había lugares disponibles en lo que pediste, así que te acomodamos en esta opción que sí tenemos.', op: null, tok: 0 };
+  if (btn) btn.textContent = '✕ Quitar el cambio (aprobar lo que pidió)';
+  _reqCorZonaCampo(id, false);
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--ts)">Buscando lo que sí hay…</div>';
+  await _reqCorCargar(id);
+}
+async function _reqCorCargar(id) {
+  const st = _reqCor[id]; if (!st || !st.on) return;
+  const tok = ++st.tok;
+  const q = { accion: 'correccion_opciones', id };
+  if (st.sel.evento_id) q.evento_id = st.sel.evento_id;
+  if (st.sel.paquete) { q.paquete = st.sel.paquete; q.zona = st.sel.zona; q.hotel = st.sel.hotel; }
+  let j = await _reqBdjCall(q).catch((e) => ({ error: e.message }));
+  if (!_reqCor[id] || _reqCor[id].tok !== tok) return; // llegó tarde: el humano ya cambió algo
+  // Una elección a medias (falta zona/habitación) contesta 400: se pide la
+  // lista sola y el error se enseña como guía, no como falla.
+  let guia = '';
+  if (j && !j.ok && st.sel.paquete && (j._status === 400 || j._status === 409)) {
+    guia = j.error || '';
+    const q2 = { accion: 'correccion_opciones', id }; if (st.sel.evento_id) q2.evento_id = st.sel.evento_id;
+    j = await _reqBdjCall(q2).catch((e) => ({ error: e.message }));
+    if (!_reqCor[id] || _reqCor[id].tok !== tok) return;
+  }
+  st.op = (j && j.ok) ? j : null; st.guia = guia; st.err = (j && j.ok) ? '' : ((j && j.error) || 'No se pudo leer lo disponible');
+  if (st.op && !st.sel.evento_id) st.sel.evento_id = st.op.evento.evento_id;
+  const t = document.getElementById('req-apr-total-' + id);
+  if (st.op && st.op.total_sugerido && t) t.value = st.op.total_sugerido;
+  _reqCorPintar(id);
+}
+function _reqCorPintar(id) {
+  const box = document.getElementById('req-cor-' + id); const st = _reqCor[id];
+  if (!box || !st) return;
+  if (!st.op) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">⚠️ ${_reqBdjEsc(st.err)}</div>`; return; }
+  const op = st.op; const e = _reqBdjEsc;
+  const pidio = op.pidio || {};
+  const pq = (op.paquetes || []).find((p) => p.paquete === st.sel.paquete) || null;
+  const selF = op.fechas.length > 1 ? `<label class="rq-field">Fecha<select onchange="_reqCorSel('${id}','evento_id',this.value)">${op.fechas.map((f) => `<option value="${e(f.evento_id)}"${f.evento_id === st.sel.evento_id ? ' selected' : ''}>${e(f.lbl)}${f.evento_id === pidio.evento_id ? ' (la que pidió)' : ''}</option>`).join('')}</select></label>` : '';
+  const selP = `<label class="rq-field">Paquete<select onchange="_reqCorSel('${id}','paquete',this.value)"><option value="">— elige —</option>${(op.paquetes || []).map((p) => `<option value="${e(p.paquete)}"${p.paquete === st.sel.paquete ? ' selected' : ''}>${e(p.nombre)}${p.paquete === pidio.paquete ? ' (el que pidió)' : ''}</option>`).join('')}</select></label>`;
+  const selZ = pq && pq.zonas ? `<label class="rq-field">Zona<select onchange="_reqCorSel('${id}','zona',this.value)"><option value="">— elige —</option>${pq.zonas.map((z) => `<option value="${e(z.zona)}"${z.zona === st.sel.zona ? ' selected' : ''}${z.sin_cupo ? ' disabled' : ''}>${e(z.zona)} · ${_reqBdjMxn(z.precio)} c/u${z.quedan != null ? ' · quedan ' + z.quedan : ''}${z.sin_cupo ? ' · SIN CUPO' : ''}${z.zona === pidio.zona ? ' (la que pidió)' : ''}</option>`).join('')}</select></label>` : '';
+  const selH = pq && pq.duerme && (op.habitaciones || []).length ? `<label class="rq-field">Habitación (${pidio.num_personas || 1} pers.)<select onchange="_reqCorSel('${id}','hotel',this.value)"><option value="">— elige —</option>${op.habitaciones.map((h) => `<option value="${e(h.nombre)}"${h.nombre === st.sel.hotel ? ' selected' : ''}>${e(h.nombre)}${h.extra ? ' · +' + _reqBdjMxn(h.extra) : ''}</option>`).join('')}</select></label>` : '';
+  const listo = !!op.eleccion;
+  box.innerHTML = `<div style="margin-top:8px;padding:10px 12px;border:1px solid var(--yellow,#e8ff4c);border-radius:10px">
+    <div class="rq-sub">🔁 Acomodarlo en lo que SÍ hay — pidió: ${e(_reqCorTxt(pidio))}</div>
+    <div class="rq-grid">${selF}${selP}${selZ}${selH}</div>
+    <label class="rq-field">Qué le decimos (sale en su correo)<input type="text" id="req-cor-motivo-${id}" maxlength="300" value="${e(st.motivo)}" oninput="_reqCor['${id}'].motivo=this.value"></label>
+    ${st.guia && !listo ? `<div style="font-size:11px;color:var(--ts)">${e(st.guia)}</div>` : ''}
+    ${listo ? `<div style="font-size:12px;color:var(--green)">✓ Queda en <b>${e(_reqCorTxt(op.eleccion))}</b> · total sugerido ${_reqBdjMxn(op.total_sugerido)} (ya está en «Total del contrato», puedes ajustarlo).</div>` : ''}
+    ${(op.avisos || []).map((a) => `<div style="font-size:11px;color:#ffb020">⚠️ ${e(a)}</div>`).join('')}
+  </div>`;
+}
+function _reqCorSel(id, campo, valor) {
+  const st = _reqCor[id]; if (!st) return;
+  st.sel[campo] = valor;
+  if (campo === 'evento_id') { st.sel.paquete = ''; st.sel.zona = ''; st.sel.hotel = ''; }
+  if (campo === 'paquete') { st.sel.zona = ''; st.sel.hotel = ''; }
+  if (st.op) { st.op.eleccion = null; st.op.total_sugerido = null; }
+  _reqCorCargar(id);
 }
 
 // [DESGLOSE-1] Cuánto pagó cada quien: prellenado con lo que DECLARÓ el
@@ -469,7 +570,18 @@ async function _reqBdjAprobar(id) {
     if (!confirm('El abono (' + _reqBdjMxn(monto) + ') es mayor que el total (' + _reqBdjMxn(total) + '). ¿El cliente sí pagó de más? Los ' + _reqBdjMxn(monto - total) + ' quedan como saldo a favor.')) { if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
     body.saldo_favor = true;
   }
-  if (zonaEl) body.zona = zonaEl.value;
+  // [REQ-CORRIGE-1] Aprobar CORREGIDA: la elección viaja y el servidor la vuelve
+  // a validar (fecha, paquete, zona con cupo, habitación). Sin elección completa
+  // no se manda nada a medias.
+  const cor = _reqCor[id] && _reqCor[id].on ? _reqCor[id] : null;
+  if (cor) {
+    const motivo = String(cor.motivo || '').trim();
+    if (!cor.op || !cor.op.eleccion) { if (msg) { msg.textContent = 'Termina de elegir la fecha/paquete/zona/habitación del cambio (o quítalo).'; msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    if (motivo.length < 3) { if (msg) { msg.textContent = 'Escribe qué le decimos al cliente del cambio.'; msg.style.color = 'var(--red)'; } if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    const e2 = cor.op.eleccion;
+    if (!confirm('Se aprueba CORREGIDA:\n\nPidió: ' + _reqCorTxt(cor.op.pidio) + '\nQueda: ' + _reqCorTxt(e2) + '\nTotal: ' + _reqBdjMxn(total) + '\n\nEl cliente recibe el correo de confirmación con este ajuste. ¿Seguimos?')) { if (btn) { btn.disabled = false; btn.textContent = 'Confirmar — crear viajero'; } return; }
+    body.correccion = { evento_id: e2.evento_id, paquete: e2.paquete, zona: e2.zona, hotel: e2.hotel, motivo };
+  } else if (zonaEl) body.zona = zonaEl.value;
   let j = await _reqBdjCall(body).catch((e) => ({ error: e.message }));
   // [REQ-DUP-1] El servidor rebotó por duplicado: se confirma CON PALABRAS y se
   // reintenta con la marca. Solo quien comparó los comprobantes puede decirlo.
@@ -486,6 +598,7 @@ async function _reqBdjAprobar(id) {
     let txt = j.sin_abono
       ? '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' SIN ABONO (sin comprobante): debe el total completo. Captura el pago cuando llegue.'
       : '✓ ' + (nv > 1 ? nv + ' viajeros creados' : 'Viajero creado') + ' con ' + _reqBdjMxn(j.monto) + ' cobrados. Confírmale al cliente por WhatsApp.';
+    if (j.correccion) txt += ' · 🔁 Corregida: quedó en ' + _reqCorTxt(j.correccion.despues);
     const pt = j.portal;
     // [CONFIRMA-1] el correo único: confirmación + invitación al Portal adentro.
     if (pt && (pt.enviados || []).length) txt += ' · Correo de confirmación enviado (' + pt.enviados.length + ')' + ((pt.invitados || []).length ? ', con invitación al Portal' : '') + ((pt.errores || []).length ? ' · ⚠️ ' + pt.errores.length + ' con error' : '') + (pt.aviso ? ' · ⚠️ ' + pt.aviso : '');

@@ -34,7 +34,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { fetchEventosRaw, fetchHotelesGlobales } = require('./_lib/catalogo-index');
 const { _calcularPrecio, _hotelLista, esCDMX, hoyMx, _diasEvento } = require('./_lib/precio-zona');
-const { _opciones, NOMBRES } = require('./_lib/opciones-paquete');
+const { _opciones, fechasVendibles, NOMBRES } = require('./_lib/opciones-paquete');
 const { planDelViaje, dsDeEvento } = require('./_lib/plan-pagos');
 const { vigentes } = require('./_lib/nube');
 
@@ -52,24 +52,9 @@ function lectorNube() {
   };
 }
 
-// Las fechas vendibles de un evento, con su evento_id 'slug#N' cuando es
-// multifecha. Una fecha que ya pasó no se ofrece (no se cotiza lo que ya fue).
-function fechasDe(ev, hoyISO) {
-  const out = [];
-  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
-    ev.multifecha.forEach((mf, i) => {
-      const id = ev.id + '#' + i;
-      const ds = dsDeEvento(ev, id);
-      if (ds && ds < hoyISO) return;
-      out.push({ evento_id: id, idx: i, lbl: String((mf && mf.lbl) || ('Fecha ' + (i + 1))), ds: ds || null });
-    });
-    return out;
-  }
-  const ds = ev.ds ? String(ev.ds) : null;
-  if (ds && ds < hoyISO) return out;
-  out.push({ evento_id: ev.id, idx: null, lbl: String(ev.f || ''), ds });
-  return out;
-}
+// [REQ-CORRIGE-1] `fechasDe` se mudó a _lib/opciones-paquete (fechasVendibles):
+// ahora la pide también la bandeja. Mismo cuerpo, un dueño.
+const fechasDe = (ev, hoyISO) => fechasVendibles(ev, hoyISO);
 
 function partirId(eventoId) {
   const s = String(eventoId || '');

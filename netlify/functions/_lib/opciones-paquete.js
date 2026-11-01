@@ -106,4 +106,27 @@ async function validarEleccion(eventoId, { paquete, zona, hotel }) {
   return { ok: true, paquete: p, zona: z, hotel: h, precio: c.precio, nombre: op.nombre, evento: o.evento };
 }
 
-module.exports = { opcionesPaquete, validarEleccion, enPreventa, _opciones, NOMBRES };
+// [REQ-CORRIGE-1] Las fechas vendibles de un evento, con su evento_id
+// 'slug#N' cuando es multifecha (una fecha ya pasada no se ofrece). Nació
+// local en admin-cotizador (COTIZA-VEND-1); al volverse 2 lectores (el
+// cotizador y el «Corregir y aprobar» de la bandeja) se MUDÓ aquí — dos
+// copias serían dos listas que todavía no divergen.
+function fechasVendibles(ev, hoyISO) {
+  const { dsDeEvento } = require('./plan-pagos');
+  const out = [];
+  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    ev.multifecha.forEach((mf, i) => {
+      const id = ev.id + '#' + i;
+      const ds = dsDeEvento(ev, id);
+      if (ds && ds < hoyISO) return;
+      out.push({ evento_id: id, idx: i, lbl: String((mf && mf.lbl) || ('Fecha ' + (i + 1))), ds: ds || null });
+    });
+    return out;
+  }
+  const ds = ev.ds ? String(ev.ds) : null;
+  if (ds && ds < hoyISO) return out;
+  out.push({ evento_id: ev.id, idx: null, lbl: String(ev.f || ''), ds });
+  return out;
+}
+
+module.exports = { opcionesPaquete, validarEleccion, enPreventa, _opciones, fechasVendibles, NOMBRES };

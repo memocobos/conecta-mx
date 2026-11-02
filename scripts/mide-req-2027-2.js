@@ -50,7 +50,9 @@ global.fetch = async (url) => {
   const esperado = C.EVENTOS_CORREO.concat(C.RESERVA_2027).sort();
   af(JSON.stringify(lista.slice().sort()) === JSON.stringify(esperado),
      'index = EVENTOS_CORREO + RESERVA_2027 (' + lista.length + ' = ' + esperado.length + ')');
-  af(C.RESERVA_2027.length === 9, 'son los 9 que firmó Memo');
+  // 9 de REQ-2027-2 (27-oct) + pitbull (2-nov): nació en el catálogo el 28-oct,
+  // DESPUÉS de la lista, y es MTY 2027 — la regla de Memo «solo los de Monterrey → ábrelos».
+  af(C.RESERVA_2027.length === 10 && C.RESERVA_2027.includes('pitbull'), 'son los 9 que firmó Memo + pitbull (MTY 2027, caso María)');
   af(new Set(lista).size === lista.length, 'sin repetidos');
 
   console.log('\n[B] cada evento abierto, contra el catálogo real');

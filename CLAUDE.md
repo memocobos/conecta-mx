@@ -188,6 +188,20 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🚪⏳ **PITBULL-REQ-1 (2-nov-2026, en main local, cero SQL): Pitbull abre la
+  puerta de requisición.** Reporte de Ximena: una clienta quería reservar Pitbull
+  en la web y el modal solo ofrecía Messenger — nada caía en Requisiciones.
+  Causa: pitbull (MTY 2027) nació en el catálogo el 28-oct, DESPUÉS de la lista
+  de REQ-2027-2, así que no estaba en `REQUISICION_EVENTOS` (index) ni en
+  `RESERVA_2027` (`_lib/correo-confirmacion`). Agregado en los dos.
+  ⚠️ **Cada evento MTY 2027 nuevo hay que agregarlo a mano en las dos listas**
+  hasta que se derive por regla (paso 3 de REQ-2027). `mide:req-2027-2` **22**
+  (su conteo literal se actualizó con su razón). Vecinos verdes: rechazo-1 71 ·
+  confirma-1 28 · acomp-1 67.
+  ⚠️ El correo «tu viaje ya está en tu Portal: Dale Mixx» que recibió la clienta
+  salió de publicar su fila VIEJA de dalemix desde la tarjeta 🪪 del Portal — no
+  es de este defecto. ⏳ Push de Memo → que reintente en la web.
+
 - 💸⏳ **REEMBOLSO-AVISO-1 (2-nov-2026, en main local; CHECK YA ESCRITO): séptimo
   motivo de rechazo «💸 Pidió su reembolso».** Caso Kevin (R-4WVCU, FR 16-ene
   Cancha VIP sin lugar; no quiso cambio y pidió su dinero). Palabra de Memo:

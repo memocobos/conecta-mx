@@ -59,6 +59,13 @@ const MOTIVOS = [
     texto: 'Resuelto por WhatsApp. (Cierre interno: a esta persona NO le llega correo.)' },
   { clave: 'otro',          avisa: true,  etiqueta: '✍️ Otro (lo escribo yo)',
     texto: '' },
+  // [REEMBOLSO-AVISO-1] Palabra de Memo (2-nov): no hubo la zona, se le ofreció
+  // cambio por WhatsApp, no quiso y pidió su dinero → correo de disculpa que
+  // promete el reembolso en menos de 24 h y deja abiertas otras fechas/zonas.
+  // 🔒 Es el ÚNICO motivo que avisa aunque la persona YA viaje en otra fecha
+  //    del evento (su otra compra es otra venta: el correo lo dice).
+  { clave: 'reembolso',     avisa: true,  reembolso: true, etiqueta: '💸 Pidió su reembolso',
+    texto: 'Sentimos mucho no tener la zona que querías en la fecha que elegiste.' },
 ];
 const CLAVES = MOTIVOS.map((m) => m.clave);
 function motivoDe(clave) { return MOTIVOS.find((m) => m.clave === String(clave || '')) || null; }
@@ -90,7 +97,7 @@ const PAQ = { plus: 'PLUS', stay: 'STAY', ride: 'RIDE', cheap: 'CHEAP' };
 //    favor» es cierto siempre; «tus $600 quedan a tu favor» puede no serlo, y
 //    un número equivocado en un correo de dinero se cobra caro. Si quien
 //    rechaza quiere decir el monto, lo escribe en su nota.
-function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, paquete, zona, personas, pago, motivo_texto }) {
+function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, paquete, zona, personas, pago, motivo_texto, reembolso, otro_lugar }) {
   if (!esCorreoUsable(correo)) return { error: 'no dejó un correo usable' };
   const to = llaveCorreo(correo);
   const porque = String(motivo_texto || '').trim();
@@ -119,7 +126,18 @@ function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, pa
 
   // El bloque del dinero SOLO si de verdad mandó comprobante. Decirle «tu pago
   // queda a favor» a quien no pagó lo deja esperando un dinero que no existe.
-  const bloquePago = pago ? `
+  // [REEMBOLSO-AVISO-1] Con reembolso el bloque del dinero dice que SE REGRESA
+  // (palabra de Memo: «en menos de 24 horas»), no que queda a favor.
+  const bloqueReembolso = (reembolso && pago) ? `
+          <div style="margin:0 0 20px;padding:16px;border:1px solid #88ea4e;border-radius:10px;background:#0f1a12">
+            <p style="margin:0 0 8px;color:#88ea4e;font-weight:800;font-size:15px">Te regresamos tu dinero</p>
+            <p style="margin:0;font-size:14px;color:#d9d9d9;line-height:1.6">En <b style="color:#ffffff">menos de 24 horas</b> recibirás tu reembolso. Si necesitamos algún dato para la transferencia, te escribimos por WhatsApp.</p>
+          </div>` : '';
+  const bloqueOtro = (reembolso && otro_lugar) ? `
+          <div style="margin:0 0 18px;padding:12px 14px;border-left:3px solid #e8ff4c;background:#14150a">
+            <p style="margin:0;font-size:14px;color:#ffffff">Esto es solo sobre esta solicitud${folio ? ' (folio ' + esc(folio) + ')' : ''}: <b>tu otro lugar con nosotros sigue confirmado</b>, igual que antes.</p>
+          </div>` : '';
+  const bloquePago = reembolso ? (bloqueReembolso + bloqueOtro) : pago ? `
           <div style="margin:0 0 20px;padding:16px;border:1px solid #88ea4e;border-radius:10px;background:#0f1a12">
             <p style="margin:0 0 8px;color:#88ea4e;font-weight:800;font-size:15px">Tu pago queda a tu favor</p>
             <p style="margin:0;font-size:14px;color:#d9d9d9;line-height:1.6">Lo tenemos apartado para ti. En cuanto nos digas qué zona o qué fecha prefieres, lo aplicamos ahí y <b style="color:#ffffff">no tienes que volver a pagar</b>. Si prefieres que te lo regresemos, nada más dinos y lo hacemos.</p>
@@ -135,7 +153,7 @@ function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, pa
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff">
         <div style="background:#e8ff4c;color:#000;padding:18px 22px;border-bottom:4px solid #ff283b">
           <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Conecta Reynosa · ${esc(artista)}</div>
-          <div style="font-size:22px;font-weight:900;margin-top:4px">${esc(primer)}, no pudimos apartarte ese lugar</div>
+          <div style="font-size:22px;font-weight:900;margin-top:4px">${reembolso ? esc(primer) + ', sentimos mucho no tener tu lugar' : esc(primer) + ', no pudimos apartarte ese lugar'}</div>
         </div>
         <div style="padding:24px 22px;background:#0a0a0a;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9)">
           <p style="margin:0 0 16px">Revisamos tu solicitud y <b style="color:#ffffff">no la pudimos confirmar</b>. Te decimos por qué y qué sigue.</p>
@@ -145,7 +163,7 @@ function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, pa
             <p style="margin:0;color:#ffffff;font-size:15px">${esc(porque)}</p>
           </div>
           ${bloquePago}
-          <p style="margin:0 0 8px">Escríbenos y te ayudamos a encontrar otro lugar — casi siempre hay opción en otra zona o en otra fecha.</p>
+          <p style="margin:0 0 8px">${reembolso ? 'Si todavía te interesa, <b style="color:#ffffff">aún tenemos lugar en otras fechas y zonas</b>: escríbenos o míralas aquí.' : 'Escríbenos y te ayudamos a encontrar otro lugar — casi siempre hay opción en otra zona o en otra fecha.'}</p>
           <p style="margin:0 0 20px;text-align:center">
             <a href="https://wa.me/${WA_RESERVAS}?text=${waTxt}" style="display:inline-block;background:#25d366;color:#000;font-weight:800;text-decoration:none;padding:13px 24px;border-radius:8px;font-size:15px;margin:4px">Escribirnos por WhatsApp →</a>${botonEv}
           </p>
@@ -153,14 +171,15 @@ function renderRechazo({ correo, nombre, folio, evento_id, evento_nombre, ev, pa
         </div>
       </div>`;
 
-  return { subject: `Sobre tu lugar para ${artista}${folio ? ' · folio ' + folio : ''}`, html, to };
+  const subject = reembolso ? `Tu reembolso · ${artista}${folio ? ' · folio ' + folio : ''}` : `Sobre tu lugar para ${artista}${folio ? ' · folio ' + folio : ''}`;
+  return { subject, html, to };
 }
 
 // ── ARMAR EL CORREO DE UNA REQUISICIÓN ──────────────────────────────────────
 // Separado del ENVÍO a propósito: la bandeja lo usa para la VISTA PREVIA (cero
 // escrituras, cero correos) y el rechazo lo usa para mandarlo. Si fueran la
 // misma función, enseñar sería mandar.
-async function armarRechazo({ req, motivo_clave, motivo_texto }) {
+async function armarRechazo({ req, motivo_clave, motivo_texto, ya }) {
   if (!avisaCon(motivo_clave)) {
     return { avisa: false, razon: 'Ese motivo es un cierre interno: al cliente no le llega correo.' };
   }
@@ -185,6 +204,8 @@ async function armarRechazo({ req, motivo_clave, motivo_texto }) {
     paquete: req.paquete, zona: req.zona, personas: req.num_personas,
     pago: !!req.comprobante_path,
     motivo_texto: texto,
+    reembolso: !!(m && m.reembolso),
+    otro_lugar: !!(ya && ya.viaja),
   });
   if (r.error) return { avisa: true, razon: r.error, error: r.error, catalogo_ok: !!ev };
   return { avisa: true, catalogo_ok: !!ev, subject: r.subject, html: r.html, to: r.to };
@@ -197,11 +218,15 @@ async function armarRechazo({ req, motivo_clave, motivo_texto }) {
 // 🔒 El sello va DESPUÉS del envío (`aviso_at`, `aviso_email_id`). Sellar antes
 //    dejaría a alguien marcado como avisado sin haber recibido nada.
 async function avisarRechazo({ req, motivo_clave, motivo_texto, KH_URL, KH_KEY }) {
-  const armado = await armarRechazo({ req, motivo_clave, motivo_texto });
-  if (!armado.avisa) return { avisado: false, razon: armado.razon };
+  if (!avisaCon(motivo_clave)) return { avisado: false, razon: 'Ese motivo es un cierre interno: al cliente no le llega correo.' };
   // [RECHAZO-AVISO-1b] Si ya viaja, callarse es lo correcto: su lugar existe.
+  // [REEMBOLSO-AVISO-1] …salvo el reembolso: ese correo SÍ sale y dice que su
+  // otro lugar sigue confirmado.
   const ya = await yaViajaEnEvento({ req, KH_URL, KH_KEY });
-  if (ya.viaja) {
+  const esReembolso = !!(motivoDe(motivo_clave) || {}).reembolso;
+  const armado = await armarRechazo({ req, motivo_clave, motivo_texto, ya });
+  if (!armado.avisa) return { avisado: false, razon: armado.razon };
+  if (ya.viaja && !esReembolso) {
     const f = ya.fila || {};
     return { avisado: false, ya_viaja: true,
       razon: `Esta persona YA viaja en ${f.evento_id || 'este evento'}`
@@ -294,7 +319,9 @@ function waDe(req) {
   const txt = encodeURIComponent(`Hola ${String(req.nombre || '').trim().split(/\s+/)[0] || ''}, te escribimos de Conecta Reynosa`
     + (req.folio ? ` por tu solicitud ${req.folio}` : '') + ` de ${artista}. `
     + (req.motivo_rechazo ? String(req.motivo_rechazo) : 'No pudimos confirmar tu lugar.')
-    + ' Tu pago queda a tu favor: dinos qué zona o fecha prefieres y lo aplicamos ahí.');
+    + (req.motivo_clave === 'reembolso'
+      ? ' En menos de 24 horas recibes tu reembolso. Si aún te interesa, tenemos lugar en otras fechas y zonas.'
+      : ' Tu pago queda a tu favor: dinos qué zona o fecha prefieres y lo aplicamos ahí.'));
   return `https://wa.me/52${cel}?text=${txt}`;
 }
 

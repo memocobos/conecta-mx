@@ -72,7 +72,7 @@ global.fetch = async (url, init) => {
       const b = JSON.parse(init.body);
       // 🔒 La red falsa muerde como la base: una clave fuera del CHECK rebota.
       if (Object.prototype.hasOwnProperty.call(b, 'motivo_clave') && b.motivo_clave !== null
-        && !['zona_agotada', 'fecha_agotada', 'comprobante', 'datos', 'whatsapp', 'otro'].includes(b.motivo_clave)) {
+        && !['zona_agotada', 'fecha_agotada', 'comprobante', 'datos', 'whatsapp', 'otro', 'reembolso'].includes(b.motivo_clave)) {
         return resp(400, { code: '23514', message: 'violates check constraint requisiciones_motivo_clave_check' });
       }
       DB.escrituras.push(['PATCH', b]);
@@ -112,19 +112,38 @@ const llamar = async (b) => {
 (async () => {
   console.log('══ mide:rechazo-1 ══\n[M] el catálogo de motivos');
   let CR = cargar();
-  af(CR.MOTIVOS.length === 6, () => 'son 6 motivos (los 5 de la casa + «Otro») — ' + CR.MOTIVOS.length);
-  af(CR.MOTIVOS.filter((m) => m.avisa).length === 5 && CR.motivoDe('whatsapp').avisa === false,
+  // [REEMBOLSO-AVISO-1] verdad nueva: 7 (se sumó «💸 Pidió su reembolso», palabra de Memo 2-nov).
+  af(CR.MOTIVOS.length === 7, () => 'son 7 motivos (5 de la casa + «Otro» + reembolso) — ' + CR.MOTIVOS.length);
+  af(CR.MOTIVOS.filter((m) => m.avisa).length === 6 && CR.motivoDe('whatsapp').avisa === false,
     '5 avisan; «ya te contactamos por WhatsApp» es el ÚNICO que se calla');
   af(CR.MOTIVOS.every((m) => m.clave && m.etiqueta) && CR.MOTIVOS.filter((m) => m.clave !== 'otro').every((m) => m.texto),
     'cada motivo trae clave, etiqueta y texto prellenado (salvo «Otro», que nace vacío a propósito)');
   af(CR.avisaCon(null) === true && CR.avisaCon('no_existe') === true,
     'sin clave (fila vieja) el lado seguro es AVISAR: callarse es el defecto que vinimos a curar');
   // 🔒 Las DOS listas: la del lib y la del CHECK de la base (acta RECHAZO-AVISO-1).
-  const acta = require('fs').readFileSync(path.join(RAIZ, 'migraciones/RECHAZO-AVISO-1.sql'), 'utf8');
+  const acta = require('fs').readFileSync(path.join(RAIZ, 'migraciones/REEMBOLSO-AVISO-1.sql'), 'utf8');
   const enActa = (acta.match(/check \(motivo_clave is null or motivo_clave in\s*\n?\s*\(([^)]*)\)/) || [])[1] || '';
   const clavesActa = enActa.split(',').map((s) => s.trim().replace(/'/g, '')).filter(Boolean).sort();
-  af(clavesActa.length === 6 && clavesActa.join(',') === CR.CLAVES.slice().sort().join(','),
+  af(clavesActa.length === 7 && clavesActa.join(',') === CR.CLAVES.slice().sort().join(','),
     () => 'el CHECK de la base trae las MISMAS 6 claves que el lib — ' + clavesActa.join(','));
+
+  console.log('\n[RB] el reembolso (REEMBOLSO-AVISO-1)');
+  {
+    const evR = { id: 'fuerzaregida', a: 'Fuerza Regida', f: '11, 12, 15 y 16 ene 2027', v: 'Arena Monterrey' };
+    const base = { correo: 'k@x.mx', nombre: 'Kevin Contreras', folio: 'R-4WVCU', evento_id: 'fuerzaregida#3', evento_nombre: 'X', ev: evR, paquete: 'cheap', zona: 'Cancha VIP', personas: 2, pago: true, motivo_texto: CR.motivoDe('reembolso').texto };
+    const rr = CR.renderRechazo(Object.assign({}, base, { reembolso: true, otro_lugar: true }));
+    af(!rr.error && /menos de 24 horas/.test(rr.html) && /recibirás tu reembolso/.test(rr.html), 'promete el reembolso en menos de 24 h (palabra de Memo)');
+    af(!/queda a tu favor/i.test(rr.html), 'con reembolso NO dice «queda a tu favor» (serían dos promesas que se contradicen)');
+    af(/otras fechas y zonas/.test(rr.html) && /Ver otras zonas y fechas/.test(rr.html) && /wa\.me\/528119771072/.test(rr.html), 'deja abiertas otras fechas/zonas con los links de siempre');
+    af(/otro lugar con nosotros sigue confirmado/.test(rr.html), 'si ya viaja en otra compra, se lo DICE');
+    af(/^Tu reembolso/.test(rr.subject), 'asunto: «Tu reembolso · …»');
+    const rs = CR.renderRechazo(Object.assign({}, base, { reembolso: true, otro_lugar: false }));
+    af(!/sigue confirmado/.test(rs.html), 'sin otra compra no inventa «tu otro lugar»');
+    const rn = CR.renderRechazo(Object.assign({}, base, { reembolso: true, pago: false }));
+    af(!/recibirás tu reembolso/.test(rn.html), 'sin comprobante no promete regresar un dinero que no llegó');
+    const rv = CR.renderRechazo(base);
+    af(/queda a tu favor/i.test(rv.html) && !/reembolso en menos/.test(rv.html), 'regresión: los demás motivos siguen con «a tu favor»');
+  }
 
   console.log('\n[R] el correo');
   const ev = { id: 'fuerzaregida', a: 'Fuerza Regida', f: '11 de diciembre', v: 'Arena Monterrey' };
@@ -156,8 +175,8 @@ const llamar = async (b) => {
   let r = await llamar({ accion: 'rechazo_preview', id: U(1), motivo_clave: 'zona_agotada' });
   af(r.s === 200 && r.j.preview && /Ya no tenemos lugares disponibles en la zona/.test(r.j.preview.html),
     'la vista previa trae el correo armado con el texto del motivo elegido');
-  af(r.j.motivos && r.j.motivos.length === 6 && r.j.pago === true,
-    'y le dice a la pantalla los 6 motivos y que esta persona SÍ pagó');
+  af(r.j.motivos && r.j.motivos.length === 7 && r.j.pago === true,
+    'y le dice a la pantalla los 7 motivos y que esta persona SÍ pagó');
   af(DB.escrituras.length === 0 && RESEND.length === 0, 'CERO escrituras y CERO correos: enseñar no es mandar');
   af(DB.r[0].estado === 'pendiente', 'la solicitud sigue PENDIENTE después de la vista previa');
 
@@ -264,6 +283,14 @@ const llamar = async (b) => {
   af(r.s === 200 && r.j.ya_viaja && r.j.ya_viaja.viaja === true,
     'la vista previa avisa que ya viaja ANTES de apretar');
   af(RESEND.length === 0 && DB.escrituras.length === 0, 'y la vista previa sigue sin escribir ni mandar');
+  // [REEMBOLSO-AVISO-1] Ya viaja en OTRA fecha + pidió reembolso de ESTA: el correo SÍ sale.
+  DB = semilla(); RESEND = [];
+  DB.v = [{ evento_id: 'fuerzaregida#1', nombre: 'Jose M.', celular: '8112345678', correo: 'jose@x.mx', zona_boleto: 'Barrera' }];
+  r = await llamar({ accion: 'rechazar', id: U(1), motivo: 'Sentimos mucho no tener la zona.', motivo_clave: 'reembolso' });
+  af(r.s === 200 && DB.r[0].estado === 'rechazada' && DB.r[0].motivo_clave === 'reembolso', 'reembolso: se rechaza con su clave (pasa el CHECK)');
+  const htmlR = RESEND.length ? String(RESEND[0].html || '') : '';
+  af(RESEND.length === 1 && r.j.aviso.avisado === true, () => 'reembolso + ya viaja: el correo SÍ sale — ' + RESEND.length);
+  af(/menos de 24 horas/.test(htmlR) && /sigue confirmado/.test(htmlR), 'y dice el reembolso Y que su otro lugar sigue confirmado');
 
   console.log('\n[U] la pantalla');
   const ui = require('fs').readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8');
@@ -276,7 +303,8 @@ const llamar = async (b) => {
   af(/a\.avisado/.test(ui) && /no se le avisó/.test(ui),
     'tras rechazar, la pantalla DICE si el cliente se enteró — el rechazo y el aviso son dos hechos distintos');
   af(/ya_viaja/.test(ui) && /Ya viaja/.test(ui), 'la bandeja pinta el aviso de «ya viaja»');
-  af(/!ya\.viaja/.test(ui), 'y con eso APAGA el botón de avisar, no solo lo rotula');
+  // [REEMBOLSO-AVISO-1] verdad nueva: «ya viaja» apaga el aviso SALVO el reembolso.
+  af(/const calla = !!\(ya\.viaja && !reemb\)/.test(ui) && /!calla/.test(ui), 'y con eso APAGA el botón de avisar (salvo reembolso), no solo lo rotula');
 
   console.log('\n══ RESULTADO ══');
   if (V === 0) { console.log('⚠️ NADA MEDIDO · esto NO es un verde'); process.exit(1); }

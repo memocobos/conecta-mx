@@ -690,13 +690,19 @@ async function _reqBdjRchPintar(id, clave) {
   // con una clienta el 28-oct, y la causa NO fue el envío a mano: aprobar la
   // segunda solicitud y rechazar la primera minutos después lo reproduce solo.
   const ya = j.ya_viaja || {};
+  // [REEMBOLSO-AVISO-1] El reembolso SÍ avisa aunque ya viaje en otra fecha.
+  const reemb = !!(sel && sel.reembolso);
+  const calla = !!(ya.viaja && !reemb);
+  const yaTxt = ya.fila ? `${ya.fila.evento_id || ''}${ya.fila.zona_boleto ? ' · ' + ya.fila.zona_boleto : ''}` : '';
   const avisoYaViaja = ya.viaja
-    ? `<div class="rq-note" style="border-left:3px solid var(--green)">✅ <b>Ya viaja:</b> ${_reqBdjEsc(ya.razon || '')} <b>No se le va a mandar correo.</b></div>`
+    ? (reemb
+      ? `<div class="rq-note" style="border-left:3px solid #e8ff4c">ℹ️ <b>Ya viaja en otra compra</b> (${_reqBdjEsc(yaTxt)}). El correo del reembolso SÍ sale y le dice que <b>ese otro lugar sigue confirmado</b>.</div>`
+      : `<div class="rq-note" style="border-left:3px solid var(--green)">✅ <b>Ya viaja:</b> ${_reqBdjEsc(ya.razon || '')} <b>No se le va a mandar correo.</b> Si pidió su dinero de ESTA solicitud, elige «💸 Pidió su reembolso».</div>`)
     : (ya.comprobado === false
       ? `<div class="rq-note" style="border-left:3px solid #ffb020">⚠️ No se pudo revisar si ya viaja (${_reqBdjEsc(ya.razon || 'el padrón no respondió')}). El correo SÍ sale — revisa que no tenga ya su lugar en otra fecha.</div>`
       : '');
   const p = j.preview || {};
-  const puedeAvisar = !!(p.avisa && !p.error && !ya.viaja);
+  const puedeAvisar = !!(p.avisa && !p.error && !calla);
   box.innerHTML = `
     <h4 style="color:var(--red)">Rechazar la solicitud</h4>
     <div style="font-size:11.5px;color:var(--ts);margin:0 0 8px">1 · Elige el motivo &nbsp;·&nbsp; 2 · Edítalo si quieres &nbsp;·&nbsp; 3 · Revisa el correo y manda</div>
@@ -705,8 +711,10 @@ async function _reqBdjRchPintar(id, clave) {
       <textarea id="req-rch-txt-${id}" maxlength="500" rows="2" placeholder="Toca un motivo arriba o escríbelo tú"
         oninput="_reqBdjRchRefrescar('${id}')" style="width:100%;box-sizing:border-box;resize:vertical">${_reqBdjEsc(texto)}</textarea></label>
     ${avisoYaViaja}
-    ${j.pago && !ya.viaja ? '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>' : ''}
-    <div id="req-rch-prev-${id}">${ya.viaja ? '' : previa}</div>
+    ${j.pago && !calla ? (reemb
+      ? '<div class="rq-note" style="border-left:3px solid var(--green)">💸 Ya transfirió: el correo le promete su <b>reembolso en menos de 24 horas</b>. La transferencia la haces tú.</div>'
+      : '<div class="rq-note" style="border-left:3px solid var(--green)">💚 Ya transfirió: el correo le dice que <b>su pago queda a su favor</b> y que no tiene que volver a pagar.</div>') : ''}
+    <div id="req-rch-prev-${id}">${calla ? '' : previa}</div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="rq-btn dan full" id="req-rch-go-${id}" onclick="_reqBdjRechazarGo('${id}')">${puedeAvisar ? 'Rechazar y avisar' : 'Rechazar (sin correo)'}</button>
       <button class="rq-btn quiet" onclick="document.getElementById('req-rch-${id}').style.display='none'">Cancelar</button>
@@ -771,7 +779,8 @@ async function _reqBdjRchPreview(id) {
   if (!t2 || (t2.value || '') !== texto) return;
   if (Array.isArray(j.motivos) && j.motivos.length) _reqMotivos[id] = j.motivos;
   const ya = j.ya_viaja || {};
-  prev.innerHTML = ya.viaja ? '' : _reqBdjRchPreviaHtml(j);
+  const reemb = !!((j.motivos || []).find((m) => m.clave === clave) || {}).reembolso;
+  prev.innerHTML = (ya.viaja && !reemb) ? '' : _reqBdjRchPreviaHtml(j);
 }
 async function _reqBdjRechazarGo(id) {
   const motivo = ((document.getElementById('req-rch-txt-' + id) || {}).value || '').trim();

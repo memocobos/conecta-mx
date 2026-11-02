@@ -188,6 +188,22 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💸⏳ **REEMBOLSO-AVISO-1 (2-nov-2026, en main local; CHECK YA ESCRITO): séptimo
+  motivo de rechazo «💸 Pidió su reembolso».** Caso Kevin (R-4WVCU, FR 16-ene
+  Cancha VIP sin lugar; no quiso cambio y pidió su dinero). Palabra de Memo:
+  *«sentimos mucho no tener la zona … en menos de 24 horas recibirás tu
+  reembolso, si te interesa aún tenemos lugar en otras fechas y zona y los links
+  de siempre»*. El correo dice eso (sin «a tu favor»; la promesa de 24 h solo si
+  mandó comprobante) y 🔒 **es el ÚNICO motivo que avisa aunque la persona YA
+  viaje en otra fecha del evento** — Kevin ya tiene su 11-ene aprobado, así que el
+  guard de RECHAZO-AVISO-1b lo callaba; ahora el correo sale y dice «tu otro lugar
+  sigue confirmado». La transferencia la hace Memo a mano (la requisición nunca
+  nació viajero: no hay fila de Yamcha). Acta `migraciones/REEMBOLSO-AVISO-1.sql`
+  (CHECK con 7 claves, corrido y leído de pg_constraint). `mide:rechazo-1` **71**
+  (bloque [RB] + caso por el handler: ya viaja + reembolso → 1 correo con las dos
+  frases). Vecinos verdes: req-corrige-1 40 · req-b1 52 · fecha-correo-1 39 ·
+  cambio-rechazo-1 36. ⏳ Push de Memo → rechazar R-4WVCU con «💸».
+
 - 🔁⏳ **REQ-CORRIGE-1 (31-oct-2026, en main local; la BASE ya escrita): «🔁
   CORREGIR Y APROBAR» en la bandeja de Requisiciones.** Palabra de Memo, citada:
   *«hay gente que no puedo darles la zona y fecha que quieren … tienen que volver

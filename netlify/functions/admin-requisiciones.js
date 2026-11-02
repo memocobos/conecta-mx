@@ -470,12 +470,12 @@ exports.handler = async (event) => {
     if (!rq.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
     const req = (await rq.json())[0];
     if (!req) return j(404, headers, { error: 'Esa solicitud ya no existe' });
-    const prev = await CR.armarRechazo({
-      req, motivo_clave: body.motivo_clave,
-      motivo_texto: String(body.motivo || '').trim().slice(0, 500),
-    });
     // [RECHAZO-AVISO-1b] Se lo DICE antes del clic, no después del correo.
     const ya = await CR.yaViajaEnEvento({ req, KH_URL: SB_URL, KH_KEY: SB_KEY });
+    const prev = await CR.armarRechazo({
+      req, motivo_clave: body.motivo_clave,
+      motivo_texto: String(body.motivo || '').trim().slice(0, 500), ya,
+    });
     return j(200, headers, {
       ok: true, motivos: CR.MOTIVOS, pago: !!req.comprobante_path,
       wa: CR.waDe(req), tiene_correo: !!req.correo, preview: prev, ya_viaja: ya,

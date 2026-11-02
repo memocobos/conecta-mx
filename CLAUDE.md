@@ -6715,6 +6715,12 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **CHEAP = BOLETOS, NO PASAJEROS (palabra de Memo, 2-nov-2026).** Una misma
+  persona puede comprar 2, 3… hasta 10 boletos CHEAP y TODOS van a su nombre en
+  UNA fila (`boletos=N`). No se le piden datos de los demás ni se trata como
+  pendiente: si ella quiere darles acceso, reparte desde su Portal («Agregar a
+  mis acompañantes») con su correo e info. Jamás sugerir «pregúntale de quién es
+  el otro boleto» en un CHEAP.
 - 🔒 **TODA TABLA NUEVA EN `public` LLEVA SU `GRANT` EN LA MISMA ACTA (desde el
   30-oct-2026, en las DOS bases: KH y Portal).** Aviso de Supabase: a partir de
   esa fecha las tablas nuevas ya NO reciben permisos automáticos para la Data API

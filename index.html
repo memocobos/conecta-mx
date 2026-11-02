@@ -7079,7 +7079,7 @@ function _reqArchivoB64(file){
   return new Promise(function(res,rej){
     if(!file)return res(null);
     if(file.type==='application/pdf'){
-      if(file.size>3*1024*1024)return rej(new Error('El PDF pesa demasiado (máx 3 MB). Mándalo como foto.'));
+      if(file.size>2*1024*1024)return rej(new Error('El PDF pesa demasiado (máx 2 MB). Sube mejor una captura de pantalla del comprobante.'));
       var r=new FileReader();
       r.onload=function(){res(String(r.result||''));};
       r.onerror=function(){rej(new Error('No se pudo leer tu archivo'));};
@@ -7099,12 +7099,12 @@ function _reqArchivoB64(file){
       var img=new Image();
       img.onload=function(){
         try{
-          var MAX=1600,w=img.naturalWidth,h=img.naturalHeight;
+          var MAX=1280,w=img.naturalWidth,h=img.naturalHeight;
           var esc=Math.min(1,MAX/Math.max(w,h));
           var c=document.createElement('canvas');
           c.width=Math.max(1,Math.round(w*esc));c.height=Math.max(1,Math.round(h*esc));
           c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-          res(c.toDataURL('image/jpeg',.85));
+          res(c.toDataURL('image/jpeg',.78));
         }catch(e){rej(new Error('No se pudo procesar tu foto'));}
       };
       // HEIC u otro formato que el navegador no sabe abrir: se dice qué hacer.
@@ -7113,6 +7113,14 @@ function _reqArchivoB64(file){
     };
     fr.readAsDataURL(file);
   });
+}
+var _REQ_MSG_LENTO='Tu conexión está lenta y la reservación no alcanzó a enviarse. Conéctate a wifi o sube una captura de pantalla del comprobante (pesa menos) e inténtalo otra vez. Si ya pagaste, tu dinero está seguro: también puedes mandarnos tu comprobante por Messenger.';
+function _reqErrRed(e){
+  // fetch revienta con TypeError («Failed to fetch»/«Load failed») o AbortError
+  // cuando la red no responde: eso NUNCA es un error que el cliente entienda.
+  var n=(e&&e.name)||'';
+  if(n==='AbortError'||n==='TypeError')return new Error(_REQ_MSG_LENTO);
+  return e;
 }
 function _reqMsg(t,esError){
   var m=document.getElementById('req-msg');
@@ -7179,9 +7187,19 @@ function _reqEnviar(){
       forma_pago:_reqEstado.forma,
       comprobante_base64:b64||''
     };
+    // [REQ-LENTO-1] Con señal lenta el envío no terminaba de subir en 30 s y
+    // el cliente veía un «Failed to fetch» pelón (caso 2-nov: 7 intentos, 0
+    // llegaron). Reloj propio de 28 s + respuesta no-JSON (un 504 del CDN es
+    // HTML) → se tratan como «conexión lenta» y se dice qué hacer.
+    var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var reloj=ctl?setTimeout(function(){try{ctl.abort();}catch(e){}},28000):null;
     return fetch('/.netlify/functions/requisicion-crear',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
-    }).then(function(r){return r.json().then(function(j){return{st:r.status,j:j};});});
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),
+      signal:ctl?ctl.signal:undefined
+    }).then(function(r){
+      if(reloj)clearTimeout(reloj);
+      return r.json().then(function(j){return{st:r.status,j:j};},function(){return{st:r.status,j:null,red:r.status>=500||r.status===0};});
+    },function(e){if(reloj)clearTimeout(reloj);throw _reqErrRed(e);});
   }).then(function(r){
     if(r.j&&r.j.ok&&r.j.folio){
       try{trackMainEvent('main_requisicion_creada',{forma:_reqEstado.forma});}catch(e){}
@@ -7196,7 +7214,7 @@ function _reqEnviar(){
         '</div>';
     }else{
       try{trackMainEvent('main_requisicion_error',{st:r.st});}catch(e){}
-      _reqMsg((r.j&&r.j.error)||'No se pudo enviar. Inténtalo otra vez o usa el botón de Messenger de abajo.',true);
+      _reqMsg((r.j&&r.j.error)||(r.red?_REQ_MSG_LENTO:'No se pudo enviar. Inténtalo otra vez o usa el botón de Messenger de abajo.'),true);
       _reqEstado.enviando=false;
       if(btn){btn.disabled=false;btn.textContent='Enviar mi reservación';btn.style.opacity='1';}
     }

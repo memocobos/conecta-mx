@@ -188,6 +188,21 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📶⏳ **REQ-LENTO-1 (2-nov-2026, en main local, cero SQL): el formulario de
+  reservación aguanta la señal lenta.** Caso real: una clienta de FR (ya había
+  transferido $600) intentó 7 veces entre 21:49 y 22:02 UTC; los 7 POST a
+  `requisicion-crear` murieron en **504 a los ~30 s SIN invocar la función**
+  (medido en los logs de Netlify) — el cuerpo no terminaba de subir — y veía un
+  «Failed to fetch» pelón. A esa misma hora otra requisición entró sin problema:
+  no era el servidor. Hoy: reloj propio de 28 s (AbortController) + respuesta
+  no-JSON (el 504 del CDN es HTML) → mensaje claro (`_REQ_MSG_LENTO`: wifi o
+  captura de pantalla, «si ya pagaste tu dinero está seguro», Messenger como
+  respaldo); la foto baja a 1280 px / JPEG .78 y el PDF a máx 2 MB. ⚠️ Un
+  reintento tras un timeout PUEDE duplicar si el servidor sí alcanzó a crear la
+  primera — el tope de 3 pendientes por celular lo acota y Bulma/Milk lo ven.
+  Vecinos verdes: req-b1 52 · acomp-1 67 · confirma-1 28 · req-2027-2 22 ·
+  preventa-pn27 62 · ride-callejon-1 11. ⏳ Push de Memo.
+
 - 🚪⏳ **PITBULL-REQ-1 (2-nov-2026, en main local, cero SQL): Pitbull abre la
   puerta de requisición.** Reporte de Ximena: una clienta quería reservar Pitbull
   en la web y el modal solo ofrecía Messenger — nada caía en Requisiciones.

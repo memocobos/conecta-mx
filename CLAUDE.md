@@ -188,10 +188,10 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
-- ♻️⏳ **CREA-REVIVE-1 (3-nov-2026, en main local, cero SQL): revivir una
+- 🐉⏳ **CREA-REVIVE-1 + 1b (3-nov-2026, en main local, cero SQL): revivir una
   colaboración de creadora dada de baja.** Palabra de Memo: *«a los dados de
   baja opción de revivirlos por si al final siempre sí lo hace la creadora, y de
-  esa manera quitarle los −20 del ranking»*. Botón «♻️ Revivir» junto a «✉ Aviso
+  esa manera quitarle los −20 del ranking»*. Botón «🐉 Revivir» (Shenlong, palabra de Memo) junto a «✉ Aviso
   de baja» (solo maestro_roshi) → acción `contrato_revivir`: seco por default,
   motivo obligatorio, valor esperado `estado=eq.cancelado` (2º clic 409). El
   contrato vuelve a `datos.estado_previo` (sin él, se deriva de `firmado_at` —
@@ -202,9 +202,13 @@ está caduco antes de escribirse.
   a mandar su correo. 🔒 **La cortesía NO se re-escribe sola** (sus lugares
   regresaron al inventario y pudieron venderse): `datos.cortesia` →
   `cortesia_anterior` y se reasigna con «🎟 Cortesía», que mide stock y reusa
-  sus filas por nombre (CREA-3). Cero correos. Los entregables vencidos siguen
-  restando sus −5 (es otra regla). `mide:crea-revive-1` **16** (sabotaje al
-  estado → rojo → restaurado sha1 `eab0de4d`). Vecinos verdes: crea-2 27 ·
+  sus filas por nombre (CREA-3). 🐉 **CREA-REVIVE-1b (palabra de Memo: «haz
+  que le llegue correo»):** le llega UN correo «tu colaboración vuelve a estar
+  activa» DESPUÉS del PATCH (sin el motivo interno; no promete la cortesía); el
+  seco lo ENSEÑA; Resend caído o sin correo → revivido igual y se DICE; el
+  email_id se sella en la reactivación del historial. Los entregables vencidos siguen
+  restando sus −5 (es otra regla). `mide:crea-revive-1` **24** (sabotaje al sello del
+  email_id → rojo → restaurado sha1 `9d728cd5`). Vecinos verdes: crea-2 27 ·
   capsule-ux-1 76 · contrato-cliente-1 31 · abono-foto-3 23. ⏳ Push de Memo.
 
 - 📎⏳ **ABONO-FOTO-3 (3-nov-2026, en main local, cero SQL): el comprobante

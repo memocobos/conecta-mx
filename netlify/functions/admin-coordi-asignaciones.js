@@ -791,7 +791,10 @@ ${entregables}
     //     `cortesia_anterior` para que «🎟 Cortesía» se pueda apretar otra vez —
     //     ese botón mide el stock y encuentra sus filas por nombre (CREA-3), así
     //     que no nace nadie duplicado;
-    //   · NO se manda correo (decisión de quien revive; se le avisa por WhatsApp).
+    //   · [CREA-REVIVE-1b, palabra de Memo: «haz que le llegue correo»] le llega
+    //     UN correo de reactivación, DESPUÉS de escribir (Resend caído → el
+    //     contrato queda revivido igual y se DICE); su email_id queda en la
+    //     reactivación del historial. El seco ENSEÑA el correo exacto.
     // 🔒 Seco por default; escribir pide `confirmar:true`. Valor esperado en el
     // filtro (`estado=eq.cancelado`): el 2º clic contesta 409 sin escribir.
     if (accion === 'contrato_revivir') {
@@ -800,7 +803,7 @@ ${entregables}
       const motivo = cleanText(body.motivo, 600);
       if (!motivo || motivo.length < 3) return bad(headers, 'Escribe por qué se revive (queda en el historial)');
       const seco = body.confirmar !== true;
-      const cr = await fetch(`${baseContratos}?id=eq.${contratoId}&select=id,creador_nombre,plantilla,estado,evento_nombre,firmado_at,datos&limit=1`, { headers: sbHeaders });
+      const cr = await fetch(`${baseContratos}?id=eq.${contratoId}&select=id,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,firmado_at,datos&limit=1`, { headers: sbHeaders });
       if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
       const c = (await cr.json())[0];
       if (!c) return bad(headers, 'Ese contrato no existe');
@@ -818,6 +821,26 @@ ${entregables}
         cortesia_anterior: datos.cortesia || null,
         puntos: 'se quitan los −20 de la baja (el ranking lo calcula solo)',
       };
+      // El correo de reactivación. Firmado → «tu colaboración vuelve a estar
+      // vigente»; nunca firmado → «tu invitación vuelve a estar vigente». No
+      // promete la cortesía: sus lugares se reasignan aparte (y pueden no estar).
+      const escR = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      const fechaEvR = c.evento_fecha ? new Date(c.evento_fecha + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Matamoros' }) : '';
+      const nombreR = String(c.creador_nombre || '').trim().split(/\s+/)[0] || '';
+      const eventoR = `${escR(c.evento_nombre || 'el evento')}${fechaEvR ? ` (${escR(fechaEvR)})` : ''}`;
+      const asuntoR = `Tu colaboración con Conecta Reynosa vuelve a estar activa — ${c.evento_nombre || 'evento'}`;
+      const htmlR = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
+<div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
+<div style="padding:20px">
+<p style="margin:0 0 12px;color:#111">Hola ${escR(nombreR)}:</p>
+<p style="margin:0 0 12px;color:#111">¡Buenas noticias! ${previo === 'firmado'
+  ? `Dejamos sin efecto la cancelación que te enviamos: <b>tu colaboración con Conecta Reynosa para ${eventoR} vuelve a estar activa</b> y tu contrato sigue vigente tal como lo firmaste.`
+  : `Dejamos sin efecto la cancelación que te enviamos: <b>la invitación a colaborar con Conecta Reynosa para ${eventoR} vuelve a estar vigente</b>. Solo falta que firmes tu contrato con el link que te enviamos.`}</p>
+<p style="margin:0 0 12px;color:#111">En los próximos días te confirmamos por WhatsApp los detalles de tus boletos y tu kit.</p>
+<p style="margin:0 0 12px;color:#111">Si tienes cualquier duda, respóndenos a este correo.</p>
+<p style="margin:0;color:#111">¡Gracias por seguir con nosotros!<br><b>Conecta Reynosa</b></p>
+</div></div>`;
+      plan.correo = { para: c.creador_email || null, asunto: asuntoR, html: htmlR };
       if (seco) return ok(headers, { seco: true, plan });
 
       const hoy = new Date().toISOString();
@@ -836,7 +859,34 @@ ${entregables}
       if (!pr.ok) return upstream(headers, await pr.text(), 'cambio del contrato');
       const out = await pr.json();
       if (!out.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato ya se había revivido (otro clic llegó primero). Nada cambió.', ya: true }) };
-      return ok(headers, { revivido: true, estado: previo, tenia_cortesia: !!datos.cortesia });
+      // El correo, DESPUÉS de escribir: jamás tumba la reactivación.
+      let correo = { enviado: false };
+      const RESEND_R = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+      const FROM_R = process.env.RESEND_FROM_CONTRATOS || process.env.RESEND_FROM_ROL || 'Conecta Reynosa <admin@conectareynosa.mx>';
+      if (!RESEND_R || !c.creador_email) correo = { enviado: false, error: !RESEND_R ? 'Falta RESEND_API_KEY' : 'El contrato no tiene correo' };
+      else {
+        try {
+          const { aplicarModoPrueba } = require('./_lib/correo-guard');
+          const mp = aplicarModoPrueba({ to: c.creador_email, subject: asuntoR });
+          const er = await fetch('https://api.resend.com/emails', {
+            method: 'POST', headers: { Authorization: `Bearer ${RESEND_R}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: FROM_R, to: mp.to, subject: mp.subject, html: htmlR, reply_to: 'admin@conectareynosa.mx' }),
+          });
+          const ej = await er.json().catch(() => ({}));
+          correo = er.ok ? { enviado: true, email_id: ej.id || null } : { enviado: false, error: ej.message || ('Resend ' + er.status) };
+        } catch (e) { correo = { enviado: false, error: e.message }; }
+      }
+      if (correo.enviado) {
+        // Bitácora del envío en la reactivación (relee para no pisar).
+        const rr = await fetch(`${baseContratos}?id=eq.${c.id}&select=datos&limit=1`, { headers: sbHeaders });
+        const d2 = rr.ok ? ((await rr.json())[0] || {}).datos || null : null;
+        if (d2 && Array.isArray(d2.cancelaciones) && d2.cancelaciones.length) {
+          const ult = d2.cancelaciones[d2.cancelaciones.length - 1];
+          ult.reactivacion = { ...(ult.reactivacion || {}), email_id: correo.email_id, email_at: new Date().toISOString() };
+          await fetch(`${baseContratos}?id=eq.${c.id}`, { method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ datos: d2 }) });
+        }
+      }
+      return ok(headers, { revivido: true, estado: previo, tenia_cortesia: !!datos.cortesia, correo });
     }
 
     if (accion === 'cortesia_asignar') {

@@ -367,16 +367,16 @@ async function ctrBajaConfirmar() {
 // Palabra de Memo: «opción de revivirlos por si al final siempre sí lo hace la
 // creadora, y de esa manera quitarle los −20 del ranking». Reusa el modal de la
 // baja (mismo fondo, `baja-bg`). Primero enseña qué va a pasar (seco) y solo con
-// el segundo botón escribe. No manda correo.
+// el segundo botón escribe y le manda UN correo de reactivación (CREA-REVIVE-1b).
 function ctrReviveAbrir(contratoId) {
   ctrBajaAbrir(contratoId);   // arma el fondo y fija _bajaCtr
   const caja = _bajaEl('baja-bg').firstElementChild;
   caja.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <b style="font-size:16px">♻️ Revivir la colaboración</b>
+      <b style="font-size:16px">🐉 Revivir la colaboración</b>
       <button class="btn btn-ghost btn-sm" onclick="ctrBajaCerrar()">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">${_escCtr(_bajaCtr.creador_nombre || '')} · ${_escCtr(_bajaCtr.evento_nombre || '')} — el contrato regresa al estado que tenía antes de la baja y <b>se le quitan los −20 del ranking</b>. La baja queda en su historial. <b>No se le manda correo</b>: avísale tú.</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">${_escCtr(_bajaCtr.creador_nombre || '')} · ${_escCtr(_bajaCtr.evento_nombre || '')} — el contrato regresa al estado que tenía antes de la baja y <b>se le quitan los −20 del ranking</b>. La baja queda en su historial y <b>le llega un correo</b> avisándole que su colaboración sigue en pie.</div>
     <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">¿Por qué se revive? (queda en el historial, ella no lo ve)</div>
     <textarea id="revive-motivo" rows="2" maxlength="600" placeholder="Ej. sí entregó el reel previo, tarde pero lo hizo" style="width:100%;box-sizing:border-box;background:var(--bg3,#18181b);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);padding:10px;font:inherit;font-size:13px"></textarea>
     <div style="display:flex;gap:8px;margin-top:10px">
@@ -407,9 +407,12 @@ async function ctrReviveVer() {
       <div style="font-size:12.5px;line-height:1.6;margin-bottom:10px">
         · El contrato vuelve a <b>${_escCtr(etq[p.estado_nuevo] || p.estado_nuevo)}</b> <span style="color:var(--ts)">(${_escCtr(p.estado_origen || '')})</span>.<br>
         · Se le quitan los <b>−20</b> del ranking.<br>
+        ${p.correo && p.correo.para ? `· Le llega un correo a <b>${_escCtr(p.correo.para)}</b>.` : '· ⚠️ El contrato <b>no tiene correo</b>: se revive igual, pero avísale tú por WhatsApp.'}<br>
         ${cort ? `· Su cortesía de antes (<b>${_escCtr(cort.evento_id || '')}</b>${cort.zona ? ' · ' + _escCtr(cort.zona) : ''}) <b>NO</b> vuelve sola: sus lugares regresaron al inventario. Asígnala otra vez con <b>🎟 Cortesía</b> (mide el stock y reusa sus filas).` : '· No tenía cortesía asignada.'}
       </div>
-      <button class="btn" id="revive-go" style="background:#3ddc84;color:#000;border-color:#3ddc84" onclick="ctrReviveConfirmar()">♻️ Revivir la colaboración</button>`;
+      ${p.correo && p.correo.html ? `<div style="font-size:11px;color:var(--ts);margin-bottom:4px"><b>Asunto:</b> ${_escCtr(p.correo.asunto || '')}</div>
+      <div style="background:#fff;border-radius:8px;max-height:260px;overflow:auto;margin-bottom:10px">${p.correo.html}</div>` : ''}
+      <button class="btn" id="revive-go" style="background:#ff8a00;color:#000;border-color:#ff8a00" onclick="ctrReviveConfirmar()">🐉 Revivir y mandar correo</button>`;
   } catch (e) {
     res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
   } finally { btn.disabled = false; btn.textContent = 'Ver qué va a pasar'; }
@@ -420,12 +423,13 @@ async function ctrReviveConfirmar() {
   try {
     const j = await _reviveLlamar(true);
     res.innerHTML = `<div style="color:#3ddc84;font-size:13px;font-weight:700">✓ Colaboración revivida — vuelve a ${_escCtr(j.estado)} y sin los −20.</div>
+      ${j.correo && j.correo.enviado ? '<div style="font-size:12px;margin-top:4px">✉️ Correo enviado.</div>' : `<div style="font-size:12px;margin-top:4px;color:#ffb020">⚠️ El correo NO salió${j.correo && j.correo.error ? ' (' + _escCtr(j.correo.error) + ')' : ''}: avísale por WhatsApp.</div>`}
       ${j.tenia_cortesia ? '<div style="font-size:12px;margin-top:4px">Recuerda reasignar su cortesía con 🎟 Cortesía.</div>' : ''}`;
     if (typeof cargarContratos === 'function') cargarContratos();
     else if (typeof loadContratosList === 'function') loadContratosList();
   } catch (e) {
     res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
-    if (btn) { btn.disabled = false; btn.textContent = '♻️ Revivir la colaboración'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🐉 Revivir y mandar correo'; }
   }
 }
 

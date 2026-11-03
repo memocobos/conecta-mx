@@ -12030,7 +12030,7 @@ function _ctrPintarLista() {
       const tokenSafe = _escCtr(c.token);
       const nombreSafe = _attrJs(c.creador_nombre);   // [CAP5-1] va dentro de onclick
       const acciones = cancelado
-        ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>${bajaBtn}`
+        ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>${bajaBtn}${bajaBtn /* [CREA-REVIVE-1] mismo candado de rol que la baja */ ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#3ddc84;border-color:rgba(61,220,132,.35)" title="Al final sí cumplió: regresa el contrato y le quita los −20 del ranking" onclick="ctrReviveAbrir('${_escCtr(c.id)}')">♻️ Revivir</button>` : ''}`
         : firmado
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>

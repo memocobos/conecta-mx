@@ -188,6 +188,25 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ♻️⏳ **CREA-REVIVE-1 (3-nov-2026, en main local, cero SQL): revivir una
+  colaboración de creadora dada de baja.** Palabra de Memo: *«a los dados de
+  baja opción de revivirlos por si al final siempre sí lo hace la creadora, y de
+  esa manera quitarle los −20 del ranking»*. Botón «♻️ Revivir» junto a «✉ Aviso
+  de baja» (solo maestro_roshi) → acción `contrato_revivir`: seco por default,
+  motivo obligatorio, valor esperado `estado=eq.cancelado` (2º clic 409). El
+  contrato vuelve a `datos.estado_previo` (sin él, se deriva de `firmado_at` —
+  jamás se inventa un firmado). 🔒 **El −20 no se escribe en ningún lado: se va
+  solo** porque `evaluarContrato` lo deriva de `estado==='cancelado'`. La baja
+  NO se borra: pasa a `datos.cancelaciones[]` con su `reactivacion` (quién,
+  cuándo, por qué); `datos.cancelacion` se quita para que una baja futura vuelva
+  a mandar su correo. 🔒 **La cortesía NO se re-escribe sola** (sus lugares
+  regresaron al inventario y pudieron venderse): `datos.cortesia` →
+  `cortesia_anterior` y se reasigna con «🎟 Cortesía», que mide stock y reusa
+  sus filas por nombre (CREA-3). Cero correos. Los entregables vencidos siguen
+  restando sus −5 (es otra regla). `mide:crea-revive-1` **16** (sabotaje al
+  estado → rojo → restaurado sha1 `eab0de4d`). Vecinos verdes: crea-2 27 ·
+  capsule-ux-1 76 · contrato-cliente-1 31 · abono-foto-3 23. ⏳ Push de Memo.
+
 - 📎⏳ **ABONO-FOTO-3 (3-nov-2026, en main local, cero SQL): el comprobante
   SÍ sube en KameHouse — ➕ Abono, Cobranza, Montaña Y el alta manual.** Palabra
   de Memo: *«Sigo sin poder subir comprobantes cuando registro un pago o un

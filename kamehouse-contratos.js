@@ -363,6 +363,72 @@ async function ctrBajaConfirmar() {
   }
 }
 
+// ═══ [CREA-REVIVE-1 · 3-nov-2026] REVIVIR UNA COLABORACIÓN DADA DE BAJA ═══
+// Palabra de Memo: «opción de revivirlos por si al final siempre sí lo hace la
+// creadora, y de esa manera quitarle los −20 del ranking». Reusa el modal de la
+// baja (mismo fondo, `baja-bg`). Primero enseña qué va a pasar (seco) y solo con
+// el segundo botón escribe. No manda correo.
+function ctrReviveAbrir(contratoId) {
+  ctrBajaAbrir(contratoId);   // arma el fondo y fija _bajaCtr
+  const caja = _bajaEl('baja-bg').firstElementChild;
+  caja.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="font-size:16px">♻️ Revivir la colaboración</b>
+      <button class="btn btn-ghost btn-sm" onclick="ctrBajaCerrar()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">${_escCtr(_bajaCtr.creador_nombre || '')} · ${_escCtr(_bajaCtr.evento_nombre || '')} — el contrato regresa al estado que tenía antes de la baja y <b>se le quitan los −20 del ranking</b>. La baja queda en su historial. <b>No se le manda correo</b>: avísale tú.</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">¿Por qué se revive? (queda en el historial, ella no lo ve)</div>
+    <textarea id="revive-motivo" rows="2" maxlength="600" placeholder="Ej. sí entregó el reel previo, tarde pero lo hizo" style="width:100%;box-sizing:border-box;background:var(--bg3,#18181b);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);padding:10px;font:inherit;font-size:13px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary" id="revive-ver" onclick="ctrReviveVer()">Ver qué va a pasar</button>
+      <button class="btn btn-ghost" onclick="ctrBajaCerrar()">Cancelar</button>
+    </div>
+    <div id="revive-res" style="margin-top:12px"></div>`;
+}
+async function _reviveLlamar(confirmar) {
+  const motivo = ((_bajaEl('revive-motivo') || {}).value || '').trim();
+  if (motivo.length < 3) throw new Error('Escribe por qué se revive');
+  const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+    method: 'POST',
+    body: JSON.stringify({ accion: 'contrato_revivir', contrato_id: _bajaCtr.id, motivo, confirmar: confirmar === true }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+async function ctrReviveVer() {
+  const res = _bajaEl('revive-res'), btn = _bajaEl('revive-ver');
+  btn.disabled = true; btn.textContent = 'Revisando…';
+  try {
+    const p = (await _reviveLlamar(false)).plan || {};
+    const etq = { firmado: '✓ Firmado', pendiente: '⏳ Pendiente (sin firmar)' };
+    const cort = p.cortesia_anterior;
+    res.innerHTML = `
+      <div style="font-size:12.5px;line-height:1.6;margin-bottom:10px">
+        · El contrato vuelve a <b>${_escCtr(etq[p.estado_nuevo] || p.estado_nuevo)}</b> <span style="color:var(--ts)">(${_escCtr(p.estado_origen || '')})</span>.<br>
+        · Se le quitan los <b>−20</b> del ranking.<br>
+        ${cort ? `· Su cortesía de antes (<b>${_escCtr(cort.evento_id || '')}</b>${cort.zona ? ' · ' + _escCtr(cort.zona) : ''}) <b>NO</b> vuelve sola: sus lugares regresaron al inventario. Asígnala otra vez con <b>🎟 Cortesía</b> (mide el stock y reusa sus filas).` : '· No tenía cortesía asignada.'}
+      </div>
+      <button class="btn" id="revive-go" style="background:#3ddc84;color:#000;border-color:#3ddc84" onclick="ctrReviveConfirmar()">♻️ Revivir la colaboración</button>`;
+  } catch (e) {
+    res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
+  } finally { btn.disabled = false; btn.textContent = 'Ver qué va a pasar'; }
+}
+async function ctrReviveConfirmar() {
+  const res = _bajaEl('revive-res'), btn = _bajaEl('revive-go');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reviviendo…'; }
+  try {
+    const j = await _reviveLlamar(true);
+    res.innerHTML = `<div style="color:#3ddc84;font-size:13px;font-weight:700">✓ Colaboración revivida — vuelve a ${_escCtr(j.estado)} y sin los −20.</div>
+      ${j.tenia_cortesia ? '<div style="font-size:12px;margin-top:4px">Recuerda reasignar su cortesía con 🎟 Cortesía.</div>' : ''}`;
+    if (typeof cargarContratos === 'function') cargarContratos();
+    else if (typeof loadContratosList === 'function') loadContratosList();
+  } catch (e) {
+    res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = '♻️ Revivir la colaboración'; }
+  }
+}
+
 // ═══ [CREA-SEG-2] ENTREGABLES DE UNA CREADORA (los marca Memo) ════════════
 let _entCtr = null, _entItems = [];
 async function _crCall(body) {

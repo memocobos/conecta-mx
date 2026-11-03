@@ -133,6 +133,7 @@
     "mide:capsule-ux-2": "node scripts/mide-capsule-ux-2.js",
     "mide:cotiza-vend-1": "node scripts/mide-cotiza-vend-1.js",
     "mide:req-corrige-1": "node scripts/mide-req-corrige-1.js",
-    "mide:abono-foto-3": "node scripts/mide-abono-foto-3.js"
+    "mide:abono-foto-3": "node scripts/mide-abono-foto-3.js",
+    "mide:crea-revive-1": "node scripts/mide-crea-revive-1.js"
   }
 }

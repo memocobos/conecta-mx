@@ -151,6 +151,8 @@ const ACCIONES = {
   // [CREA-BAJA-1] Dar de baja la colaboración de una creadora: escribe en su
   // contrato, le quita la cortesía y le MANDA UN CORREO. Solo Memo.
   contrato_cancelar: ['maestro_roshi'],
+  // [CREA-REVIVE-1] Deshacer la baja (al final sí cumplió). Solo Memo.
+  contrato_revivir: ['maestro_roshi'],
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -772,6 +774,69 @@ ${entregables}
         }
       }
       return ok(headers, { cancelado: true, ya_cancelado: yaCancelado, bajas, correo });
+    }
+
+    // ═══ [CREA-REVIVE-1] (3-nov-2026) REVIVIR UNA COLABORACIÓN DADA DE BAJA ═══
+    // Palabra de Memo: «a los dados de baja opción de revivirlos por si al final
+    // siempre sí lo hace la creadora, y de esa manera quitarle los −20 del
+    // ranking». El −20 NO se guarda en ningún lado: `_lib/creadoras` lo DERIVA de
+    // `estado === 'cancelado'`. Así que revivir = regresar el contrato al estado
+    // que tenía antes de la baja, y el −20 se va solo (cero segunda regla).
+    //   · el estado vuelve a `datos.estado_previo` (firmado/pendiente); sin él,
+    //     se deriva de `firmado_at` — jamás se inventa un «firmado»;
+    //   · la baja NO se borra: pasa a `datos.cancelaciones` (historial) con la
+    //     reactivación al lado — quién, cuándo y por qué;
+    //   · la cortesía NO se re-escribe sola: sus lugares ya regresaron al
+    //     inventario y pudieron venderse. `datos.cortesia` pasa a
+    //     `cortesia_anterior` para que «🎟 Cortesía» se pueda apretar otra vez —
+    //     ese botón mide el stock y encuentra sus filas por nombre (CREA-3), así
+    //     que no nace nadie duplicado;
+    //   · NO se manda correo (decisión de quien revive; se le avisa por WhatsApp).
+    // 🔒 Seco por default; escribir pide `confirmar:true`. Valor esperado en el
+    // filtro (`estado=eq.cancelado`): el 2º clic contesta 409 sin escribir.
+    if (accion === 'contrato_revivir') {
+      const contratoId = String(body.contrato_id || '').trim();
+      if (!UUID_RE.test(contratoId)) return bad(headers, 'contrato_id inválido');
+      const motivo = cleanText(body.motivo, 600);
+      if (!motivo || motivo.length < 3) return bad(headers, 'Escribe por qué se revive (queda en el historial)');
+      const seco = body.confirmar !== true;
+      const cr = await fetch(`${baseContratos}?id=eq.${contratoId}&select=id,creador_nombre,plantilla,estado,evento_nombre,firmado_at,datos&limit=1`, { headers: sbHeaders });
+      if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
+      const c = (await cr.json())[0];
+      if (!c) return bad(headers, 'Ese contrato no existe');
+      if (!['creadora', 'creadora_team'].includes(c.plantilla)) return bad(headers, 'Solo se reviven así los contratos de creadoras');
+      if (c.estado !== 'cancelado') return { statusCode: 409, headers, body: JSON.stringify({ error: `El contrato no está dado de baja (está «${c.estado}»). Nada cambió.`, ya: true }) };
+      const datos = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+      const previo = ['firmado', 'pendiente'].includes(datos.estado_previo)
+        ? datos.estado_previo
+        : (c.firmado_at ? 'firmado' : 'pendiente');
+      const plan = {
+        contrato: { id: c.id, nombre: c.creador_nombre, evento: c.evento_nombre },
+        estado_nuevo: previo,
+        estado_origen: datos.estado_previo ? 'guardado al dar de baja' : 'derivado de la firma',
+        baja: datos.cancelacion || null,
+        cortesia_anterior: datos.cortesia || null,
+        puntos: 'se quitan los −20 de la baja (el ranking lo calcula solo)',
+      };
+      if (seco) return ok(headers, { seco: true, plan });
+
+      const hoy = new Date().toISOString();
+      const nuevosDatos = { ...datos };
+      const historial = Array.isArray(datos.cancelaciones) ? datos.cancelaciones.slice() : [];
+      historial.push({ ...(datos.cancelacion || {}), estado_previo: datos.estado_previo || null,
+        reactivacion: { motivo, por: jwtUserId, at: hoy } });
+      nuevosDatos.cancelaciones = historial;
+      delete nuevosDatos.cancelacion;
+      delete nuevosDatos.estado_previo;
+      if (datos.cortesia) { nuevosDatos.cortesia_anterior = datos.cortesia; delete nuevosDatos.cortesia; }
+      const pr = await fetch(`${baseContratos}?id=eq.${c.id}&estado=eq.cancelado`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ estado: previo, datos: nuevosDatos }),
+      });
+      if (!pr.ok) return upstream(headers, await pr.text(), 'cambio del contrato');
+      const out = await pr.json();
+      if (!out.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato ya se había revivido (otro clic llegó primero). Nada cambió.', ya: true }) };
+      return ok(headers, { revivido: true, estado: previo, tenia_cortesia: !!datos.cortesia });
     }
 
     if (accion === 'cortesia_asignar') {

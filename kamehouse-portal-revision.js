@@ -88,7 +88,12 @@ function _prvFilaHtml(rev, v, i) {
   const pasado = v.evento_pasado ? ' <span class="rq-tag" style="color:var(--ts)">evento pasado</span>' : '';
   const pagadoSinTotal = (Number(v.abonado_previo) || 0) + (v.abonos_lista || []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
   const abonos = (v.abonos_lista || []).map((a) => `<div>${_prvEsc(a.fecha || '—')} · <b>${_prvMxn(a.monto)}</b>${a.nota ? ' · <span style="color:var(--ts)">' + _prvEsc(String(a.nota).slice(0, 90)) + '</span>' : ''}</div>`).join('') || '<div style="color:var(--ts)">Sin abonos capturados</div>';
-  const dinero = c.total == null
+  // [PORTAL-RECUERDO-1] Un viaje pasado se publica como RECUERDO: el Portal no
+  // le enseña dinero, así que el «Sin total» no aplica (palabra de Memo: «ya no
+  // importa el dinero»). El dinero de la base NO se toca.
+  const dinero = v.evento_pasado
+    ? `<div style="font-size:13px;color:var(--ts)">📸 <b>Viaje pasado</b> — se publica como recuerdo: el cliente ve el tour, sin dinero ni plan. Pagado registrado: <b>${_prvMxn(c.total == null ? pagadoSinTotal : c.abonado)}</b></div>`
+    : c.total == null
     // [PRV-SINTOTAL-1] Sin total, saldoMigrado no cuenta (un cero sería falso):
     // se DICE que falta y se enseña lo pagado.
     ? `<div style="font-size:13px;color:var(--yellow)">⚠️ <b>Sin total de contrato</b> — ponlo con ✏️ Editar antes de publicar. Pagado hasta hoy: <b style="color:var(--green)">${_prvMxn(pagadoSinTotal)}</b></div>`
@@ -100,7 +105,7 @@ function _prvFilaHtml(rev, v, i) {
         <button class="rq-btn" onclick="_prvEditarAbrir('${rev.id}', ${i})">✏️ Editar</button>
         <button class="rq-btn" onclick="_prvAbonoAbrir('${rev.id}', ${i})">➕ Pago</button>
         <button class="rq-btn" onclick="_prvExcel('${rev.id}', ${i})">📊 Excel</button>
-        <button class="rq-btn pri" onclick="_prvFilaPublicar('${rev.id}', ${i})">✓ Publicar este</button>
+        <button class="rq-btn pri" onclick="_prvFilaPublicar('${rev.id}', ${i})">${v.evento_pasado ? '📸 Publicar como recuerdo' : '✓ Publicar este'}</button>
         <button class="rq-btn dan" onclick="_prvFilaNoAbrir('${rev.id}', ${i})">✗ No procede</button>
       </div>`;
   return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0;${decidida ? 'opacity:.6' : ''}">

@@ -234,6 +234,12 @@ exports.handler = async (event) => {
     const evPorSlug = {};
     (Array.isArray(evRaw) ? evRaw : []).forEach((e) => { if (e && e.id) evPorSlug[String(e.id)] = e; });
     const ahora = new Date();
+    // [PORTAL-RECUERDO-1] «Hoy» en Reynosa, como cadena, para saber si un viaje
+    // YA PASÓ. Se pregunta aparte del plan a propósito: el plan contesta
+    // 'sin_total' antes de mirar la fecha, y un viaje pasado sin total (los
+    // migrados viejos) también es pasado.
+    const _h = PP.hoyReynosa(ahora);
+    const hoyDs = _h.getFullYear() + '-' + String(_h.getMonth() + 1).padStart(2, '0') + '-' + String(_h.getDate()).padStart(2, '0');
 
     const tours = viajeros.map((v) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
@@ -284,6 +290,10 @@ exports.handler = async (event) => {
         banco: bancoDeViajero(v),
         // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
         evento_ds: dsEv,
+        // [PORTAL-RECUERDO-1] Viaje ya realizado: el Portal lo pinta como
+        // RECUERDO (sin dinero, plan, contrato ni botones). Sin fecha → false:
+        // no se esconde el dinero de nadie por una fecha que no se pudo leer.
+        pasado: !!(dsEv && /^\d{4}-\d{2}-\d{2}$/.test(dsEv) && dsEv < hoyDs),
         // 🔒 Los abonos van ORDENADOS por fecha y con su fecha tal cual está. Los
         // de la cosecha traen la fecha del careo, no la del pago: el Portal lo
         // dice con palabras en vez de presentarlas como fecha de pago.

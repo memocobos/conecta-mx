@@ -3353,6 +3353,19 @@ async function renderPlanMigrado(){
       const titulo = ev && ev.a ? ev.a : t.evento_id;
       // `sin_plan` = la fila no trae total. Se DICE, en vez de pintar $0, que se
       // leería como «no debes nada».
+      // [PORTAL-RECUERDO-1] Un viaje que ya pasó es un RECUERDO: palabra de
+      // Memo, «ya no importa el dinero y nomás les aparezca el tour». Se queda
+      // el hero (foto) y la música; fuera dinero, plan, contrato, paquete,
+      // acompañantes y datos editables (no hay nada que hacer con un viaje hecho).
+      if (t.pasado) {
+        return '<div class="tour-card" data-mig-viajero="' + escapeHtml(t.viajero_id || '') + '">'
+          + _migHeroHtml(t, titulo)
+          + '<div class="mig-body">'
+          + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
+          + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
+          + '<div style="display:inline-block;padding:6px 12px;border-radius:999px;background:rgba(136,234,78,.15);color:#88ea4e;font-size:13px;font-weight:700">✓ Viaje realizado · ¡gracias por viajar con nosotros!</div>'
+          + _migMediaHtml(t) + '</div></div>';
+      }
       const cuenta = t.sin_plan
         ? '<div class="tour-empty" style="margin:0">Todavía no tenemos el detalle de tu plan. Escríbenos por WhatsApp.</div>'
         : '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">'

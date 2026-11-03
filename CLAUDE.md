@@ -188,6 +188,22 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📸⏳ **PORTAL-RECUERDO-1 (2-nov-2026, en main local, cero SQL, cero dinero):
+  los viajes PASADOS se publican como RECUERDO.** Palabra de Memo (con Humbe
+  7-feb en la bandeja, «Sin total de contrato»): *«son tours pasados… ya no
+  importa el dinero y no más les aparezca el tour»* → «si dale».
+  `portal-mi-plan-migrado` manda `pasado` (ds del #N < hoy en Reynosa,
+  calculado APARTE del plan: el plan contesta `sin_total` antes de mirar la
+  fecha; sin fecha legible → false, no se esconde dinero por una fecha que no
+  se leyó). El Portal pinta esa card con hero + música + «✓ Viaje realizado» y
+  NADA más (sin dinero, plan, contrato, paquete, acompañantes ni datos). En la
+  bandeja 🪪, la fila con `evento_pasado` cambia el «⚠️ Sin total» por «📸 Viaje
+  pasado — se publica como recuerdo» y el botón dice «📸 Publicar como
+  recuerdo» (el MISMO `fila_publicar`, que nunca exigió total). La base no se
+  toca. Vecinos verdes: portal-solo-1 89 · plan-pagos-1 81 · portal-vivo-1 45 ·
+  portal-edit-1 28 · preventa-portal-1 35 · pagos-portal-2 38 ·
+  ticket-circuito-1 32. ⏳ Push de Memo → publicar a Basilio/Johana (Humbe).
+
 - 📶⏳ **REQ-LENTO-1 (2-nov-2026, en main local, cero SQL): el formulario de
   reservación aguanta la señal lenta.** Caso real: una clienta de FR (ya había
   transferido $600) intentó 7 veces entre 21:49 y 22:02 UTC; los 7 POST a

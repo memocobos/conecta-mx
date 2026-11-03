@@ -345,12 +345,32 @@ async function migGuardarIgual() {
   if (d) await _migEnviar(d);
 }
 async function _migEnviar(d) {
+  // [ABONO-FOTO-3 · 3-nov-2026] Con comprobante, lo ABONADO entra como abono
+  // CON su foto (la misma puerta que ➕ Abono, `abono_crear`, sin correo) y no
+  // como pagado-antes, que no tiene ni fecha ni foto. Sin comprobante, todo
+  // como siempre. La foto se lee ANTES de crear a nadie: si no sirve, no nace
+  // un viajero a medias.
+  let foto = null;
+  try { foto = await _vj3LeerFoto(_migEl('mig-foto')); }
+  catch (e) { return _migError(e.message); }
+  const montoFoto = foto ? Number(String(d.abonado_previo || '').replace(/[$,\s]/g, '')) : 0;
+  if (foto && !(Number.isFinite(montoFoto) && montoFoto > 0)) {
+    return _migError('Subiste un comprobante: pon en ABONADO el monto que ampara.');
+  }
+  if (foto) d = Object.assign({}, d, { abonado_previo: '' });
   const btn = _migEl('mig-guardar');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
     const r = await khViajeros.migrar(d);
     const v = r && r.viajero;
     if (!v) throw new Error('el servidor no devolvió el viajero');
+    if (foto && v.id) {
+      try {
+        await khViajeros.abonoCrear({ viajero_id: v.id, monto: montoFoto, foto, nota: 'Comprobante del alta manual', avisar: false });
+      } catch (e) {
+        showToast(`${v.nombre || 'El viajero'} quedó dado de alta, pero su abono de ${_vj3Money(montoFoto)} NO: regístralo con ➕ Abono (${e.message})`, 'error');
+      }
+    }
     _migCapturados.unshift(v);
     _migPintarCapturados();
     // [MIG-1b] El aviso del DOBLE DESCUENTO. No se traga: si esta gente ya
@@ -368,6 +388,7 @@ async function _migEnviar(d) {
     // que en una tanda del Excel se repiten. El foco vuelve al nombre.
     ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-notas']
       .forEach(id => { const el = _migEl(id); if (el) el.value = ''; });
+    { const fEl = _migEl('mig-foto'); if (fEl) fEl.value = ''; }
     _migEl('mig-nombre') && _migEl('mig-nombre').focus();
     _migError('');
   } catch (e) {

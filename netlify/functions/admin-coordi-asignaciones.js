@@ -2384,8 +2384,8 @@ ${entregables}
       let foto_path = null;
       if (body.foto) {
         const img = _decodeImagen(body.foto);
-        if (img.error) return bad(headers, 'Foto inválida: ' + img.error);
-        if (img.tooBig) return bad(headers, 'La foto pesa demasiado (máx 6 MB)');
+        if (img.error) return bad(headers, 'Comprobante inválido: ' + img.error);
+        if (img.tooBig) return bad(headers, 'El comprobante pesa demasiado (máx 6 MB)');
         // <evento>/<viajero_id>/<uuid>.<ext> — el evento adelante para poder
         // barrer por evento sin abrir cada carpeta.
         foto_path = `${String(vRows[0].evento_id || 'sin-evento')}/${viajero_id}/${_uuid()}.${img.ext}`;
@@ -2725,20 +2725,22 @@ function _uuid() {
 }
 
 function _decodeImagen(dataUri) {
-  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(String(dataUri || ''));
-  if (!m) return { error: 'no es una imagen en base64' };
-  const mime = m[1].toLowerCase();
+  // [ABONO-FOTO-3 · 3-nov-2026] Acepta también PDF (el comprobante de banco
+  // muchas veces llega así) y el TIPO lo deciden los BYTES, no el rótulo del
+  // navegador: _lib/imagen-magia es el dueño (el mismo del comprobante de la
+  // requisición). HEIC ya no entra: ningún navegador del equipo lo pinta, y el
+  // lector de KameHouse lo convierte a JPEG antes de mandarlo.
+  const m = /^data:([a-zA-Z0-9.+\/-]+);base64,([\s\S]+)$/.exec(String(dataUri || ''));
+  if (!m) return { error: 'no es un archivo en base64' };
   let bytes;
   try { bytes = Buffer.from(m[2].replace(/\s+/g, ''), 'base64'); }
   catch (_) { return { error: 'base64 corrupta' }; }
   if (!bytes.length) return { error: 'bytes vacíos' };
   if (bytes.length > FOTO_MAX_BYTES) return { tooBig: true };
-  const ext = mime === 'image/png' ? 'png'
-    : mime === 'image/webp' ? 'webp'
-    : mime === 'image/heic' ? 'heic'
-    : mime === 'image/heif' ? 'heif'
-    : 'jpg';
-  return { bytes, mime, ext };
+  const { tipoImagen } = require('./_lib/imagen-magia');
+  const t = tipoImagen(bytes, { pdf: true });
+  if (!t) return { error: 'tiene que ser foto (JPG, PNG, WEBP) o PDF' };
+  return { bytes, mime: t.mime, ext: t.ext };
 }
 
 async function _subirAbono(env, path, bytes, contentType) {

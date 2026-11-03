@@ -1189,6 +1189,10 @@
             <div id="mig-sug" style="font-size:10px;color:var(--ts);margin-top:3px;min-height:13px"></div></div>
            <div><label class="mig-lbl">DESCUENTO</label><input class="cot-input" id="mig-desc" inputmode="decimal" placeholder="$ 0" oninput="_migSugerirCosto(true)"></div>
            <div><label class="mig-lbl">ABONADO (total)</label><input class="cot-input" id="mig-abonado" inputmode="decimal" placeholder="$ 0"></div>
+           <!-- [ABONO-FOTO-3] El comprobante del alta. Con foto, lo abonado entra
+                como ABONO con su ticket (📎 Pagos y el Portal lo enseñan); sin
+                foto, como siempre (pagado-antes). -->
+           <div><label class="mig-lbl">COMPROBANTE (opcional)</label><input class="cot-input" id="mig-foto" type="file" accept="image/*,application/pdf"></div>
            <!-- [CAP-MIG-FIX] Talla de CATÁLOGO, no texto libre: Memo tiene razón
                 en que un campo abierto ahí solo invita basura ("mediana", "m",
                 "M "). El set es el MISMO que ya usa el Portal en su registro

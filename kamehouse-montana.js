@@ -1062,7 +1062,7 @@ function _vj3BloqueHtml(v, i) {
         <label class="vj-campo"><span>Nota</span>
           <input class="cot-input" id="vj3-nota-${i}" placeholder="Transferencia, OXXO…" maxlength="500"></label>
         <label class="vj-campo"><span>Foto (opcional)</span>
-          <input class="cot-input" id="vj3-foto-${i}" type="file" accept="image/*"></label>
+          <input class="cot-input" id="vj3-foto-${i}" type="file" accept="image/*,application/pdf"></label>
       </div>
       <div class="vj3-form-b">
         <button class="btn btn-primary btn-sm" type="button" id="vj3-btn-${i}" onclick="_vj3Abonar(${i})">Registrar abono</button>
@@ -1082,7 +1082,9 @@ async function _vj3Abonar(i) {
   }
   const fecha = String((document.getElementById(`vj3-fecha-${i}`) || {}).value || '').trim();
   const nota = String((document.getElementById(`vj3-nota-${i}`) || {}).value || '').trim();
-  const foto = await _vj3LeerFoto(document.getElementById(`vj3-foto-${i}`));
+  let foto;
+  try { foto = await _vj3LeerFoto(document.getElementById(`vj3-foto-${i}`)); }
+  catch (e) { return _vjMal(e.message, `vj3-foto-${i}`); }
 
   const btn = document.getElementById(`vj3-btn-${i}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }

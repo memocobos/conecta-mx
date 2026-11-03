@@ -188,6 +188,26 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📎⏳ **ABONO-FOTO-3 (3-nov-2026, en main local, cero SQL): el comprobante
+  SÍ sube en KameHouse — ➕ Abono, Cobranza, Montaña Y el alta manual.** Palabra
+  de Memo: *«Sigo sin poder subir comprobantes cuando registro un pago o un
+  nuevo viajero»*. Medido: **0 objetos** subidos jamás por `abono_crear` al
+  bucket y **cero errores** en los logs de la function — la foto CRUDA del
+  celular (4-8 MB → base64 >6 MB) moría en el gateway antes de invocarla.
+  `_vj3LeerFoto` (el dueño de los 4 lectores) hoy baja la imagen a 1600 px /
+  JPEG .8 con `decode()` + el candado de FOTO-NEGRA-1, acepta **PDF** (≤4 MB) y
+  RECHAZA con palabras (HEIC que no abre, PDF pesado) — antes tragaba el error
+  y el abono nacía sin foto. Los 4 llamadores lo atrapan y lo pintan.
+  Servidor: `_decodeImagen` decide por BYTES (`_lib/imagen-magia`, pdf:true).
+  **Alta manual:** campo COMPROBANTE; con foto, lo ABONADO entra como abono con
+  ticket (`abono_crear`, `avisar:false`) y NO como pagado-antes (que no tiene
+  fecha ni foto); sin foto, igual que siempre. Si el abono falla tras crear al
+  viajero, se DICE («regístralo con ➕ Abono»). ⚠️ El contrato que sale en el
+  alta se emite antes del abono: su foto dice pagado $0. `mide:abono-foto-3`
+  **17**. Vecinos verdes: ticket-circuito-1 32 · capsule-ux-2 46 · capsule-ux-1
+  76 · capsule-comp-1 16 · ride-sin-zona-1 9 · contrato-cliente-1 31 ·
+  viajero-edita-1 67. ⏳ Push de Memo → que Bulma/Milk recarguen KameHouse.
+
 - 🖤⏳ **FOTO-NEGRA-1 (3-nov-2026, en main local, cero SQL): un comprobante ya
   no puede llegar NEGRO.** Reporte de Ximena: el 📎 de Aaron Muñoz / Karla
   (FR 11-ene, R-B3DRX) abría una foto negra. Medido en el bucket: **6 objetos

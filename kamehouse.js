@@ -4194,7 +4194,7 @@ function _cobCajaAbrir(id) {
       <label class="cob-caja-c" style="flex:1;min-width:150px"><span>NOTA</span>
         <input class="cot-input" id="cbn-${_esfEsc(id)}" placeholder="opcional — ej. depósito BBVA" maxlength="500"></label>
       <label class="cob-caja-c"><span>COMPROBANTE</span>
-        <input class="cot-input" id="cbfoto-${_esfEsc(id)}" type="file" accept="image/*"></label>
+        <input class="cot-input" id="cbfoto-${_esfEsc(id)}" type="file" accept="image/*,application/pdf"></label>
     </div>
     <div class="cob-caja-acc" style="margin-top:8px">
       <button class="btn btn-primary btn-sm" type="button" id="cbbtn-${_esfEsc(id)}" onclick="_cobCajaGuardar('${_attrJs(id)}')">Guardar abono</button>
@@ -4215,7 +4215,9 @@ async function _cobCajaGuardar(id) {
   const nota = String((document.getElementById(`cbn-${id}`) || {}).value || '').trim();
   // La foto se lee con el MISMO helper de VJ-3: un segundo lector sería otra
   // forma de leer el mismo archivo, y ya sabemos cómo termina eso.
-  const foto = await _vj3LeerFoto(document.getElementById(`cbfoto-${id}`));
+  let foto;
+  try { foto = await _vj3LeerFoto(document.getElementById(`cbfoto-${id}`)); }
+  catch (e) { return mal(e.message); }
 
   const btn = document.getElementById(`cbbtn-${id}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
@@ -6744,7 +6746,7 @@ function _vjAbonoAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)">MONTO<br><input class="cot-input" id="vja-m-${_esfEsc(id)}" type="number" min="0" step="0.01" placeholder="0.00" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)">FECHA<br><input class="cot-input" id="vja-f-${_esfEsc(id)}" type="date" value="${_esfEsc(_mxFechaStr ? _mxFechaStr() : '')}" style="width:140px"></label>
       <label style="font-size:10px;color:var(--ts);flex:1;min-width:160px">NOTA<br><input class="cot-input" id="vja-n-${_esfEsc(id)}" placeholder="ej. transferencia BBVA · link de pago" maxlength="500" style="width:100%"></label>
-      <label style="font-size:10px;color:var(--ts)" title="[ABONO-FOTO-2] Opcional: el ticket que mandó el cliente. Queda pegado al abono (📎 Pagos) y el cliente lo ve en su Portal.">COMPROBANTE (opcional)<br><input class="cot-input" id="vja-ft-${_esfEsc(id)}" type="file" accept="image/*" style="width:180px"></label>
+      <label style="font-size:10px;color:var(--ts)" title="[ABONO-FOTO-2] Opcional: el ticket que mandó el cliente. Queda pegado al abono (📎 Pagos) y el cliente lo ve en su Portal.">COMPROBANTE (opcional)<br><input class="cot-input" id="vja-ft-${_esfEsc(id)}" type="file" accept="image/*,application/pdf" style="width:180px"></label>
       <button class="btn btn-primary btn-sm" id="vja-b-${_esfEsc(id)}" onclick="_vjAbonoGuardar('${_attrJs(id)}')">Guardar abono</button>
       <button class="btn btn-ghost btn-sm" onclick="_vjAbonoAbrir('${_attrJs(id)}')">Cancelar</button>
       <div id="vja-e-${_esfEsc(id)}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
@@ -7209,7 +7211,9 @@ async function _vjAbonoGuardar(id) {
   const nota = String((document.getElementById(`vja-n-${id}`) || {}).value || '').trim();
   // [ABONO-FOTO-2] El ticket, opcional — el MISMO lector de la caja de
   // Cobranza (_vj3LeerFoto): un segundo lector sería otra lista que diverge.
-  const foto = await _vj3LeerFoto(document.getElementById(`vja-ft-${id}`));
+  let foto;
+  try { foto = await _vj3LeerFoto(document.getElementById(`vja-ft-${id}`)); }
+  catch (e) { if (err) err.textContent = e.message; return; }
   const btn = document.getElementById(`vja-b-${id}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
@@ -10091,13 +10095,60 @@ const VJ_CAMPOS = [
 
 
 // Lee un <input type=file> a data-URI. Sin archivo → null (la foto es opcional).
+// [ABONO-FOTO-3 · 3-nov-2026] «Sigo sin poder subir comprobantes» (Memo): el
+// lector mandaba la foto CRUDA del celular — 4-8 MB que en base64 pasan el tope
+// de ~6 MB del request de Netlify, y el gateway la rebota ANTES de la function
+// (por eso los logs no tenían ni un error). Hoy: la imagen baja a 1600 px /
+// JPEG .8 (~300 KB), esperando decode() y con el candado del lienzo vacío de
+// FOTO-NEGRA-1 (un lienzo sin pintar sale NEGRO); el PDF viaja tal cual si cabe.
+// Un archivo que no se puede leer RECHAZA con palabras — antes se tragaba en
+// silencio y el abono nacía sin foto sin que nadie se enterara.
+function _vj3LienzoVacio(c) {
+  try {
+    const w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data;
+    for (let iy = 0; iy < 8; iy++) for (let ix = 0; ix < 8; ix++) {
+      const x = Math.min(w - 1, Math.floor((ix + .5) * w / 8)), y = Math.min(h - 1, Math.floor((iy + .5) * h / 8)), k = (y * w + x) * 4;
+      if (d[k + 3] > 0 && (d[k] > 12 || d[k + 1] > 12 || d[k + 2] > 12)) return false;
+    }
+    return true;
+  } catch (_) { return false; }
+}
+const _VJ3_ORIGINAL_MAX = 4.2 * 1024 * 1024;   // ~5.6 MB en base64: cabe en el request
 function _vj3LeerFoto(input) {
-  return new Promise((res) => {
+  return new Promise((res, rej) => {
     const f = input && input.files && input.files[0];
     if (!f) return res(null);
+    const tipo = String(f.type || '').toLowerCase();
+    const esPdf = tipo === 'application/pdf' || /\.pdf$/i.test(f.name || '');
     const fr = new FileReader();
-    fr.onload = () => res(String(fr.result || '') || null);
-    fr.onerror = () => res(null);   // fails-soft: el abono vale sin la foto
+    fr.onerror = () => rej(new Error('No se pudo leer el archivo del comprobante. Vuelve a elegirlo.'));
+    fr.onload = () => {
+      const original = String(fr.result || '');
+      if (!original) return rej(new Error('El archivo del comprobante está vacío.'));
+      if (esPdf) {
+        if (f.size > _VJ3_ORIGINAL_MAX) return rej(new Error('El PDF pesa demasiado (máx 4 MB). Mándalo como captura de pantalla.'));
+        return res(original.replace(/^data:[^;,]*/, 'data:application/pdf'));
+      }
+      const cabeTalCual = /^data:image\/(jpeg|png|webp);/i.test(original) && f.size <= _VJ3_ORIGINAL_MAX;
+      const sinPintar = (msg) => cabeTalCual ? res(original) : rej(new Error(msg));
+      const img = new Image();
+      img.onerror = () => sinPintar('Esa imagen no se pudo abrir (¿HEIC del iPhone?). Toma una captura de pantalla del comprobante y súbela.');
+      const dibujar = () => {
+        try {
+          const MAX = 1600, k = Math.min(1, MAX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round((img.naturalWidth || 1) * k));
+          c.height = Math.max(1, Math.round((img.naturalHeight || 1) * k));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          // SIN fondo a propósito: un relleno blanco taparía el lienzo sin pintar
+          // y el candado de FOTO-NEGRA-1 ya no lo vería.
+          if (_vj3LienzoVacio(c)) return sinPintar('Tu foto no se pudo procesar. Toma una captura de pantalla del comprobante y súbela.');
+          res(c.toDataURL('image/jpeg', .8));
+        } catch (_) { sinPintar('Tu foto no se pudo procesar. Toma una captura de pantalla del comprobante y súbela.'); }
+      };
+      img.onload = () => { if (img.decode) img.decode().then(dibujar, dibujar); else dibujar(); };
+      img.src = original;
+    };
     fr.readAsDataURL(f);
   });
 }

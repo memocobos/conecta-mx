@@ -230,10 +230,10 @@ exports.handler = async (event) => {
       const por = new Map();
       cs.forEach((c) => {
         const k = String(c.creador_email || c.creador_nombre).toLowerCase().trim();
-        if (!por.has(k)) por.set(k, { nombre: c.creador_nombre, correo: c.creador_email, colaboraciones: 0, cumplidas: 0, bajas: 0, a_tiempo: 0, tarde: 0, vencidos: 0, puntos: 0, ultima: null, eventos: [], redes: null });
+        if (!por.has(k)) por.set(k, { nombre: c.creador_nombre, correo: c.creador_email, colaboraciones: 0, cumplidas: 0, bajas: 0, bajas_justificadas: 0, a_tiempo: 0, tarde: 0, vencidos: 0, puntos: 0, ultima: null, eventos: [], redes: null });
         const p = por.get(k);
         const ev = L.evaluarContrato(c, es.filter((e) => e.contrato_id === c.id), hoy);
-        p.colaboraciones++; if (ev.cumplida) p.cumplidas++; if (ev.baja) p.bajas++;
+        p.colaboraciones++; if (ev.cumplida) p.cumplidas++; if (ev.baja) p.bajas++; if (ev.baja_justificada) p.bajas_justificadas++;
         p.a_tiempo += ev.a_tiempo; p.tarde += ev.tarde; p.vencidos += ev.vencido; p.puntos += ev.puntos;
         if (!p.ultima || (c.evento_fecha || '') > p.ultima) { p.ultima = c.evento_fecha || p.ultima; p.nombre = c.creador_nombre; }
         p.eventos.push({ evento: c.evento_nombre, fecha: c.evento_fecha, estado: c.estado, puntos: ev.puntos });

@@ -59,6 +59,7 @@ const COLS = [
   // dos veces) y si el contrato trae talla (para pedirla a mano si no). Sigue
   // sin viajar el jsonb entero.
   'cortesia_evento:datos->cortesia->>evento_id',
+  'baja_justificada:datos->cancelacion->>justificada',   // [CREA-BAJA-JUST-1] sin −20
   'talla_contrato:datos->>talla',
   // [CREA-2] El acompañante que la creadora declaró al firmar, y si la
   // cortesía ya le hizo fila. Mismo patrón: sub-campos puntuales, jamás el

@@ -310,6 +310,10 @@ function ctrBajaAbrir(contratoId) {
     <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:6px">Motivo (lo va a leer ella)</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">${_BAJA_MOTIVOS.map((m, i) => `<button type="button" class="btn btn-ghost btn-sm" style="text-align:left;white-space:normal;line-height:1.35" onclick="document.getElementById('baja-motivo').value=_BAJA_MOTIVOS[${i}]">${_escCtr(m)}</button>`).join('')}</div>
     <textarea id="baja-motivo" rows="3" maxlength="600" placeholder="Toca un motivo o escríbelo" style="width:100%;box-sizing:border-box;background:var(--bg3,#18181b);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);padding:10px;font:inherit;font-size:13px"></textarea>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:12.5px;line-height:1.4;cursor:pointer">
+      <input type="checkbox" id="baja-justificada" style="margin-top:2px" onchange="var r=document.getElementById('baja-res'); if (r) r.innerHTML='';">
+      <span>🤝 <b>Baja justificada</b> — avisó con anticipación. <span style="color:var(--ts)">No le resta los −20 del ranking y el correo es amable (no le cita incumplimiento).</span></span>
+    </label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-primary" id="baja-ver" onclick="ctrBajaVer()">Ver el correo antes de enviar</button>
       <button class="btn btn-ghost" onclick="ctrBajaCerrar()">Cancelar</button>
@@ -323,7 +327,7 @@ async function _bajaLlamar(confirmar) {
   if (motivo.length < 5) throw new Error('Escribe el motivo');
   const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
     method: 'POST',
-    body: JSON.stringify({ accion: 'contrato_cancelar', contrato_id: _bajaCtr.id, motivo, confirmar: confirmar === true }),
+    body: JSON.stringify({ accion: 'contrato_cancelar', contrato_id: _bajaCtr.id, motivo, confirmar: confirmar === true, justificada: !!((_bajaEl('baja-justificada') || {}).checked) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
@@ -338,6 +342,7 @@ async function ctrBajaVer() {
     const cort = (p.cortesia_baja || []);
     res.innerHTML = `
       <div style="font-size:12px;margin-bottom:8px">Para: <b>${_escCtr(p.correo && p.correo.para)}</b><br>Asunto: <b>${_escCtr(p.correo && p.correo.asunto)}</b></div>
+      <div style="font-size:12px;margin-bottom:8px;color:${p.justificada ? '#3ddc84' : '#ff6666'}">${p.justificada ? '🤝 Baja justificada: NO resta en el ranking.' : '⚠️ Resta −20 en el ranking.'}</div>
       <div style="font-size:12px;color:var(--ts);margin-bottom:8px">${cort.length ? `Se dan de baja de la lista de viajeros: ${cort.map((v) => `<b>${_escCtr(v.nombre)}</b> (${_escCtr(v.zona || '—')})`).join(', ')} — sus lugares regresan al inventario.` : 'No tenía cortesía asignada: no se mueve ningún boleto.'}</div>
       <div style="background:#fff;border-radius:8px;overflow:hidden;margin-bottom:12px">${(p.correo && p.correo.html) || ''}</div>
       ${j.ya_cancelado ? '<div style="font-size:12px;color:#ffb020;margin-bottom:8px">Este contrato ya estaba cancelado: si el correo no había salido, se reintenta.</div>' : ''}
@@ -361,6 +366,28 @@ async function ctrBajaConfirmar() {
     res.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Cancelar la colaboración y enviar el correo'; }
   }
+}
+
+// ═══ [CREA-BAJA-JUST-1 · 3-nov-2026] JUSTIFICAR UNA BAJA YA HECHA ═══
+// Palabra de Memo: «hay bajas que sí son permitidas … avisó con anticipación —
+// dame opción de darlas de baja sin penalización». Quita (o devuelve) los −20;
+// el ranking lo deriva solo. Sin correo: ya recibió el de su baja.
+async function ctrBajaJustificar(contratoId, justificada) {
+  const c = (typeof _contratosCache !== 'undefined' ? _contratosCache : []).find((x) => x.id === contratoId) || {};
+  const q = justificada
+    ? `¿Marcar la baja de ${c.creador_nombre || 'esta creadora'} como JUSTIFICADA? Se le quitan los −20 del ranking. No se le manda correo.`
+    : `¿Volver a contar los −20 a ${c.creador_nombre || 'esta creadora'}?`;
+  if (!confirm(q)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'contrato_baja_justificar', contrato_id: contratoId, justificada: justificada === true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    if (typeof showToast === 'function') showToast(justificada ? '🤝 Baja justificada: sin −20' : 'Los −20 vuelven a contar');
+    if (typeof cargarContratos === 'function') cargarContratos();
+    else if (typeof loadContratosList === 'function') loadContratosList();
+  } catch (e) { alert('No se pudo: ' + e.message); }
 }
 
 // ═══ [CREA-REVIVE-1 · 3-nov-2026] REVIVIR UNA COLABORACIÓN DADA DE BAJA ═══
@@ -573,7 +600,7 @@ async function ctrRankingAbrir() {
       const r = c.redes || {};
       return `<tr>
         <td style="font-weight:800;color:var(--ts)">${i + 1}</td>
-        <td><b>${_escCtr(c.nombre)}</b>${c.bajas ? ' <span style="color:#ff6666;font-size:10px;font-weight:800">⛔ ' + c.bajas + ' baja' + (c.bajas > 1 ? 's' : '') + '</span>' : ''}<br><span style="font-size:11px;color:var(--ts)">${r.instagram ? 'IG @' + _escCtr(r.instagram) + ' · ' : ''}${_escCtr(c.correo || '')}</span></td>
+        <td><b>${_escCtr(c.nombre)}</b>${c.bajas ? ' <span style="color:#ff6666;font-size:10px;font-weight:800">⛔ ' + c.bajas + ' baja' + (c.bajas > 1 ? 's' : '') + '</span>' : ''}${c.bajas_justificadas ? ' <span style="color:#3ddc84;font-size:10px;font-weight:800" title="Avisó con anticipación: no restan">🤝 ' + c.bajas_justificadas + ' justificada' + (c.bajas_justificadas > 1 ? 's' : '') + '</span>' : ''}<br><span style="font-size:11px;color:var(--ts)">${r.instagram ? 'IG @' + _escCtr(r.instagram) + ' · ' : ''}${_escCtr(c.correo || '')}</span></td>
         <td style="text-align:center">${c.colaboraciones}</td>
         <td style="text-align:center">${c.cumplidas}</td>
         <td style="text-align:center;font-size:11px"><span style="color:#3ddc84">${c.a_tiempo}</span> / <span style="color:#ffb020">${c.tarde}</span> / <span style="color:#ff5f56">${c.vencidos}</span></td>
@@ -583,7 +610,7 @@ async function ctrRankingAbrir() {
     }).join('');
     box.innerHTML = `<div class="card" style="padding:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>🏆 Ranking de creadoras</b><button class="btn btn-ghost btn-sm" onclick="document.getElementById('ctr-ranking').style.display='none'">Cerrar</button></div>
-      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Puntos: +${P.cumplida} colaboración cumplida · +${P.a_tiempo} por entrega a tiempo · ${P.tarde} tarde · ${P.vencido} vencida sin entregar · ${P.baja} dada de baja.</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Puntos: +${P.cumplida} colaboración cumplida · +${P.a_tiempo} por entrega a tiempo · ${P.tarde} tarde · ${P.vencido} vencida sin entregar · ${P.baja} dada de baja (0 si es justificada: avisó con anticipación).</div>
       <div class="table-wrap"><table><thead><tr><th>#</th><th>Creadora</th><th>Veces</th><th>Cumplidas</th><th>A tiempo / tarde / vencidas</th><th>Puntos</th><th>Último evento</th></tr></thead><tbody>${filas || '<tr><td colspan="7" style="color:var(--ts)">Sin creadoras todavía.</td></tr>'}</tbody></table></div>
     </div>`;
   } catch (e) { box.innerHTML = `<div style="color:#ff5f56;font-size:12px">No se pudo: ${_escCtr(e.message)}</div>`; }

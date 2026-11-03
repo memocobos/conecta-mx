@@ -120,10 +120,18 @@ ${faltan.length ? `<p style="margin:0 0 6px">Te falta:</p>${tablaEntregables(fal
 //   +10 colaboración cumplida (evento pasado y TODO lo vivo entregado)
 //   +3  entregable a tiempo · −3 entregado tarde · −5 vencido sin entregar
 //   −20 colaboración cancelada (dada de baja)
+//   [CREA-BAJA-JUST-1 · 3-nov-2026] palabra de Memo: «hay bajas que sí son
+//   permitidas … avisó con anticipación — dame opción de darlas de baja sin
+//   penalización». Una baja con `datos.cancelacion.justificada` NO resta: se
+//   cuenta aparte (`baja_justificada`) y `baja` queda en false para el ranking.
 const PUNTOS = { cumplida: 10, a_tiempo: 3, tarde: -3, vencido: -5, baja: -20 };
 function evaluarContrato(c, items, hoy) {
   hoy = hoy || hoyMx();
-  const r = { a_tiempo: 0, tarde: 0, vencido: 0, pendiente: 0, cumplida: false, baja: c.estado === 'cancelado', puntos: 0 };
+  const r = { a_tiempo: 0, tarde: 0, vencido: 0, pendiente: 0, cumplida: false, baja: false, baja_justificada: false, puntos: 0 };
+  if (c.estado === 'cancelado') {
+    const canc = c.datos && c.datos.cancelacion;
+    if (canc && canc.justificada === true) r.baja_justificada = true; else r.baja = true;
+  }
   const vivos = (items || []).filter((e) => e.estado !== 'descartado');
   vivos.forEach((e) => {
     if (e.estado === 'entregado') {
@@ -135,7 +143,7 @@ function evaluarContrato(c, items, hoy) {
     else r.pendiente++;
   });
   const pasado = c.evento_fecha && c.evento_fecha < hoy;
-  r.cumplida = !r.baja && c.estado === 'firmado' && pasado && vivos.length > 0 && vivos.every((e) => e.estado === 'entregado');
+  r.cumplida = !r.baja && !r.baja_justificada && c.estado === 'firmado' && pasado && vivos.length > 0 && vivos.every((e) => e.estado === 'entregado');
   r.puntos = r.a_tiempo * PUNTOS.a_tiempo + r.tarde * PUNTOS.tarde + r.vencido * PUNTOS.vencido
     + (r.cumplida ? PUNTOS.cumplida : 0) + (r.baja ? PUNTOS.baja : 0);
   return r;

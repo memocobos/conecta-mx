@@ -151,6 +151,7 @@ const ACCIONES = {
   // [CREA-BAJA-1] Dar de baja la colaboración de una creadora: escribe en su
   // contrato, le quita la cortesía y le MANDA UN CORREO. Solo Memo.
   contrato_cancelar: ['maestro_roshi'],
+  contrato_baja_justificar: ['maestro_roshi'],
   // [CREA-REVIVE-1] Deshacer la baja (al final sí cumplió). Solo Memo.
   contrato_revivir: ['maestro_roshi'],
 };
@@ -689,7 +690,24 @@ exports.handler = async (event) => {
       // previo). El correo no puede citarle cláusulas de un contrato que no
       // aceptó: dice que la invitación queda sin efecto.
       const sinFirma = !yaCancelado ? c.estado === 'pendiente' : !c.firmado_at;
-      const html = sinFirma
+      // [CREA-BAJA-JUST-1] baja JUSTIFICADA (avisó con anticipación): sin −20
+      // en el ranking y un correo AMABLE — no se le cita la cláusula de
+      // incumplimiento a quien cumplió avisando. En un 2º clic sobre uno ya
+      // cancelado manda lo que quedó escrito, no lo que diga este cuerpo.
+      const justificada = yaCancelado
+        ? !!(datos.cancelacion && datos.cancelacion.justificada === true)
+        : body.justificada === true;
+      const htmlJust = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
+<div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
+<div style="padding:20px">
+<p style="margin:0 0 12px;color:#111">Hola ${esc(nombre1)}:</p>
+<p style="margin:0 0 12px;color:#111">Gracias por avisarnos con anticipación que no podrás acompañarnos en <b>${esc(c.evento_nombre || 'el evento')}${fechaEv ? ` (${esc(fechaEv)})` : ''}</b>. Tu colaboración para este evento queda cancelada <b>sin ningún problema</b>, y esta baja <b>no afecta tu historial</b> con nosotros.</p>
+<p style="margin:0 0 8px;color:#111"><b>Motivo:</b> ${esc(motivo)}</p>
+<p style="margin:0 0 12px;color:#111">Como esta colaboración ya no se realizará, no recibirás los beneficios de este intercambio (${esc((Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join(', ') || 'boletos y kit')}) y <b>no tienes ningún pago ni reembolso pendiente</b> con nosotros.</p>
+<p style="margin:0 0 12px;color:#111">Nos encantará contar contigo en el siguiente evento.</p>
+<p style="margin:0;color:#111">¡Gracias!<br><b>Conecta Reynosa</b></p>
+</div></div>`;
+      const html = justificada ? htmlJust : sinFirma
         ? `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.55">
 <div style="background:#000;color:#fff;padding:16px 20px;font-weight:900;letter-spacing:.04em">CONECTA REYNOSA</div>
 <div style="padding:20px">
@@ -714,13 +732,15 @@ ${entregables}
 </div></div>`;
       const plan = {
         contrato: { id: c.id, nombre: c.creador_nombre, correo: c.creador_email, evento: c.evento_nombre, fecha: c.evento_fecha, estado: c.estado },
+        justificada,
+        puntos: justificada ? 'baja justificada: NO resta en el ranking' : 'resta −20 en el ranking',
         cortesia_baja: filas.map((v) => ({ id: v.id, nombre: v.nombre, zona: v.zona_boleto, boletos: v.boletos })),
         correo: { para: c.creador_email, asunto, html },
       };
       if (seco) return ok(headers, { seco: true, plan, ya_cancelado: yaCancelado });
 
       const hoy = new Date().toISOString();
-      const ahora = { motivo, por: jwtUserId, at: hoy };
+      const ahora = { motivo, por: jwtUserId, at: hoy, ...(justificada ? { justificada: true } : {}) };
       // 1) El contrato. Valor esperado en el filtro: dos clics no escriben dos veces.
       if (!yaCancelado) {
         const nuevosDatos = { ...datos, cancelacion: ahora, estado_previo: c.estado };
@@ -773,7 +793,38 @@ ${entregables}
           }
         }
       }
-      return ok(headers, { cancelado: true, ya_cancelado: yaCancelado, bajas, correo });
+      return ok(headers, { cancelado: true, ya_cancelado: yaCancelado, justificada, bajas, correo });
+    }
+
+    // ═══ [CREA-BAJA-JUST-1] (3-nov-2026) JUSTIFICAR UNA BAJA YA HECHA ═══
+    // Para bajas ya aplicadas (caso Renata, Frontera: avisó con anticipación).
+    // Marca/desmarca `datos.cancelacion.justificada` → el −20 se va o vuelve SOLO
+    // (lo deriva evaluarContrato). Cero correos: ya recibió el de su baja.
+    // Valor esperado `estado=eq.cancelado`; el cambio queda en un rastro anexado.
+    if (accion === 'contrato_baja_justificar') {
+      const contratoId = String(body.contrato_id || '').trim();
+      if (!UUID_RE.test(contratoId)) return bad(headers, 'contrato_id inválido');
+      if (typeof body.justificada !== 'boolean') return bad(headers, 'Falta justificada (true/false)');
+      const cr = await fetch(`${baseContratos}?id=eq.${contratoId}&select=id,plantilla,estado,datos&limit=1`, { headers: sbHeaders });
+      if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
+      const c = (await cr.json())[0];
+      if (!c) return bad(headers, 'Ese contrato no existe');
+      if (!['creadora', 'creadora_team'].includes(c.plantilla)) return bad(headers, 'Solo contratos de creadoras');
+      if (c.estado !== 'cancelado') return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ese contrato no está dado de baja' }) };
+      const datos = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+      const canc = (datos.cancelacion && typeof datos.cancelacion === 'object') ? datos.cancelacion : {};
+      if ((canc.justificada === true) === body.justificada) return ok(headers, { sin_cambio: true, justificada: body.justificada });
+      const rastro = Array.isArray(canc.justificaciones) ? canc.justificaciones : [];
+      const nuevaCanc = { ...canc, justificada: body.justificada, justificaciones: rastro.concat([{ justificada: body.justificada, por: jwtUserId, at: new Date().toISOString() }]) };
+      if (!body.justificada) delete nuevaCanc.justificada;
+      const pr = await fetch(`${baseContratos}?id=eq.${c.id}&estado=eq.cancelado`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ datos: { ...datos, cancelacion: nuevaCanc } }),
+      });
+      if (!pr.ok) return upstream(headers, await pr.text(), 'cambio del contrato');
+      const out = await pr.json();
+      if (!out.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato cambió mientras tanto; recarga' }) };
+      return ok(headers, { justificada: body.justificada });
     }
 
     // ═══ [CREA-REVIVE-1] (3-nov-2026) REVIVIR UNA COLABORACIÓN DADA DE BAJA ═══

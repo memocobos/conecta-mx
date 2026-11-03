@@ -188,6 +188,27 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🤝⏳ **CREA-BAJA-JUST-1 (3-nov-2026, en main local, cero SQL): baja
+  JUSTIFICADA — sin los −20 del ranking.** Palabra de Memo: *«hay bajas de
+  evento que sí son permitidas, como Renata … aviso que no iba a poder con
+  anticipación, dame opción de darlas de baja sin penalización»*. Dos puertas:
+  (1) casilla «🤝 Baja justificada» en el modal de ⛔ Dar de baja → escribe
+  `datos.cancelacion.justificada=true` y el correo sale AMABLE («gracias por
+  avisarnos con anticipación… no afecta tu historial», sin citar la cláusula 5
+  de incumplimiento); (2) botón «🤝 Sin −20» / «↩ Contar −20» en las bajas YA
+  hechas (acción `contrato_baja_justificar`, solo maestro_roshi, valor esperado
+  `estado=eq.cancelado`, cero correos, rastro `justificaciones[]` anexado, 2º
+  clic sin cambio). 🔒 El −20 NO se escribe: `evaluarContrato` lo deriva —
+  justificada → `baja:false, baja_justificada:true`, 0 puntos (solo el booleano
+  `true` justifica, un texto no). La lista proyecta `baja_justificada` y pinta
+  el sello «🤝 Justificada · sin −20»; el ranking la cuenta aparte. Caso
+  Renata Nesme · Frontera (cancelada 30-oct con el correo de siempre): se
+  justifica con el botón tras el push. `mide:crea-baja-just-1` **24** (sabotaje
+  a la derivación → 3 rojos → restaurado sha1 `5803f698`). Vecinos verdes:
+  crea-revive-1 24 (su ausencia «No se le manda correo» se acotó al bloque del
+  revive: la baja justificada SÍ lo dice — un grep de ausencia que se cazó solo)
+  · crea-2 27 · contrato-cliente-1 31 · capsule-ux-1 76. ⏳ Push de Memo.
+
 - 🐉⏳ **CREA-REVIVE-1 + 1b (3-nov-2026, en main local, cero SQL): revivir una
   colaboración de creadora dada de baja.** Palabra de Memo: *«a los dados de
   baja opción de revivirlos por si al final siempre sí lo hace la creadora, y de

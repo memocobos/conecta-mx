@@ -89,7 +89,7 @@ const llama = (rol, b) => H({ httpMethod: 'POST', headers: { origin: 'https://co
   const kh = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8'), kc = fs.readFileSync(path.join(RAIZ, 'kamehouse-contratos.js'), 'utf8');
   af(/ctrReviveAbrir\('\$\{_escCtr\(c\.id\)\}'\)/.test(kh), 'el renglón cancelado pinta 🐉 Revivir');
   af(/🐉 Revivir/.test(kh) && !/♻️ Revivir/.test(kh) && !/♻️/.test(kc.slice(kc.indexOf('function ctrReviveAbrir'), kc.indexOf('[CREA-SEG-2]'))), 'el dragón reemplazó al reciclaje');
-  af(/p\.correo\.html/.test(kc) && !/No se le manda correo/.test(kc), 'el modal enseña el correo antes de mandar');
+  af(/p\.correo\.html/.test(kc) && !/No se le manda correo/.test(kc.slice(kc.indexOf('function ctrReviveAbrir'), kc.indexOf('[CREA-SEG-2]')))  /* el bloque del revive, no todo el archivo: la baja justificada SÍ dice «no se le manda correo» */, 'el modal enseña el correo antes de mandar');
   af(/function ctrReviveAbrir\(/.test(kc) && /accion: 'contrato_revivir'/.test(kc), 'el modal llama a la acción');
 
   console.log(`\n${r ? '🔴' : '✅'} mide:crea-revive-1 · ${v} en verde · ${r} en rojo`);

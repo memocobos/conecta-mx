@@ -2121,6 +2121,19 @@ ${entregables}
       // ⚠️ Un abonado MAYOR que el total NO es un error: VJ-3 selló que los
       // saldos a favor son reales y no se corrigen. Se deja pasar a propósito.
 
+      // [ABONO-FOTO-3b · 3-nov-2026] CON comprobante, lo abonado entra como
+      // ABONO con su foto (no como pagado-antes, que no tiene ni fecha ni foto)
+      // y nace AQUÍ, ANTES del contrato: si naciera después, el contrato que
+      // sale en esta misma alta diría «pagado $0». La foto se valida ANTES de
+      // crear a nadie: un comprobante que no sirve no deja un viajero a medias.
+      let fotoAlta = null;
+      if (body.foto) {
+        fotoAlta = _decodeImagen(body.foto);
+        if (fotoAlta.error) return bad(headers, 'Comprobante inválido: ' + fotoAlta.error);
+        if (fotoAlta.tooBig) return bad(headers, 'El comprobante pesa demasiado (máx 6 MB)');
+        if (!(abonado > 0)) return bad(headers, 'Subiste un comprobante: pon en ABONADO el monto que ampara.');
+      }
+
       // [BOLETOS-1] Cuántos boletos trae esta persona. La pestaña lleva UNA
       // FILA POR BOLETO y el careo las funde por nombre, así que un alta puede
       // nacer con 4. Se valida aquí, en la puerta, como todo lo demás: un
@@ -2137,7 +2150,7 @@ ${entregables}
         tipo_paquete: paquete,
         zona_boleto: zona || null,
         total_contrato: total,
-        abonado_previo: abonado,
+        abonado_previo: body.foto ? 0 : abonado,
         tipo_viajero: 'cliente',
         boletos: nBoletos,
       };
@@ -2222,12 +2235,34 @@ ${entregables}
       // manualmente, el contrato ya es FUNDAMENTAL»). `contrato:false` lo apaga
       // para una captura que no debe avisar. La lib jamás lanza: el alta YA se
       // guardó y la respuesta DICE qué pasó con el contrato.
+      // [ABONO-FOTO-3b] El abono con su comprobante, ANTES del contrato. Si
+      // falla, el viajero YA existe: no se borra nada y la respuesta lo DICE
+      // con el monto (se registra por ➕ Abono). Sin correo de pago: es alta.
+      let abonoAlta = null, abonoError = null;
+      if (creado && fotoAlta) {
+        try {
+          const path = `${String(creado.evento_id || eventoId || 'sin-evento')}/${creado.id}/${_uuid()}.${fotoAlta.ext}`;
+          await _subirAbono(env, path, fotoAlta.bytes, fotoAlta.mime);
+          const ra = await fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero`, {
+            method: 'POST',
+            headers: { ...sbHeaders, Prefer: 'return=representation' },
+            body: JSON.stringify({
+              viajero_id: creado.id, monto: abonado, foto_path: path,
+              nota: 'Comprobante del alta manual',
+              capturado_por: (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || jwtUserId,
+            }),
+          });
+          if (!ra.ok) throw new Error(`abono ${ra.status}: ${await ra.text()}`);
+          abonoAlta = (await ra.json())[0] || null;
+        } catch (e) { abonoError = String((e && e.message) || e); }
+      }
+
       let contrato = null;
       if (creado && body.contrato !== false) {
         const { emitirContratos } = require('./_lib/contrato-cliente');
         contrato = await emitirContratos({ viajeroIds: [creado.id], creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
       }
-      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig, contrato });
+      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig, contrato, abono: abonoAlta, abono_error: abonoError, abono_monto: fotoAlta ? abonado : null });
     }
 
     // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────

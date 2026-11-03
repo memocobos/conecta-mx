@@ -2,6 +2,9 @@
 // acepta PDF, y DICE cuando no puede (antes: foto cruda de 4-8 MB que el gateway
 // rebotaba antes de la function, y errores tragados). Sin ancla — árbol.
 'use strict';
+process.env.JWT_SECRET = 'secreto-de-arnes';
+process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.falso.test';
+process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'svc';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const RAIZ = path.join(__dirname, '..');
 let v = 0, r = 0; const af = (c, m) => { if (c) v++; else { r++; console.log('  ✗ ' + m); } };
@@ -46,8 +49,47 @@ function mundo({ tipo, nombre, size, data, decodeFalla, imgFalla, pinta }) {
   console.log('[C] el alta manual');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
   af(/id="mig-foto" type="file"/.test(html), 'el formulario trae COMPROBANTE');
-  af(/abonoCrear\(\{ viajero_id: v\.id, monto: montoFoto, foto, nota: 'Comprobante del alta manual', avisar: false \}\)/.test(caps), 'con foto el abonado entra como abono con ticket, sin correo');
-  af(/abonado_previo: ''/.test(caps), 'y NO se cuenta dos veces como pagado-antes');
+  af(/d = Object\.assign\(\{\}, d, \{ foto \}\)/.test(caps) && !/abonoCrear\(\{ viajero_id: v\.id/.test(caps), 'la pantalla manda la foto DENTRO del alta (no un segundo abono después)');
+
+  console.log('[E] el alta con comprobante, por el handler REAL: el abono nace ANTES del contrato');
+  const INDEX = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+  const resp = (st, b) => ({ ok: st < 300, status: st, json: async () => (typeof b === 'string' ? JSON.parse(b) : b), text: async () => (typeof b === 'string' ? b : JSON.stringify(b)), headers: { get: () => null } });
+  let SEQ = [];
+  global.fetch = async (url, init) => {
+    init = init || {}; const m = (init.method || 'GET').toUpperCase(); const u = String(url);
+    if (u.includes('/index.html') || /conectareynosa\.mx\/?$/.test(u)) return resp(200, INDEX);
+    if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u', activo: true, rol: 'maestro_roshi' }]);
+    if (u.includes('/rest/v1/eventos_meta')) return resp(200, [{ slug: 'juniorh' }]);
+    if (u.includes('/rest/v1/stock_ajustes')) return resp(200, []);
+    if (u.includes('/storage/v1/object/')) { SEQ.push('storage:' + m); return resp(200, {}); }
+    if (u.includes('/rest/v1/abonos_viajero')) { SEQ.push('abonos:' + m); if (m === 'POST') { const f = Object.assign({ id: 'a-1' }, JSON.parse(init.body)); SEQ.abono = f; return resp(201, [f]); } return resp(200, SEQ.abono ? [SEQ.abono] : []); }
+    if (u.includes('/rest/v1/contratos_cliente')) { SEQ.push('contratos:' + m); return resp(200, []); }
+    if (u.includes('/rest/v1/viajeros_evento')) { if (m === 'POST') { const f = Object.assign({ id: '11111111-2222-3333-4444-555555555555' }, JSON.parse(init.body)); SEQ.push('viajero:POST'); SEQ.viajero = f; return resp(201, [f]); } return resp(200, SEQ.viajero ? [SEQ.viajero] : []); }
+    if (u.includes('api.resend.com')) { SEQ.push('resend'); return resp(200, { id: 'x' }); }
+    return resp(200, []);
+  };
+  const H = require(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js')).handler;
+  const { jwtSign } = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js'));
+  const tok = jwtSign({ id: 'u-roshi', rol: 'maestro_roshi', correo: 'memo@x.mx', nombre: 'Memo' }, process.env.JWT_SECRET, 3600);
+  const jpg = 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).toString('base64');
+  const migrar = (x) => H({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + tok },
+    body: JSON.stringify(Object.assign({ accion: 'viajero_migrar', evento_id: 'juniorh', nombre: 'Prueba Arnés', correo: 'prueba@x.mx', tipo_paquete: 'ride', total_contrato: 2700, abonado_previo: '500' }, x)) });
+  let res = await migrar({ foto: jpg });
+  let j = JSON.parse(res.body);
+  af(res.statusCode === 200 && SEQ.viajero && SEQ.viajero.abonado_previo === 0, 'con foto el viajero nace con pagado-antes 0 (no se cuenta dos veces): ' + res.statusCode + ' ' + res.body.slice(0, 120));
+  af(SEQ.abono && SEQ.abono.monto === 500 && /^juniorh\/11111111-2222-3333-4444-555555555555\/.+\.jpg$/.test(SEQ.abono.foto_path), 'nace UN abono de $500 con su foto: ' + JSON.stringify(SEQ.abono || null));
+  const iA = SEQ.indexOf('abonos:POST'), iC = SEQ.findIndex((x) => /^contratos/.test(x));
+  af(iA >= 0 && iC >= 0 && iA < iC, 'el abono se escribe ANTES de que el contrato se emita: ' + SEQ.join(' → ') + ' · contrato=' + JSON.stringify(j.contrato));
+  af(j.abono && !j.abono_error, 'la respuesta trae el abono y ningún error');
+  SEQ = [];
+  res = await migrar({ foto: jpg, abonado_previo: '' });
+  af(res.statusCode === 400 && !SEQ.includes('viajero:POST'), 'foto sin monto → 400 y NO nace el viajero');
+  SEQ = [];
+  res = await migrar({ foto: 'data:image/jpeg;base64,' + Buffer.from('<html>').toString('base64') });
+  af(res.statusCode === 400 && !SEQ.includes('viajero:POST'), 'comprobante basura → 400 y NO nace el viajero');
+  SEQ = [];
+  res = await migrar({});
+  af(res.statusCode === 200 && SEQ.viajero.abonado_previo === 500 && !SEQ.includes('abonos:POST'), 'regresión: SIN foto, todo como siempre (pagado-antes $500, cero abonos)');
 
   console.log('[D] el servidor');
   const s = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');

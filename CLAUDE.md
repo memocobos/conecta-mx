@@ -202,9 +202,13 @@ está caduco antes de escribirse.
   **Alta manual:** campo COMPROBANTE; con foto, lo ABONADO entra como abono con
   ticket (`abono_crear`, `avisar:false`) y NO como pagado-antes (que no tiene
   fecha ni foto); sin foto, igual que siempre. Si el abono falla tras crear al
-  viajero, se DICE («regístralo con ➕ Abono»). ⚠️ El contrato que sale en el
-  alta se emite antes del abono: su foto dice pagado $0. `mide:abono-foto-3`
-  **17**. Vecinos verdes: ticket-circuito-1 32 · capsule-ux-2 46 · capsule-ux-1
+  viajero, se DICE («regístralo con ➕ Abono»). 🔒 **ABONO-FOTO-3b (mismo día,
+  palabra de Memo «hay que reparar eso»):** el abono del alta lo crea el
+  SERVIDOR dentro de `viajero_migrar`, ANTES de `emitirContratos` — el contrato
+  ya no sale diciendo pagado $0; la foto se valida antes de crear a nadie.
+  `mide:abono-foto-3` **23** (bloque [E] por el handler real: orden viajero →
+  foto → abono → contrato; sabotaje invirtiendo el orden → rojo → restaurado
+  sha1 `d8ec0865`). Vecinos verdes: ticket-circuito-1 32 · capsule-ux-2 46 · capsule-ux-1
   76 · capsule-comp-1 16 · ride-sin-zona-1 9 · contrato-cliente-1 31 ·
   viajero-edita-1 67. ⏳ Push de Memo → que Bulma/Milk recarguen KameHouse.
 

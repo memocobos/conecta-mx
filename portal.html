@@ -3909,6 +3909,18 @@ function _migCtrHtml(t){
     + '<div style="font-size:13px;font-weight:800;margin-bottom:6px">📜 Tu contrato de viaje está pendiente de firma</div>'
     + cuerpo + '<div data-mig-msg style="font-size:12px;margin-top:6px"></div></div>';
 }
+// [FOTO-NEGRA-1] ¿El lienzo quedó sin pintar? (espejo de _reqLienzoVacio del
+// index): rejilla 8×8 toda transparente o casi negra = la foto no se dibujó.
+function _lienzoVacio(c){
+  try {
+    const w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data;
+    for (let iy = 0; iy < 8; iy++) for (let ix = 0; ix < 8; ix++) {
+      const x = Math.min(w - 1, Math.floor((ix + .5) * w / 8)), y = Math.min(h - 1, Math.floor((iy + .5) * h / 8)), k = (y * w + x) * 4;
+      if (d[k + 3] > 0 && (d[k] > 12 || d[k + 1] > 12 || d[k + 2] > 12)) return false;
+    }
+    return true;
+  } catch (_) { return false; }
+}
 // La foto se lee como data: (el CSP no permite blob: — REQ-FOTO-1) y se baja a
 // 1600px JPEG: una INE legible pesa ~300 KB así.
 function _ctrFoto(file){
@@ -3924,6 +3936,8 @@ function _ctrFoto(file){
           const MAX = 1600, w = img.naturalWidth, h = img.naturalHeight, e = Math.min(1, MAX / Math.max(w, h));
           const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w * e)); cv.height = Math.max(1, Math.round(h * e));
           cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          // [FOTO-NEGRA-1] un lienzo sin pintar sale NEGRO en JPEG: jamás se manda.
+          if (_lienzoVacio(cv)) return rej(new Error('Tu foto no se pudo procesar. Toma una captura de pantalla de la INE y súbela.'));
           res(cv.toDataURL('image/jpeg', 0.85));
         } catch (_) { rej(new Error('No se pudo procesar la foto')); }
       };
@@ -4061,6 +4075,11 @@ async function _migPagoSubir(id, btn){
             const cv = document.createElement('canvas');
             cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
             cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            // [FOTO-NEGRA-1] lienzo sin pintar → el original si cabe, si no, captura.
+            if (_lienzoVacio(cv)) {
+              if (/^data:image\/(jpeg|png|webp)/i.test(dataUrl) && dataUrl.length <= 4.6 * 1024 * 1024) return res(dataUrl);
+              return rej(new Error('Tu foto no se pudo procesar. Toma una captura de pantalla del comprobante y súbela.'));
+            }
             res(cv.toDataURL('image/jpeg', 0.85));
           } catch (e) { rej(e); }
         };

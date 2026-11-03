@@ -7075,6 +7075,19 @@ function _reqForma(f){
 }
 // Imagen → JPEG a máx 1600px antes de viajar (un ticket fotografiado pesa MB
 // y a 1600px sigue legible). PDF pasa tal cual si cabe. Devuelve Promise.
+// [FOTO-NEGRA-1] ¿El lienzo quedó sin pintar? Muestrea una rejilla 8×8: si
+// TODO es transparente o casi negro, la foto no se dibujó (un comprobante real
+// nunca es negro entero). Lienzo ilegible (getImageData falla) → se da por bueno.
+function _reqLienzoVacio(c){
+  try{
+    var w=c.width,h=c.height,d=c.getContext('2d').getImageData(0,0,w,h).data;
+    for(var iy=0;iy<8;iy++)for(var ix=0;ix<8;ix++){
+      var x=Math.min(w-1,Math.floor((ix+.5)*w/8)),y=Math.min(h-1,Math.floor((iy+.5)*h/8)),k=(y*w+x)*4;
+      if(d[k+3]>0&&(d[k]>12||d[k+1]>12||d[k+2]>12))return false;
+    }
+    return true;
+  }catch(e){return false;}
+}
 function _reqArchivoB64(file){
   return new Promise(function(res,rej){
     if(!file)return res(null);
@@ -7097,15 +7110,31 @@ function _reqArchivoB64(file){
     fr.onerror=function(){rej(new Error('No se pudo leer tu foto'));};
     fr.onload=function(){
       var img=new Image();
-      img.onload=function(){
+      var original=String(fr.result||'');
+      var dibujar=function(){
         try{
           var MAX=1280,w=img.naturalWidth,h=img.naturalHeight;
           var esc=Math.min(1,MAX/Math.max(w,h));
           var c=document.createElement('canvas');
           c.width=Math.max(1,Math.round(w*esc));c.height=Math.max(1,Math.round(h*esc));
           c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+          // [FOTO-NEGRA-1] Medido el 2-nov: 6 comprobantes de un mismo celular
+          // llegaron como JPEG de 7,508 bytes idénticos = un lienzo VACÍO (el
+          // navegador no alcanzó a pintar la foto y el canvas transparente sale
+          // NEGRO en JPEG). Se revisa el lienzo antes de mandarlo: si salió
+          // vacío/negro, se manda el archivo ORIGINAL si cabe (el servidor revisa
+          // los bytes) y si no, se pide captura — jamás se manda un negro.
+          if(_reqLienzoVacio(c)){
+            if(/^data:image\/(jpeg|png|webp)/i.test(original)&&original.length<=4.6*1024*1024)return res(original);
+            return rej(new Error('Tu foto no se pudo procesar. Toma una captura de pantalla del comprobante y súbela.'));
+          }
           res(c.toDataURL('image/jpeg',.78));
         }catch(e){rej(new Error('No se pudo procesar tu foto'));}
+      };
+      // decode() espera a que la foto esté pintable de verdad (iPhone a veces
+      // dispara onload antes); sin decode, el camino de siempre.
+      img.onload=function(){
+        if(img.decode)img.decode().then(dibujar,dibujar);else dibujar();
       };
       // HEIC u otro formato que el navegador no sabe abrir: se dice qué hacer.
       img.onerror=function(){rej(new Error('Ese formato de foto no se pudo abrir. Toma una captura de pantalla del comprobante y súbela.'));};

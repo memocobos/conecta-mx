@@ -188,6 +188,26 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🖤⏳ **FOTO-NEGRA-1 (3-nov-2026, en main local, cero SQL): un comprobante ya
+  no puede llegar NEGRO.** Reporte de Ximena: el 📎 de Aaron Muñoz / Karla
+  (FR 11-ene, R-B3DRX) abría una foto negra. Medido en el bucket: **6 objetos
+  `req/` de 7,508 bytes IDÉNTICOS** (2-nov 21:50→22:50) — un lienzo que el
+  navegador no alcanzó a pintar (transparente → negro en JPEG); los 5 huérfanos
+  de las 21:50-22:02 son los intentos de la clienta de REQ-LENTO-1 (la misma
+  persona). Hoy, en `_reqArchivoB64` del index: se espera `img.decode()` antes
+  de dibujar y `_reqLienzoVacio` (rejilla 8×8 transparente o casi negra) frena
+  el envío → manda el archivo ORIGINAL si cabe (jpeg/png/webp ≤4.6 MB, el
+  servidor revisa bytes) o pide captura. Espejo `_lienzoVacio` en el Portal
+  (comprobante de pago y la INE del contrato). ⚠️ El comprobante real de R-B3DRX
+  NO existe en ningún lado: se le pide por WhatsApp. ⚠️ Los lectores de foto de
+  KameHouse (Capsule, reportes, radio, esferas) no se tocaron: son celulares del
+  equipo — tuerca propia si muerde. Vecinos verdes: req-b1 52 · pagos-portal-2
+  38 · contrato-cliente-2 19 · fecha3-1 33. ⏳ Push de Memo.
+  **De paso (palabra de Ximena vía Memo):** R-W2CD4 — el abono de $600 de Carlos
+  Alexis Solis se repartió $300/$300 con Damileth Briones (PATCH con valor
+  esperado + abono nuevo con el mismo comprobante, notas anexadas). El desglose
+  declarado por el cliente ([600,0]) no se tocó.
+
 - ✉️⏳ **CORREO-PUNTOS-1 (3-nov-2026, en main local, cero SQL): el correo con
   puntos raros ya no pasa.** Caso Mia (NSQK R-X4NMC): reservó con
   «miaa..galvarado002@gmail.com», se aprobó y NO le llegó nada — ni

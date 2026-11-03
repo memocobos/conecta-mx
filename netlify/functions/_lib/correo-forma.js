@@ -11,8 +11,40 @@
 // =============================================================================
 
 // Formato básico: algo@algo.tld con TLD de 2+ letras, sin espacios.
+// [CORREO-PUNTOS-1, 3-nov-2026] …y SIN PUNTOS RAROS: dos puntos seguidos, o un
+// punto al empezar/terminar el usuario o el dominio, no existen en un correo
+// real (RFC 5321) — Resend lo rechaza y la persona se queda sin confirmación
+// SIN que nadie se entere. Caso real: «miaa..galvarado002@gmail.com» (Mia,
+// NSQK R-X4NMC) se aprobó y no le llegó nada.
 function correoFormatoValido(correo) {
-  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
+  const c = String(correo == null ? '' : correo).trim();
+  if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(c)) return false;
+  return !puntosRaros(c);
+}
+
+// ¿Trae puntos que ningún buzón acepta? (dos seguidos, o punto en la orilla
+// del usuario o del dominio).
+function puntosRaros(correo) {
+  const c = String(correo == null ? '' : correo).trim();
+  const at = c.lastIndexOf('@');
+  if (at < 0) return false;
+  const u = c.slice(0, at), d = c.slice(at + 1);
+  return /\.\./.test(c) || u.startsWith('.') || u.endsWith('.') || d.startsWith('.') || d.endsWith('.');
+}
+
+// EL PORQUÉ, EN PALABRAS: '' si el correo es usable; si no, qué tiene. Es lo
+// que el formulario del sitio, el servidor y la bandeja le DICEN a la persona —
+// «no se ve bien» a secas manda a adivinar.
+function problemaCorreo(correo) {
+  const c = String(correo == null ? '' : correo).trim();
+  if (!c) return 'falta el correo';
+  if (/\s/.test(c)) return 'tiene espacios';
+  if ((c.match(/@/g) || []).length !== 1) return 'le falta la @ (o trae más de una)';
+  if (/\.\./.test(c)) return 'tiene dos puntos seguidos (..)';
+  if (puntosRaros(c)) return 'tiene un punto pegado a la @ o en una orilla';
+  if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(c)) return 'no termina como correo (ej. @gmail.com)';
+  if (tldClaramenteMalo(c)) return 'termina en «.' + c.slice(c.lastIndexOf('.') + 1) + '» — ¿quisiste decir «.com»?';
+  return '';
 }
 
 // TLD claramente mal escrito (típico de ".com" mal tecleado). Atrapa el caso que
@@ -48,4 +80,4 @@ function tallaNormalizada(t) {
   return TALLAS_VALIDAS.includes(v) ? v : null;
 }
 
-module.exports = { correoFormatoValido, tldClaramenteMalo, llaveCorreo, esCorreoUsable, tallaNormalizada, TALLAS_VALIDAS };
+module.exports = { correoFormatoValido, puntosRaros, problemaCorreo, tldClaramenteMalo, llaveCorreo, esCorreoUsable, tallaNormalizada, TALLAS_VALIDAS };

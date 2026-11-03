@@ -7126,6 +7126,22 @@ function _reqMsg(t,esError){
   var m=document.getElementById('req-msg');
   if(m){m.textContent=t;m.style.color=esError?'#ff6b6b':'#88ea4e';}
 }
+// [CORREO-PUNTOS-1] ESPEJO con nombre de problemaCorreo (_lib/correo-forma, el
+// dueño — el servidor lo vuelve a preguntar). El caso que lo pidió: «miaa..x@gmail.com»
+// pasó, se aprobó y la clienta no recibió nada. Devuelve '' si el correo sirve.
+function _reqCorreoProblema(c){
+  c=String(c==null?'':c).trim();
+  if(!c)return 'falta el correo';
+  if(/\s/.test(c))return 'tiene espacios';
+  if((c.match(/@/g)||[]).length!==1)return 'le falta la @ (o trae más de una)';
+  if(/\.\./.test(c))return 'tiene dos puntos seguidos (..)';
+  var at=c.lastIndexOf('@'),u=c.slice(0,at),d=c.slice(at+1);
+  if(u.charAt(0)==='.'||u.slice(-1)==='.'||d.charAt(0)==='.'||d.slice(-1)==='.')return 'tiene un punto pegado a la @ o en una orilla';
+  if(!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(c))return 'no termina como correo (ej. @gmail.com)';
+  var tld=c.slice(c.lastIndexOf('.')+1);
+  if(['con','cm','comm','ocm'].indexOf(tld.toLowerCase())>=0)return 'termina en «.'+tld+'» — ¿quisiste decir «.com»?';
+  return '';
+}
 function _reqEnviar(){
   if(_reqEstado.enviando)return;
   if(!cur||!selPkg)return _reqMsg('Primero completa tu cotización arriba',true);
@@ -7134,7 +7150,8 @@ function _reqEnviar(){
   var correo=(document.getElementById('req-correo')||{value:''}).value.trim();
   if(nombre.length<2)return _reqMsg('Escribe tu nombre completo',true);
   if(cel.length!==10)return _reqMsg('Tu WhatsApp va a 10 dígitos, sin lada de país',true);
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))return _reqMsg('Escribe tu correo: ahí te llega tu acceso para ver tu plan',true);
+  if(!correo)return _reqMsg('Escribe tu correo: ahí te llega tu acceso para ver tu plan',true);
+  if(_reqCorreoProblema(correo))return _reqMsg('Revisa tu correo: '+_reqCorreoProblema(correo),true);
   var viaje=_reqPideViaje(), talla='', emer='';
   if(viaje){
     talla=(document.getElementById('req-talla')||{value:''}).value;
@@ -7147,7 +7164,7 @@ function _reqEnviar(){
   for(var ai=0;ai<acomp.length;ai++){
     var q=' del acompañante '+(ai+1);
     if(acomp[ai].nombre.length<2)return _reqMsg('Escribe el nombre completo'+q,true);
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acomp[ai].correo))return _reqMsg('Revisa el correo'+q,true);
+    if(_reqCorreoProblema(acomp[ai].correo))return _reqMsg('Revisa el correo'+q+': '+_reqCorreoProblema(acomp[ai].correo),true);
     if(viaje){
       if(acomp[ai].celular.length!==10)return _reqMsg('El WhatsApp'+q+' va a 10 dígitos',true);
       if(!acomp[ai].talla_playera)return _reqMsg('Elige la talla de playera'+q,true);

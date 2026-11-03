@@ -290,9 +290,14 @@ function _reqBdjCard(r) {
   const dup = Array.isArray(r.dup_de) && r.dup_de.length
     ? `<div style="margin:6px 0;padding:6px 10px;border:1px solid var(--red);border-radius:8px;font-size:11px;color:var(--red)">⚠️ Posible duplicado: este celular/correo ya tiene ${r.dup_de.map((d) => `<b>${_reqBdjEsc(d.folio)}</b> (${_reqBdjEsc(d.estado)})`).join(', ')} en este mismo evento. Compara los comprobantes antes de aprobar.</div>`
     : '';
+  // [CORREO-PUNTOS-1] Correo con forma rota (lo nombra el servidor): sin
+  // arreglarlo, al aprobar NO le llega ni la confirmación ni el contrato.
+  const malCorreo = Array.isArray(r.correo_problema) && r.correo_problema.length
+    ? `<div style="margin:6px 0;padding:6px 10px;border:1px solid var(--red);border-radius:8px;font-size:11px;color:var(--red)">⚠️ <b>Correo mal escrito:</b> ${r.correo_problema.map((m) => `${_reqBdjEsc(m.quien)} — «${_reqBdjEsc(m.correo)}» ${_reqBdjEsc(m.problema)}`).join(' · ')}. Si apruebas así, <b>no le llega la confirmación ni el contrato</b>: pídele el correo bueno por WhatsApp y corrígelo después en ✏️ de su viajero.</div>`
+    : '';
   return `
   <div class="rq-card is-${cls}" id="req-card-${r.id}">
-    ${dup}
+    ${dup}${malCorreo}
     <div class="rq-head">
       <div class="rq-av">${_reqBdjEsc(ini)}</div>
       <div class="rq-who">

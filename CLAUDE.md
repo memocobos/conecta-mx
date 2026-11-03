@@ -188,6 +188,26 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✉️⏳ **CORREO-PUNTOS-1 (3-nov-2026, en main local, cero SQL): el correo con
+  puntos raros ya no pasa.** Caso Mia (NSQK R-X4NMC): reservó con
+  «miaa..galvarado002@gmail.com», se aprobó y NO le llegó nada — ni
+  confirmación ni contrato — sin que nadie se enterara. Hoy `_lib/correo-forma`
+  (el dueño) rechaza dos puntos seguidos y punto en la orilla del usuario o del
+  dominio, y `problemaCorreo(c)` dice el PORQUÉ en palabras («tiene dos puntos
+  seguidos (..)», «termina en .con — ¿quisiste decir .com?»). Lo preguntan:
+  `requisicion-crear` (titular y acompañantes, 400 con el porqué), el form del
+  index (espejo con nombre `_reqCorreoProblema`, careado = dueño) y la bandeja
+  (`correo_problema` → aviso rojo «no le llega la confirmación ni el contrato»).
+  Como `esCorreoUsable` bebe de ahí, puente/invitación/correos también lo
+  saltan. Medido: 0 de 1,790 correos del padrón quedan fuera (Mia ya corregida
+  a mano el 3-nov: viajero, requisición y contrato; sus 2 correos reenviados y
+  asentados — la ficha `clientes` del Portal conserva el viejo: el trigger
+  `clientes_bloquear_columnas_sensibles` no deja cambiarlo; su viaje lo ve por
+  `viajeros_evento`). `mide:correo-puntos-1` **20**. Vecinos verdes: req-b1 52 ·
+  acomp-1 67 · acomp-2 43 · confirma-1 28 · rechazo-1 71 · mig-1d-ii 46 ·
+  puente-portal 21 · req-corrige-1 40 · req-2027-2 22 · contrato-cliente-1 31 ·
+  portal-solo-1 89. ⏳ Push de Memo.
+
 - 📸⏳ **PORTAL-RECUERDO-1 (2-nov-2026, en main local, cero SQL, cero dinero):
   los viajes PASADOS se publican como RECUERDO.** Palabra de Memo (con Humbe
   7-feb en la bandeja, «Sin total de contrato»): *«son tours pasados… ya no

@@ -256,7 +256,26 @@ exports.handler = async (event) => {
         }
       }
     } catch (_) { /* el aviso no tumba la bandeja; la autoridad es el candado de aprobar */ }
-    return j(200, headers, { ok: true, requisiciones: rows.map((x) => dups[x.id] ? Object.assign({}, x, { dup_de: dups[x.id] }) : x), pendientes: pend });
+    // [CORREO-PUNTOS-1] El correo con forma rota se NOMBRA antes de aprobar
+    // (caso Mia: «miaa..x@gmail.com» se aprobó y no le llegó ni la confirmación
+    // ni el contrato). Lo decide el dueño de la forma; la bandeja solo pinta.
+    const { problemaCorreo } = require('./_lib/correo-forma');
+    const malCorreo = (x) => {
+      const out = [];
+      if (x.correo) { const p = problemaCorreo(x.correo); if (p) out.push({ quien: x.nombre || 'titular', correo: x.correo, problema: p }); }
+      (Array.isArray(x.acompanantes) ? x.acompanantes : []).forEach((a, i) => {
+        const p = a && a.correo ? problemaCorreo(a.correo) : '';
+        if (p) out.push({ quien: (a && a.nombre) || ('acompañante ' + (i + 1)), correo: a.correo, problema: p });
+      });
+      return out.length ? out : null;
+    };
+    return j(200, headers, { ok: true, requisiciones: rows.map((x) => {
+      const extra = {};
+      if (dups[x.id]) extra.dup_de = dups[x.id];
+      const mc = malCorreo(x);
+      if (mc) extra.correo_problema = mc;
+      return Object.keys(extra).length ? Object.assign({}, x, extra) : x;
+    }), pendientes: pend });
   }
 
   // ── [PORTAL-EDIT-1] solicitudes de cambio del Portal ─────────────────────

@@ -38,7 +38,7 @@
 const { corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 const { paqueteVendibleEnSitio } = require('./_lib/paquete-sitio');   // [REQ-2027-1]
-const { tallaNormalizada } = require('./_lib/correo-forma');
+const { tallaNormalizada, problemaCorreo } = require('./_lib/correo-forma');
 
 const BUCKET = 'abonos-viajeros'; // el de los abonos, a propósito — ver encabezado
 const FORMAS_PAGO = ['transferencia', 'deposito', 'oxxo', 'link_pago'];
@@ -110,8 +110,9 @@ exports.handler = async (event) => {
   const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const correo = String(body.correo || '').trim().toLowerCase().slice(0, 120);
   if (!correo) return json(400, headers, { ok: false, error: 'Escribe tu correo: ahí te llega tu acceso para ver tu plan' });
-  if (!RE_CORREO.test(correo)) {
-    return json(400, headers, { ok: false, error: 'Ese correo no se ve bien — revísalo' });
+  // [CORREO-PUNTOS-1] el dueño de la forma decide, y el porqué se DICE.
+  if (!RE_CORREO.test(correo) || problemaCorreo(correo)) {
+    return json(400, headers, { ok: false, error: 'Revisa tu correo: ' + (problemaCorreo(correo) || 'no se ve bien') });
   }
 
   const forma_pago = String(body.forma_pago || '').trim();
@@ -173,7 +174,7 @@ exports.handler = async (event) => {
       if (n.length < 2) return json(400, headers, { ok: false, error: `Escribe el nombre completo del acompañante ${i + 1}` });
       let c = String(a.correo || '').trim().toLowerCase().slice(0, 120);
       if (!c) c = correo;
-      if (!RE_CORREO.test(c)) return json(400, headers, { ok: false, error: `El correo del acompañante ${i + 1} no se ve bien — revísalo` });
+      if (!RE_CORREO.test(c) || problemaCorreo(c)) return json(400, headers, { ok: false, error: `Revisa el correo del acompañante ${i + 1}: ${problemaCorreo(c) || 'no se ve bien'}` });
       const fila = { nombre: n, correo: c };
       // [ACOMP-1b] celular, talla y emergencia de cada acompañante.
       const cA = leerTel(a.celular, `el WhatsApp del acompañante ${i + 1}`);

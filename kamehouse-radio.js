@@ -1666,9 +1666,13 @@ async function _cbApi(body) {
 function cabinaWsUrl() { return 'wss://radio.conectareynosa.mx/webdj/radioconecta/'; }
 // El hello del protocolo webcast (webcast.js): mime + credenciales del locutor
 // + la ficha del audio. Sin user/password AzuraCast rechaza la conexión.
-function cabinaHello(usuario, contrasena, sampleRate) {
+// [CABINA-ESTABLE-1] Al aire a 128 kbps (antes 192): la voz se oye igual, gasta
+// un tercio menos de internet de subida y de computadora. La estación re-codifica
+// a su propio mount de 192 de todos modos.
+const CAB_AIRE_KBPS = 128;
+function cabinaHello(usuario, contrasena, sampleRate, kbps) {
   return { type: 'hello', data: { mime: 'audio/mpeg', user: String(usuario || ''), password: String(contrasena || ''),
-    audio: { channels: 2, samplerate: Number(sampleRate) || 44100, bitrate: 192, encoder: 'lamejs' } } };
+    audio: { channels: 2, samplerate: Number(sampleRate) || 44100, bitrate: Number(kbps) || CAB_AIRE_KBPS, encoder: 'lamejs' } } };
 }
 // [KAIO-CABINA-6] La METADATA del show viaja por el MISMO webcast, después del
 // hello. Sin ella AzuraCast sigue reportando la última canción del AutoDJ y la
@@ -1968,14 +1972,107 @@ function _cbOyentesStart() {
       const n = (d && d.listeners && Number(d.listeners.current)) || 0;
       const live = !!(d && d.live && d.live.is_live);
       el.textContent = '👥 ' + n + (n === 1 ? ' oyente' : ' oyentes') + (live ? ' · la estación te tiene al aire ✓' : '');
+      _cbVigilaEstacion(live);
     }).catch(() => {});   // un latido fallido no borra el anterior ni habla
   };
   tick();
   _cb.oyTimer = setInterval(tick, 15000);
 }
+// [CABINA-ESTABLE-1] «La estación te soltó» se DICE. Medido el 3-nov: la radio
+// regresó a la música automática con el locutor creyéndose al aire. Pasado el
+// arranque (liquidsoap tarda en reportar), dos latidos seguidos sin is_live
+// con el envío abierto = la estación no está recibiendo el audio.
+function cabEstacionSolto(liveFallas, segAlAire) { return Number(segAlAire) > 35 && Number(liveFallas) >= 2; }
+function _cbVigilaEstacion(live) {
+  if (!_cb.aireDesde) return;
+  if (live) {
+    _cb.liveFallas = 0;
+    if (_cb.liveAvisado) { _cb.liveAvisado = false; _cbMsg('cab-msg', '✓ La estación te volvió a tomar: estás al aire.'); }
+    return;
+  }
+  _cb.liveFallas = (_cb.liveFallas || 0) + 1;
+  if (!_cb.liveAvisado && cabEstacionSolto(_cb.liveFallas, (Date.now() - _cb.aireDesde) / 1000)) {
+    _cb.liveAvisado = true;
+    _cbMsg('cab-msg', '⚠️ La estación NO está recibiendo tu audio: la radio regresó a la música automática. Casi siempre es el internet de subida. Revisa tu conexión; si en unos segundos no regresa, corta y vuelve a salir al aire.', true);
+  }
+}
 function _cbOyentesStop() {
   if (_cb.oyTimer) { clearInterval(_cb.oyTimer); _cb.oyTimer = null; }
   const el = _cbEl('cab-oyentes'); if (el) el.textContent = '';
+}
+// ── [CABINA-ESTABLE-1 · 3-nov-2026] El envío FUERA del hilo de la pantalla ──
+// Medido en la prueba del 3-nov: la estación soltó al locutor y regresó el
+// AutoDJ varias veces (23:13 y 23:16:50–23:17:02), justo después de bajar
+// canciones del catálogo estando al aire. La mezcla se codificaba en un
+// ScriptProcessor, que corre en el hilo de la PANTALLA: cualquier trabajo de
+// Kaio-sama atrasaba el envío y la estación se quedaba sin audio.
+// Hoy, donde el navegador lo permite (Chrome/Edge/Safari actuales): un
+// AudioWorklet (/cabina-captura.js, hilo de audio) junta la mezcla y la manda
+// por un MessagePort DIRECTO a un Worker (/cabina-envio.js) que codifica y
+// envía. El hilo de la pantalla solo recibe un latido por segundo.
+// Si el navegador no puede (o el módulo no carga), cae al camino de siempre
+// — el ScriptProcessor — y se DICE: transmitir no se frena por esto.
+function _cbHiloPosible(ctx) {
+  return !!(ctx && ctx.audioWorklet && typeof AudioWorkletNode === 'function' && typeof Worker === 'function' && typeof MessageChannel === 'function');
+}
+async function _cbHiloAbrir(ctx, orden) {
+  if (!_cb.workletListo) { await ctx.audioWorklet.addModule('/cabina-captura.js'); _cb.workletListo = true; }
+  const worker = new Worker('/cabina-envio.js');
+  const canal = new MessageChannel();
+  const node = new AudioWorkletNode(ctx, 'cabina-captura', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: 'explicit' });
+  const sink = ctx.createGain(); sink.gain.value = 0;   // un nodo suelto no procesa; a destination directo duplicaría el monitor
+  node.port.postMessage({ puerto: canal.port1 }, [canal.port1]);
+  worker.postMessage(Object.assign({ puerto: canal.port2, sampleRate: ctx.sampleRate }, orden), [canal.port2]);
+  _cb.master.connect(node); node.connect(sink); sink.connect(ctx.destination);
+  return { worker, node, sink };
+}
+function _cbHiloSoltar(h) {
+  if (!h) return;
+  try { h.node.port.postMessage({ parar: true }); } catch (e) {}
+  try { _cb.master.disconnect(h.node); } catch (e) {}
+  try { h.node.disconnect(); h.sink.disconnect(); } catch (e) {}
+}
+// El vigilante de SILENCIO (KAIO-CABINA-3), un dueño para los dos caminos.
+// [KAIO-CABINA-3, medido en la primera transmisión real: 12.7 s de stream con
+// pico 0.0000] Un micrófono vivo mete ruido de piso aunque nadie hable — el
+// cero digital sostenido es un track muerto o una ganancia en cero, y desde la
+// cabina no se oye (el monitor no toca el mic a propósito).
+function _cbVigilaSilencio(pico) {
+  if (pico < 0.0004) {
+    if (!_cb.silencioDesde) _cb.silencioDesde = Date.now();
+    else if (!_cb.silencioAvisado && Date.now() - _cb.silencioDesde > 7000) {
+      _cb.silencioAvisado = true;
+      _cbMsg('cab-msg', '⚠️ Estás AL AIRE pero la radio está recibiendo PURO SILENCIO desde hace varios segundos. Si tu micrófono está activo, Chrome está capturando un micrófono muerto: elige otro en el selector de micrófono, y en Mac revisa Ajustes del Sistema → Privacidad y seguridad → Micrófono → que tu navegador esté activado.', true);
+    }
+  } else if (_cb.silencioDesde) {
+    _cb.silencioDesde = 0;
+    if (_cb.silencioAvisado) { _cb.silencioAvisado = false; _cbMsg('cab-msg', '✓ Ya entra audio a la transmisión.'); }
+  }
+}
+// [CABINA-ESTABLE-1] El INTERNET DE SUBIDA se vigila: la cola del WebSocket son
+// bytes que ya se codificaron y todavía no salen. Más de ~3 s de audio
+// atorados dos latidos seguidos = la subida no alcanza y la radio se va a oír
+// cortada. Se DICE con remedio, y se dice también cuando se pone al día.
+function cabColaExcedida(colaBytes, kbps) { return Number(colaBytes) > (Number(kbps) || CAB_AIRE_KBPS) * 125 * 3; }
+function _cbVigilaCola(colaBytes) {
+  if (cabColaExcedida(colaBytes, CAB_AIRE_KBPS)) {
+    _cb.colaMal = (_cb.colaMal || 0) + 1;
+    if (_cb.colaMal >= 2 && !_cb.colaAvisado) {
+      _cb.colaAvisado = true;
+      _cbMsg('cab-msg', '⚠️ Tu internet de SUBIDA no está alcanzando: el audio se está atorando antes de llegar a la estación y la radio se va a oír cortada. Conecta la computadora por cable o acércate al módem, y cierra lo que esté usando internet (videos, descargas, otra pestaña con la radio).', true);
+    }
+  } else {
+    _cb.colaMal = 0;
+    if (_cb.colaAvisado) { _cb.colaAvisado = false; _cbMsg('cab-msg', '✓ El envío se puso al día.'); }
+  }
+}
+function _cbAlAireUI(btn) {
+  _cb.aireDesde = Date.now();
+  const est = _cbEl('cab-estado');
+  if (est) { est.textContent = '🔴 AL AIRE'; est.style.background = 'var(--red)'; est.style.color = '#fff'; }
+  if (btn) { btn.disabled = false; btn.textContent = '⏹ Cortar transmisión'; }
+  _cbMsg('cab-msg', 'Al aire. Lo que suena en la mezcladora está saliendo en la radio.' + (_cb.hilo ? '' : ' (Este navegador manda el audio por el camino viejo: evita bajar canciones mientras transmites.)'));
+  _cbOyentesStart();   // [KAIO-CABINA-8] oyentes en vivo mientras dure el aire
 }
 async function cabAire() {
   if (_cb.ws) { cabCortar('Cortaste la transmisión'); return; }
@@ -1986,7 +2083,6 @@ async function cabAire() {
   const btn = _cbEl('cab-aire');
   if (btn) btn.disabled = true;
   try {
-    await _cbCargarLame();
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
     _cbMsg('cab-msg', 'Conectando con la estación…');
@@ -1997,12 +2093,50 @@ async function cabAire() {
     let cart6 = null;
     const pCart6 = fetch('/.netlify/functions/radio-cartelera')
       .then((r) => r.json()).then((j) => { if (j && j.ok) cart6 = j; }).catch(() => {});
+    _cb.silencioDesde = 0; _cb.silencioAvisado = false; _cb.colaMal = 0; _cb.colaAvisado = false; _cb.liveFallas = 0; _cb.liveAvisado = false;
+
+    // [CABINA-ESTABLE-1] El camino nuevo: captura en el hilo de audio, envío en un Worker.
+    if (_cbHiloPosible(ctx)) {
+      let h = null;
+      try {
+        h = await _cbHiloAbrir(ctx, { tipo: 'aire', url: cabinaWsUrl(), kbps: CAB_AIRE_KBPS,
+          hello: JSON.stringify(cabinaHello(usuario, pass, ctx.sampleRate, CAB_AIRE_KBPS)) });
+      } catch (e) { h = null; console.warn('[cabina] el envío en segundo plano no arrancó, uso el camino de siempre:', e); }
+      if (h) {
+        _cb.hilo = h;
+        // _cb.ws es la bandera «estoy al aire» que leen el reloj, los oyentes y
+        // cabCortar: en este camino es una fachada — el WebSocket vive en el Worker.
+        _cb.ws = { hilo: true, readyState: 1, send() {}, close() {} };
+        let abrio = false;
+        h.worker.onmessage = (ev) => {
+          const m = ev.data || {};
+          if (_cb.hilo !== h) return;
+          if (m.tipo === 'abierto') {
+            abrio = true;
+            // [KAIO-CABINA-6] la METADATA del show: el Worker ya mandó el hello
+            // en su onopen, así que el orden hello → metadata está garantizado.
+            pCart6.then(() => { try { if (_cb.hilo === h) h.worker.postMessage({ tipo: 'meta', json: JSON.stringify(cabinaMetadata(cart6, usuario)) }); } catch (e) {} });
+            _cbAlAireUI(btn);
+          } else if (m.tipo === 'latido') {
+            _cbVigilaSilencio(Number(m.pico) || 0);
+            _cbVigilaCola(Number(m.cola) || 0);
+          } else if (m.tipo === 'cerrado') {
+            cabCortar(m.abrio || abrio ? ('La estación cerró la conexión (código ' + m.code + '). ¿La contraseña del locutor es la buena? ¿Hay otro DJ conectado?') : 'No se pudo conectar con la estación — revisa tu internet o usa el Web DJ (plan B)');
+          }
+        };
+        h.worker.onerror = (ev) => { if (_cb.hilo === h) cabCortar('El envío se cayó en la computadora (' + ((ev && ev.message) || 'error del Worker') + '). Vuelve a salir al aire.'); };
+        return;
+      }
+    }
+
+    // El camino de siempre (navegador sin AudioWorklet/Worker): el ScriptProcessor.
+    await _cbCargarLame();
     const ws = new WebSocket(cabinaWsUrl(), 'webcast');
     ws.binaryType = 'arraybuffer';
     let abrio = false;
     ws.onopen = () => {
       abrio = true;
-      ws.send(JSON.stringify(cabinaHello(usuario, pass, ctx.sampleRate)));
+      ws.send(JSON.stringify(cabinaHello(usuario, pass, ctx.sampleRate, CAB_AIRE_KBPS)));
       // [KAIO-CABINA-6] METADATA tras el hello (el hello SIEMPRE va primero:
       // registrar el envío aquí adentro garantiza el orden aunque la parrilla
       // ya hubiera contestado). Con esto la web pública cambia título/artista
@@ -2010,7 +2144,7 @@ async function cabAire() {
       pCart6.then(() => {
         try { if (_cb.ws === ws && ws.readyState === 1) ws.send(JSON.stringify(cabinaMetadata(cart6, usuario))); } catch (e) {}
       });
-      _cb.enc = new lamejs.Mp3Encoder(2, ctx.sampleRate, 192);
+      _cb.enc = new lamejs.Mp3Encoder(2, ctx.sampleRate, CAB_AIRE_KBPS);
       // ScriptProcessor: el master entra, se codifica a MP3 y viaja por el WS.
       // Va conectado a un sink en silencio (gain 0) porque un processor suelto
       // no procesa — y a destination directo DUPLICARÍA el monitor.
@@ -2018,37 +2152,18 @@ async function cabAire() {
       _cb.procSink = ctx.createGain(); _cb.procSink.gain.value = 0;
       _cb.master.connect(_cb.proc);
       _cb.proc.connect(_cb.procSink); _cb.procSink.connect(ctx.destination);
-      _cb.silencioDesde = 0; _cb.silencioAvisado = false;
       _cb.proc.onaudioprocess = (e) => {
         if (!_cb.ws || _cb.ws.readyState !== 1 || !_cb.enc) return;
         const L = e.inputBuffer.getChannelData(0);
         const mp3 = _cb.enc.encodeBuffer(cabF32aI16(L), cabF32aI16(e.inputBuffer.getChannelData(1)));
         if (mp3.length) _cb.ws.send(mp3);
-        // [KAIO-CABINA-3, medido en la primera transmisión real: 12.7 s de
-        // stream con pico 0.0000] El SILENCIO AL AIRE SE DICE: un micrófono
-        // vivo mete ruido de piso aunque nadie hable — el cero digital
-        // sostenido es un track muerto o una ganancia en cero, y desde la
-        // cabina no se oye (el monitor no toca el mic a propósito).
         let pico = 0;
         for (let i = 0; i < L.length; i += 16) { const a = Math.abs(L[i]); if (a > pico) pico = a; }
-        if (pico < 0.0004) {
-          if (!_cb.silencioDesde) _cb.silencioDesde = Date.now();
-          else if (!_cb.silencioAvisado && Date.now() - _cb.silencioDesde > 7000) {
-            _cb.silencioAvisado = true;
-            _cbMsg('cab-msg', '⚠️ Estás AL AIRE pero la radio está recibiendo PURO SILENCIO desde hace varios segundos. Si tu micrófono está activo, Chrome está capturando un micrófono muerto: elige otro en el selector de micrófono, y en Mac revisa Ajustes del Sistema → Privacidad y seguridad → Micrófono → que tu navegador esté activado.', true);
-          }
-        } else if (_cb.silencioDesde) {
-          _cb.silencioDesde = 0;
-          if (_cb.silencioAvisado) { _cb.silencioAvisado = false; _cbMsg('cab-msg', '✓ Ya entra audio a la transmisión.'); }
-        }
+        _cbVigilaSilencio(pico);
+        _cbVigilaCola(_cb.ws.bufferedAmount);
       };
       _cb.ws = ws;
-      _cb.aireDesde = Date.now();
-      const est = _cbEl('cab-estado');
-      if (est) { est.textContent = '🔴 AL AIRE'; est.style.background = 'var(--red)'; est.style.color = '#fff'; }
-      if (btn) { btn.disabled = false; btn.textContent = '⏹ Cortar transmisión'; }
-      _cbMsg('cab-msg', 'Al aire. Lo que suena en la mezcladora está saliendo en la radio.');
-      _cbOyentesStart();   // [KAIO-CABINA-8] oyentes en vivo mientras dure el aire
+      _cbAlAireUI(btn);
     };
     // Un cierre/error se DICE con su motivo — el silencio se leería como «sigo al aire».
     ws.onclose = (ev) => { if (_cb.ws === ws || !abrio) cabCortar(abrio ? ('La estación cerró la conexión (código ' + ev.code + '). ¿La contraseña del locutor es la buena? ¿Hay otro DJ conectado?') : 'No se pudo conectar con la estación — revisa tu internet o usa el Web DJ (plan B)'); };
@@ -2059,6 +2174,12 @@ async function cabAire() {
   }
 }
 function cabCortar(motivo) {
+  // [CABINA-ESTABLE-1] el camino del Worker: le pide soltar la cola y cerrar, y desconecta la captura.
+  if (_cb.hilo) {
+    const h = _cb.hilo; _cb.hilo = null;
+    try { h.worker.onmessage = null; h.worker.onerror = null; h.worker.postMessage({ tipo: 'cerrar' }); } catch (e) {}
+    _cbHiloSoltar(h);
+  }
   if (_cb.proc) { try { _cb.master.disconnect(_cb.proc); } catch (e) {} try { _cb.proc.disconnect(); } catch (e) {} _cb.proc.onaudioprocess = null; _cb.proc = null; }
   if (_cb.procSink) { try { _cb.procSink.disconnect(); } catch (e) {} _cb.procSink = null; }
   if (_cb.ws) {
@@ -2079,7 +2200,7 @@ function cabCortar(motivo) {
   if (est) { est.textContent = 'FUERA DEL AIRE'; est.style.background = 'var(--border)'; est.style.color = 'var(--ts)'; }
   const btn = _cbEl('cab-aire'); if (btn) { btn.disabled = false; btn.textContent = '🔴 Salir al aire'; }
   const r = _cbEl('cab-reloj'); if (r) r.textContent = '';
-  if (motivo) _cbMsg('cab-msg', motivo, /cerró|No se pudo|no se pudo/.test(motivo));
+  if (motivo) _cbMsg('cab-msg', motivo, /cerró|No se pudo|no se pudo|se cayó/.test(motivo));
 }
 
 // ── [RADIO-EPISODIOS-1] La GRABADORA y los EPISODIOS ─────────────────────────
@@ -2115,18 +2236,30 @@ async function cabGrabar() {
     await _cbCargarLame();
     const ctx = cabCtx();
     if (ctx.state === 'suspended') await ctx.resume();
-    const g = { enc: new lamejs.Mp3Encoder(2, ctx.sampleRate, CAB_GRAB_KBPS), chunks: [], bytes: 0, desde: Date.now(), cart: null };
+    const g = { enc: null, chunks: [], bytes: 0, desde: Date.now(), cart: null };
     // La parrilla se pide al ARRANCAR: el título y el programa son los del
     // momento en que empezó la grabación, no los de cuando se detuvo.
     fetch('/.netlify/functions/radio-cartelera').then((r) => r.json()).then((j) => { if (j && j.ok) g.cart = j; }).catch(() => {});
-    g.proc = ctx.createScriptProcessor(4096, 2, 2);
-    g.sink = ctx.createGain(); g.sink.gain.value = 0;   // un processor suelto no procesa; a destination directo duplicaría el monitor
-    _cb.master.connect(g.proc); g.proc.connect(g.sink); g.sink.connect(ctx.destination);
-    g.proc.onaudioprocess = (e) => {
-      if (_cb.grab !== g) return;
-      const mp3 = g.enc.encodeBuffer(cabF32aI16(e.inputBuffer.getChannelData(0)), cabF32aI16(e.inputBuffer.getChannelData(1)));
-      if (mp3.length) { g.chunks.push(new Int8Array(mp3)); g.bytes += mp3.length; }
-    };
+    // [CABINA-ESTABLE-1] Grabar también codifica FUERA de la pantalla (el mismo
+    // worklet + Worker del aire): grabar y transmitir a la vez ya no compiten
+    // por el hilo de Kaio-sama. Sin AudioWorklet, el camino de siempre.
+    if (_cbHiloPosible(ctx)) {
+      try {
+        g.hilo = await _cbHiloAbrir(ctx, { tipo: 'grabar', kbps: CAB_GRAB_KBPS });
+        g.hilo.worker.onmessage = (ev) => { const m = ev.data || {}; if (m.tipo === 'latido') g.bytes = Number(m.bytes) || 0; };
+      } catch (e) { g.hilo = null; console.warn('[cabina] la grabadora en segundo plano no arrancó, uso el camino de siempre:', e); }
+    }
+    if (!g.hilo) {
+      g.enc = new lamejs.Mp3Encoder(2, ctx.sampleRate, CAB_GRAB_KBPS);
+      g.proc = ctx.createScriptProcessor(4096, 2, 2);
+      g.sink = ctx.createGain(); g.sink.gain.value = 0;   // un processor suelto no procesa; a destination directo duplicaría el monitor
+      _cb.master.connect(g.proc); g.proc.connect(g.sink); g.sink.connect(ctx.destination);
+      g.proc.onaudioprocess = (e) => {
+        if (_cb.grab !== g) return;
+        const mp3 = g.enc.encodeBuffer(cabF32aI16(e.inputBuffer.getChannelData(0)), cabF32aI16(e.inputBuffer.getChannelData(1)));
+        if (mp3.length) { g.chunks.push(new Int8Array(mp3)); g.bytes += mp3.length; }
+      };
+    }
     g.reloj = setInterval(_cbGrabEstado, 500);   // el reloj tiene dueño: muere en _cbGrabDetener
     _cb.grab = g;
     _cbGrabEstado();
@@ -2138,13 +2271,34 @@ function _cbGrabDetener() {
   const g = _cb.grab; if (!g) return;
   _cb.grab = null;
   clearInterval(g.reloj);
+  const btn = _cbEl('cab-grab-btn');
+  if (btn) { btn.textContent = '⏺ Grabar'; btn.style.borderColor = ''; btn.style.color = ''; }
+  _cbGrabEstado();
+  if (g.hilo) {
+    // [CABINA-ESTABLE-1] el Worker suelta su cola (flush) y devuelve los frames.
+    const h = g.hilo;
+    _cbMsg('cab-grab-msg', 'Cerrando la grabación…');
+    const reloj = setTimeout(() => { _cbHiloSoltar(h); _cbMsg('cab-grab-msg', 'La grabación no se pudo cerrar (el codificador no contestó). Vuelve a intentar grabar.', true); }, 8000);
+    h.worker.onmessage = (ev) => {
+      const m = ev.data || {};
+      if (m.tipo !== 'grabacion') return;
+      clearTimeout(reloj);
+      _cbHiloSoltar(h);
+      g.chunks = (m.chunks || []).map((b) => new Int8Array(b));
+      g.bytes = Number(m.bytes) || 0;
+      _cbGrabCerrar(g);
+    };
+    try { h.node.port.postMessage({ parar: true }); } catch (e) {}
+    h.worker.postMessage({ tipo: 'detener' });
+    return;
+  }
   try { _cb.master.disconnect(g.proc); } catch (e) {}
   try { g.proc.disconnect(); g.sink.disconnect(); } catch (e) {}
   g.proc.onaudioprocess = null;
   try { const fin = g.enc.flush(); if (fin.length) { g.chunks.push(new Int8Array(fin)); g.bytes += fin.length; } } catch (e) {}
-  const btn = _cbEl('cab-grab-btn');
-  if (btn) { btn.textContent = '⏺ Grabar'; btn.style.borderColor = ''; btn.style.color = ''; }
-  _cbGrabEstado();
+  _cbGrabCerrar(g);
+}
+function _cbGrabCerrar(g) {
   if (!g.bytes) { _cbMsg('cab-grab-msg', 'La grabación salió vacía.', true); return; }
   const blob = new Blob(g.chunks, { type: 'audio/mpeg' });
   const desdeMs = g.desde;

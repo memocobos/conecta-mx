@@ -31,7 +31,11 @@ const run = (e) => vm.runInContext(e, ctx);
 af(run('cabinaWsUrl()') === 'wss://radio.conectareynosa.mx/webdj/radioconecta/', 'la URL del webcast usa el MISMO shortcode del nowplaying (radioconecta) — una estación, un nombre');
 const hello = run("cabinaHello('memo', 'secreta123', 48000)");
 af(hello.type === 'hello' && hello.data.mime === 'audio/mpeg' && hello.data.user === 'memo' && hello.data.password === 'secreta123', 'el hello lleva mime y las credenciales del locutor (sin ellas AzuraCast rechaza)');
-af(hello.data.audio.samplerate === 48000 && hello.data.audio.channels === 2 && hello.data.audio.bitrate === 192, 'y la ficha del audio viaja con el sampleRate REAL del contexto, no uno tecleado');
+// ⚠️ ACTUALIZADA EN CABINA-ESTABLE-1 (3-nov), con razón: al aire se manda a
+// 128 kbps (antes 192) — un tercio menos de subida y de CPU; la estación
+// re-codifica a su mount de 192 de todos modos. Sin kbps, el default es ése.
+af(hello.data.audio.samplerate === 48000 && hello.data.audio.channels === 2 && hello.data.audio.bitrate === 128, 'y la ficha del audio viaja con el sampleRate REAL del contexto, no uno tecleado (y a 128 kbps por default)');
+af(run("cabinaHello('memo', 'x', 44100, 96)").data.audio.bitrate === 96, 'el bitrate del hello es el que se le pide (el mismo con que se codifica)');
 const i16 = run('cabF32aI16(new Float32Array([0, 0.5, -0.5, 1, -1, 2, -2]))');
 af(i16[0] === 0 && i16[3] === 32767 && i16[4] === -32768 && i16[5] === 32767 && i16[6] === -32768, 'float→int16 con CLAMP: un pico >1.0 satura en vez de dar la vuelta (el wrap suena a estática)');
 af(run('cabMMSS(0)') === '0:00' && run('cabMMSS(65)') === '1:05' && run('cabMMSS(3601)') === '60:01', 'el reloj habla mm:ss');
@@ -339,7 +343,10 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(html8.includes('id="ks-hero-live"'), '[KC-8] el badge AL AIRE vive en el hero de Kaio-sama');
   af((jsR8.match(/getElementById\('ks-hero-live'\)/g) || []).length >= 2 && jsR8.includes('lv.is_live'), '[KC-8] _loadRadioHero lo ENCIENDE con live.is_live y lo APAGA en el catch — sin dato no se afirma un AL AIRE');
   af(html8.includes('id="cab-oyentes"'), '[KC-8] los oyentes en vivo viven junto al estado de la transmisión');
-  af(jsR8.slice(jsR8.indexOf('async function cabAire'), jsR8.indexOf('function cabCortar')).includes('_cbOyentesStart();'), '[KC-8] el latido de oyentes nace al abrir el WS (dentro del onopen)');
+  // ⚠️ ACTUALIZADA EN CABINA-ESTABLE-1: el «al aire» de la pantalla tiene UN dueño
+// (_cbAlAireUI) que llaman los dos caminos — el Worker al recibir 'abierto' y
+// el WebSocket de siempre en su onopen. El latido de oyentes vive ahí.
+af(jsR8.slice(jsR8.indexOf('function _cbAlAireUI'), jsR8.indexOf('async function cabAire')).includes('_cbOyentesStart();') && (jsR8.slice(jsR8.indexOf('async function cabAire'), jsR8.indexOf('function cabCortar')).match(/_cbAlAireUI\(btn\)/g) || []).length === 2, '[KC-8] el latido de oyentes nace al abrir el envío (en _cbAlAireUI, que llaman los DOS caminos al abrir)');
   af(jsR8.slice(jsR8.indexOf('function cabCortar')).includes('_cbOyentesStop();') && /clearInterval\(_cb\.oyTimer\)/.test(jsR8), '[KC-8] y MUERE en cabCortar — el reloj tiene dueño (_cb.oyTimer), un huérfano seguiría pidiendo el nowplaying para siempre');
   af(jsR8.includes("if (!_cb.ws) { _cbOyentesStop(); return; }"), '[KC-8] el tick se apaga solo si el aire ya se cortó mientras la red contestaba');
 

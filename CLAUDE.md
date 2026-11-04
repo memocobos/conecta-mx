@@ -188,6 +188,33 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📻⏳ **CABINA-ESTABLE-1 (3-nov-2026, en main local, cero SQL): la transmisión
+  ya no se corta por la pantalla.** Reporte de Memo: *«la transmisión se escucha
+  super cortada como falta de señal»*. Medido en el nowplaying: entró al aire
+  23:09, la estación lo soltó a las 23:13 y otra vez 23:16:50–23:17:02 (AutoDJ de
+  8 s y 6 s entre tramos al aire) — y los logs de `admin-radio-cabina` muestran
+  canciones del catálogo BAJÁNDOSE al aire justo antes de cada corte. Causa: el
+  MP3 se hacía en un ScriptProcessor = hilo de la PANTALLA; cualquier trabajo de
+  Kaio-sama atrasaba el envío y el colchón de 2 s de AzuraCast (lo bajé en
+  KAIO-CABINA-8) se vaciaba. Hoy: **AudioWorklet** (`/cabina-captura.js`, hilo de
+  audio, bloques de 2048, silencio si no hay entrada) → **MessageChannel DIRECTO**
+  → **Worker** (`/cabina-envio.js`: lamejs + el WebSocket webcast, hello
+  primero) — la pantalla solo recibe un latido por segundo. La grabadora usa el
+  MISMO camino (modo grabar). Sin AudioWorklet/Worker cae al ScriptProcessor de
+  siempre y lo dice. **Al aire a 128 kbps** (antes 192; la estación re-codifica a
+  su mount de 192). Avisos nuevos: **la subida no alcanza** (cola del WS > ~3 s
+  dos latidos) y **la estación te soltó** (2 latidos sin `is_live` pasados 35 s).
+  `mide:cabina-estable-1` **39** (worklet y Worker REALES en vm con lamejs real;
+  sabotaje «audio antes del hello» → 2 rojos → restaurado sha1 `c8a2ac5d`).
+  ✅ Verificado en **Chrome real** (OfflineAudioContext → worklet → Worker →
+  lamejs): 3 s de tono = 36,288 bytes MP3 a 96.8 kbps, sync 0xFFFB. ⚠️ El envío
+  contra el AzuraCast vivo lo estrena Memo. kaio-cabina-1 **95** (2 aserciones
+  actualizadas con su razón: hello a 128 · `_cbAlAireUI` dueño del «al aire») ·
+  radio-episodios-1 29 · kaio-v3 45 · radio-v2b 44 · radio-v2a 32.
+  ⏳ **Colchón de DJ de AzuraCast de 2 → 5 s**: la sesión del panel en Chrome
+  expiró — lo cambia Memo (Estación → Editar perfil → Transmisores/DJs → «Retraso
+  del búfer de DJ» = 5 → Guardar → reiniciar). ⏳ Push de Memo.
+
 - 🔴⏳ **ABONO-HASH-1 (4-nov-2026, en main local, cero SQL): el «#» del
   multifecha se COMÍA el comprobante — y en las altas, el dinero.** Reporte de
   Bulma/Milk: *«los comprobantes sí suben y guardan, pero cuando vuelves a buscar

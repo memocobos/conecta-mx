@@ -1895,6 +1895,7 @@ async function cabMicToggle() {
     if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
     if (_cb.micMono) try { _cb.micMono.disconnect(); } catch (e) {}
     _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
+    _cb.micQuerido = false;   // [CABINA-MICVIVO-1] apagado A PROPÓSITO: nadie lo re-abre solo
     if (btn) { btn.textContent = '🎤 Activar micrófono'; btn.style.color = ''; }
     _cbMsg('cab-mic-msg', '');
     return;
@@ -1910,6 +1911,8 @@ async function cabMicToggle() {
     // DICE, (3) un track muted se grita con su remedio.
     const audio = cabMicRestricciones(_cb.consola);
     if (_cb.micDevice) audio.deviceId = { exact: _cb.micDevice };
+    // [CABINA-MICVIVO-1] al re-abrir tras reconectar la tarjeta, si el id exacto ya no casa se pide «parecido»
+    if (_cb.micDevice && _cb.micIdeal) audio.deviceId = { ideal: _cb.micDevice };
     const stream = await navigator.mediaDevices.getUserMedia({ audio });
     _cb.micStream = stream;
     _cb.micSrc = ctx.createMediaStreamSource(stream);
@@ -1934,7 +1937,22 @@ async function cabMicToggle() {
     } else {
       _cbMsg('cab-mic-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.' + (cabPareceConsola(etiqueta) ? ' 💡 Parece una consola o tarjeta de sonido: prende «🎛 Uso consola» para que la música no se corte y entren los dos micrófonos.' : ''));
     }
-    if (track) track.addEventListener('mute', () => _cbMsg('cab-mic-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true));
+    _cb.micQuerido = true;
+    if (track) {
+      // [CABINA-MICVIVO-1, medido 4-nov: la estación siguió con Memo al aire
+      // 16 min pero recibiendo SILENCIO PURO desde el minuto 8 — el envío vivo,
+      // la entrada muerta] Una tarjeta USB que se reconecta o se duerme MATA el
+      // track (ended) o lo enmudece (mute) y Chrome no lo revive solo: el
+      // micrófono se RE-ABRE solo y se dice.
+      track.addEventListener('ended', () => { if (_cb.micStream === stream) _cbMicReabrir('el micrófono «' + etiqueta + '» se desconectó'); });
+      track.addEventListener('mute', () => {
+        _cbMsg('cab-mic-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true);
+        clearTimeout(_cb.micMuteT);
+        _cb.micMuteT = setTimeout(() => { if (_cb.micStream === stream && track.muted) _cbMicReabrir('el sistema enmudeció «' + etiqueta + '»'); }, 4000);
+      });
+      track.addEventListener('unmute', () => { clearTimeout(_cb.micMuteT); if (_cb.micStream === stream) _cbMsg('cab-mic-msg', '✓ El micrófono «' + etiqueta + '» volvió a entregar audio.'); });
+    }
+    _cbMicVigilaDispositivos();
     _cbLlenarMics();
   } catch (e) {
     // [KAIO-CABINA-2, cazado por Memo: «Permission denied» pelado no dice el
@@ -1992,6 +2010,51 @@ async function cabMicCambiar(sel) {
     _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
     await cabMicToggle();
   }
+}
+// [CABINA-MICVIVO-1] El micrófono que se MUERE se re-abre solo. Solo si el
+// locutor lo quería prendido (_cb.micQuerido): apagarlo a mano lo deja apagado.
+// Reintenta ~20 s (la tarjeta tarda en volver tras reconectarse); al tercer
+// intento deja de exigir el id exacto (un replug puede cambiarlo). Al aire, el
+// aviso también va a la Transmisión: es una emergencia, no un detalle.
+function _cbMicAviso(txt, esError) {
+  _cbMsg('cab-mic-msg', txt, esError);
+  if (_cb.aireDesde) _cbMsg('cab-msg', txt, esError);
+}
+async function _cbMicReabrir(motivo) {
+  if (!_cb.micQuerido || _cb.micReabriendo) return;
+  _cb.micReabriendo = true;
+  try {
+    _cbMicAviso('⚠️ ' + motivo + ' — lo vuelvo a conectar solo…', true);
+    for (let i = 0; i < 8 && _cb.micQuerido; i++) {
+      if (_cb.micStream) {
+        _cb.micStream.getTracks().forEach((t) => t.stop());
+        if (_cb.micSrc) { try { _cb.micSrc.disconnect(); } catch (e) {} }
+        if (_cb.micMono) { try { _cb.micMono.disconnect(); } catch (e) {} }
+        _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
+      }
+      _cb.micIdeal = i >= 2;
+      await cabMicToggle();
+      const t = _cb.micStream && _cb.micStream.getAudioTracks()[0];
+      if (t && t.readyState === 'live' && !t.muted) {
+        _cb.micReabiertoAt = Date.now();
+        _cbMicAviso('✓ Micrófono reconectado solo («' + (t.label || 'micrófono') + '»): la radio vuelve a oírte.');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+    if (_cb.micQuerido) _cbMicAviso('⚠️ No pude reconectar el micrófono. Revisa el cable USB de la consola (desconéctalo y conéctalo) y aprieta «🎤 Activar micrófono». La transmisión sigue abierta.', true);
+  } finally { _cb.micIdeal = false; _cb.micReabriendo = false; }
+}
+// Conectar/desconectar una tarjeta dispara devicechange: si el mic que se
+// quería ya no vive, se re-abre (y el selector se actualiza).
+function _cbMicVigilaDispositivos() {
+  if (_cb.devVigia || !navigator.mediaDevices || !navigator.mediaDevices.addEventListener) return;
+  _cb.devVigia = true;
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    _cbLlenarMics();
+    const t = _cb.micStream && _cb.micStream.getAudioTracks()[0];
+    if (_cb.micQuerido && (!t || t.readyState === 'ended')) _cbMicReabrir('cambió la conexión de la tarjeta de sonido');
+  });
 }
 
 // ── El uplink (webcast → AzuraCast) ─────────────────────────────────────────
@@ -2093,6 +2156,14 @@ function _cbVigilaSilencio(pico) {
     else if (!_cb.silencioAvisado && Date.now() - _cb.silencioDesde > 7000) {
       _cb.silencioAvisado = true;
       _cbMsg('cab-msg', '⚠️ Estás AL AIRE pero la radio está recibiendo PURO SILENCIO desde hace varios segundos. Si tu micrófono está activo, Chrome está capturando un micrófono muerto: elige otro en el selector de micrófono, y en Mac revisa Ajustes del Sistema → Privacidad y seguridad → Micrófono → que tu navegador esté activado.', true);
+    }
+    // [CABINA-MICVIVO-1] Silencio DIGITAL sostenido con el mic que se quería
+    // prendido = entrada muerta aunque Chrome no lo avise: se re-abre UNA vez
+    // (y no más de una cada 45 s, para no tartamudear si de verdad es silencio).
+    if (_cb.micQuerido && _cb.micStream && Date.now() - _cb.silencioDesde > 10000 &&
+        (!_cb.micAutoAt || Date.now() - _cb.micAutoAt > 45000)) {
+      _cb.micAutoAt = Date.now();
+      _cbMicReabrir('la radio lleva más de 10 s recibiendo silencio puro');
     }
   } else if (_cb.silencioDesde) {
     _cb.silencioDesde = 0;

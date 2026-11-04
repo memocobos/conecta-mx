@@ -169,6 +169,8 @@ const af = (c, m) => { try { c = typeof c === 'function' ? c() : c; } catch (e) 
   af(tg.includes('cabMicRestricciones(_cb.consola)') && tg.includes('audio.deviceId = { exact: _cb.micDevice }'), 'la captura usa las restricciones del dueño y conserva el micrófono elegido');
   af(/channelCount = 1; _cb\.micMono\.channelCountMode = 'explicit'; _cb\.micMono\.channelInterpretation = 'speakers'/.test(tg) && tg.includes('_cb.micMono.connect(_cb.buses.mic)'), 'en consola los dos canales se SUMAN al centro antes del bus del mic (medido en Chrome real: L-solo y R-solo salen 0.334/0.334)');
   af((js.match(/if \(_cb\.micMono\) try \{ _cb\.micMono\.disconnect\(\); \} catch \(e\) \{\}/g) || []).length === 3, 'el nodo de suma se suelta en los 3 sitios donde se suelta el mic (apagar · cambiar mic · cambiar modo)');
+  // [CABINA-MICVIVO-1] el cuarto sitio que suelta el mic es la re-apertura automática (otra forma, con llaves)
+  af(js.slice(js.indexOf('async function _cbMicReabrir'), js.indexOf('function _cbMicVigilaDispositivos')).includes('if (_cb.micMono) { try { _cb.micMono.disconnect(); } catch (e) {} }'), 'la re-apertura automática también suelta el nodo de suma (no deja un mic fantasma conectado al bus)');
   const htmlK = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
   af(htmlK.includes('id="cab-consola" onchange="cabConsola(this.checked)"') && /<input type="checkbox" id="cab-consola"[^>]*>/.test(htmlK) && !/id="cab-consola"[^>]*\schecked[\s>]/.test(htmlK), 'la casilla vive en la Mezcladora y nace APAGADA en el HTML (la preferencia de cada computadora la pinta loadRadioCabina)');
   // [CABINA-MICMSG-1, reporte de Memo: «no me sale el mensaje de los canales»]
@@ -181,6 +183,61 @@ const af = (c, m) => { try { c = typeof c === 'function' ? c() : c; } catch (e) 
     af(!cuerpoMic.includes("_cbMsg('cab-msg'") && (cuerpoMic.match(/_cbMsg\('cab-mic-msg'/g) || []).length >= 6, 'ningún aviso del micrófono (canales, modo consola, permisos) va ya a cab-msg de la Transmisión');
   }
   af(js.includes("localStorage.setItem('cab-consola'") && js.slice(js.indexOf('async function loadRadioCabina')).includes("_cbEl('cab-consola')"), 'la preferencia se recuerda por computadora y se pinta al abrir la cabina');
+
+  console.log('\n[G] CABINA-MICVIVO-1: el micrófono que se muere se re-abre solo (medido 4-nov: 16 min al aire, silencio puro desde el minuto 8)');
+  await (async () => {
+    const gctx = { console, setTimeout: (f) => setTimeout(f, 1), clearTimeout, Date, Promise };
+    const msgs = []; let gum = 0; const pistas = [];
+    gctx._cbMsg = (id, t) => msgs.push(id + ': ' + t);
+    gctx._cbEl = () => null; gctx._cbLlenarMics = () => {};
+    gctx.cabMicRestricciones = () => ({}); gctx.cabPareceConsola = () => false;
+    const nodo = () => ({ connect() {}, disconnect() {} });
+    gctx.cabCtx = () => ({ state: 'running', createMediaStreamSource: nodo, createGain: nodo });
+    let devCb = null;
+    gctx.navigator = { mediaDevices: {
+      addEventListener: (ev, f) => { if (ev === 'devicechange') devCb = f; },
+      getUserMedia: async () => {
+        gum++;
+        const ls = {};
+        const t = { label: 'V8 USB Audio', muted: false, readyState: 'live', getSettings: () => ({ channelCount: 2 }),
+          addEventListener: (ev, f) => { (ls[ev] = ls[ev] || []).push(f); }, stop() { t.readyState = 'ended'; },
+          disparar(ev) { if (ev === 'ended') t.readyState = 'ended'; (ls[ev] || []).forEach((f) => f()); } };
+        pistas.push(t);
+        return { getTracks: () => [t], getAudioTracks: () => [t] };
+      } } };
+    gctx._cb = { buses: { mic: nodo() }, consola: true, micStream: null, micSrc: null, micMono: null };
+    vm.createContext(gctx);
+    vm.runInContext(js.slice(js.indexOf('async function cabMicToggle()'), js.indexOf('async function _cbLlenarMics')), gctx);
+    vm.runInContext(js.slice(js.indexOf('function _cbMicAviso'), js.indexOf('// ── El uplink')), gctx);
+    vm.runInContext(js.slice(js.indexOf('function _cbVigilaSilencio'), js.indexOf('// [CABINA-ESTABLE-1] El INTERNET DE SUBIDA')), gctx);
+    const espera = () => new Promise((r) => setTimeout(r, 30));
+    await vm.runInContext('cabMicToggle()', gctx);
+    af(gum === 1 && gctx._cb.micQuerido === true, 'activar el micrófono lo marca como QUERIDO');
+    gctx._cb.aireDesde = Date.now();
+    pistas[0].disparar('ended'); await espera();
+    af(gum === 2 && gctx._cb.micStream && pistas[1].readyState === 'live', 'la tarjeta se desconecta (track «ended») → el micrófono se RE-ABRE solo, sin cortar la transmisión');
+    af(msgs.some((m) => m.startsWith('cab-msg: ✓ Micrófono reconectado')) && msgs.some((m) => m.startsWith('cab-mic-msg: ⚠️') && /se desconectó/.test(m)), 'y se DICE, junto al botón y en la Transmisión (al aire es emergencia)');
+    // silencio digital sostenido con el mic querido
+    gctx._cb.silencioDesde = Date.now() - 11000; gctx._cb.silencioAvisado = true; gctx._cb.micAutoAt = 0;
+    vm.runInContext('_cbVigilaSilencio(0)', gctx); await espera();
+    af(gum === 3, '10 s de silencio PURO al aire con el mic prendido → se re-abre la entrada aunque Chrome no avise');
+    vm.runInContext('_cbVigilaSilencio(0)', gctx); await espera();
+    af(gum === 3, 'y no tartamudea: no más de una re-apertura por silencio cada 45 s');
+    // devicechange con el track muerto
+    pistas[2].readyState = 'ended'; devCb && devCb(); await espera();
+    af(devCb && gum === 4, 'reconectar la tarjeta (devicechange) con el mic muerto → se re-abre');
+    // apagado a propósito: nada lo revive
+    await vm.runInContext('cabMicToggle()', gctx);
+    af(gctx._cb.micQuerido === false && !gctx._cb.micStream, 'apagar el micrófono A MANO lo deja apagado (micQuerido=false)');
+    devCb && devCb(); gctx._cb.silencioDesde = Date.now() - 20000; gctx._cb.micAutoAt = 0;
+    vm.runInContext('_cbVigilaSilencio(0)', gctx); await espera();
+    af(gum === 4, 'con el mic apagado a propósito ni el silencio ni la tarjeta lo vuelven a abrir');
+  })();
+  {
+    let baseR = '';
+    try { baseR = execSync('git show 889c1dc:kamehouse-radio.js', { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 << 20 }); } catch (e) {}
+    af(baseR && !baseR.includes("addEventListener('ended'") && !baseR.includes('devicechange'), 'control positivo: en 889c1dc (lo que transmitió el 4-nov) un track muerto no se re-abría — el defecto existía');
+  }
 
   console.log('\n[E] control positivo: BASE no tenía camino fuera de la pantalla');
   let base = '';

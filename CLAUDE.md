@@ -188,6 +188,27 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎤⏳ **CABINA-MICVIVO-1 (4-nov-2026, en main local, cero SQL): el micrófono
+  que se MUERE se re-abre solo.** Reporte de Memo: *«al minuto 8 dejó de
+  escucharse la transmisión»*. Medido (log de liquidsoap + 30 s del stream
+  decodificados en el navegador): la estación lo tomó al aire a las 23:51:50 y
+  **nunca regresó al AutoDJ** — el envío siguió vivo, pero lo que llegaba era
+  **silencio puro (pico 0.000)**. O sea: se murió la ENTRADA en la computadora
+  (la V8 por USB se durmió/reconectó → el track del mic queda `ended`/`mute` y
+  Chrome no lo revive). Al re-activar el mic, el stream volvió a tener audio
+  (medido: picos 0.05–0.12). Hoy: `_cb.micQuerido` (apagar a mano lo deja
+  apagado) · track `ended` → re-abre · `mute` sostenido 4 s → re-abre ·
+  `devicechange` con el mic muerto → re-abre · **10 s de silencio digital al
+  aire con el mic querido → re-abre** (máx. una vez cada 45 s) · 8 intentos en
+  ~20 s, desde el 3º pide el dispositivo «ideal» (un replug puede cambiar el
+  id) · el aviso va junto al botón Y en la Transmisión. `mide:cabina-estable-1`
+  **60** (bloque [G] con el cabMicToggle REAL en vm; sabotaje al `ended` → 4
+  rojos → restaurado sha1 `e0451be3`; control positivo en 889c1dc). Vecinos
+  verdes: kaio-cabina-1 95 · radio-episodios-1 29 · kaio-v3 45 · radio-v2b 44.
+  ⚠️ Se curó el SÍNTOMA; la causa física (por qué la V8 suelta el USB a los
+  ~8 min — ahorro de energía de la tarjeta, cable, hub) no se ve desde aquí.
+  ⏳ Push de Memo → recargar Kaio-sama.
+
 - 🎛⏳ **CABINA-CONSOLA-1 (3-nov-2026, en main local, cero SQL): la consola
   (V8 Max) entra CRUDA y con los DOS micrófonos.** Reporte de Memo tras el push
   de CABINA-ESTABLE-1: *«todavía se corta, si pongo música de fondo se corta aún

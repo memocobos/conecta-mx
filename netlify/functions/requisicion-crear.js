@@ -38,7 +38,7 @@
 const { corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 const { paqueteVendibleEnSitio } = require('./_lib/paquete-sitio');   // [REQ-2027-1]
-const { tallaNormalizada, problemaCorreo } = require('./_lib/correo-forma');
+const { tallaNormalizada, problemaCorreo, generoNormalizado } = require('./_lib/correo-forma');
 
 const BUCKET = 'abonos-viajeros'; // el de los abonos, a propósito — ver encabezado
 const FORMAS_PAGO = ['transferencia', 'deposito', 'oxxo', 'link_pago'];
@@ -160,6 +160,21 @@ exports.handler = async (event) => {
   if (eT.error) return json(400, headers, { ok: false, error: eT.error });
   if (eT.v && eT.v === celular) return json(400, headers, { ok: false, error: 'Tu número de emergencia tiene que ser de otra persona, no el tuyo' });
   const talla_playera = tT.v, num_emergencia = eT.v;
+  // [GENERO-2] El género de cada persona (Hombre/Mujer), palabra de Bulma vía
+  // Memo: «preguntárselo a los viajeros a la hora de su registro». El formulario
+  // nuevo lo pide a TODOS y manda `pide_genero:true`; con esa marca es
+  // obligatorio aquí. Sin ella (página vieja en caché) es opcional — pero si
+  // viene, se valida: un valor raro lo rechazaría el CHECK y perderíamos la
+  // requisición entera.
+  const pideGenero = body.pide_genero === true;
+  const leerGenero = (g, quien) => {
+    if (g == null || String(g).trim() === '') return pideGenero ? { error: `Elige ${quien}: hombre o mujer` } : { v: null };
+    const v = generoNormalizado(g);
+    return v ? { v } : { error: `${quien.charAt(0).toUpperCase() + quien.slice(1)} no es válido` };
+  };
+  const gT = leerGenero(body.genero, 'tu género');
+  if (gT.error) return json(400, headers, { ok: false, error: gT.error });
+  const genero = gT.v;
 
   let acompanantes = null;
   if (num_personas > 1 && Array.isArray(body.acompanantes)) {
@@ -183,9 +198,12 @@ exports.handler = async (event) => {
       if (tA.error) return json(400, headers, { ok: false, error: tA.error });
       const eA = leerTel(a.num_emergencia, `el número de emergencia del acompañante ${i + 1}`);
       if (eA.error) return json(400, headers, { ok: false, error: eA.error });
+      const gA = leerGenero(a.genero, `el género del acompañante ${i + 1}`);
+      if (gA.error) return json(400, headers, { ok: false, error: gA.error });
       if (cA.v) fila.celular = cA.v;
       if (tA.v) fila.talla_playera = tA.v;
       if (eA.v) fila.num_emergencia = eA.v;
+      if (gA.v) fila.genero = gA.v;   // [GENERO-2]
       acompanantes.push(fila);
     }
   }
@@ -311,7 +329,7 @@ exports.handler = async (event) => {
     num_personas,
     hotel, transporte,
     nombre, celular, correo, forma_pago,
-    acompanantes, talla_playera, num_emergencia, desglose,
+    acompanantes, talla_playera, num_emergencia, genero, desglose,
     total_sistema: precio.total,
     separo_sistema: precio.separo,
     cotizacion_texto,

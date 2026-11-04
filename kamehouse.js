@@ -6128,12 +6128,23 @@ let _vj2Ctx = null;      // lo que _vj2Cargar dejó listo para repintar SIN refe
 
 const _vjNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 function _vjEsBaja(v) { return Number(v.boletos) === 0 && !v.zona_boleto; }
+// [GENERO-2] El género de una fila (pura): el de KameHouse MANDA; si falta, el
+// que la persona dijo en su registro del Portal (v._perfGenero, lo anota
+// _vj2Pintar desde los perfiles), ROTULADO «perfil». Sin ninguno → null. La
+// inferencia por nombre del rooming NO entra aquí: en la card solo se pinta lo
+// que alguien DIJO, no lo que se adivina.
+function _vjGeneroDe(v) {
+  const g = v && (v.genero === 'H' || v.genero === 'M') ? v.genero : null;
+  if (g) return { g, origen: 'dato' };
+  const p = v && (v._perfGenero === 'H' || v._perfGenero === 'M') ? v._perfGenero : null;
+  return p ? { g: p, origen: 'perfil' } : { g: null, origen: null };
+}
 
 // El resumen del evento (puro): filas activas, lugares, por paquete, por zona,
 // staff y bajas. Una fila sin boletos capturados cuenta 1 lugar (el suyo),
 // igual que el `capsule_resumen` del servidor.
 function _vjResumenDe(filas, ctrMapa) {
-  const r = { filas: 0, lugares: 0, staff: 0, bajas: 0, paquetes: {}, zonas: {}, habitaciones: {}, ctr_sin: 0, prv_sin: 0 };
+  const r = { filas: 0, lugares: 0, staff: 0, bajas: 0, paquetes: {}, zonas: {}, habitaciones: {}, ctr_sin: 0, prv_sin: 0, generos: { M: 0, H: 0, sin: 0 } };
   (filas || []).forEach((v) => {
     if (_vjEsBaja(v)) { r.bajas++; return; }
     const lug = Number(v.boletos) > 0 ? Number(v.boletos) : 1;
@@ -6146,6 +6157,8 @@ function _vjResumenDe(filas, ctrMapa) {
     // [VJ-HAB-1] Para armar el rooming: cuántos eligieron cada tipo de cuarto.
     // Se cuentan LUGARES (una fila de 3 lugares en Doble son 3 camas, no 1).
     if (v.hotel_tipo) r.habitaciones[v.hotel_tipo] = (r.habitaciones[v.hotel_tipo] || 0) + lug;
+    // [GENERO-2] Personas (filas) por género — para el control de Bulma.
+    { const ge = _vjGeneroDe(v).g; r.generos[ge || 'sin']++; }
     // [VJ-CARD-1] Las dos ALERTAS: contrato sin firmar y Portal sin revisar —
     // con los MISMOS predicados de sus chips (_vjCtrPuede / prvChip), para que
     // el contador diga lo que las filas enseñan.
@@ -6176,6 +6189,7 @@ function _vjFiltraFilas(filas, q, chip, ctrMapa) {
     else if (chip && chip.startsWith('__grp:')) { if (_vjEsBaja(v) || String(v.grupo_viaje || '') !== chip.slice(6)) return false; }
     else if (chip && chip.startsWith('__zona:')) { if (_vjEsBaja(v) || String(v.zona_boleto || '') !== chip.slice(7)) return false; }
     else if (chip && chip.startsWith('__hab:')) { if (_vjEsBaja(v) || String(v.hotel_tipo || '') !== chip.slice(6)) return false; }
+    else if (chip && chip.startsWith('__gen:')) { if (_vjEsBaja(v) || (_vjGeneroDe(v).g || '-') !== chip.slice(6)) return false; }
     else if (chip === '__ctr_sin') {
       if (_vjEsBaja(v) || typeof _vjCtrPuede !== 'function' || !_vjCtrPuede(v)) return false;
       const c = (ctrMapa || {})[v.id];
@@ -6184,7 +6198,8 @@ function _vjFiltraFilas(filas, q, chip, ctrMapa) {
     else if (chip === '__prv_sin') { if (_vjEsBaja(v) || !('portal_revisado_at' in v) || v.portal_revisado_at || v.usuario_id || _esStaff(v)) return false; }
     else if (chip) { if (_vjEsBaja(v) || (khPaqueteTexto(v) || '—') !== chip) return false; }
     if (!qn) return true;
-    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.hotel_tipo, v.emergencia_nombre, v.num_emergencia, v.indicaciones, v.notas]
+    const _gq = _vjGeneroDe(v).g;
+    const hay = _vjNorm([v.nombre, v.correo, v.celular, v.zona_boleto, khPaqueteTexto(v), v.talla_playera, v.hotel_tipo, v.emergencia_nombre, v.num_emergencia, v.indicaciones, v.notas, _gq === 'M' ? 'mujer' : _gq === 'H' ? 'hombre' : '']
       .filter(Boolean).join(' | '));
     return hay.includes(qn);
   });
@@ -6257,6 +6272,14 @@ function _vjChipsPintar(res) {
       ${res.staff ? chip('__staff', `staff <b>${res.staff}</b>`, 'Filas del equipo (coordis, creadoras). Clic para verlas solas.') : ''}
       ${res.bajas ? chip('__bajas', `⛔ cancelados <b>${res.bajas}</b>`, 'Cancelados (boletos en 0): no suman lugares y no salen en la lista. Clic para verlos.') : ''}
       ${res.ctr_sin ? chip('__ctr_sin', `📜 sin firmar <b>${res.ctr_sin}</b>`, '[VJ-CARD-1] Viajeros con contrato pendiente de firma (o sin contrato emitido). Clic para verlos y recordarles.') : ''}
+      ${(() => {
+        // [GENERO-2] Mujeres · hombres · sin género (clic = ver a esas personas).
+        const gq = res.generos || { M: 0, H: 0, sin: 0 };
+        if (!(gq.M + gq.H + gq.sin)) return '';
+        return chip('__gen:M', `♀ <b>${gq.M}</b>`, `${gq.M} mujer(es). Clic para verlas.`)
+          + chip('__gen:H', `♂ <b>${gq.H}</b>`, `${gq.H} hombre(s). Clic para verlos.`)
+          + (gq.sin ? chip('__gen:-', `❔ sin género <b>${gq.sin}</b>`, `${gq.sin} persona(s) sin género: se captura con ✏️ Corregir, o lo dicen al reservar / en su Portal. Clic para verlas.`) : '');
+      })()}
       ${res.prv_sin ? chip('__prv_sin', `🪪 sin revisar <b>${res.prv_sin}</b>`, '[VJ-CARD-1] Nadie ha revisado sus números para el Portal: si entran verán «estamos revisando tu viaje». Clic para verlos.') : ''}
     </div>${habsHtml}${zonasHtml}`;
 }
@@ -6454,6 +6477,9 @@ function _vj2Pintar() {
 
   // [CAPSULE-UX-1] Los contadores del evento (universo completo, fuera de la
   // lista para que el repintado no los toque) y el filtro de la TABLA.
+  // [GENERO-2] El género del perfil del Portal viaja anotado en la fila (solo
+  // en memoria: jamás se escribe por aquí) para que resumen, filtro y card lo vean.
+  _vj2Filas.forEach((v) => { v._perfGenero = _vjPerfil(v, _perf).genero || null; });
   _vjChipsPintar(_vjResumenDe(_vj2Filas, _ctrMapa));
   const visibles = _vjFiltraFilas(_vj2Filas, _vj2Q, _vj2Chip, _ctrMapa);
   const _hayFiltro = !!(_vjNorm(_vj2Q).trim() || _vj2Chip);
@@ -6464,7 +6490,8 @@ function _vj2Pintar() {
     c === '__ctr_sin' ? '📜 contrato sin firmar' : c === '__prv_sin' ? '🪪 Portal sin revisar' :
     c.startsWith('__grp:') ? '👥 un grupo que viaja junto' :
     c.startsWith('__zona:') ? `zona «${c.slice(7)}»` :
-    c.startsWith('__hab:') ? `🛏 ${c.slice(6)}` : c;
+    c.startsWith('__hab:') ? `🛏 ${c.slice(6)}` :
+    c === '__gen:M' ? '♀ mujeres' : c === '__gen:H' ? '♂ hombres' : c === '__gen:-' ? '❔ sin género' : c;
   // [VJ-CANCEL-OCULTO-1] Sin filtro, los cancelados NO se pintan (palabra de
   // Memo: «solo ver los que sí van al tour»). Nada se borra: el chip
   // «cancelados» los enseña, y aquí se DICE cuántos quedaron fuera.
@@ -6557,7 +6584,16 @@ function _vj2Pintar() {
       const lugares = Number(v.boletos) > 1 ? `<span class="vj2-tag" title="Esta fila trae ${Number(v.boletos)} lugares: sus acompañantes aún no tienen ficha propia">${Number(v.boletos)} lugares</span>` : '';
       return `<tr${gCol ? ` style="box-shadow:inset 4px 0 0 ${gCol}"` : ''}>
         ${_puedeAgrupar ? `<td><input type="checkbox" class="vj-grp-chk" value="${_esfEsc(v.id)}" aria-label="Seleccionar a ${_esfEsc(v.nombre || '')}"></td>` : ''}
-        <td>${foto}<b>${_esfEsc(v.nombre || '—')}</b>${edad != null ? ` <span style="font-size:11px;color:var(--ts)" title="Edad hoy (fecha de nacimiento del contrato o de su perfil del Portal)">· ${edad} años</span>` : ''}
+        <td>${foto}<b>${_esfEsc(v.nombre || '—')}</b>${(() => {
+            // [GENERO-2] ♀/♂ junto al nombre (clic = ver solo ese género). Del
+            // perfil del Portal va con borde punteado: lo dijo la persona, pero no
+            // está en su fila de KameHouse — se confirma con ✏️.
+            const gd = _vjGeneroDe(v);
+            if (!gd.g) return ` <span class="vj2-vacio" style="font-size:11px" title="Sin género: se captura con ✏️ Corregir, o lo dice al reservar / en su Portal">❔</span>`;
+            const et = gd.g === 'M' ? '♀ Mujer' : '♂ Hombre';
+            const col = gd.g === 'M' ? '#ff7ab8' : '#5aa9ff';
+            return ` <a href="#" onclick="vjChip('__gen:${gd.g}');return false" title="${gd.origen === 'perfil' ? 'Lo dijo en su registro del Portal (aún no está en su fila: confírmalo con ✏️). ' : ''}Clic: ver solo este género" style="font-size:11px;text-decoration:none;color:${col};border:1px ${gd.origen === 'perfil' ? 'dashed' : 'solid'} ${col};border-radius:999px;padding:0 6px;white-space:nowrap">${et}</a>`;
+          })()}${edad != null ? ` <span style="font-size:11px;color:var(--ts)" title="Edad hoy (fecha de nacimiento del contrato o de su perfil del Portal)">· ${edad} años</span>` : ''}
             <!-- [VJ-FILA-2] Las etiquetas en SU renglón, una al lado de la otra
                  (palabra de Memo: contrato y Portal juntos se leen mejor). -->
             <div class="vj2-tags">${_vjEsBaja(v) ? '<span class="vj2-tag" style="color:var(--red);border-color:var(--red)">⛔ cancelado</span>' : ''}<span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span>${lugares}<span class="vj2-par">${_vjCtrChip(v, _ctrMapa)}${typeof prvChip === 'function' ? prvChip(v) : ''}</span></div>
@@ -6846,7 +6882,7 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)" title="[VJ-HAB-1] El tipo de habitación que eligió — de aquí se arma el rooming. Solo PLUS/STAY/RIDE duermen; en CHEAP déjalo vacío.">HABITACIÓN<br><select class="cot-input" id="vjx-h-${e}">
         ${['', 'Compartida', 'Doble', 'Triple', 'Individual'].map((h) => `<option value="${h}"${String(v.hotel_tipo || '') === h ? ' selected' : ''}>${h || '—'}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts)" title="[GENERO-1] El insumo de las Compartidas del rooming (H con H, M con M — regla firmada). Vacío = no se sabe.">GÉNERO<br><select class="cot-input" id="vjx-g-${e}" style="width:70px">
-        ${[['', '—'], ['M', 'M'], ['H', 'H']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
+        ${[['', '—'], ['M', 'Mujer'], ['H', 'Hombre']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts);flex-basis:100%" title="[VJ-INDICA-1] Lo que el equipo tiene que saber de esta persona: cuarto especial, planta baja, alergia, viaja con silla de ruedas… La ven el rooming y la coordinadora. Vacío = sin indicaciones.">📌 INDICACIONES (cuarto especial, algo específico)<br><input class="cot-input" id="vjx-i-${e}" maxlength="500" value="${_esfEsc(v.indicaciones || '')}" placeholder="Ej. cama matrimonial con su pareja · planta baja · alérgica a mariscos" style="width:100%"></label>
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[PAGADO-CLARO-1] Lo pagado FUERA del sistema. Los pagos capturados (📎 Pagos) se suman aparte: no los repitas aquí.">PAGADO ANTES (sin capturados)<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px" oninput="_vjPagadoPintar('${_attrJs(id)}')"></label>

@@ -6923,6 +6923,9 @@ function _reqPintar(){
     '<input type="text" id="req-nombre" placeholder="Tu nombre completo *" maxlength="80" style="'+inp+'">'+
     '<input type="tel" id="req-celular" placeholder="Tu WhatsApp (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
     '<input type="email" id="req-correo" placeholder="Tu correo * (ahí te llega tu acceso)" maxlength="120" style="'+inp+'">'+
+    // [GENERO-2] Palabra de Bulma vía Memo: el género se pregunta al reservar
+    // (a cada persona) para acomodar las habitaciones y tener el control en Capsule.
+    _reqGeneroSel('req-genero','Tu género *',inp)+
     // [ACOMP-1b] Datos del viajero (plantilla de Memo para PLUS/STAY/RIDE):
     // talla de playera de hombre + número de emergencia.
     (_reqPideViaje()?_reqTallaSel('req-talla','Tu talla de playera (de hombre) *',inp)+
@@ -6991,6 +6994,7 @@ function _reqAcompHtml(inp){
     h+='<div style="border-left:2px solid rgba(232,255,76,.4);padding-left:8px;margin:0 0 6px">'+
       '<input type="text" class="req-acomp-nombre" placeholder="Nombre completo del acompañante '+i+' *" maxlength="80" style="'+inp+'">'+
       '<input type="email" class="req-acomp-correo" placeholder="Correo del acompañante '+i+'" maxlength="120" style="'+inp+'">'+
+      _reqGeneroSel('','Género del acompañante '+i+' *',inp,'req-acomp-genero')+
       (_reqPideViaje()?
         '<input type="tel" class="req-acomp-cel" placeholder="WhatsApp del acompañante '+i+' (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
         _reqTallaSel('','Talla de playera del acompañante '+i+' (de hombre) *',inp,'req-acomp-talla')+
@@ -7038,6 +7042,12 @@ function _reqPideViaje(){
   if(selPkg!=='cheap')return true;
   try{return !!(cur&&_esPreventaCiegas(cur));}catch(e){return false;}
 }
+// [GENERO-2] Hombre/Mujer, nace VACÍO (DEFAULTS-1: es un dato de la persona,
+// nadie lo elige por ella). Función DECLARADA (ley del hoisting de la serie CARDS).
+function _reqGeneroSel(id,ph,inp,clase){
+  var o='<option value="">'+ph+'</option><option value="M">Mujer</option><option value="H">Hombre</option>';
+  return '<select'+(id?' id="'+id+'"':'')+(clase?' class="'+clase+'"':'')+' style="'+inp+';appearance:auto">'+o+'</select>';
+}
 function _reqTallaSel(id,ph,inp,clase){
   var o='<option value="">'+ph+'</option>';
   ['XS','S','M','L','XL','XXL'].forEach(function(t){o+='<option value="'+t+'">'+t+'</option>';});
@@ -7050,6 +7060,8 @@ function _reqAcompLeer(){
   for(var i=0;i<ns.length;i++){
     var c=((cs[i]&&cs[i].value)||'').trim()||titular;
     var f={nombre:ns[i].value.trim(),correo:c};
+    var ge=document.querySelectorAll('.req-acomp-genero')[i];
+    f.genero=(ge&&ge.value)||'';   // [GENERO-2]
     if(_reqPideViaje()){
       var ce=document.querySelectorAll('.req-acomp-cel')[i], ta=document.querySelectorAll('.req-acomp-talla')[i], em=document.querySelectorAll('.req-acomp-emer')[i];
       f.celular=((ce&&ce.value)||'').replace(/\D/g,'');
@@ -7181,6 +7193,8 @@ function _reqEnviar(){
   if(cel.length!==10)return _reqMsg('Tu WhatsApp va a 10 dígitos, sin lada de país',true);
   if(!correo)return _reqMsg('Escribe tu correo: ahí te llega tu acceso para ver tu plan',true);
   if(_reqCorreoProblema(correo))return _reqMsg('Revisa tu correo: '+_reqCorreoProblema(correo),true);
+  var genero=(document.getElementById('req-genero')||{value:''}).value;   // [GENERO-2]
+  if(!genero)return _reqMsg('Elige tu género (mujer u hombre)',true);
   var viaje=_reqPideViaje(), talla='', emer='';
   if(viaje){
     talla=(document.getElementById('req-talla')||{value:''}).value;
@@ -7194,6 +7208,7 @@ function _reqEnviar(){
     var q=' del acompañante '+(ai+1);
     if(acomp[ai].nombre.length<2)return _reqMsg('Escribe el nombre completo'+q,true);
     if(_reqCorreoProblema(acomp[ai].correo))return _reqMsg('Revisa el correo'+q+': '+_reqCorreoProblema(acomp[ai].correo),true);
+    if(!acomp[ai].genero)return _reqMsg('Elige el género'+q,true);
     if(viaje){
       if(acomp[ai].celular.length!==10)return _reqMsg('El WhatsApp'+q+' va a 10 dígitos',true);
       if(!acomp[ai].talla_playera)return _reqMsg('Elige la talla de playera'+q,true);
@@ -7228,6 +7243,7 @@ function _reqEnviar(){
       acompanantes:acomp.length?acomp:undefined,
       desglose:(acomp.length&&desglose.length)?desglose.map(function(v){return Math.round(v);}):undefined,
       datos_viaje:viaje||undefined,
+      genero:genero,pide_genero:true,   // [GENERO-2]
       talla_playera:viaje?talla:undefined,
       num_emergencia:viaje?emer:undefined,
       forma_pago:_reqEstado.forma,

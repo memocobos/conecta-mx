@@ -188,6 +188,37 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ♀♂⏳ **GENERO-2 (3-nov-2026, en main local; la BASE ya escrita): el género se
+  PREGUNTA al registrarse y se VE en las cards de Capsule.** Palabra de Bulma vía
+  Memo: *«tener la información del género en las cards de Capsule Corp … y de una
+  vez preguntárselo a los viajeros a la hora de su registro»*. Acta
+  `migraciones/GENERO-2.sql` (YA CORRIDA en las DOS bases, CHECK H/M mordido):
+  `requisiciones.genero` (KH) + `clientes.genero` (Portal); los acompañantes van
+  en el jsonb. `generoNormalizado` en `_lib/correo-forma` es el dueño (H/M,
+  acepta la palabra). **Las puertas:** (1) el formulario de reservación del index
+  pide Mujer/Hombre al titular y a CADA acompañante (todos los paquetes, nace
+  vacío) y manda `pide_genero:true` → `requisicion-crear` lo exige con la marca,
+  lo valida siempre (página vieja sin marca nace con NULL) → al aprobar cada
+  viajero nace con SU género (uno raro en el jsonb cae a NULL, no tumba el INSERT);
+  la bandeja lo pinta. (2) El perfil del Portal pide Género y entra a
+  `_perfilIncompleto`: **quien ya estaba registrado lo completa UNA vez en su
+  próxima visita**. (3) La tarjeta del viaje en el Portal lo pide en «Completar
+  datos» (es faltante) y `portal-viajero editar` lo guarda; si la fila es de la
+  persona del perfil (mismo primer nombre) se propone el del perfil. **Capsule:**
+  ♀ Mujer / ♂ Hombre junto al nombre (clic = filtra), chips «♀ N · ♂ N · ❔ sin
+  género N», el buscador entiende «mujer/hombre». 🔒 El de KameHouse MANDA; si
+  falta, el del perfil del Portal se pinta con borde PUNTEADO («lo dijo en su
+  registro — confírmalo con ✏️») y jamás se escribe solo; la inferencia por
+  nombre del rooming NO entra a la card (❔ si nadie lo dijo). Careos:
+  acomp-1 **76** ([GEN], sabotaje al aprobar → rojo → restaurado sha1 `951416db`)
+  · capsule-ux-1 **83** ([GEN] por el pintor real; sabotaje al fallback del perfil
+  → 3 rojos → restaurado sha1 `e3be4bef`) · portal-edit-1 **31** · capsule-ux-2
+  46 (su sandbox ganó `_vjGeneroDe`) · vecinos verdes (req-b1 52 · rechazo-1 71
+  · req-corrige-1 40 · portal-solo-1 89 · rooming-auto-1 79 · preventa-pn27 62 ·
+  viajero-edita-1 67 · confirma-1 28). ⚠️ No verificado en navegador (careado en
+  vm). ⏳ Push de Memo → hoy 0 de 2,8xx viajeros traen género: se llena con las
+  reservaciones nuevas, el Portal y el ✏️ de Bulma/Milk.
+
 - 📎⏳ **ABONO-FOTO-4 (3-nov-2026, en main local, cero SQL): subir o CAMBIAR
   el comprobante de un abono que YA EXISTE.** Reporte de Bulma/Milk vía Memo:
   *«sigue sin poder en Capsule subir el comprobante o corregir el comprobante de

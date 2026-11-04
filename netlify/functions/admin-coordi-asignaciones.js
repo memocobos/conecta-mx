@@ -1679,7 +1679,7 @@ ${entregables}
       const hP = { apikey: env.PORTAL_SB_SERVICE, Authorization: 'Bearer ' + env.PORTAL_SB_SERVICE };
       for (let i = 0; i < correos.length; i += 100) {
         const lote = correos.slice(i, i + 100).map((c) => '"' + c.replace(/"/g, '') + '"').join(',');
-        const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/clientes?correo=in.(${encodeURIComponent(lote)})&select=correo,fecha_nacimiento,avatar_url,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion`, { headers: hP });
+        const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/clientes?correo=in.(${encodeURIComponent(lote)})&select=correo,fecha_nacimiento,avatar_url,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion,genero`, { headers: hP });
         if (!r.ok) return ok(headers, { perfiles: null, motivo: 'no se pudo leer el Portal' });
         (await r.json()).forEach((c) => {
           perfiles[String(c.correo || '').toLowerCase()] = {
@@ -1688,6 +1688,9 @@ ${entregables}
             emergencia_nombre: c.contacto_emergencia_nombre || null,
             emergencia_tel: c.contacto_emergencia_telefono || null,
             emergencia_relacion: c.contacto_emergencia_relacion || null,
+            // [GENERO-2] Lo que dijo en su registro del Portal (H/M). La lista lo
+            // usa solo si su fila de KameHouse no lo trae, y lo ROTULA «del perfil».
+            genero: (c.genero === 'H' || c.genero === 'M') ? c.genero : null,
           };
         });
       }

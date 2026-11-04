@@ -282,7 +282,7 @@ function _reqBdjCard(r) {
   const esRoshi = typeof currentUser !== 'undefined' && currentUser && currentUser.rol === 'maestro_roshi';
   const acomp = Array.isArray(r.acompanantes) && r.acompanantes.length ? `<div>
       <div class="rq-sub">Acompañantes · al aprobar nace un viajero por persona${Array.isArray(r.desglose) ? ', con lo que declaró cada quien' : ', el pago repartido'}</div>
-      <div class="rq-acomp">${r.acompanantes.map((a, i) => `<div>${i + 2}. <b>${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}${a.celular ? ' · WA ' + _reqBdjEsc(a.celular) : ''}${a.talla_playera ? ' · talla ' + _reqBdjEsc(a.talla_playera) : ''}${a.num_emergencia ? ' · emerg. ' + _reqBdjEsc(a.num_emergencia) : ''}</div>`).join('')}</div>
+      <div class="rq-acomp">${r.acompanantes.map((a, i) => `<div>${i + 2}. <b>${_reqBdjEsc(a.nombre)}</b> · ${_reqBdjEsc(a.correo)}${a.celular ? ' · WA ' + _reqBdjEsc(a.celular) : ''}${a.genero ? ' · ' + (a.genero === 'M' ? '♀ mujer' : '♂ hombre') : ''}${a.talla_playera ? ' · talla ' + _reqBdjEsc(a.talla_playera) : ''}${a.num_emergencia ? ' · emerg. ' + _reqBdjEsc(a.num_emergencia) : ''}</div>`).join('')}</div>
     </div>` : '';
   // [REQ-DUP-1] El aviso de gemelas que el servidor derivó (mismo evento +
   // mismo celular o correo). Nació del caso Virginia Moguel: la misma solicitud
@@ -318,6 +318,7 @@ function _reqBdjCard(r) {
       <div class="rq-contact">
         <span>WhatsApp <b>${_reqBdjEsc(r.celular)}</b></span>
         ${r.correo ? `<span>Correo <b>${_reqBdjEsc(r.correo)}</b></span>` : ''}
+        ${r.genero ? `<span>${r.genero === 'M' ? '♀ Mujer' : '♂ Hombre'}</span>` : ''}
         ${r.talla_playera ? `<span>Talla <b>${_reqBdjEsc(r.talla_playera)}</b></span>` : ''}
         ${r.num_emergencia ? `<span>Emergencia <b>${_reqBdjEsc(r.num_emergencia)}</b></span>` : ''}
       </div>

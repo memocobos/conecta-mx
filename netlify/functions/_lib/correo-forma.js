@@ -80,4 +80,15 @@ function tallaNormalizada(t) {
   return TALLAS_VALIDAS.includes(v) ? v : null;
 }
 
-module.exports = { correoFormatoValido, puntosRaros, problemaCorreo, tldClaramenteMalo, llaveCorreo, esCorreoUsable, tallaNormalizada, TALLAS_VALIDAS };
+// [GENERO-2] El género del viajero, en la forma que guarda la base (CHECK H/M
+// en viajeros_evento, requisiciones y clientes). Acepta la letra o la palabra;
+// cualquier otra cosa → null (el llamador decide si eso es «falta» o «inválido»).
+// Es el insumo de las Compartidas del rooming (regla firmada 30-oct: H con H, M con M).
+function generoNormalizado(g) {
+  const v = String(g == null ? '' : g).trim().toLowerCase();
+  if (v === 'h' || v === 'hombre' || v === 'masculino') return 'H';
+  if (v === 'm' || v === 'mujer' || v === 'femenino') return 'M';
+  return null;
+}
+
+module.exports = { correoFormatoValido, puntosRaros, problemaCorreo, tldClaramenteMalo, llaveCorreo, esCorreoUsable, tallaNormalizada, TALLAS_VALIDAS, generoNormalizado };

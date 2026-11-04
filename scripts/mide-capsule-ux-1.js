@@ -54,7 +54,7 @@ console.log('[A] _vjResumenDe · los contadores derivan de las filas, con el due
 const sb = {};
 vm.createContext(sb);
 [decl(js, 'KH_PREVENTA_EVENTOS'), fn(js, 'khEsPreventaCiegas'), fn(js, 'khPaqueteTexto'),
- fn(js, '_esStaff'), decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas')]
+ fn(js, '_esStaff'), decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjGeneroDe'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas')]
   .forEach((code) => vm.runInContext(code, sb));
 
 // Fixture: nombres INVENTADOS (jamás datos de clientes reales). Cada fila
@@ -137,7 +137,7 @@ vm.createContext(sb2);
 let chipsHtml = '';
 sb2.document = { getElementById: (id) => (id === 'cc-vj-chips' ? { set innerHTML(v) { chipsHtml = v; }, get innerHTML() { return chipsHtml; } } : null) };
 [decl(js, 'KH_PREVENTA_EVENTOS'), fn(js, 'khEsPreventaCiegas'), fn(js, 'khPaqueteTexto'), fn(js, '_esStaff'),
- decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_esfEsc'), fn(js, '_attrJs'),
+ decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjGeneroDe'), fn(js, '_vjResumenDe'), fn(js, '_esfEsc'), fn(js, '_attrJs'),
  'let _vj2Chip = null;', fn(js, '_vjChipsPintar')].forEach((code) => vm.runInContext(code, sb2));
 vm.runInContext('_vjChipsPintar(_vjResumenDe(' + JSON.stringify(FILAS) + '))', sb2);
 af(/👥 <b>6<\/b> viajeros · 🎟 <b>7<\/b> lugares/.test(chipsHtml), 'el chip GLOBAL dice 6 viajeros · 7 lugares');
@@ -201,7 +201,7 @@ try {
   sb5.document = { getElementById: (id) => nodo(id), querySelectorAll: () => [] };
   sb5.currentUser = { rol: 'maestro_roshi' };   // ve dinero y acciones
   [decl(js, 'KH_PREVENTA_EVENTOS'), fn(js, 'khEsPreventaCiegas'), fn(js, 'khPaqueteTexto'), fn(js, '_esStaff'),
-   decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'),
+   decl(js, '_vjNorm'), fn(js, '_vjEsBaja'), fn(js, '_vjGeneroDe'), fn(js, '_vjResumenDe'), fn(js, '_vjFiltraFilas'),
    fn(js, '_esfEsc'), fn(js, '_attrJs'), fn(js, '_vj3Saldo'), fn(js, '_vj3Money'),
    // [CAPSULE-WA-1] el pintor ahora arma links de WhatsApp: sus tres dueños van al sandbox
    fn(js, '_cobDigits'), fn(js, '_waDigits10'), fn(js, '_vjWaHref'), fn(js, '_vjEdad'), fn(js, '_vjPerfil'),
@@ -252,6 +252,22 @@ try {
   af(/<details class="vj2-nota"><summary[^>]*>📝 Notas<\/summary>[\s\S]*nota larga de migración/.test(t3) && !/<th>Notas<\/th>/.test(t3), '[VJ-PERFIL-1] las notas viven en un desplegable al final (ya no es columna)');
   af(vm.runInContext('_vjEdad("2010-12-31")', sb5) === anioRey - 2011 || vm.runInContext('_vjEdad("2010-12-31")', sb5) === anioRey - 2010, 'la edad descuenta el cumpleaños que aún no llega');
   af(vm.runInContext('_vjEdad("")', sb5) === null, 'sin fecha no se inventa edad');
+  // [GENERO-2] ♀/♂ en la card, chips por género y filtro — el de KH manda, el del
+  // perfil del Portal entra ROTULADO (borde punteado) solo si la fila no lo trae.
+  vm.runInContext('_vj2Filas[1].genero = "M"; _vj2Filas[0].genero = null;'
+    + '_vj2Ctx.perfiles["maria@x.mx"].genero = "M"; _vj2Filas[2].genero = "H"; _vj2Q = ""; _vj2Chip = null; _vj2Pintar();', sb5);
+  const tg = nodos['cc-kh-list'].innerHTML, chg = nodos['cc-vj-chips'].innerHTML;
+  af(/Sofía López<\/b> <a [^>]*vjChip\('__gen:M'\)[^>]*border:1px solid[^>]*>♀ Mujer<\/a>/.test(tg), '[GEN] la card de Sofía (dato de KH) dice ♀ Mujer, borde sólido, y filtra al tocarla');
+  af(/María Pérez<\/b> <a [^>]*title="Lo dijo en su registro del Portal[^>]*border:1px dashed[^>]*>♀ Mujer<\/a>/.test(tg), '[GEN] María sin género en KH toma el de su PERFIL, rotulado y con borde punteado');
+  af(/Pedro Niño<\/b> <a [^>]*>♂ Hombre<\/a>/.test(tg), '[GEN] Pedro ♂ Hombre');
+  af(/Luisa Cantú<\/b> <span class="vj2-vacio"[^>]*>❔<\/span>/.test(tg), '[GEN] sin género en ningún lado → ❔ (NO se adivina por el nombre)');
+  af(/♀ <b>2<\/b>/.test(chg) && /♂ <b>1<\/b>/.test(chg) && /sin género <b>3<\/b>/.test(chg), '[GEN] chips: 2 mujeres · 1 hombre · 3 sin género (sobre el universo activo, sin la baja)');
+  vm.runInContext('_vj2Chip = "__gen:M"; _vj2Pintar();', sb5);
+  const tgm = nodos['cc-kh-list'].innerHTML;
+  af(/Sofía López/.test(tgm) && /María Pérez/.test(tgm) && !/Pedro Niño/.test(tgm) && !/Luisa Cantú/.test(tgm), '[GEN] el chip ♀ filtra a las 2 mujeres (incluida la del perfil)');
+  vm.runInContext('_vj2Chip = null; _vj2Q = "hombre"; _vj2Pintar();', sb5);
+  af(/Pedro Niño/.test(nodos['cc-kh-list'].innerHTML) && !/Sofía López/.test(nodos['cc-kh-list'].innerHTML), '[GEN] el buscador entiende «hombre»');
+  vm.runInContext('_vj2Q = ""; _vj2Chip = null;', sb5);
 } catch (e) {
   af(false, 'EL PINTOR REVENTÓ al ejecutarse: ' + e.message);
 }

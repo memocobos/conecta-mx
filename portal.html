@@ -1576,6 +1576,18 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
         </div>
 
         <div class="field">
+          <!-- [GENERO-2] Para acomodar las habitaciones compartidas (mujeres con
+               mujeres, hombres con hombres). Nace vacío: lo elige la persona. -->
+          <label for="p-genero">Género</label>
+          <select id="p-genero" name="genero" required>
+            <option value="">Elige</option>
+            <option value="M">Mujer</option>
+            <option value="H">Hombre</option>
+          </select>
+          <div class="err">Elige mujer u hombre (lo usamos para acomodar las habitaciones)</div>
+        </div>
+
+        <div class="field">
           <label for="p-talla">Talla de playera</label>
           <select id="p-talla" name="talla_playera" required>
             <option value="">Elige tu talla</option>
@@ -2289,6 +2301,9 @@ function validarPerfil(){
   const talla = $('#p-talla').value;
   if (!talla){ setFieldError($('#p-talla').closest('.field')); ok = false; }
 
+  // [GENERO-2]
+  if (!$('#p-genero').value){ setFieldError($('#p-genero').closest('.field')); ok = false; }
+
   const en = $('#p-emerg-nombre').value.trim();
   if (en.length < 3){ setFieldError($('#p-emerg-nombre').closest('.field')); ok = false; }
 
@@ -2307,6 +2322,7 @@ function recolectarPerfil(user){
     celular: soloDigitos($('#p-celular').value),
     correo_ticketmaster: $('#p-tm').value.trim().toLowerCase() || null,
     talla_playera: $('#p-talla').value,
+    genero: $('#p-genero').value || null,   // [GENERO-2]
     contacto_emergencia_nombre: $('#p-emerg-nombre').value.trim(),
     contacto_emergencia_telefono: soloDigitos($('#p-emerg-tel').value),
     contacto_emergencia_relacion: $('#p-emerg-rel').value.trim() || null,
@@ -2321,6 +2337,7 @@ function prellenarPerfil(c){
   $('#p-celular').value      = c.celular || '';
   $('#p-tm').value           = c.correo_ticketmaster || '';
   $('#p-talla').value        = c.talla_playera || '';
+  $('#p-genero').value       = c.genero || '';   // [GENERO-2]
   $('#p-emerg-nombre').value = c.contacto_emergencia_nombre || '';
   $('#p-emerg-tel').value    = c.contacto_emergencia_telefono || '';
   $('#p-emerg-rel').value    = c.contacto_emergencia_relacion || '';
@@ -2605,7 +2622,9 @@ document.querySelector('[data-action="logout"]').addEventListener('click', async
 // =====================================================================
 // ¿Le falta algún dato obligatorio del perfil? (Los walk-ins nacen con estos NULL.)
 function _perfilIncompleto(c){
-  return !c || !c.fecha_nacimiento || !c.talla_playera
+  // [GENERO-2] El género entra aquí: quien ya estaba registrado lo completa
+  // UNA vez en su próxima visita (palabra de Bulma vía Memo: «tenerlo bien»).
+  return !c || !c.fecha_nacimiento || !c.talla_playera || !c.genero
     || !c.contacto_emergencia_nombre || !c.contacto_emergencia_telefono;
 }
 
@@ -3526,6 +3545,7 @@ function _migFaltantes(t){
   const f = [];
   if (!t.celular) f.push('WhatsApp');
   if (!t.talla_playera) f.push('talla');
+  if (!t.genero) f.push('género');   // [GENERO-2]
   if (!t.num_emergencia) f.push('número de emergencia');
   return f;
 }
@@ -3740,6 +3760,15 @@ function _migDatosHtml(t){
   const lbl = 'display:block;font-size:11px;opacity:.7;margin:0 0 3px';
   let tallas = '<option value="">— elige —</option>';
   ['XS','S','M','L','XL','XXL'].forEach((x) => { tallas += '<option' + (t.talla_playera === x ? ' selected' : '') + '>' + x + '</option>'; });
+  // [GENERO-2] Si el viaje no lo trae, se PROPONE el del perfil (lo dijo la
+  // misma persona al registrarse) — se guarda solo cuando aprieta Guardar.
+  // Solo si la fila ES de la persona del perfil (mismo primer nombre): con el
+  // mismo correo viajan acompañantes, y a ellos no se les adivina.
+  const _pn = (x) => String(x || '').trim().split(/\s+/)[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const _pf = (typeof perfilExistente !== 'undefined' && perfilExistente) || null;
+  const gPerf = (_pf && _pf.genero && _pn(_pf.nombre_completo) && _pn(_pf.nombre_completo) === _pn(t.nombre)) ? _pf.genero : '';
+  const gSel = t.genero || gPerf;
+  const generos = '<option value="">— elige —</option>' + [['M','Mujer'],['H','Hombre']].map(([v, e]) => '<option value="' + v + '"' + (gSel === v ? ' selected' : '') + '>' + e + '</option>').join('');
   return '<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px">'
     + (falt.length ? '<div style="font-size:12px;color:#e8ff4c;margin-bottom:8px">⚠️ Falta: ' + escapeHtml(falt.join(', ')) + '</div>' : '')
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
@@ -3749,6 +3778,7 @@ function _migDatosHtml(t){
     + '<div data-mig-panel="datos" style="display:none;margin-top:10px">'
     +   '<label style="' + lbl + '">Nombre completo</label><input data-f="nombre" maxlength="80" style="' + inp + '" value="' + escapeHtml(t.nombre || '') + '">'
     +   '<label style="' + lbl + '">WhatsApp (10 dígitos)</label><input data-f="celular" inputmode="numeric" maxlength="14" style="' + inp + '" value="' + escapeHtml(t.celular || '') + '">'
+    +   '<label style="' + lbl + '">Género (para acomodar las habitaciones)</label><select data-f="genero" style="' + inp + '">' + generos + '</select>'
     +   '<label style="' + lbl + '">Talla de playera (de hombre)</label><select data-f="talla_playera" style="' + inp + '">' + tallas + '</select>'
     +   '<label style="' + lbl + '">Contacto de emergencia (nombre)</label><input data-f="emergencia_nombre" maxlength="80" style="' + inp + '" value="' + escapeHtml(t.emergencia_nombre || '') + '">'
     +   '<label style="' + lbl + '">Parentesco (mamá, pareja, hermano…)</label><input data-f="emergencia_parentesco" maxlength="40" style="' + inp + '" value="' + escapeHtml(t.emergencia_parentesco || '') + '">'
@@ -4174,6 +4204,7 @@ async function _migGuardar(id){
   p.querySelectorAll('[data-f]').forEach((el) => { campos[el.getAttribute('data-f')] = el.value; });
   if (!campos.emergencia_nombre) delete campos.emergencia_nombre;
   if (!campos.emergencia_parentesco) delete campos.emergencia_parentesco;
+  if (!campos.genero) return _migMsg(p, 'Elige el género (mujer u hombre)');   // [GENERO-2]
   if (!campos.talla_playera) return _migMsg(p, 'Elige tu talla de playera');
   _migMsg(p, 'Guardando…', true);
   try {

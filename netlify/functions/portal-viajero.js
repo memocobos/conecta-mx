@@ -28,7 +28,7 @@
 // Env: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_ANON_KEY, SUPABASE_URL_KAMEHOUSE,
 //      SUPABASE_SERVICE_KEY_KAMEHOUSE.
 // =============================================================================
-const { tallaNormalizada } = require('./_lib/correo-forma');
+const { tallaNormalizada, generoNormalizado } = require('./_lib/correo-forma');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TIPOS = ['hotel', 'zona', 'fecha', 'otro'];
@@ -164,6 +164,13 @@ exports.handler = async (event) => {
       const t = tallaNormalizada(c.talla_playera);
       if (!t) return json(400, headers, { ok: false, error: 'Elige una talla de XS a XXL' });
       cambios.talla_playera = t;
+    }
+    // [GENERO-2] El cliente dice su género (y el de sus acompañantes que van a
+    // su correo): lista cerrada H/M — es el insumo de las Compartidas del rooming.
+    if (c.genero !== undefined) {
+      const g = generoNormalizado(c.genero);
+      if (!g) return json(400, headers, { ok: false, error: 'Elige mujer u hombre' });
+      cambios.genero = g;
     }
     if (c.num_emergencia !== undefined) {
       const d = String(c.num_emergencia || '').replace(/\D/g, '');

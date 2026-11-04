@@ -141,7 +141,7 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
@@ -260,6 +260,7 @@ exports.handler = async (event) => {
         nombre: v.nombre || null,
         celular: v.celular || null,
         talla_playera: v.talla_playera || null,
+        genero: (v.genero === 'H' || v.genero === 'M') ? v.genero : null,   // [GENERO-2]
         num_emergencia: v.num_emergencia || null,
         emergencia_nombre: v.emergencia_nombre || null,
         emergencia_parentesco: v.emergencia_parentesco || null,

@@ -442,6 +442,41 @@ const BASURA = Buffer.alloc(64, 1).toString('base64');
   af(r.statusCode === 200 && red.viajeros.length === 3 && red.abonos.length === 2, '[F12] quien puso $0 nace sin abono (debe su parte), sin error');
   af(/function _reqDesgloseHtml\(/.test(INDEX_HTML) && /desglose:\(acomp\.length&&desglose\.length\)/.test(INDEX_HTML), '[F13] el index pide el desglose y lo manda en el envío');
 
+  // ── [GEN] GENERO-2 · el género se pregunta al reservar y viaja al viajero ──
+  console.log('\n[GEN] GENERO-2 — el género de cada persona, del formulario a la lista');
+  const acompG = acompOk.map((a, i) => Object.assign({}, a, { genero: i === 0 ? 'mujer' : 'H' }));
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', pedido({ pide_genero: true, genero: 'M', acompanantes: acompG })));
+  const rg = red.requisiciones[0] || {};
+  af(r.statusCode === 200 && rg.genero === 'M' && rg.acompanantes && rg.acompanantes[0].genero === 'M' && rg.acompanantes[1].genero === 'H',
+    `[GEN1] titular M y acompañantes normalizados ('mujer'→M, H) (${r.statusCode})`);
+  const casosG = [
+    ['[GEN2] con la marca y SIN género del titular → 400', { pide_genero: true, acompanantes: acompG }],
+    ['[GEN3] con la marca y un acompañante sin género → 400', { pide_genero: true, genero: 'M', acompanantes: [acompG[0], Object.assign({}, acompG[1], { genero: '' })] }],
+    ['[GEN4] género inventado («X») → 400 aunque no venga la marca (el CHECK no tumba la venta a media aprobación)', { genero: 'X', acompanantes: acompOk }],
+  ];
+  for (const [msg, extra] of casosG) {
+    red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+    r = await H.crear(evento('POST', pedido(extra)));
+    af(r.statusCode === 400 && red.requisiciones.length === 0, msg + ` (${r.statusCode})`);
+  }
+  red = redNueva(); global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.crear(evento('POST', pedido({ acompanantes: acompOk })));
+  af(r.statusCode === 200 && red.requisiciones[0].genero == null, '[GEN5] página vieja sin la marca → nace igual, género NULL (no se inventa)');
+  red = redNueva({ requisiciones: [pend({ genero: 'M', acompanantes: [
+    Object.assign({}, acompOk[0], { genero: 'H' }), Object.assign({}, acompOk[1], { genero: 'basura' })] })] });
+  global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma));
+  af(r.statusCode === 200 && red.viajeros.length === 3 && red.viajeros[0].genero === 'M' && red.viajeros[1].genero === 'H' && red.viajeros[2].genero == null,
+    '[GEN6] al aprobar cada viajero nace con SU género; uno raro en el jsonb cae a NULL en vez de tumbar el INSERT de todos');
+  red = redNueva({ requisiciones: [pend({ acompanantes: null, genero: 'H' })] });
+  global.fetch = red.fetch; H = handlersFrescos();
+  r = await H.admin(evento('POST', { accion: 'aprobar', id: pend().id, monto: 900 }, tokenBulma));
+  af(red.viajeros.length === 1 && red.viajeros[0].genero === 'H', '[GEN7] camino viejo (un viajero) también lleva el género');
+  af(/function _reqGeneroSel\(/.test(INDEX_HTML) && /_reqGeneroSel\('req-genero'/.test(INDEX_HTML) && /req-acomp-genero/.test(INDEX_HTML)
+    && /genero:genero,pide_genero:true/.test(INDEX_HTML), '[GEN8] el index pregunta el género (titular + cada acompañante) y lo marca en el envío');
+  af(/if\(!genero\)return _reqMsg/.test(INDEX_HTML) && /if\(!acomp\[ai\]\.genero\)return _reqMsg/.test(INDEX_HTML), '[GEN9] el index no deja enviar sin género (titular ni acompañantes)');
+
   console.log(`\n${R === 0 ? (V ? '✅ VERDE' : '⚠️ NADA MEDIDO · esto NO es un verde') : '🔴 ROJO'} · ${V} en verde · ${R} en rojo`);
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.log('✗ EL ARNÉS SE CAYÓ: ' + e.stack); process.exit(1); });

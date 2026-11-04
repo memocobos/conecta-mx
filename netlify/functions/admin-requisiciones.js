@@ -90,6 +90,11 @@ const { fetchEventosRaw, fetchHotelesGlobales } = require('./_lib/catalogo-index
 const { _calcularPrecio, _hotelLista, esCDMX, hoyMx } = require('./_lib/precio-zona');
 const { _opciones, fechasVendibles, NOMBRES } = require('./_lib/opciones-paquete');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
+// [GENERO-2] El género de un acompañante viaja dentro del jsonb de la
+// requisición (lo validó requisicion-crear); aquí se vuelve a pasar por el dueño
+// para que un jsonb tocado a mano no tumbe el INSERT de todos por el CHECK.
+const { generoNormalizado } = require('./_lib/correo-forma');
+const _generoOk = (g) => generoNormalizado(g);
 
 // [VJ-HAB-1] El tipo de habitación del rooming KH, normalizado (un solo dueño
 // para la habitación pedida y la corregida).
@@ -759,9 +764,9 @@ exports.handler = async (event) => {
       ? req.acompanantes : null;
     // [ACOMP-1b] talla y emergencia viajan a cada viajero (el Portal las hereda en el puente).
     const personas = acomp && acomp.length ? [{ nombre: req.nombre, correo: req.correo, celular: req.celular,
-        talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null, titular: true }]
+        talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null, genero: req.genero || null, titular: true }]
       .concat(acomp.map((a) => ({ nombre: a.nombre, correo: a.correo || req.correo, celular: a.celular || null,
-        talla_playera: a.talla_playera || null, num_emergencia: a.num_emergencia || null, titular: false }))) : null;
+        talla_playera: a.talla_playera || null, num_emergencia: a.num_emergencia || null, genero: _generoOk(a.genero), titular: false }))) : null;
     const N = personas ? personas.length : 1;
     const repartir = (x) => { const base = Math.floor(x / N); return Array.from({ length: N }, (_, i) => base + (i === 0 ? x - base * N : 0)); };
     const contratos = repartir(total_contrato);
@@ -782,6 +787,7 @@ exports.handler = async (event) => {
           grupo_viaje: grupoViaje,
           evento_id: evEf, nombre: p.nombre, celular: p.celular, correo: p.correo,
           talla_playera: p.talla_playera, num_emergencia: p.num_emergencia,
+          genero: p.genero,   // [GENERO-2] lo que dijo al reservar (alimenta el rooming)
           tipo_paquete: paqEf, zona_boleto: zonaFinal, boletos: 1,
           hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato: contratos[i], abonado_previo: 0,
@@ -790,6 +796,7 @@ exports.handler = async (event) => {
       : [{
           evento_id: evEf, nombre: req.nombre, celular: req.celular, correo: req.correo,
           talla_playera: req.talla_playera || null, num_emergencia: req.num_emergencia || null,
+          genero: req.genero || null,   // [GENERO-2]
           tipo_paquete: paqEf, zona_boleto: zonaFinal, boletos: req.num_personas,
           hotel_tipo: hotelTipo,   // [VJ-HAB-1]
           total_contrato, abonado_previo: 0, notas: notaViajero,

@@ -100,6 +100,13 @@ const ev = (body, jwt) => ({ httpMethod: 'POST', headers: Object.assign({ origin
   af(r.statusCode === 401, '[B11] sin sesión → 401');
   r = await H.pv(ev({ accion: 'editar', viajero_id: VK, campos: {} }, 'jwt-karina'));
   af(r.statusCode === 400, '[B12] nada que guardar → 400');
+  // [GENERO-2] el género se dice desde el Portal (lista cerrada).
+  r = await H.pv(ev({ accion: 'editar', viajero_id: VA, campos: { genero: 'mujer' } }, 'jwt-karina'));
+  af(r.statusCode === 200 && st.viajeros.find((v) => v.id === VA).genero === 'M', '[B13] el género llega a la lista, normalizado (mujer → M)');
+  r = await H.pv(ev({ accion: 'editar', viajero_id: VA, campos: { genero: 'X' } }, 'jwt-karina'));
+  af(r.statusCode === 400 && st.viajeros.find((v) => v.id === VA).genero === 'M', '[B14] género inventado → 400 y no se pisa el que había');
+  r = await H.plan(ev({}, 'jwt-karina'));
+  af(((JSON.parse(r.body).tours || []).find((t) => t.viajero_id === VA) || {}).genero === 'M', '[B15] el plan migrado manda el género para pintarlo en el formulario');
 
   console.log('\n[C] pedir un cambio — no cambia nada, cae a la bandeja');
   const antesK = JSON.stringify(st.viajeros.find((v) => v.id === VK));

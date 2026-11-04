@@ -2089,8 +2089,11 @@ function cabCortar(motivo) {
 // PROPIO encoder — no depende de estar al aire: sirve para ensayar. Al detener
 // la grabación queda en esta sesión para escuchar, descargar o guardar en
 // Episodios (el MP3 sube DIRECTO al bucket privado con una URL firmada: un
-// episodio de una hora pesa ~55 MB y una function no carga más de ~6 MB).
-const CAB_GRAB_KBPS = 128;
+// episodio de una hora pesa ~43 MB y una function no carga más de ~6 MB).
+// [RADIO-EPISODIOS-1b] 96 kbps, palabra de Memo («podemos bajar la calidad»):
+// a 128 una hora (~57 MB) no cabía en el tope de 50 MB del bucket; a 96 caben
+// ~1 h 10 min.
+const CAB_GRAB_KBPS = 96;
 // Pura (el careo la corre en vm): el título por defecto de una grabación.
 function cabGrabTitulo(cart, fechaMs) {
   const d = new Date(fechaMs);

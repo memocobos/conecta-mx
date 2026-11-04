@@ -193,9 +193,9 @@ está caduco antes de escribirse.
   guardar los episodios de los programas de radio, el audio sobre todo… quiero
   hacer pruebas y grabar para escuchar»*. Tarjeta «⏺ Grabadora y episodios» en
   la Cabina: graba LA MEZCLA (el master post-efectos = lo que sale al aire) con
-  su PROPIO processor y encoder MP3 128 kbps — **con o sin estar al aire**
+  su PROPIO processor y encoder MP3 **96 kbps** (RADIO-EPISODIOS-1b, palabra de Memo: a 128 una hora no cabía en 50 MB) — **con o sin estar al aire**
   (ensayo). Al detener: escuchar ahí, ⬇ descargar el MP3 o ☁️ guardar en
-  Episodios. 🔒 El audio NO pasa por una function (1 h ≈ 55 MB): el servidor
+  Episodios. 🔒 El audio NO pasa por una function (1 h ≈ 43 MB): el servidor
   firma una URL de SUBIDA (path armado por él) y el navegador sube directo al
   bucket PRIVADO `radio-episodios`; el índice `radio_episodios` nace SOLO si el
   objeto existe (409 si no). Lista con URL firmada 1 h (el path crudo no viaja),
@@ -207,7 +207,7 @@ está caduco antes de escribirse.
   Vecinos verdes: kaio-cabina-1 94 · kaio-v3 45 · radio-v2a 32 · radio-v2b 44.
   ⚠️ **No probado contra el storage real** (sin llave de servicio aquí; las
   formas de la API se tomaron de storage-js). ⚠️ **Tope de subida:** el global
-  del proyecto (Pro) es 50 MB por default ≈ 53 min a 128 kbps; si un episodio lo
+  del proyecto (Pro) es 50 MB por default ≈ 1 h 10 min a 96 kbps; si un episodio lo
   pasa, la grabadora lo DICE y queda la descarga — subirlo es Supabase →
   Storage → Settings. ⏳ Push de Memo → primera grabación de prueba.
 

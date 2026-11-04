@@ -1761,11 +1761,14 @@ function cabCtx() {
   _cb.fx.micOut.connect(_cb.micMonitorGain);
   _cb.micMonitorGain.connect(ctx.destination);
   _cbVuLoop();
+  _cbVolSync();   // [CAB-VOL-1] lo que dicen los sliders es lo que suena desde el primer instante
   return ctx;
 }
 // [KAIO-CABINA-7] Aplica los efectos de voz leyendo los controles de la
 // Mezcladora. Nunca reconecta: solo mueve parámetros (cabFxParams, pura).
 function cabFxAplicar() {
+  const ecoEl = _cbEl('cab-fx-eco'), ecoPct = _cbEl('cab-fx-eco-pct');
+  if (ecoEl && ecoPct) ecoPct.textContent = Math.round(Number(ecoEl.value) || 0) + '%';
   if (!_cb.fx || !_cb.ctx) return;
   const t = _cb.ctx.currentTime;
   const p = cabFxParams({
@@ -1806,7 +1809,32 @@ function cabDuck(on) {
     _cb.duckGain.gain.setTargetAtTime(hablando ? 0.3 : 1, _cb.ctx.currentTime, hablando ? 0.06 : 0.45);
   }, 80);
 }
-function cabVol(bus, v) { if (_cb.buses[bus]) _cb.buses[bus].gain.value = Number(v) / 100; }
+// [CAB-VOL-1] Los sliders de la Mezcladora, arreglados (prueba de Memo: «al
+// subir y bajar como que no funciona bien»). Tres causas, medidas leyendo:
+//  (1) el grafo nace DESPUÉS del primer movimiento: un slider movido antes de
+//      activar el mic o de tocar algo se quedaba mostrando un valor que NUNCA
+//      se aplicó (los buses nacían en 100%). Hoy cabCtx() sincroniza al nacer;
+//  (2) el slider del MIC movía la ganancia ANTES del compresor de «Voz de
+//      locutor» — el compresor se comía la subida y el volumen casi no
+//      cambiaba. Hoy el mic se mueve en micOut (DESPUÉS de los efectos): lo
+//      que mueves es lo que sale al aire, con o sin efectos;
+//  (3) el salto seco de gain.value mete un «clic»; se mueve con rampa corta.
+// Y el porcentaje se pinta junto a cada slider.
+function _cbNodoVol(bus) {
+  if (!_cb.ctx) return null;
+  if (bus === 'mic') return (_cb.fx && _cb.fx.micOut) || null;
+  return _cb.buses[bus] || null;
+}
+function cabVol(bus, v) {
+  const pct = Math.max(0, Math.round(Number(v) || 0));
+  const lab = _cbEl('cab-vol-' + bus + '-pct');
+  if (lab) lab.textContent = pct + '%';
+  const n = _cbNodoVol(bus);
+  if (n) n.gain.setTargetAtTime(pct / 100, _cb.ctx.currentTime, 0.03);
+}
+function _cbVolSync() {
+  ['mic', 'sam', 'mus'].forEach((b) => { const el = _cbEl('cab-vol-' + b); if (el) cabVol(b, el.value); });
+}
 function cabMonitor(on) { cabCtx(); _cb.monitorGain.gain.value = on ? 1 : 0; }
 function cabMicMonitor(on) { cabCtx(); _cb.micMonitorGain.gain.value = on ? 1 : 0; }
 function _cbVuLoop() {

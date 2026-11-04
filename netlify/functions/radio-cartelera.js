@@ -37,8 +37,11 @@ exports.handler = async (event) => {
   if (!URL_ || !KEY) {
     return { statusCode: 500, headers: { ...headers, 'Cache-Control': 'no-store' }, body: JSON.stringify({ ok: false, error: 'Faltan env vars' }) };
   }
+  // [RADIO-FOTO-1] foto_url VA en el select: V2a2 la agregó a la tabla, al
+  // admin y a la proyección de _lib/radio-cartelera, pero NO a esta lectura —
+  // la lib proyectaba un campo que nunca le llegaba y /radio jamás vio la foto.
   try {
-    const r = await fetch(`${URL_}/rest/v1/radio_programas?archivado=is.false&select=id,nombre,descripcion,conductor,dia_semana,fecha,hora_inicio,hora_fin,color,activo,archivado&limit=500`,
+    const r = await fetch(`${URL_}/rest/v1/radio_programas?archivado=is.false&select=id,nombre,descripcion,conductor,dia_semana,fecha,hora_inicio,hora_fin,color,foto_url,activo,archivado&limit=500`,
       { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
     if (!r.ok) throw new Error('Supabase ' + r.status);
     const programas = await r.json();

@@ -343,6 +343,29 @@ const ev = (body, tok) => ({ httpMethod: 'POST', headers: { origin: 'https://con
   af(jsR8.slice(jsR8.indexOf('function cabCortar')).includes('_cbOyentesStop();') && /clearInterval\(_cb\.oyTimer\)/.test(jsR8), '[KC-8] y MUERE en cabCortar — el reloj tiene dueño (_cb.oyTimer), un huérfano seguiría pidiendo el nowplaying para siempre');
   af(jsR8.includes("if (!_cb.ws) { _cbOyentesStop(); return; }"), '[KC-8] el tick se apaga solo si el aire ya se cortó mientras la red contestaba');
 
+  // [CAB-VOL-1] Los sliders: se EJECUTAN cabVol/_cbVolSync/_cbNodoVol reales en
+  // un vm con un grafo falso (gains que registran su valor).
+  const fnSrc = ['function _cbEl', 'function _cbNodoVol', 'function cabVol', 'function _cbVolSync'].map((n) => {
+    const i = jsR8.indexOf(n); let d = 0, j = jsR8.indexOf('{', i);
+    for (; j < jsR8.length; j++) { if (jsR8[j] === '{') d++; else if (jsR8[j] === '}' && --d === 0) break; }
+    return jsR8.slice(i, j + 1);
+  }).join('\n');
+  const g = () => ({ gain: { v: 1, setTargetAtTime(x) { this.v = x; } } });
+  const els = { 'cab-vol-mic': { value: '160' }, 'cab-vol-sam': { value: '40' }, 'cab-vol-mus': { value: '75' },
+    'cab-vol-mic-pct': { textContent: '' }, 'cab-vol-sam-pct': { textContent: '' }, 'cab-vol-mus-pct': { textContent: '' } };
+  const vctx = { document: { getElementById: (id) => els[id] || null } };
+  vm.createContext(vctx);
+  vm.runInContext('var _cb = { buses: {} };' + fnSrc, vctx);
+  vm.runInContext("cabVol('mus', 50)", vctx);
+  af(els['cab-vol-mus-pct'].textContent === '50%', '[CAB-VOL-1] el slider pinta su PORCENTAJE aunque el grafo aún no exista (no truena)');
+  vctx._g = { mic: g(), sam: g(), mus: g(), out: g() };
+  vm.runInContext("_cb.ctx = { currentTime: 0 }; _cb.buses = { mic: _g.mic, sam: _g.sam, mus: _g.mus }; _cb.fx = { micOut: _g.out }; _cbVolSync();", vctx);
+  af(vctx._g.sam.gain.v === 0.4 && vctx._g.mus.gain.v === 0.75, '[CAB-VOL-1] al nacer el grafo, lo que DICEN los sliders es lo que suena (antes los buses nacían en 100% sin importar el slider)');
+  af(vctx._g.out.gain.v === 1.6 && vctx._g.mic.gain.v === 1, '[CAB-VOL-1] el slider del MIC mueve micOut (DESPUÉS del compresor de «Voz de locutor»), no la entrada — el compresor ya no se come la subida');
+  af(els['cab-vol-mic-pct'].textContent === '160%', '[CAB-VOL-1] y el % del mic dice lo que suena');
+  af(jsR8.slice(jsR8.indexOf('function cabCtx'), jsR8.indexOf('function cabFxAplicar')).includes('_cbVolSync();'), '[CAB-VOL-1] cabCtx sincroniza los sliders al nacer');
+  af(html8.includes('id="cab-vol-mic-pct"') && html8.includes('id="cab-vol-sam-pct"') && html8.includes('id="cab-vol-mus-pct"') && html8.includes('id="cab-fx-eco-pct"'), '[CAB-VOL-1] los cuatro controles traen su porcentaje a la vista');
+
   console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
   process.exit(ko ? 1 : 0);
 })();

@@ -113,5 +113,54 @@ af(run("caratulaSrc('album.jpg', { is_live: true }, { al_aire: { foto_url: null 
    run("caratulaSrc('album.jpg', null, null)") === 'album.jpg', 'programa sin foto, sin programa o sin dato → el álbum de siempre');
 af(html.includes('caratulaSrc(actual.art, ultimoLive, cart)') && html.includes('pintarCaratula();'), 'y el reproductor REAL le pregunta a caratulaSrc en el latido Y al llegar la cartelera');
 
-console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
-process.exit(ko ? 1 : 0);
+console.log('\n[F] RADIO-FOTO-1 · la foto del programa LLEGA a /radio y una carátula rota no se queda negra');
+// El endpoint público SELECCIONA foto_url (V2a2 la proyectaba en la lib y nunca
+// la pedía a la base: la foto jamás llegó a /radio ni a la cartelera).
+const fnCart = fs.readFileSync(path.join(__dirname, '..', 'netlify/functions/radio-cartelera.js'), 'utf8');
+const sel = (fnCart.match(/radio_programas\?[^`]*select=([^&`]+)/) || [])[1] || '';
+af(sel.split(',').includes('foto_url'), 'radio-cartelera pide foto_url en su select (sin él la lib proyecta null siempre)');
+// Y se mide por el HECHO: el handler real con una base falsa que SOLO devuelve
+// las columnas que el select pidió (como PostgREST).
+(async () => {
+  const realFetch = global.fetch;
+  process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.test'; process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'k';
+  const FILA = { id: 'p1', nombre: 'Los Ayatola', descripcion: null, conductor: 'Memo', dia_semana: new Date().getDay(), fecha: null,
+    hora_inicio: '00:00:00', hora_fin: null, color: null, foto_url: 'https://kh.test/storage/v1/object/public/radio-programas/programas/p1.jpg', activo: true, archivado: false };
+  global.fetch = async (u) => {
+    const cols = (decodeURIComponent(String(u)).match(/select=([^&]+)/) || [])[1].split(',');
+    const o = {}; cols.forEach((c) => { o[c] = FILA[c]; });
+    return { ok: true, status: 200, json: async () => [o] };
+  };
+  try {
+    delete require.cache[require.resolve('../netlify/functions/radio-cartelera.js')];
+    const h = require('../netlify/functions/radio-cartelera.js').handler;
+    const r = await h({ httpMethod: 'GET', headers: {} });
+    const b = JSON.parse(r.body);
+    const todos = [b.al_aire].concat(b.semanales || []).filter(Boolean);
+    af(r.statusCode === 200 && todos.length > 0, 'el handler real contesta con el programa sembrado');
+    af(todos.length > 0 && todos.every((p) => p.foto_url === FILA.foto_url), 'la foto VIAJA en el AL AIRE y en la parrilla (por el handler real, con la base devolviendo solo lo pedido)');
+  } catch (e) { af(false, 'el handler real corre · EXC: ' + e.message); }
+  global.fetch = realFetch;
+
+  // La carátula rota: un <img> falso que dispara su 'error'. Se corre el bloque
+  // REAL (caratulaSrc → ponerCaratula → su oyente de error) con un document falso.
+  const bloque = corta('var cart = null;', 'function hora12');
+  const fake = { listeners: {}, attrs: {}, getAttribute(k) { return this.attrs[k] || null; },
+    addEventListener(t, f) { this.listeners[t] = f; }, set src(v) { this.attrs.src = v; }, get src() { return this.attrs.src; } };
+  const amb = { style: {} };
+  const c2 = { document: { getElementById: (id) => (id === 'art' ? fake : id === 'ambiente' ? amb : null) } };
+  vm.createContext(c2);
+  vm.runInContext('var actual = null;' + bloque, c2);
+  vm.runInContext("ponerCaratula('https://radio/live-art.jpg')", c2);
+  af(fake.attrs.src === 'https://radio/live-art.jpg', 'la carátula se pone con la URL que manda caratulaSrc');
+  fake.listeners.error && fake.listeners.error();
+  af(fake.attrs.src === '/radio/icon-512.png', 'si esa imagen NO carga, cae al logo de la radio (no se queda el cuadro negro con el ícono roto)');
+  vm.runInContext("ponerCaratula('https://radio/live-art.jpg')", c2);
+  af(fake.attrs.src === '/radio/icon-512.png', '🔒 y el latido siguiente NO vuelve a pedir la URL rota (se queda el logo)');
+  vm.runInContext("ponerCaratula('https://kh/programa.jpg')", c2);
+  af(fake.attrs.src === 'https://kh/programa.jpg', 'una URL buena distinta (la foto del programa) sí entra después');
+  af(/class="cartAhoraFoto" onerror=/.test(html) && /class="cartFoto" onerror=/.test(html), 'en la cartelera una foto que no carga se esconde en vez de pintar el ícono roto');
+
+  console.log('\n' + (ko ? '🔴 ROJO' : (ok ? '✅ VERDE' : 'NADA MEDIDO · esto NO es un verde')) + ' · ' + ok + ' en verde, ' + ko + ' en rojo');
+  process.exit(ko ? 1 : 0);
+})();

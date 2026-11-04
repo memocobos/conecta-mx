@@ -2535,8 +2535,8 @@
       <!-- [KAIO-CABINA-3] El selector de micrófono nace oculto (sin permiso los
            nombres no existen) y se llena al capturar — elegir otro re-captura en vivo. -->
       <select id="cab-mic-sel" onchange="cabMicCambiar(this)" style="display:none;margin-top:6px;width:100%;font-size:12px"></select>
-      <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts)">Mic</label>
-      <input type="range" id="cab-vol-mic" min="0" max="150" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div>
+      <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts);display:flex;justify-content:space-between">🎤 Volumen del micrófono <b id="cab-vol-mic-pct" style="color:var(--text)">100%</b></label>
+      <input type="range" id="cab-vol-mic" min="0" max="200" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div>
       <!-- [KAIO-CABINA-4] Monitoreo LOCAL del mic: la radia trae 15-30 s de
            delay (normal), así que el locutor se oye por aquí, al instante. -->
       <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
@@ -2553,14 +2553,15 @@
        📻 Efecto radio viejita / teléfono</label>
       <label style="display:block;margin-top:4px;font-size:11px;color:var(--ts)">🏟 Eco
        <input type="range" id="cab-fx-eco" min="0" max="50" value="0" oninput="cabFxAplicar()" style="width:110px;vertical-align:middle">
-       <span style="opacity:.7">(0 = sin eco)</span></label>
+       <b id="cab-fx-eco-pct" style="color:var(--text)">0%</b> <span style="opacity:.7">(0 = sin eco)</span></label>
       <label style="display:block;margin-top:4px;font-size:11px;color:var(--ts)">
        <input type="checkbox" id="cab-duck" onchange="cabDuck(this.checked)">
        🎵 La música baja sola cuando hablas (ducking)</label></div>
-     <div><label style="font-size:11px;color:var(--ts)">Samplers</label>
+     <div><label style="font-size:11px;color:var(--ts);display:flex;justify-content:space-between">🔊 Samplers <b id="cab-vol-sam-pct" style="color:var(--text)">100%</b></label>
       <input type="range" id="cab-vol-sam" min="0" max="150" value="100" oninput="cabVol('sam',this.value)" style="width:100%"></div>
-     <div><label style="font-size:11px;color:var(--ts)">Música</label>
-      <input type="range" id="cab-vol-mus" min="0" max="150" value="100" oninput="cabVol('mus',this.value)" style="width:100%"></div>
+     <div><label style="font-size:11px;color:var(--ts);display:flex;justify-content:space-between">🎵 Música <b id="cab-vol-mus-pct" style="color:var(--text)">100%</b></label>
+      <input type="range" id="cab-vol-mus" min="0" max="150" value="100" oninput="cabVol('mus',this.value)" style="width:100%">
+      <div style="font-size:10.5px;color:var(--ts);margin-top:6px;line-height:1.4">Los cambios se oyen al instante aquí (con «Escuchar aquí» o 🎧) y en la radio con unos segundos de retraso — es normal.</div></div>
     </div>
     <div style="display:flex;gap:14px;align-items:center;margin-top:10px;flex-wrap:wrap">
      <canvas id="cab-vu" width="260" height="14" style="background:var(--border);border-radius:7px"></canvas>

@@ -188,6 +188,28 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📻⏳ **RADIO-FOTO-1 + CAB-VOL-1 (3-nov-2026, en main local, cero SQL): la
+  foto del programa por fin llega a /radio, y los sliders de la cabina hacen
+  lo que dicen.** Reporte de Memo con captura (Los Ayatola al aire, carátula
+  negra con ícono roto, cartelera sin foto, sliders «como que no funcionan»).
+  🔴 **La foto:** V2a2 metió `foto_url` en la tabla, el admin y la proyección
+  de `_lib/radio-cartelera`… y **NO en el select de `radio-cartelera`**: la lib
+  proyectaba un campo que nunca le llegaba (la foto SÍ estaba en el bucket
+  público, medido). Hoy se pide. La carátula tiene UN escritor
+  (`ponerCaratula`): si la imagen no carga (el arte de AzuraCast en un vivo),
+  cae al logo `/radio/icon-512.png` y la URL rota no se vuelve a pedir cada
+  latido; en la cartelera una foto que no carga se esconde. **Los sliders:**
+  (1) los buses nacían en 100% sin importar lo que el slider ya decía —
+  `cabCtx` hoy sincroniza (`_cbVolSync`); (2) el del MIC movía la entrada,
+  ANTES del compresor de «Voz de locutor», que se comía la subida — hoy mueve
+  `micOut` (post-efectos, lo que sale al aire), tope 200%; (3) rampa corta en
+  vez del salto seco. Cada slider (mic · samplers · música · eco) pinta su %.
+  `mide:radio-v2b` **44** (handler real con base que solo devuelve lo pedido;
+  sabotaje al select → 2 rojos → restaurado sha1 `65a7d92c`) ·
+  `mide:kaio-cabina-1` **94** (sabotaje al nodo del mic → rojo → restaurado
+  sha1 `3edaf34f`) · kaio-v3 45 · radio-v2a 32. ⏳ Push de Memo → recargar
+  /radio y Kaio-sama.
+
 - 📋⏳ **CC-EQUIPO-DATOS-1 (3-nov-2026, en main local, cero SQL): la tarjeta de
   cada evento de Capsule trae los DATOS del equipo, plegados.** Palabra de Memo:
   *«ver información en el card de cada evento de capsule corps de los

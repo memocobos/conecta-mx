@@ -993,11 +993,7 @@ function actualizar(){
       document.getElementById('artista').textContent = actual.artist;
       // [RADIO-V2a2] La carátula la decide caratulaSrc: en vivo con programa
       // con foto, la foto del programa; si no, el arte del álbum como siempre.
-      var art = caratulaSrc(actual.art, ultimoLive, cart);
-      if(art){
-        document.getElementById('art').src = art;
-        document.getElementById('ambiente').style.backgroundImage = 'url("' + art.replace(/"/g,'%22') + '")';
-      }
+      ponerCaratula(caratulaSrc(actual.art, ultimoLive, cart));
       var pg = document.getElementById('genero');
       if(actual.genre){ pg.textContent = actual.genre; pg.classList.add('visible'); }
       else pg.classList.remove('visible');
@@ -1315,14 +1311,33 @@ function caratulaSrc(artCancion, live, c){
 // Repinta la carátula con lo último que se sabe (la llama el latido del
 // nowplaying Y la llegada de la cartelera, para no esperar 15 s al cambio).
 function pintarCaratula(){
-  var src = caratulaSrc(actual && actual.art, ultimoLive, cart);
-  if(!src) return;
-  var img = document.getElementById('art');
-  if(img && img.src !== src){
-    img.src = src;
-    document.getElementById('ambiente').style.backgroundImage = 'url("' + src.replace(/"/g,'%22') + '")';
-  }
+  ponerCaratula(caratulaSrc(actual && actual.art, ultimoLive, cart));
 }
+// [RADIO-FOTO-1] UN solo escritor de la carátula. Si la imagen no carga (el
+// arte que AzuraCast manda en un vivo puede no existir), se pone el logo de la
+// radio y esa URL queda marcada como rota: el latido de 15 s NO la vuelve a
+// pedir (sin esto, el cuadro negro con el ícono roto regresaba cada latido).
+var CARATULA_RESPALDO = '/radio/icon-512.png';
+var caratulasRotas = {};
+function ponerCaratula(src){
+  if(!src) return;
+  if(caratulasRotas[src]) src = CARATULA_RESPALDO;
+  var img = document.getElementById('art');
+  if(!img || img.getAttribute('src') === src) return;
+  img.src = src;
+  document.getElementById('ambiente').style.backgroundImage = 'url("' + src.replace(/"/g,'%22') + '")';
+}
+(function(){
+  if(typeof document === 'undefined') return;   // el careo rebana este bloque y lo corre en vm
+  var img = document.getElementById('art');
+  if(!img) return;
+  img.addEventListener('error', function(){
+    var fallo = img.getAttribute('src') || '';
+    if(!fallo || fallo === CARATULA_RESPALDO) return;
+    caratulasRotas[fallo] = true;
+    ponerCaratula(CARATULA_RESPALDO);
+  });
+})();
 
 function hora12(hhmm){
   var p = String(hhmm || '').split(':');
@@ -1377,7 +1392,7 @@ function cartHtml(c, errorRed, dowHoy){
   var html = '';
   if(c.al_aire){
     html += '<div class="cartAhora"><span class="dot"></span>' +
-      (c.al_aire.foto_url ? '<img class="cartAhoraFoto" src="' + esc(c.al_aire.foto_url) + '" alt="">' : '') +
+      (c.al_aire.foto_url ? '<img class="cartAhoraFoto" onerror="this.style.display=\'none\'" src="' + esc(c.al_aire.foto_url) + '" alt="">' : '') +
       '<div>' +
       '<div class="cartAhoraTag">Al aire ahora</div>' +
       '<div class="cartAhoraNom">' + esc(c.al_aire.nombre) + (c.al_aire.tipo === 'especial' ? '<span class="cartEsp">Especial</span>' : '') + '</div>' +
@@ -1397,7 +1412,7 @@ function cartHtml(c, errorRed, dowHoy){
   }
   var fila = function(p){
     return '<div class="cartProg">' +
-      (p.foto_url ? '<img class="cartFoto" src="' + esc(p.foto_url) + '" alt="">' : '') +
+      (p.foto_url ? '<img class="cartFoto" onerror="this.style.display=\'none\'" src="' + esc(p.foto_url) + '" alt="">' : '') +
       '<div class="cartHora">' + rangoHoras(p) + '</div>' +
       '<div><div class="cartNom">' + esc(p.nombre) + (p.tipo === 'especial' ? '<span class="cartEsp">Especial · ' + esc(p.fecha || '') + '</span>' : '') + '</div>' +
       (p.conductor ? '<div class="cartCon">con ' + esc(p.conductor) + '</div>' : '') +

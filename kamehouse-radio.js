@@ -1643,7 +1643,9 @@ async function radioCartArchivar(id, archivado) {
 
 const _cb = {
   ctx: null, master: null, buses: {}, monitorGain: null, analyser: null,
-  micStream: null, micSrc: null,
+  micStream: null, micSrc: null, micMono: null,
+  // [CABINA-CONSOLA-1] preferencia de ESTA computadora (es forma, no dato).
+  consola: (() => { try { return localStorage.getItem('cab-consola') === '1'; } catch (e) { return false; } })(),
   ws: null, enc: null, proc: null, procSink: null, reloj: null, aireDesde: 0,
   samplers: [], cacheAudio: {}, vivos: [],
   mus: { buffer: null, src: null, nombre: '', offset: 0, inicioCtx: 0, sonando: false },
@@ -1720,6 +1722,25 @@ function cabMMSS(seg) {
 }
 
 // ── El grafo de audio (nace al primer uso) ───────────────────────────────────
+// [CABINA-CONSOLA-1 · 3-nov-2026] Las restricciones del micrófono, PURAS.
+// Reporte de Memo: «si pongo música de fondo se corta aún más… transmitimos
+// con una V8 Max con dos micrófonos y el segundo no se escucha». Medido en la
+// estación: el locutor NO se cayó al AutoDJ en esa prueba (23:33–23:35), así
+// que el corte venía del AUDIO mismo. Chrome, con los filtros de llamada
+// prendidos (cancelación de eco, supresión de ruido, ganancia automática),
+// trata la música como RUIDO y la recorta a pedazos, y además captura en MONO
+// con el primer canal — una V8 manda cada micrófono por su canal, así que el
+// segundo se pierde. Con una consola el audio llega ya mezclado y limpio:
+// se pide CRUDO y en estéreo.
+function cabMicRestricciones(consola) {
+  return consola
+    ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } }
+    : { echoCancellation: true, noiseSuppression: true };
+}
+// ¿El dispositivo capturado tiene cara de consola/tarjeta USB? Solo SUGIERE.
+function cabPareceConsola(etiqueta) {
+  return /usb|v8|mixer|mezclad|codec|interface|scarlett|focusrite|behringer|maono|yamaha|audio device/i.test(String(etiqueta || ''));
+}
 function cabCtx() {
   if (_cb.ctx) return _cb.ctx;
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1872,7 +1893,8 @@ async function cabMicToggle() {
   if (_cb.micStream) {
     _cb.micStream.getTracks().forEach((t) => t.stop());
     if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
-    _cb.micStream = null; _cb.micSrc = null;
+    if (_cb.micMono) try { _cb.micMono.disconnect(); } catch (e) {}
+    _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
     if (btn) { btn.textContent = '🎤 Activar micrófono'; btn.style.color = ''; }
     return;
   }
@@ -1885,19 +1907,31 @@ async function cabMicToggle() {
     // virtual, un iPhone desconectado) o macOS dándole ceros. Por eso: (1) se
     // puede ELEGIR el micrófono, (2) el nombre del dispositivo capturado se
     // DICE, (3) un track muted se grita con su remedio.
-    const audio = { echoCancellation: true, noiseSuppression: true };
+    const audio = cabMicRestricciones(_cb.consola);
     if (_cb.micDevice) audio.deviceId = { exact: _cb.micDevice };
     const stream = await navigator.mediaDevices.getUserMedia({ audio });
     _cb.micStream = stream;
     _cb.micSrc = ctx.createMediaStreamSource(stream);
-    _cb.micSrc.connect(_cb.buses.mic);
+    if (_cb.consola) {
+      // [CABINA-CONSOLA-1] Los DOS canales de la consola se suman al centro
+      // (L+R)/2: si cada micrófono viene por su lado, los dos se oyen parejo;
+      // si ya vienen juntos en ambos lados, suena igual que antes.
+      _cb.micMono = ctx.createGain();
+      _cb.micMono.channelCount = 1; _cb.micMono.channelCountMode = 'explicit'; _cb.micMono.channelInterpretation = 'speakers';
+      _cb.micSrc.connect(_cb.micMono); _cb.micMono.connect(_cb.buses.mic);
+    } else {
+      _cb.micSrc.connect(_cb.buses.mic);
+    }
     if (btn) { btn.textContent = '🎤 Micrófono VIVO (clic para apagar)'; btn.style.color = 'var(--red)'; }
     const track = stream.getAudioTracks()[0];
     const etiqueta = (track && track.label) || 'micrófono sin nombre';
     if (track && track.muted) {
       _cbMsg('cab-msg', '⚠️ «' + etiqueta + '» está entregando SILENCIO (el sistema lo tiene mudo). En Mac: Ajustes del Sistema → Privacidad y seguridad → Micrófono → activa tu navegador y vuelve a intentar.', true);
+    } else if (_cb.consola) {
+      const canales = (track && track.getSettings && track.getSettings().channelCount) || '?';
+      _cbMsg('cab-msg', 'Modo consola: capturando «' + etiqueta + '» en crudo (' + canales + (canales === 1 ? ' canal' : ' canales') + ', sin filtros de llamada). Los volúmenes los manejas en la consola.' + (canales === 1 ? ' ⚠️ La tarjeta entrega UN solo canal: si el segundo micrófono no se oye, revisa en la V8 que su perilla esté arriba y que esté en modo mezcla.' : ''));
     } else {
-      _cbMsg('cab-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.');
+      _cbMsg('cab-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.' + (cabPareceConsola(etiqueta) ? ' 💡 Parece una consola o tarjeta de sonido: prende «🎛 Uso consola» para que la música no se corte y entren los dos micrófonos.' : ''));
     }
     if (track) track.addEventListener('mute', () => _cbMsg('cab-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true));
     _cbLlenarMics();
@@ -1933,13 +1967,28 @@ async function _cbLlenarMics() {
     sel.style.display = '';
   } catch (e) {}
 }
+// [CABINA-CONSOLA-1] Prender/apagar el modo consola re-captura EN VIVO.
+async function cabConsola(on) {
+  _cb.consola = !!on;
+  try { localStorage.setItem('cab-consola', _cb.consola ? '1' : '0'); } catch (e) {}
+  if (_cb.micStream) {
+    _cb.micStream.getTracks().forEach((t) => t.stop());
+    if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
+    if (_cb.micMono) try { _cb.micMono.disconnect(); } catch (e) {}
+    _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
+    await cabMicToggle();
+  } else {
+    _cbMsg('cab-msg', _cb.consola ? 'Modo consola prendido: al activar el micrófono se captura en crudo y en estéreo.' : 'Modo consola apagado: el micrófono vuelve a usar los filtros de llamada (para micrófono de laptop sin consola).');
+  }
+}
 async function cabMicCambiar(sel) {
   _cb.micDevice = (sel && sel.value) || '';
   if (_cb.micStream) {
     // Re-capturar EN VIVO con el dispositivo elegido: apagar y volver a prender.
     _cb.micStream.getTracks().forEach((t) => t.stop());
     if (_cb.micSrc) try { _cb.micSrc.disconnect(); } catch (e) {}
-    _cb.micStream = null; _cb.micSrc = null;
+    if (_cb.micMono) try { _cb.micMono.disconnect(); } catch (e) {}
+    _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
     await cabMicToggle();
   }
 }
@@ -2519,6 +2568,7 @@ function _cbDing() {
 
 // ── Soundboard ───────────────────────────────────────────────────────────────
 async function loadRadioCabina() {
+  { const c = _cbEl('cab-consola'); if (c) c.checked = !!_cb.consola; }   // [CABINA-CONSOLA-1] la preferencia de esta computadora
   _cbSamplersPintar();
   _cbDjsPintar();
   _cbPubStart();   // [KAIO-V3a] el panel del público late mientras la cabina está abierta

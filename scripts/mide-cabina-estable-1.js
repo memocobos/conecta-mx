@@ -13,7 +13,7 @@
  *     y el modo grabar devolviendo frames MP3 reales.
  * [C] las puras nuevas del front (cola de subida · estación que suelta).
  * [D] los cables: el camino nuevo primero, el de siempre como respaldo, el CSP.
- * [E] control positivo: BASE (HEAD sin esta tuerca) no tiene camino fuera de
+ * [E] control positivo: BASE (42e560b, sin esta tuerca) no tiene camino fuera de
  *     la pantalla — el defecto existía.
  * ⚠️ Lo que NO se puede medir aquí y queda DICHO: el AudioWorklet y el Worker
  * de un navegador real contra el AzuraCast vivo. Esa prueba es de Memo. */
@@ -23,6 +23,10 @@ const path = require('path');
 const vm = require('vm');
 const { execSync } = require('child_process');
 const RAIZ = path.join(__dirname, '..');
+// El «antes» es un COMMIT fijo (42e560b, el padre de CABINA-ESTABLE-1): leer
+// HEAD caducó el día del propio commit — un control positivo anclado a HEAD
+// mide el presente, no el defecto.
+const BASE = process.env.BASE_SHA || '42e560b';
 
 let ok = 0, ko = 0;
 const af = (c, m) => { try { c = typeof c === 'function' ? c() : c; } catch (e) { c = false; m += ' · EXC: ' + e.message; } if (c) { ok++; console.log('  ✓ ' + m); } else { ko++; console.log('  ✗ ' + m); } };
@@ -153,9 +157,25 @@ const af = (c, m) => { try { c = typeof c === 'function' ? c() : c; } catch (e) 
   af(/script-src 'self'/.test(csp) && !/worker-src/.test(csp) && /connect-src[^;]*wss:\/\/radio\.conectareynosa\.mx/.test(csp), 'el CSP deja cargar el worklet y el Worker (script-src self, sin worker-src que los vete) y deja salir el socket');
   af(fs.existsSync(path.join(RAIZ, 'cabina-captura.js')) && fs.existsSync(path.join(RAIZ, 'cabina-envio.js')), 'los dos archivos existen en la raíz (el comodín de _redirects no tapa archivos que existen)');
 
+  console.log('\n[F] CABINA-CONSOLA-1: la consola (V8) entra en crudo y con los dos canales');
+  const fctx = {}; vm.createContext(fctx);
+  vm.runInContext(js.slice(js.indexOf('function cabMicRestricciones'), js.indexOf('function cabCtx')), fctx);
+  const rc = vm.runInContext('cabMicRestricciones(true)', fctx), rl = vm.runInContext('cabMicRestricciones(false)', fctx);
+  af(rc.echoCancellation === false && rc.noiseSuppression === false && rc.autoGainControl === false, 'modo consola: SIN filtros de llamada — la supresión de ruido ya no recorta la música como «ruido»');
+  af(rc.channelCount && rc.channelCount.ideal === 2, 'modo consola: pide los DOS canales (con filtros, Chrome captura mono del primero y el 2º micrófono se pierde)');
+  af(rl.echoCancellation === true && rl.noiseSuppression === true, 'sin consola (mic de laptop) los filtros siguen como siempre');
+  af(vm.runInContext("cabPareceConsola('V8 USB Audio Device') && cabPareceConsola('USB PnP Sound Device') && !cabPareceConsola('MacBook Pro Microphone')", fctx), 'una V8/tarjeta USB se reconoce para SUGERIR el modo (solo sugiere, no lo prende solo)');
+  const tg = js.slice(js.indexOf('async function cabMicToggle'), js.indexOf('async function _cbLlenarMics'));
+  af(tg.includes('cabMicRestricciones(_cb.consola)') && tg.includes('audio.deviceId = { exact: _cb.micDevice }'), 'la captura usa las restricciones del dueño y conserva el micrófono elegido');
+  af(/channelCount = 1; _cb\.micMono\.channelCountMode = 'explicit'; _cb\.micMono\.channelInterpretation = 'speakers'/.test(tg) && tg.includes('_cb.micMono.connect(_cb.buses.mic)'), 'en consola los dos canales se SUMAN al centro antes del bus del mic (medido en Chrome real: L-solo y R-solo salen 0.334/0.334)');
+  af((js.match(/if \(_cb\.micMono\) try \{ _cb\.micMono\.disconnect\(\); \} catch \(e\) \{\}/g) || []).length === 3, 'el nodo de suma se suelta en los 3 sitios donde se suelta el mic (apagar · cambiar mic · cambiar modo)');
+  const htmlK = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
+  af(htmlK.includes('id="cab-consola" onchange="cabConsola(this.checked)"') && /<input type="checkbox" id="cab-consola"[^>]*>/.test(htmlK) && !/id="cab-consola"[^>]*\schecked[\s>]/.test(htmlK), 'la casilla vive en la Mezcladora y nace APAGADA en el HTML (la preferencia de cada computadora la pinta loadRadioCabina)');
+  af(js.includes("localStorage.setItem('cab-consola'") && js.slice(js.indexOf('async function loadRadioCabina')).includes("_cbEl('cab-consola')"), 'la preferencia se recuerda por computadora y se pinta al abrir la cabina');
+
   console.log('\n[E] control positivo: BASE no tenía camino fuera de la pantalla');
   let base = '';
-  try { base = execSync('git show HEAD:kamehouse-radio.js', { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 << 20 }); } catch (e) {}
+  try { base = execSync('git show ' + BASE + ':kamehouse-radio.js', { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 << 20 }); } catch (e) {}
   af(base && base.includes('createScriptProcessor(4096, 2, 2)') && !base.includes('_cbHiloPosible'), 'en BASE el MP3 del aire se hacía SOLO en el ScriptProcessor (hilo de la pantalla) — el defecto existía');
   af(base && /bitrate: 192/.test(base) && /Mp3Encoder\(2, ctx\.sampleRate, 192\)/.test(base), 'y en BASE se mandaba a 192 kbps');
 

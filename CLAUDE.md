@@ -188,6 +188,31 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎛⏳ **CABINA-CONSOLA-1 (3-nov-2026, en main local, cero SQL): la consola
+  (V8 Max) entra CRUDA y con los DOS micrófonos.** Reporte de Memo tras el push
+  de CABINA-ESTABLE-1: *«todavía se corta, si pongo música de fondo se corta aún
+  más… transmitimos con una V8 Max con dos micrófonos y el segundo no se
+  escucha»*. Medido en la estación: en la prueba de 23:33–23:35 el locutor **NO
+  se cayó al AutoDJ** (cero cambios a mitad) — el corte venía del AUDIO. Chrome
+  capturaba con los filtros de llamada (cancelación de eco + supresión de ruido
+  + ganancia automática): la supresión trata la música como RUIDO y la recorta a
+  pedazos, y con filtros Chrome captura MONO del primer canal — la V8 manda cada
+  mic por su lado, así que el 2º se perdía. Hoy: casilla **«🎛 Uso consola o
+  tarjeta de sonido»** en la Mezcladora (nace apagada en el HTML; la preferencia
+  se recuerda POR COMPUTADORA en localStorage — es forma, no dato) →
+  `cabMicRestricciones(true)` pide audio CRUDO (sin eco/ruido/ganancia) y
+  `channelCount ideal 2`, y un GainNode mono «speakers» suma los dos canales al
+  centro antes del bus del mic. ✅ **Medido en Chrome real** (OfflineAudioContext):
+  sin la suma, mic-solo-izquierda sale L 0.521/R 0 y mic-solo-derecha L 0/R 0.521;
+  con la suma, los dos salen 0.334/0.334. Cambiar el modo re-captura en vivo; si
+  el dispositivo tiene cara de USB/V8 y el modo está apagado, la cabina lo
+  SUGIERE (no lo prende solo); con el modo prendido dice cuántos canales entrega
+  la tarjeta (1 = la V8 no está en modo mezcla). `mide:cabina-estable-1` **48**
+  (bloque [F]; sabotaje a la suma → rojo → restaurado sha1 `342570a4`; su control
+  positivo se RE-ANCLÓ a `42e560b` — leía HEAD y caducó el día de su propio
+  commit). Vecinos verdes: kaio-cabina-1 95 · radio-episodios-1 29 · kaio-v3 45 ·
+  radio-v2b 44. ⏳ Push de Memo → recargar Kaio-sama → prender «🎛 Uso consola».
+
 - 📻⏳ **CABINA-ESTABLE-1 (3-nov-2026, en main local, cero SQL): la transmisión
   ya no se corta por la pantalla.** Reporte de Memo: *«la transmisión se escucha
   super cortada como falta de señal»*. Medido en el nowplaying: entró al aire

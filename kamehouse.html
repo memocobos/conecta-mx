@@ -2556,6 +2556,12 @@
       <!-- [KAIO-CABINA-3] El selector de micrófono nace oculto (sin permiso los
            nombres no existen) y se llena al capturar — elegir otro re-captura en vivo. -->
       <select id="cab-mic-sel" onchange="cabMicCambiar(this)" style="display:none;margin-top:6px;width:100%;font-size:12px"></select>
+      <!-- [CABINA-CONSOLA-1] Con consola (V8, mezcladora): audio CRUDO y los dos
+           canales a la mezcla. Sin esto Chrome recorta la música como «ruido» y
+           captura un solo canal (el segundo micrófono se pierde). -->
+      <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
+       <input type="checkbox" id="cab-consola" onchange="cabConsola(this.checked)">
+       🎛 Uso consola o tarjeta de sonido (V8, mezcladora): audio crudo, sin filtros de llamada, los dos micrófonos a la mezcla</label>
       <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts);display:flex;justify-content:space-between">🎤 Volumen del micrófono <b id="cab-vol-mic-pct" style="color:var(--text)">100%</b></label>
       <input type="range" id="cab-vol-mic" min="0" max="200" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div>
       <!-- [KAIO-CABINA-4] Monitoreo LOCAL del mic: la radia trae 15-30 s de

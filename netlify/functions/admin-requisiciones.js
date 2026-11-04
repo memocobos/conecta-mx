@@ -274,8 +274,25 @@ exports.handler = async (event) => {
       });
       return out.length ? out : null;
     };
+    // [REQ-FICHA-1 · 4-nov-2026] La FECHA de cada solicitud, para que la
+    // tarjeta la diga sin abrir la cotización (palabra de Memo: «tengo que
+    // abrir ver la cotización para ver el tipo de boleto, habitación…»). En
+    // un multifecha la fecha del #N la decide su dueño (`fechaDeEventoId`):
+    // jamás las cuatro de Fuerza Regida juntas. Catálogo ilegible → sin fecha
+    // (la tarjeta lo dice) y la bandeja NO se cae por eso.
+    let evCat = null;
+    try { const l = await fetchEventosRaw(); if (Array.isArray(l)) { evCat = {}; l.forEach((e) => { if (e && e.id) evCat[e.id] = e; }); } } catch (_) { evCat = null; }
+    const { fechaDeEventoId } = require('./_lib/fecha-evento');
+    const fichaDe = (x) => {
+      if (!evCat) return null;
+      const ev = evCat[String(x.evento_id || '').split('#')[0]];
+      if (!ev) return null;
+      return { fecha: fechaDeEventoId(ev, x.evento_id) || null, venue: ev.v || null };
+    };
     return j(200, headers, { ok: true, requisiciones: rows.map((x) => {
       const extra = {};
+      const fi = fichaDe(x);
+      if (fi) { if (fi.fecha) extra.fecha_txt = fi.fecha; if (fi.venue) extra.venue_txt = fi.venue; }
       if (dups[x.id]) extra.dup_de = dups[x.id];
       const mc = malCorreo(x);
       if (mc) extra.correo_problema = mc;

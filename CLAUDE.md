@@ -188,6 +188,36 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🗓⏳ **REQ-FICHA-1 + PLAN-VJ-1 (4-nov-2026, en main local, cero SQL): la
+  requisición dice su ficha sin abrir la cotización, y cada cliente tiene su
+  ROL DE PAGOS con PNG.** Palabra de Memo: *«tengo que abrir ver la cotización
+  para ver el tipo de boleto, habitación, paquete… y tener acceso a las fechas
+  de pago de cada cliente y cantidades por si preguntan… descargar como la del
+  /rol el png pero con la info del cliente»*.
+  - **REQ-FICHA-1:** la tarjeta de la bandeja pinta con rótulo 📅 Fecha (+venue)
+    · 🎟 Paquete · 🎫 Boleto/zona · 🏨 Habitación · 👥 Personas (+ por persona) ·
+    🚌 Transporte. 🔒 La fecha la deriva el SERVIDOR (`listar` → `fecha_txt` por
+    `fechaDeEventoId`: en un multifecha SOLO la del #N); catálogo ilegible → la
+    tarjeta dice «sin fecha en el catálogo», no adivina. La cotización completa
+    sigue plegada debajo («📄 Ver la cotización completa»).
+  - **PLAN-VJ-1:** botón **«🗓 Plan»** por viajero en la lista de Capsule (junto a
+    📎 Pagos, mismo renglón plegable) → acción `plan_viajero` (SOLO LEE,
+    roles de siempre): total/pagado/falta por `saldoMigrado`, quincenas por
+    `planDelViaje`, fecha del #N, y la cuenta por `_bancoDeViajero` del Portal
+    (CHEAP→Banamex, preventa y lo demás→BBVA) con CLABE/tarjeta del catálogo —
+    lo mismo que el cliente ve en su Portal. Panel con lo que falta (cuotas),
+    lo ya pagado (antes del sistema + abonos «registrado el»), **⬇️ PNG 1080**
+    (lienzo de la marca del 🧮 Cotizador, con el nombre del cliente) y **📋 texto
+    para WhatsApp**. 🔒 La pantalla no arma quincenas; catálogo ilegible → plan
+    null CON motivo.
+  - `mide:plan-vj-1` **26** (handlers reales, calendario careado byte a byte con
+    el dueño, cero escrituras; sabotaje a `fecha_txt` → 2 rojos → restaurado
+    sha1 `c46099c7`). Vecinos verdes: req-b1 52 · capsule-comp-1 16 ·
+    capsule-ux-1 83 · capsule-ux-2 46 · ticket-circuito-1 32 · req-corrige-1 40
+    · cambio-rechazo-1 36 · plan-pagos-1 81 · viajero-edita-1 67 · rechazo-1 71
+    · cotiza-vend-1 38 · portal-solo-1 89. ⚠️ No verificado en navegador
+    (careado en vm). ⏳ Push de Memo → Bulma/Milk recargan.
+
 - 🎤⏳ **CABINA-MICVIVO-1 (4-nov-2026, en main local, cero SQL): el micrófono
   que se MUERE se re-abre solo.** Reporte de Memo: *«al minuto 8 dejó de
   escucharse la transmisión»*. Medido (log de liquidsoap + 30 s del stream

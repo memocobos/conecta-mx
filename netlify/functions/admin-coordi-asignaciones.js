@@ -130,6 +130,8 @@ const ACCIONES = {
   // [ABONO-FOTO-4] Subir o CAMBIAR el comprobante de un abono que ya existe.
   abono_foto: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
+  // [PLAN-VJ-1] El rol de pagos de UN viajero (fechas y montos), solo lectura.
+  plan_viajero: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
   grupo_wa_guardar: ROLES_EDITA_VIAJERO,
@@ -2869,6 +2871,60 @@ ${entregables}
         });
       }
       return ok(headers, { abonos });
+    }
+
+    // ── [PLAN-VJ-1 · 4-nov-2026] EL ROL DE PAGOS DE UN VIAJERO ───────────
+    // Palabra de Memo: «tener acceso a las fechas de pago de cada cliente y
+    // cantidades por si preguntan… poder descargar como la del /rol el png
+    // pero con la info del cliente». SOLO LEE. Cero regla nueva: el dinero lo
+    // cuenta `saldoMigrado` (el MISMO del Palacio y del Portal), las quincenas
+    // las arma `planDelViaje` (el dueño, la copia canónica de /rol), la fecha
+    // del #N la dice `fechaDeEventoId` y el banco `bancoDeViajero` del Portal
+    // — así lo que Bulma le manda al cliente dice lo MISMO que su Portal.
+    // Catálogo ilegible → `plan: null` con su motivo (jamás un calendario
+    // vacío, que se leería como «ya no tienes pagos»).
+    if (accion === 'plan_viajero') {
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+      const vr = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,nombre,evento_id,tipo_paquete,zona_boleto,hotel_tipo,boletos,total_contrato,abonado_previo,celular,correo&limit=1`, { headers: sbHeaders });
+      if (!vr.ok) return upstream(headers, await vr.text(), 'consulta');
+      const v = (await vr.json())[0];
+      if (!v) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
+      const ar = await fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero?viajero_id=eq.${viajero_id}&select=id,monto,fecha,foto_path&order=fecha.asc,created_at.asc`, { headers: sbHeaders });
+      if (!ar.ok) return upstream(headers, await ar.text(), 'consulta');
+      const abonos = await ar.json();
+      const PP = require('./_lib/plan-pagos');
+      const { fechaDeEventoId } = require('./_lib/fecha-evento');
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      const ev = Array.isArray(EV) ? (EV.find((e) => e && e.id === String(v.evento_id).split('#')[0]) || null) : null;
+      const s = saldoMigrado(v, abonos);
+      const ds = ev ? PP.dsDeEvento(ev, v.evento_id) : null;
+      const plan = Array.isArray(EV) ? PP.planDelViaje({
+        total: s ? s.total : null, abonado: s ? s.abonado : 0, ds,
+        paquete: v.tipo_paquete, diasAntes: ev ? ev.diasAntes : null, ahora: new Date(),
+      }) : null;
+      // La cuenta: la decide el dueño del Portal (con la excepción de la
+      // preventa) y los datos salen de las constantes del catálogo — sin
+      // banco legible no se pinta ninguna cuenta (señalar la mala es peor).
+      let banco = null;
+      try {
+        const clave = require('./portal-mi-plan-migrado')._bancoDeViajero(v);
+        const CI = require('./_lib/catalogo-index');
+        const b = clave === 'banamex' ? CI._BANCO_HEY : clave === 'bbva' ? CI._BANCO_DEFAULT : null;
+        if (b) banco = { clave, nombre: b.nombre, clabe: b.clabe, tarjeta: b.tarjeta, titular: b.titular };
+      } catch (_) { banco = null; }
+      return ok(headers, {
+        viajero: { id: v.id, nombre: v.nombre || null, evento_id: v.evento_id, paquete: v.tipo_paquete || null,
+          zona: v.zona_boleto || null, hotel: v.hotel_tipo || null, boletos: Number(v.boletos) || 1,
+          celular: v.celular || null },
+        evento: ev ? { nombre: ev.a || v.evento_id, fecha: fechaDeEventoId(ev, v.evento_id) || null, venue: ev.v || null, ds } : null,
+        total: s ? s.total : null, abonado: s ? s.abonado : null, resta: s ? s.resta : null,
+        abonado_previo: Number(v.abonado_previo) || 0,
+        abonos: abonos.map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null, tiene_foto: !!a.foto_path })),
+        plan, plan_error: Array.isArray(EV) ? null : 'No se pudo leer el catálogo: sin él no se arma el calendario.',
+        banco,
+      });
     }
 
 

@@ -2195,6 +2195,8 @@ const khViajeros = {
   editar(id, campos) { return this._call({ accion: 'viajero_editar', id, campos }); },
   // [VJ-3] dinero de los migrados
   abonosDe(viajero_id) { return this._call({ accion: 'abonos_listar', viajero_id }).then(j => j.abonos || []); },
+  // [PLAN-VJ-1] el rol de pagos de un viajero (lo arma el servidor; aquí se pinta)
+  planDe(viajero_id) { return this._call({ accion: 'plan_viajero', viajero_id }); },
   abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
   // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
@@ -6689,6 +6691,9 @@ function _vj2Pintar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Ver los pagos de ${_esfEsc(v.nombre || '')} con sus comprobantes"
             onclick="_vjPagosVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📎 Pagos</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px"
+            title="Rol de pagos de ${_esfEsc(v.nombre || '')}: fechas y montos que le faltan, con imagen para mandarle"
+            onclick="_vjPlanVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🗓 Plan</button>
           ${khEsPreventaCiegas(v) ? `<button class="btn btn-primary btn-sm" style="font-size:10px"
             title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
             onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
@@ -6800,6 +6805,157 @@ async function _vjPagosVer(id, nombre) {
   } catch (e) {
     celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudieron leer los pagos: ${_esfEsc(e.message)}</div>`;
   }
+}
+
+// ═══ [PLAN-VJ-1 · 4-nov-2026] EL ROL DE PAGOS DE CADA CLIENTE ══════════════
+// Palabra de Memo: «tener acceso a las fechas de pago de cada cliente y
+// cantidades por si preguntan… poder descargar como la del /rol el png pero con
+// la info del cliente». 🔒 La pantalla NO calcula una fecha ni un monto: pinta
+// lo que manda `plan_viajero` (saldoMigrado + planDelViaje, los mismos dueños
+// del Portal), así lo que se le manda al cliente dice lo mismo que su Portal.
+// Reusa el renglón plegable `vj-ab-` (un solo panel abierto a la vez).
+const _VJPLAN_ESTADO = {
+  sin_total: 'Este viaje no trae total de contrato: corrígelo con ✏️ antes de mandar un plan.',
+  liquidado: '✓ Ya está liquidado: no tiene pagos pendientes.',
+  sin_fecha: 'El catálogo no trae la fecha de este viaje: no se puede armar el calendario.',
+  evento_pasado: 'El evento ya pasó.',
+  liquidar: 'Ya no caben quincenas: lo que falta se liquida antes del evento.',
+};
+function _vjPlanFecha(ds) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ds || ''));
+  if (!m) return '';
+  return Number(m[3]) + ' ' + ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(m[2]) - 1] + ' ' + m[1];
+}
+// Las líneas del calendario que FALTA (lo pagado va aparte, con su fecha).
+function _vjPlanCuotas(d) {
+  const pl = d && d.plan;
+  if (!pl || !(pl.estado === 'calendario' || pl.estado === 'liquidar')) return [];
+  return (pl.cuotas || []).map((q) => ({ lbl: pl.estado === 'liquidar' ? 'Liquidar' : 'Pago ' + q.n, cuando: q.lbl, monto: q.monto }));
+}
+function _vjPlanTitulo(d) {
+  const v = d.viajero || {}, e = d.evento || {};
+  return {
+    evento: e.nombre || v.evento_id || '',
+    fecha: [e.fecha, e.venue].filter(Boolean).join(' · '),
+    paq: [khPaqueteTexto({ tipo_paquete: v.paquete, zona_boleto: v.zona, evento_id: v.evento_id }), v.zona, v.hotel].filter(Boolean).join(' · '),
+  };
+}
+async function _vjPlanVer(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'plan';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'plan';
+  const celda = tr.firstElementChild;
+  celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--ts)">Armando el plan de ${_esfEsc(nombre)}…</div>`;
+  let d;
+  try { d = await khViajeros.planDe(id); }
+  catch (e) { celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudo leer el plan: ${_esfEsc(e.message)}</div>`; return; }
+  window.__vjPlan = window.__vjPlan || {};
+  window.__vjPlan[id] = d;
+  const t = _vjPlanTitulo(d), cuotas = _vjPlanCuotas(d), pl = d.plan;
+  const pagados = [];
+  if (d.abonado_previo > 0) pagados.push({ cuando: 'antes del sistema', monto: d.abonado_previo });
+  (d.abonos || []).forEach((a) => { if (a.monto > 0) pagados.push({ cuando: 'registrado el ' + _vjPlanFecha(a.fecha), monto: a.monto }); });
+  const nota = !pl ? (d.plan_error || 'Sin plan') : (_VJPLAN_ESTADO[pl.estado] || '');
+  const fila = (a, b, c, col) => `<tr><td>${a}</td><td style="color:var(--ts)">${b}</td><td style="text-align:right;font-weight:700${col ? ';color:' + col : ''}">${c}</td></tr>`;
+  celda.innerHTML = `<div style="padding:12px;border:1px dashed var(--ts);border-radius:8px">
+    <div style="font-weight:800">${_esfEsc(nombre)} · ${_esfEsc(t.evento)}</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:8px">${_esfEsc(t.fecha || 'sin fecha')}${t.paq ? ' · ' + _esfEsc(t.paq) : ''}</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">
+      <div><small style="color:var(--ts)">Total</small><div style="font-weight:800">${d.total == null ? '—' : _spFmtMxn(d.total)}</div></div>
+      <div><small style="color:var(--ts)">Pagado</small><div style="font-weight:800;color:var(--green)">${d.abonado == null ? '—' : _spFmtMxn(d.abonado)}</div></div>
+      <div><small style="color:var(--ts)">Falta</small><div style="font-weight:800;color:${(d.resta || 0) > 0 ? 'var(--red)' : 'var(--green)'}">${d.resta == null ? '—' : _spFmtMxn(Math.max(0, d.resta))}</div></div>
+    </div>
+    ${cuotas.length ? `<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ts)">Lo que le falta</div>
+      <table class="cob-table" style="width:100%;margin:4px 0 10px"><tbody>${cuotas.map((q) => fila(_esfEsc(q.lbl), _esfEsc(q.cuando), _spFmtMxn(q.monto))).join('')}</tbody></table>` : ''}
+    ${nota ? `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">${_esfEsc(nota)}</div>` : ''}
+    ${pagados.length ? `<details><summary style="font-size:12px;cursor:pointer">Lo que ya pagó (${pagados.length})</summary>
+      <table class="cob-table" style="width:100%;margin-top:4px"><tbody>${pagados.map((p) => fila('✓', _esfEsc(p.cuando), _spFmtMxn(p.monto), 'var(--green)')).join('')}</tbody></table></details>` : ''}
+    ${d.banco ? `<div style="font-size:12px;color:var(--ts);margin-top:8px">Paga en <b style="color:var(--text)">${_esfEsc(d.banco.nombre)}</b> · CLABE ${_esfEsc(d.banco.clabe)} · Tarjeta ${_esfEsc(d.banco.tarjeta)} · ${_esfEsc(d.banco.titular)}</div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-primary btn-sm" onclick="_vjPlanPng('${_attrJs(id)}')">⬇️ Descargar imagen (PNG)</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjPlanCopiar('${_attrJs(id)}')">📋 Copiar para WhatsApp</button>
+    </div>
+  </div>`;
+}
+function _vjPlanTexto(d) {
+  const v = d.viajero || {}, t = _vjPlanTitulo(d), cuotas = _vjPlanCuotas(d);
+  const l = [`Hola ${String(v.nombre || '').split(' ')[0]} 👋, este es tu plan de pagos:`, '', `*${t.evento}*`];
+  if (t.fecha) l.push(t.fecha);
+  if (t.paq) l.push(t.paq);
+  l.push('', `Total: ${d.total == null ? '—' : _spFmtMxn(d.total)}`, `Pagado: ${d.abonado == null ? '—' : _spFmtMxn(d.abonado)}`, `*Te falta: ${d.resta == null ? '—' : _spFmtMxn(Math.max(0, d.resta))}*`);
+  if (cuotas.length) { l.push('', '*Tus próximos pagos*'); cuotas.forEach((q) => l.push(`• ${q.lbl} (${q.cuando}): ${_spFmtMxn(q.monto)}`)); }
+  const n = d.plan ? _VJPLAN_ESTADO[d.plan.estado] : ''; if (n && d.plan.estado !== 'calendario') l.push('', n);
+  if (d.banco) l.push('', `Cuenta ${d.banco.nombre}`, `CLABE ${d.banco.clabe}`, `Tarjeta ${d.banco.tarjeta}`, `A nombre de ${d.banco.titular}`);
+  l.push('', 'Mándanos tu comprobante por aquí. Conecta Reynosa');
+  return l.join('\n');
+}
+async function _vjPlanCopiar(id) {
+  const d = (window.__vjPlan || {})[id]; if (!d) return;
+  try { await navigator.clipboard.writeText(_vjPlanTexto(d)); showToast('Texto copiado', 'success'); }
+  catch (_) { showToast('No se pudo copiar — selecciona el texto a mano', 'error'); }
+}
+// La IMAGEN: el mismo lienzo de la marca que el 🧮 Cotizador (1080 de ancho),
+// con el nombre del cliente, lo pagado y lo que falta.
+function _vjPlanPng(id) {
+  const d = (window.__vjPlan || {})[id]; if (!d) return;
+  const v = d.viajero || {}, t = _vjPlanTitulo(d), cuotas = _vjPlanCuotas(d);
+  const W = 1080, H = Math.max(1350, 1000 + cuotas.length * 64 + (d.banco ? 120 : 0));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#0000cd'; g.fillRect(0, 0, W, 16);
+  const F = (peso, px) => `${peso} ${px}px Montserrat, Arial, sans-serif`;
+  const txt = (s, x, y, f, col, al) => { g.font = f; g.fillStyle = col; g.textAlign = al || 'left'; g.fillText(String(s), x, y); };
+  const wrap = (s, x, y, maxW, f, col, lh) => {
+    g.font = f; const pal = String(s).split(' '); let lin = '', yy = y;
+    for (const w of pal) { const tt = lin ? lin + ' ' + w : w; if (g.measureText(tt).width > maxW && lin) { txt(lin, x, yy, f, col); lin = w; yy += lh; } else lin = tt; }
+    if (lin) txt(lin, x, yy, f, col); return yy;
+  };
+  let y = 110;
+  txt('CONECTA REYNOSA', 70, y, F(800, 30), '#e8ff4c'); txt('Plan de pagos', W - 70, y, F(500, 28), '#ffffff', 'right');
+  y = wrap(String(v.nombre || '').toUpperCase(), 70, 200, W - 140, F(800, 44), '#ffffff', 54) + 70;
+  y = wrap(String(t.evento).toUpperCase(), 70, y, W - 140, F(900, 60), '#ffffff', 68) + 56;
+  if (t.fecha) { txt(t.fecha, 70, y, F(500, 30), '#bbbbbb'); y += 52; }
+  if (t.paq) { y = wrap(t.paq, 70, y, W - 140, F(700, 32), '#ffffff', 42) + 40; }
+  y += 20;
+  g.fillStyle = '#111111'; g.fillRect(50, y, W - 100, 170);
+  const col3 = (lbl, val, x, al, color) => { txt(lbl, x, y + 60, F(600, 26), '#bbbbbb', al); txt(val, x, y + 130, F(900, 52), color, al); };
+  col3('TOTAL', d.total == null ? '—' : _spFmtMxn(d.total), 90, 'left', '#ffffff');
+  col3('PAGADO', d.abonado == null ? '—' : _spFmtMxn(d.abonado), W / 2, 'center', '#88ea4e');
+  col3('FALTA', d.resta == null ? '—' : _spFmtMxn(Math.max(0, d.resta)), W - 90, 'right', '#e8ff4c');
+  y += 240;
+  if (cuotas.length) {
+    txt('TUS PRÓXIMOS PAGOS', 70, y, F(800, 32), '#e8ff4c'); y += 30;
+    cuotas.forEach((q, i) => {
+      y += 64;
+      if (i % 2 === 0) { g.fillStyle = '#0d0d0d'; g.fillRect(50, y - 44, W - 100, 62); }
+      txt(q.lbl, 80, y, F(700, 30), '#ffffff');
+      txt(q.cuando, 360, y, F(500, 28), '#bbbbbb');
+      txt(_spFmtMxn(q.monto), W - 80, y, F(800, 32), '#ffffff', 'right');
+    });
+    y += 70;
+  } else {
+    const n = d.plan ? (_VJPLAN_ESTADO[d.plan.estado] || '') : (d.plan_error || '');
+    if (n) y = wrap(n, 70, y, W - 140, F(600, 32), '#ffffff', 42) + 50;
+  }
+  if (d.banco) {
+    txt('DÓNDE PAGAR', 70, y, F(800, 28), '#e8ff4c'); y += 46;
+    txt(`${d.banco.nombre} · CLABE ${d.banco.clabe}`, 70, y, F(600, 28), '#ffffff'); y += 40;
+    txt(`Tarjeta ${d.banco.tarjeta} · ${d.banco.titular}`, 70, y, F(500, 26), '#bbbbbb'); y += 40;
+  }
+  wrap('Mándanos tu comprobante por WhatsApp · conectareynosa.mx', 70, H - 110, W - 140, F(500, 24), '#888888', 32);
+  g.fillStyle = '#ff283b'; g.fillRect(0, H - 16, W, 16);
+  cv.toBlob((b) => {
+    if (!b) { showToast('No se pudo generar la imagen', 'error'); return; }
+    const a = document.createElement('a');
+    a.download = 'plan-' + String(v.nombre || 'cliente').trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.png';
+    a.href = URL.createObjectURL(b); document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }, 'image/png');
 }
 
 // ═══ [ABONO-EDITA-1] ✏️ CORREGIR UN ABONO CAPTURADO MAL ═════════════════════

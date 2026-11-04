@@ -139,6 +139,7 @@
     "mide:abono-foto-4": "node scripts/mide-abono-foto-4.js",
     "mide:abono-hash-1": "node scripts/mide-abono-hash-1.js",
     "mide:cabina-estable-1": "node scripts/mide-cabina-estable-1.js",
-    "mide:radio-episodios-1": "node scripts/mide-radio-episodios-1.js"
+    "mide:radio-episodios-1": "node scripts/mide-radio-episodios-1.js",
+    "mide:plan-vj-1": "node scripts/mide-plan-vj-1.js"
   }
 }

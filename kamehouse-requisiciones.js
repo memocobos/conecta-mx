@@ -271,6 +271,31 @@ async function _reqCambioCerrarGo(id, estado) {
   else { if (msg) { msg.textContent = 'No se pudo cerrar: ' + ((j && j.error) || 'sin respuesta'); msg.style.color = 'var(--red)'; } if (btn) btn.disabled = false; }
 }
 
+// [REQ-FICHA-1 · 4-nov-2026] LA FICHA de la solicitud, a la vista sin abrir
+// nada. Palabra de Memo: «tengo que abrir el botón de ver la cotización para
+// ver el tipo de boleto, habitación, paquete… dame esa info desde que veo la
+// requisición». Los datos ya viajaban en columnas (paquete, zona, hotel,
+// transporte); lo que faltaba era DECIRLOS con su rótulo — y la FECHA, que en
+// un multifecha (Fuerza Regida: 4 fechas) era lo que más obligaba a abrir la
+// cotización. La fecha la deriva el SERVIDOR (fecha_txt, el dueño
+// fechaDeEventoId); sin ella se DICE «sin fecha en el catálogo», no se adivina.
+function _reqFichaHtml(r, np) {
+  const fila = (ico, lbl, val, fuerte) => `<div class="rq-fi"><small>${ico} ${lbl}</small><b${fuerte ? ' class="pk"' : ''}>${val}</b></div>`;
+  const vac = '<span style="color:var(--ts);font-weight:400">—</span>';
+  const paq = khPaqueteTexto({ tipo_paquete: r.paquete, zona_boleto: r.zona, evento_id: r.evento_id });
+  const fecha = r.fecha_txt ? _reqBdjEsc(r.fecha_txt) + (r.venue_txt ? `<i>${_reqBdjEsc(r.venue_txt)}</i>` : '')
+    : '<span style="color:var(--ts);font-weight:400">sin fecha en el catálogo · ver cotización</span>';
+  const porPersona = (np > 1 && r.total_sistema != null && Number(r.total_sistema) > 0) ? `<i>${_reqBdjMxn(Number(r.total_sistema) / np)} por persona</i>` : '';
+  return `<div class="rq-ficha">
+      ${fila('📅', 'Fecha', fecha)}
+      ${fila('🎟', 'Paquete', paq ? _reqBdjEsc(paq) : vac, true)}
+      ${fila('🎫', 'Boleto / zona', r.zona ? _reqBdjEsc(r.zona) : (String(r.paquete || '').toLowerCase() === 'ride' ? 'Sin boleto (RIDE)' : vac))}
+      ${fila('🏨', 'Habitación', r.hotel ? _reqBdjEsc(r.hotel) : (String(r.paquete || '').toLowerCase() === 'cheap' ? 'Sin hotel (CHEAP)' : vac))}
+      ${fila('👥', 'Personas', np + (np > 1 ? ' personas' : ' persona') + porPersona)}
+      ${r.transporte ? fila('🚌', 'Transporte', _reqBdjEsc(r.transporte)) : ''}
+    </div>`;
+}
+
 function _reqBdjCard(r) {
   const esPend = r.estado === 'pendiente';
   const cls = r.estado === 'aprobada' ? 'ok' : r.estado === 'rechazada' ? 'no' : 'pend';
@@ -306,9 +331,7 @@ function _reqBdjCard(r) {
       </div>
       <div class="rq-meta"><span class="rq-pill ${cls}">${_reqBdjEsc(r.estado)}</span><br>${_reqBdjEsc(r.folio)} · ${_reqBdjFecha(r.creado_en)}</div>
     </div>
-    <div class="rq-tags">
-      ${tag(khPaqueteTexto({ tipo_paquete: r.paquete, zona_boleto: r.zona, evento_id: r.evento_id }), 'pk')}${tag(r.zona)}${tag(np + (np > 1 ? ' personas' : ' persona'))}${tag(r.hotel)}${tag(r.transporte)}
-    </div>
+    ${_reqFichaHtml(r, np)}
     <div class="rq-nums">
       <div class="rq-num"><small>Separo</small><b>${_reqBdjMxn(r.separo_sistema)}</b></div>
       <div class="rq-num"><small>Total</small><b>${_reqBdjMxn(r.total_sistema)}</b>${(r.transporte && r.total_sistema != null) ? '<i>sin transporte CDMX</i>' : ''}</div>
@@ -323,7 +346,7 @@ function _reqBdjCard(r) {
         ${r.num_emergencia ? `<span>Emergencia <b>${_reqBdjEsc(r.num_emergencia)}</b></span>` : ''}
       </div>
       ${acomp}
-      ${r.cotizacion_texto ? `<details><summary>Ver la cotización que el cliente vio</summary><pre>${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
+      ${r.cotizacion_texto ? `<details><summary>📄 Ver la cotización completa (tal como la vio el cliente)</summary><pre>${_reqBdjEsc(r.cotizacion_texto)}</pre></details>` : ''}
       ${r.estado === 'rechazada' && r.motivo_rechazo ? `<div class="rq-note no">Motivo del rechazo: ${_reqBdjEsc(r.motivo_rechazo)}</div>` : ''}
       ${/* [RECHAZO-AVISO-1] ¿se enteró el cliente? Un rechazo sin aviso se veía
             EXACTAMENTE igual que uno avisado — por eso cuatro personas que ya

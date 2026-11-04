@@ -2082,6 +2082,176 @@ function cabCortar(motivo) {
   if (motivo) _cbMsg('cab-msg', motivo, /cerró|No se pudo|no se pudo/.test(motivo));
 }
 
+// ── [RADIO-EPISODIOS-1] La GRABADORA y los EPISODIOS ─────────────────────────
+// Palabra de Memo: «guardar los episodios de los programas… quiero hacer
+// pruebas y grabar para escuchar». Graba LA MEZCLA (el master: mic post-efectos
+// + samplers + música, lo mismo que sale al aire) con su PROPIO processor y su
+// PROPIO encoder — no depende de estar al aire: sirve para ensayar. Al detener
+// la grabación queda en esta sesión para escuchar, descargar o guardar en
+// Episodios (el MP3 sube DIRECTO al bucket privado con una URL firmada: un
+// episodio de una hora pesa ~55 MB y una function no carga más de ~6 MB).
+const CAB_GRAB_KBPS = 128;
+// Pura (el careo la corre en vm): el título por defecto de una grabación.
+function cabGrabTitulo(cart, fechaMs) {
+  const d = new Date(fechaMs);
+  const f = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Matamoros' });
+  const h = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Matamoros' });
+  const p = cart && cart.al_aire;
+  return (p && p.nombre ? String(p.nombre) : 'Prueba de cabina') + ' · ' + f + ' ' + h;
+}
+function _cbGrabEstado() {
+  const el = _cbEl('cab-grab-estado'); if (!el) return;
+  if (!_cb.grab) { el.textContent = ''; return; }
+  const seg = (Date.now() - _cb.grab.desde) / 1000;
+  el.innerHTML = '<span style="color:var(--red);font-weight:800">● GRABANDO</span> ' + cabMMSS(seg) + ' · ' + (_cb.grab.bytes / 1048576).toFixed(1) + ' MB';
+}
+async function cabGrabar() {
+  if (_cb.grab) { _cbGrabDetener(); return; }
+  const btn = _cbEl('cab-grab-btn');
+  try {
+    await _cbCargarLame();
+    const ctx = cabCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const g = { enc: new lamejs.Mp3Encoder(2, ctx.sampleRate, CAB_GRAB_KBPS), chunks: [], bytes: 0, desde: Date.now(), cart: null };
+    // La parrilla se pide al ARRANCAR: el título y el programa son los del
+    // momento en que empezó la grabación, no los de cuando se detuvo.
+    fetch('/.netlify/functions/radio-cartelera').then((r) => r.json()).then((j) => { if (j && j.ok) g.cart = j; }).catch(() => {});
+    g.proc = ctx.createScriptProcessor(4096, 2, 2);
+    g.sink = ctx.createGain(); g.sink.gain.value = 0;   // un processor suelto no procesa; a destination directo duplicaría el monitor
+    _cb.master.connect(g.proc); g.proc.connect(g.sink); g.sink.connect(ctx.destination);
+    g.proc.onaudioprocess = (e) => {
+      if (_cb.grab !== g) return;
+      const mp3 = g.enc.encodeBuffer(cabF32aI16(e.inputBuffer.getChannelData(0)), cabF32aI16(e.inputBuffer.getChannelData(1)));
+      if (mp3.length) { g.chunks.push(new Int8Array(mp3)); g.bytes += mp3.length; }
+    };
+    g.reloj = setInterval(_cbGrabEstado, 500);   // el reloj tiene dueño: muere en _cbGrabDetener
+    _cb.grab = g;
+    _cbGrabEstado();
+    if (btn) { btn.textContent = '⏹ Detener grabación'; btn.style.borderColor = 'var(--red)'; btn.style.color = 'var(--red)'; }
+    _cbMsg('cab-grab-msg', _cb.micStream ? 'Grabando la mezcla. Puedes salir al aire o seguir ensayando — la grabación no se corta.' : 'Grabando la mezcla — ⚠️ tu micrófono NO está activo: actívalo en la mezcladora si quieres que se oiga tu voz.', !_cb.micStream);
+  } catch (e) { _cbMsg('cab-grab-msg', e.message, true); }
+}
+function _cbGrabDetener() {
+  const g = _cb.grab; if (!g) return;
+  _cb.grab = null;
+  clearInterval(g.reloj);
+  try { _cb.master.disconnect(g.proc); } catch (e) {}
+  try { g.proc.disconnect(); g.sink.disconnect(); } catch (e) {}
+  g.proc.onaudioprocess = null;
+  try { const fin = g.enc.flush(); if (fin.length) { g.chunks.push(new Int8Array(fin)); g.bytes += fin.length; } } catch (e) {}
+  const btn = _cbEl('cab-grab-btn');
+  if (btn) { btn.textContent = '⏺ Grabar'; btn.style.borderColor = ''; btn.style.color = ''; }
+  _cbGrabEstado();
+  if (!g.bytes) { _cbMsg('cab-grab-msg', 'La grabación salió vacía.', true); return; }
+  const blob = new Blob(g.chunks, { type: 'audio/mpeg' });
+  const desdeMs = g.desde;
+  _cb.grabaciones = _cb.grabaciones || [];
+  _cb.grabaciones.unshift({ id: 'g' + desdeMs, blob, url: URL.createObjectURL(blob), dur: Math.round((Date.now() - desdeMs) / 1000),
+    bytes: blob.size, titulo: cabGrabTitulo(g.cart, desdeMs), programa_id: (g.cart && g.cart.al_aire && g.cart.al_aire.id) || null,
+    archivo: 'radio-conecta-' + new Date(desdeMs).toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }) + '-' + desdeMs.toString(36) + '.mp3', guardada: false });
+  _cbMsg('cab-grab-msg', 'Listo. Escúchala abajo, descárgala o guárdala en Episodios.');
+  _cbGrabSesionPintar();
+}
+function _cbGrabSesionPintar() {
+  const box = _cbEl('cab-grab-sesion'); if (!box) return;
+  const gs = _cb.grabaciones || [];
+  box.innerHTML = gs.map((g) => `<div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+     <input class="form-input" id="cab-grab-t-${g.id}" value="${_rcEsc(g.titulo)}" maxlength="160" style="flex:1;min-width:180px" ${g.guardada ? 'disabled' : ''}>
+     <span style="font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums">${cabMMSS(g.dur)} · ${(g.bytes / 1048576).toFixed(1)} MB</span>
+    </div>
+    <audio controls preload="metadata" src="${g.url}" style="width:100%"></audio>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center">
+     ${g.guardada ? '<span style="color:var(--green);font-size:12px;font-weight:700">✓ Guardada en Episodios</span>'
+       : `<button class="btn btn-primary btn-sm" id="cab-grab-g-${g.id}" onclick="cabGrabGuardar('${g.id}')">☁️ Guardar en Episodios</button>`}
+     <a class="btn btn-ghost btn-sm" href="${g.url}" download="${_rcEsc(g.archivo)}">⬇ Descargar MP3</a>
+     <button class="btn btn-ghost btn-sm" onclick="cabGrabDescartar('${g.id}')">✕ Quitar</button>
+     <span id="cab-grab-m-${g.id}" style="font-size:12px"></span>
+    </div></div>`).join('');
+}
+function cabGrabDescartar(id) {
+  const g = (_cb.grabaciones || []).find((x) => x.id === id); if (!g) return;
+  if (!g.guardada && !confirm('Esta grabación NO está guardada en Episodios. ¿Quitarla? (si no la descargaste, se pierde)')) return;
+  try { URL.revokeObjectURL(g.url); } catch (e) {}
+  _cb.grabaciones = _cb.grabaciones.filter((x) => x.id !== id);
+  _cbGrabSesionPintar();
+}
+// Sube el MP3 DIRECTO al bucket (XHR para ver el avance) con la URL firmada que
+// da el servidor, y SOLO después le pide crear el renglón (el servidor revisa
+// que el objeto exista: un episodio sin audio no nace).
+async function cabGrabGuardar(id) {
+  const g = (_cb.grabaciones || []).find((x) => x.id === id); if (!g || g.guardada) return;
+  const msg = (t, err) => { const m = _cbEl('cab-grab-m-' + id); if (m) m.innerHTML = `<span style="color:${err ? 'var(--red)' : 'var(--ts)'}">${_rcEsc(t)}</span>`; };
+  const btn = _cbEl('cab-grab-g-' + id); if (btn) btn.disabled = true;
+  const tIn = _cbEl('cab-grab-t-' + id);
+  const titulo = String((tIn && tIn.value) || g.titulo).trim();
+  if (!titulo) { msg('Ponle un título', true); if (btn) btn.disabled = false; return; }
+  try {
+    const a = await _cbApi({ accion: 'episodio_subir_url' });
+    if (a.st !== 200 || !a.j.upload_url) throw new Error(a.j.error || ('HTTP ' + a.st));
+    await new Promise((ok, mal) => {
+      const x = new XMLHttpRequest();
+      x.open('PUT', a.j.upload_url);
+      x.setRequestHeader('Content-Type', 'audio/mpeg');
+      x.upload.onprogress = (e) => { if (e.lengthComputable) msg('Subiendo… ' + Math.round(e.loaded * 100 / e.total) + '%'); };
+      x.onload = () => {
+        if (x.status >= 200 && x.status < 300) return ok();
+        if (x.status === 413 || /too large|exceeded|maximum/i.test(x.responseText || ''))
+          return mal(new Error('El episodio pesa ' + (g.bytes / 1048576).toFixed(1) + ' MB y pasa el tope de subida de Supabase. Descárgalo con ⬇; para guardar episodios largos hay que subir el tope en Supabase → Storage → Settings.'));
+        mal(new Error('El bucket no lo aceptó: HTTP ' + x.status + ' ' + String(x.responseText || '').slice(0, 120)));
+      };
+      x.onerror = () => mal(new Error('Se cortó la conexión subiendo el audio — vuelve a intentar'));
+      x.send(g.blob);
+    });
+    msg('Guardando…');
+    const c = await _cbApi({ accion: 'episodio_crear', path: a.j.path, titulo, programa_id: g.programa_id, duracion_seg: g.dur, bytes: g.bytes });
+    if (c.st !== 200 || !c.j.ok) throw new Error(c.j.error || ('HTTP ' + c.st));
+    g.guardada = true; g.titulo = titulo;
+    _cbGrabSesionPintar();
+    cabEpisodiosCargar();
+  } catch (e) { msg(e.message, true); if (btn) btn.disabled = false; }
+}
+async function cabEpisodiosCargar() {
+  const box = _cbEl('cab-epi-lista'); if (!box) return;
+  const { st, j } = await _cbApi({ accion: 'episodios_listar' });
+  if (st !== 200 || !j.ok) { box.innerHTML = `<div class="alert alert-error">${_rcEsc(j.error || ('HTTP ' + st))}</div>`; return; }
+  _cb.episodios = j.episodios || [];
+  const n = _cbEl('cab-epi-n'); if (n) n.textContent = '(' + _cb.episodios.length + ')';
+  if (!_cb.episodios.length) { box.innerHTML = '<div style="color:var(--ts);font-size:13px">Todavía no hay episodios guardados — graba arriba y dale «☁️ Guardar en Episodios».</div>'; return; }
+  box.innerHTML = _cb.episodios.map((e) => {
+    const f = new Date(e.grabado_el).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Matamoros' });
+    const meta = [f, e.duracion_seg != null ? cabMMSS(e.duracion_seg) : '', e.bytes ? (e.bytes / 1048576).toFixed(1) + ' MB' : '', e.programa ? '📻 ' + e.programa : ''].filter(Boolean).join(' · ');
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+     <div style="font-weight:700">${_rcEsc(e.titulo)}</div>
+     <div style="font-size:11px;color:var(--ts);margin-bottom:6px">${_rcEsc(meta)}</div>
+     ${e.url ? `<audio controls preload="none" src="${_rcEsc(e.url)}" style="width:100%"></audio>` : '<div style="font-size:12px;color:var(--red)">No se pudo firmar el audio — recarga la lista.</div>'}
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      ${e.url ? `<a class="btn btn-ghost btn-sm" href="${_rcEsc(e.url + (e.url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(e.titulo.replace(/[^\w\- áéíóúñÁÉÍÓÚÑ·]/g, '').trim() + '.mp3'))}">⬇ Descargar</a>` : ''}
+      <button class="btn btn-ghost btn-sm" onclick="cabEpiRenombrar('${_rcEsc(e.id)}')">✏️ Renombrar</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="cabEpiEliminar('${_rcEsc(e.id)}')">🗑 Eliminar</button>
+     </div></div>`;
+  }).join('');
+}
+async function cabEpiRenombrar(id) {
+  const e = (_cb.episodios || []).find((x) => x.id === id); if (!e) return;
+  const t = prompt('Nuevo título del episodio:', e.titulo);
+  if (t == null || !t.trim() || t.trim() === e.titulo) return;
+  const { st, j } = await _cbApi({ accion: 'episodio_editar', id, titulo: t.trim() });
+  if (st !== 200 || !j.ok) { alert(j.error || ('HTTP ' + st)); return; }
+  cabEpisodiosCargar();
+}
+async function cabEpiEliminar(id) {
+  const e = (_cb.episodios || []).find((x) => x.id === id); if (!e) return;
+  if (!confirm('¿Eliminar el episodio «' + e.titulo + '»? El audio se borra y no se puede recuperar.')) return;
+  const { st, j } = await _cbApi({ accion: 'episodio_eliminar', id, confirmar: true });
+  if (st !== 200 || !j.ok) { alert(j.error || ('HTTP ' + st)); return; }
+  cabEpisodiosCargar();
+}
+// Cerrar la pestaña con una grabación en curso o sin guardar la perdería: se avisa.
+window.addEventListener('beforeunload', (ev) => {
+  if (_cb.grab || (_cb.grabaciones || []).some((g) => !g.guardada)) { ev.preventDefault(); ev.returnValue = ''; }
+});
+
 // ── [KAIO-V3a] Llegando del público — EN VIVO ────────────────────────────────
 // Peticiones + muro en la cabina, latiendo cada 10 s mientras la pestaña está
 // visible. El dueño del reloj es _cb.pubTimer (la ley del reloj); los datos se
@@ -2195,6 +2365,8 @@ async function loadRadioCabina() {
   _cbSamplersPintar();
   _cbDjsPintar();
   _cbPubStart();   // [KAIO-V3a] el panel del público late mientras la cabina está abierta
+  cabEpisodiosCargar();   // [RADIO-EPISODIOS-1] los episodios guardados
+  _cbGrabSesionPintar();
   const { st, j } = await _cbApi({ accion: 'samplers_listar' });
   if (st === 200 && j.ok) { _cb.samplers = j.samplers || []; _cbSamplersPintar(); }
   else { const box = _cbEl('cab-pads'); if (box) box.innerHTML = `<div class="alert alert-error">${_rcEsc(j.error || ('HTTP ' + st))}</div>`; }

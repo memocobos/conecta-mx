@@ -2500,6 +2500,27 @@
     </details>
    </div>
 
+   <!-- [RADIO-EPISODIOS-1] GRABADORA Y EPISODIOS. Graba LA MEZCLA (mic +
+        samplers + música, post-efectos: lo mismo que sale al aire) en el
+        navegador, CON o SIN estar al aire — sirve para ensayar. Al detener
+        queda para escuchar aquí mismo, descargar el MP3 o guardarlo en
+        Episodios (bucket privado; sube directo con URL firmada). -->
+   <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">⏺ Grabadora y episodios</div>
+     <span id="cab-grab-estado" style="font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums"></span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+     <button class="btn btn-ghost" id="cab-grab-btn" onclick="cabGrabar()">⏺ Grabar</button>
+     <span style="font-size:11px;color:var(--ts)">Graba la mezcla (mic + samplers + música) — al aire o de ensayo. No hace falta salir al aire.</span>
+    </div>
+    <div id="cab-grab-msg" style="margin-top:8px;font-size:12px"></div>
+    <div id="cab-grab-sesion" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
+    <details id="cab-epi-det" style="margin-top:12px" open><summary style="cursor:pointer;font-size:12px;color:var(--ts)">🎧 Episodios guardados <span id="cab-epi-n"></span></summary>
+     <div id="cab-epi-lista" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"><div style="color:var(--ts);font-size:13px">Cargando…</div></div>
+    </details>
+   </div>
+
    <!-- [KAIO-V3a] LLEGANDO DEL PÚBLICO — EN VIVO. Peticiones y muro en tiempo
         real para atenderlos SIN salir de la cabina mientras transmites. Late
         cada 10 s (dueño _cb.pubTimer, solo con la pestaña visible); los datos

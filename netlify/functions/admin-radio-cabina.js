@@ -21,6 +21,15 @@
 //     concatena. Tope TOTAL 25 MB (los 10 s de Netlify), dicho en el 413 — más
 //     grande va por archivo local.
 //
+//  EPISODIOS (RADIO-EPISODIOS-1 · tabla radio_episodios + bucket PRIVADO
+//  radio-episodios — la grabadora de la cabina graba la mezcla en el navegador):
+//   POST { accion:'episodio_subir_url' } → { ok, path, upload_url }  (el path lo arma el servidor)
+//   POST { accion:'episodio_crear', path, titulo, programa_id?, duracion_seg?, bytes? } → { ok, episodio }
+//     (409 si el objeto no llegó al bucket: un índice sin audio no nace)
+//   POST { accion:'episodios_listar' } → { ok, episodios:[{…, url firmada 1 h}] }
+//   POST { accion:'episodio_editar', id, titulo } → { ok }
+//   POST { accion:'episodio_eliminar', id, confirmar:true } → { ok }  (contenido, no dinero)
+//
 //  LOCUTORES (streamers de AzuraCast — las cuentas de DJ para transmitir):
 //   POST { accion:'streamers_listar' } → { ok, streamers:[{id,usuario,nombre,activo}] }
 //     (SIN contraseñas: AzuraCast no las regresa y aquí tampoco viajarían)
@@ -233,6 +242,100 @@ exports.handler = async (event) => {
         desde, bytes: rebanada.length, bytes_total: total, completo: desde + rebanada.length >= total });
     }
 
+    // ── EPISODIOS (RADIO-EPISODIOS-1) ───────────────────────────────────────
+    // La grabadora de la cabina graba LA MEZCLA en el navegador; aquí solo se
+    // administran sus piezas. El audio NO pasa por esta function: un episodio
+    // de una hora pesa ~55 MB y una function no carga más de ~6 MB, así que se
+    // firma una URL de SUBIDA y el navegador sube directo al bucket PRIVADO.
+    // El path lo arma el SERVIDOR (el navegador no elige dónde cae) y el
+    // índice nace solo si el objeto de verdad existe en el bucket.
+    if (accion.startsWith('episodio')) {
+      const EB = 'radio-episodios';
+      const TE = `${URL_}/rest/v1/radio_episodios`;
+      const PATH_OK = /^episodios\/[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]{6,20}\.mp3$/;
+      const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const quien = (auth.user && (auth.user.correo || auth.user.nombre || auth.user.id)) || null;
+
+      if (accion === 'episodio_subir_url') {
+        const dia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+        const path = `episodios/${dia}-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}.mp3`;
+        const r = await fetch(`${URL_}/storage/v1/object/upload/sign/${EB}/${path}`, { method: 'POST', headers: sb, body: '{}' });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.url) return res(502, { error: 'El bucket no firmó la subida: ' + (j.message || j.error || ('HTTP ' + r.status)) });
+        return res(200, { ok: true, path, upload_url: `${URL_}/storage/v1${j.url}` });
+      }
+
+      if (accion === 'episodio_crear') {
+        const path = String(body.path || '');
+        if (!PATH_OK.test(path)) return res(400, { error: 'path de episodio inválido' });
+        const titulo = String(body.titulo || '').trim().slice(0, 160);
+        if (!titulo) return res(400, { error: 'Ponle un título al episodio' });
+        const programa_id = body.programa_id ? String(body.programa_id) : null;
+        if (programa_id && !UUID.test(programa_id)) return res(400, { error: 'programa_id inválido' });
+        const dur = Number(body.duracion_seg);
+        const bytes = Number(body.bytes);
+        // El índice solo nace si el audio de verdad llegó al bucket — un renglón
+        // que apunta a un objeto inexistente sería un episodio mudo.
+        const nombre = path.slice('episodios/'.length);
+        const rl = await fetch(`${URL_}/storage/v1/object/list/${EB}`, { method: 'POST', headers: sb,
+          body: JSON.stringify({ prefix: 'episodios', search: nombre, limit: 5 }) });
+        const lista = rl.ok ? await rl.json().catch(() => []) : [];
+        const obj = Array.isArray(lista) ? lista.find((o) => o && o.name === nombre) : null;
+        if (!obj) return res(409, { error: 'El audio no llegó al bucket — vuelve a intentar «Guardar en Episodios»' });
+        const fila = { titulo, programa_id, audio_path: path, creado_por: quien,
+          duracion_seg: Number.isFinite(dur) && dur >= 0 ? Math.round(dur) : null,
+          bytes: Number.isFinite(bytes) && bytes >= 0 ? Math.round(bytes) : ((obj.metadata && obj.metadata.size) || null) };
+        const r = await fetch(TE, { method: 'POST', headers: { ...sb, Prefer: 'return=representation' }, body: JSON.stringify(fila) });
+        if (!r.ok) return res(502, { error: 'No se pudo guardar el episodio: ' + (await r.text()).slice(0, 200) });
+        return res(200, { ok: true, episodio: (await r.json())[0] });
+      }
+
+      if (accion === 'episodios_listar') {
+        const r = await fetch(`${TE}?select=*,radio_programas(nombre)&order=grabado_el.desc&limit=200`, { headers: sb });
+        if (!r.ok) throw new Error('Supabase ' + r.status);
+        const filas = await r.json();
+        // Escuchar/descargar con URL firmada de 1 h (el bucket es privado).
+        let firmas = {};
+        if (filas.length) {
+          const rs = await fetch(`${URL_}/storage/v1/object/sign/${EB}`, { method: 'POST', headers: sb,
+            body: JSON.stringify({ expiresIn: 3600, paths: filas.map((f) => f.audio_path) }) });
+          const js = rs.ok ? await rs.json().catch(() => []) : [];
+          (Array.isArray(js) ? js : []).forEach((x) => { if (x && x.path && x.signedURL) firmas[x.path] = `${URL_}/storage/v1${x.signedURL}`; });
+        }
+        return res(200, { ok: true, episodios: filas.map((f) => ({ id: f.id, titulo: f.titulo, programa_id: f.programa_id,
+          programa: (f.radio_programas && f.radio_programas.nombre) || null, grabado_el: f.grabado_el,
+          duracion_seg: f.duracion_seg, bytes: f.bytes, url: firmas[f.audio_path] || null })) });
+      }
+
+      if (accion === 'episodio_editar') {
+        const id = String(body.id || '');
+        if (!UUID.test(id)) return res(400, { error: 'id inválido' });
+        const titulo = String(body.titulo || '').trim().slice(0, 160);
+        if (!titulo) return res(400, { error: 'El título no puede quedar vacío' });
+        const r = await fetch(`${TE}?id=eq.${id}`, { method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' }, body: JSON.stringify({ titulo }) });
+        if (!r.ok) return res(502, { error: 'No se pudo renombrar: ' + (await r.text()).slice(0, 200) });
+        const out = await r.json().catch(() => []);
+        if (!out.length) return res(404, { error: 'Ese episodio ya no existe' });
+        return res(200, { ok: true, episodio: out[0] });
+      }
+
+      if (accion === 'episodio_eliminar') {
+        const id = String(body.id || '');
+        if (!UUID.test(id)) return res(400, { error: 'id inválido' });
+        if (body.confirmar !== true) return res(400, { error: 'Para eliminar un episodio hace falta confirmar:true' });
+        const r = await fetch(`${TE}?id=eq.${id}`, { method: 'DELETE', headers: { ...sb, Prefer: 'return=representation' } });
+        if (!r.ok) return res(502, { error: 'No se pudo eliminar: ' + (await r.text()).slice(0, 200) });
+        const idas = await r.json().catch(() => []);
+        if (!idas.length) return res(404, { error: 'Ese episodio ya no existía' });
+        // El audio se barre DESPUÉS del índice: si el borrado del objeto falla,
+        // queda un huérfano en el bucket, nunca un renglón que apunta a nada.
+        await fetch(`${URL_}/storage/v1/object/${EB}/${idas[0].audio_path}`, { method: 'DELETE', headers: sb }).catch(() => {});
+        return res(200, { ok: true });
+      }
+
+      return res(400, { error: 'acción de episodio desconocida' });
+    }
+
     // ── TRANSMISIÓN ─────────────────────────────────────────────────────────
     // [KAIO-CABINA-6] Cortar en la ESTACIÓN, no solo en el navegador. Cerrar
     // el WS deja que liquidsoap suelte al DJ cuando note el socket muerto —
@@ -308,7 +411,7 @@ exports.handler = async (event) => {
       return res(200, { ok: true });
     }
 
-    return res(400, { error: "accion inválida: samplers_listar | sampler_crear | sampler_editar | sampler_eliminar | cancion_descargar | streamers_listar | streamer_crear | streamer_eliminar" });
+    return res(400, { error: "accion inválida: samplers_listar | sampler_crear | sampler_editar | sampler_eliminar | cancion_descargar | streamers_listar | streamer_crear | streamer_eliminar | episodio_subir_url | episodio_crear | episodios_listar | episodio_editar | episodio_eliminar" });
   } catch (e) {
     return res(502, { error: 'La cabina no pudo con eso: ' + e.message });
   }

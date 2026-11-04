@@ -136,6 +136,7 @@
     "mide:abono-foto-3": "node scripts/mide-abono-foto-3.js",
     "mide:crea-revive-1": "node scripts/mide-crea-revive-1.js",
     "mide:crea-baja-just-1": "node scripts/mide-crea-baja-just-1.js",
-    "mide:abono-foto-4": "node scripts/mide-abono-foto-4.js"
+    "mide:abono-foto-4": "node scripts/mide-abono-foto-4.js",
+    "mide:radio-episodios-1": "node scripts/mide-radio-episodios-1.js"
   }
 }

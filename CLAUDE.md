@@ -188,6 +188,29 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ⏺⏳ **RADIO-EPISODIOS-1 (3-nov-2026, en main local; la BASE ya escrita): la
+  cabina GRABA y guarda EPISODIOS.** Palabra de Memo: *«dame la opción de
+  guardar los episodios de los programas de radio, el audio sobre todo… quiero
+  hacer pruebas y grabar para escuchar»*. Tarjeta «⏺ Grabadora y episodios» en
+  la Cabina: graba LA MEZCLA (el master post-efectos = lo que sale al aire) con
+  su PROPIO processor y encoder MP3 128 kbps — **con o sin estar al aire**
+  (ensayo). Al detener: escuchar ahí, ⬇ descargar el MP3 o ☁️ guardar en
+  Episodios. 🔒 El audio NO pasa por una function (1 h ≈ 55 MB): el servidor
+  firma una URL de SUBIDA (path armado por él) y el navegador sube directo al
+  bucket PRIVADO `radio-episodios`; el índice `radio_episodios` nace SOLO si el
+  objeto existe (409 si no). Lista con URL firmada 1 h (el path crudo no viaja),
+  renombrar, eliminar con `confirmar:true` (índice primero, luego el audio).
+  Cerrar la pestaña con grabación en curso o sin guardar AVISA. CSP: supabase
+  entró a `media-src`. Acta `migraciones/RADIO-EPISODIOS-1.sql` (YA CORRIDA:
+  RLS deny-all + GRANT service_role, CHECKs mordidos). `mide:radio-episodios-1`
+  **29** (sabotaje al candado del objeto → rojo → restaurado sha1 `19761fb2`).
+  Vecinos verdes: kaio-cabina-1 94 · kaio-v3 45 · radio-v2a 32 · radio-v2b 44.
+  ⚠️ **No probado contra el storage real** (sin llave de servicio aquí; las
+  formas de la API se tomaron de storage-js). ⚠️ **Tope de subida:** el global
+  del proyecto (Pro) es 50 MB por default ≈ 53 min a 128 kbps; si un episodio lo
+  pasa, la grabadora lo DICE y queda la descarga — subirlo es Supabase →
+  Storage → Settings. ⏳ Push de Memo → primera grabación de prueba.
+
 - 📻⏳ **RADIO-FOTO-1 + CAB-VOL-1 (3-nov-2026, en main local, cero SQL): la
   foto del programa por fin llega a /radio, y los sliders de la cabina hacen
   lo que dicen.** Reporte de Memo con captura (Los Ayatola al aire, carátula

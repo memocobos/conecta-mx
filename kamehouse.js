@@ -2199,6 +2199,7 @@ const khViajeros = {
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
   // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
   abonoEditar(abono_id, campos) { return this._call(Object.assign({ accion: 'abono_editar', abono_id }, campos || {})); },
+  abonoFoto(abono_id, foto) { return this._call({ accion: 'abono_foto', abono_id, foto }); },   // [ABONO-FOTO-4]
   // [VJ-5] poner/quitar cuarto a un migrado
   habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
   // [MIG-1a] alta de un viajero del Excel, y la búsqueda de parecidos previa
@@ -6697,6 +6698,12 @@ async function _vjPagosVer(id, nombre) {
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--yellow);border-color:var(--yellow)"
             title="[ABONO-EDITA-1] Corregir el monto o la fecha de este abono (si se aceptó algo erróneo). El rastro queda en su nota."
             onclick="_vjAbonoEditar('${_attrJs(a.id)}','${_attrJs(id)}','${_attrJs(nombre)}',${Number(a.monto) || 0},'${_attrJs(String(a.fecha || '').slice(0, 10))}')">✏️</button>
+          <label class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green);cursor:pointer"
+            title="[ABONO-FOTO-4] ${a.foto_url ? 'Cambiar el comprobante (el anterior no se borra: queda anotado en la nota)' : 'Subir el comprobante de este abono'}">
+            ${a.foto_url ? '🔁 Cambiar comprobante' : '📎 Subir comprobante'}
+            <input type="file" accept="image/*,application/pdf" style="display:none"
+              onchange="_vjAbonoFoto(this,'${_attrJs(a.id)}','${_attrJs(id)}','${_attrJs(nombre)}',${a.foto_url ? 'true' : 'false'})">
+          </label>
         </div>`).join('')}
     </div>`;
   } catch (e) {
@@ -6725,6 +6732,29 @@ async function _vjAbonoEditar(abonoId, viajeroId, nombre, montoActual, fechaActu
     await _vj2Cargar();
     _vjPagosVer(viajeroId, nombre);
   } catch (e) { showToast('No se pudo corregir el abono: ' + ((e && e.message) || ''), 'error'); }
+}
+
+// ═══ [ABONO-FOTO-4] 📎/🔁 EL COMPROBANTE DE UN ABONO QUE YA EXISTE ══════════
+// Bulma/Milk: «no puedo subir o corregir el comprobante de los viajeros». El
+// lector es el MISMO de siempre (_vj3LeerFoto: 1600 px, PDF, errores con
+// palabras); el servidor (`abono_foto`) cambia SOLO la foto con valor esperado
+// y anota el path viejo en la nota — el comprobante anterior no se borra.
+async function _vjAbonoFoto(input, abonoId, viajeroId, nombre, tenia) {
+  let foto;
+  try { foto = await _vj3LeerFoto(input); }
+  catch (e) { showToast((e && e.message) || 'No se pudo leer el comprobante', 'error'); input.value = ''; return; }
+  if (!foto) return;
+  if (tenia && !confirm(`¿Cambiar el comprobante de este abono de ${nombre || 'este viajero'}?\n\nEl anterior NO se borra: queda anotado en la nota del abono.`)) { input.value = ''; return; }
+  showToast('Subiendo comprobante…', 'info');
+  try {
+    const j = await khViajeros.abonoFoto(abonoId, foto);
+    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo guardar');
+    showToast(j.reemplazo ? '✓ Comprobante cambiado' : '✓ Comprobante agregado', 'success');
+    // Reabre el panel: el toggle cierra si está abierto, así que se cierra primero.
+    const tr = document.getElementById(`vj-ab-${viajeroId}`);
+    if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
+    _vjPagosVer(viajeroId, nombre);
+  } catch (e) { showToast('No se pudo subir el comprobante: ' + ((e && e.message) || ''), 'error'); input.value = ''; }
 }
 
 function _vjAbonoAbrir(id, nombre) {

@@ -188,6 +188,25 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📎⏳ **ABONO-FOTO-4 (3-nov-2026, en main local, cero SQL): subir o CAMBIAR
+  el comprobante de un abono que YA EXISTE.** Reporte de Bulma/Milk vía Memo:
+  *«sigue sin poder en Capsule subir el comprobante o corregir el comprobante de
+  los viajeros»*. Medido: ABONO-FOTO-3 ya estaba en producción (push 3-nov
+  ~22:00 UTC) y **desde el deploy no hubo ningún intento fallido** (0 errores de
+  la function, 0 abonos nuevos de Capsule) — pero un abono existente, sin foto
+  o con la foto negra o equivocada, **no tenía puerta**: `abono_editar` solo
+  toca monto y fecha. Hoy en el panel 📎 Pagos, cada abono tiene **«📎 Subir
+  comprobante»** o **«🔁 Cambiar comprobante»** (mismo lector `_vj3LeerFoto`) →
+  la acción `abono_foto` (roles de siempre). Cambia SOLO `foto_path` y la nota,
+  con **valor esperado** (`foto_path=is.null|eq.viejo`; si hay carrera, 409 y
+  se dice el objeto huérfano). La foto nueva estrena su propio objeto, **la vieja
+  NO se borra** y su path queda ANEXADO en la nota. Cero correos.
+  `mide:abono-foto-4` **21** (sabotaje al valor esperado → 2 rojos → restaurado
+  sha1 `2c9cee9c`). abono-foto-3 **23** (sus conteos literales 4→5 lectores y
+  2→3 inputs se actualizaron, con su razón). Vecinos verdes: capsule-ux-2 46 ·
+  capsule-ux-1 76 · capsule-comp-1 16 · ticket-circuito-1 32 · viajero-edita-1
+  67. ⏳ Push de Memo → Bulma/Milk RECARGAN KameHouse.
+
 - 🤝⏳ **CREA-BAJA-JUST-1 (3-nov-2026, en main local, cero SQL): baja
   JUSTIFICADA — sin los −20 del ranking.** Palabra de Memo: *«hay bajas de
   evento que sí son permitidas, como Renata … aviso que no iba a poder con

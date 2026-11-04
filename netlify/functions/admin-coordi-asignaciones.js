@@ -127,6 +127,8 @@ const ACCIONES = {
   // [ABONO-EDITA-1] Corregir el MONTO/fecha de un abono capturado mal (el
   // separo erróneo — palabra de Memo, 30-oct). Mismos roles que capturarlo.
   abono_editar: ROLES_EDITA_VIAJERO,
+  // [ABONO-FOTO-4] Subir o CAMBIAR el comprobante de un abono que ya existe.
+  abono_foto: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
@@ -2726,6 +2728,62 @@ ${entregables}
       const filas = await r.json();
       if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien movió este abono mientras lo corregías. Recarga y vuelve a intentar.', ya: true }) };
       return ok(headers, { abono: filas[0], cambios });
+    }
+
+    // ═══ [ABONO-FOTO-4] (3-nov-2026) SUBIR O CAMBIAR EL COMPROBANTE ═══════════
+    // Reporte de Bulma/Milk vía Memo: «sigue sin poder en Capsule subir el
+    // comprobante o CORREGIR el comprobante de los viajeros». Medido: el ➕ Abono
+    // ya sube foto (ABONO-FOTO-3), pero un abono que YA EXISTE —sin foto, o con
+    // la foto equivocada/negra— no tenía puerta: abono_editar toca solo monto y
+    // fecha. Ésta es esa puerta, y NO toca dinero:
+    //  · solo `foto_path` (y la nota que lo cuenta) — monto, fecha y viajero no;
+    //  · la foto nueva estrena SU objeto (uuid nuevo, sin upsert): la vieja NO
+    //    se borra del bucket y su path queda ANEXADO en la nota — un comprobante
+    //    reemplazado sigue siendo evidencia;
+    //  · 🔒 VALOR ESPERADO: el PATCH filtra por el foto_path que se leyó (o
+    //    is.null). Doble clic / carrera → 409 y la foto subida queda huérfana
+    //    pero DICHA (no se pisa el comprobante que otro acaba de poner);
+    //  · CERO correos (es una corrección de evidencia, no un pago nuevo).
+    if (accion === 'abono_foto') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes cambiar comprobantes' }) };
+      }
+      const abono_id = String(body.abono_id || '').trim();
+      if (!UUID_RE.test(abono_id)) return bad(headers, 'abono_id inválido');
+      if (!body.foto) return bad(headers, 'Elige la foto o el PDF del comprobante');
+      const img = _decodeImagen(body.foto);
+      if (img.error) return bad(headers, 'Comprobante inválido: ' + img.error);
+      if (img.tooBig) return bad(headers, 'El comprobante pesa demasiado (máx 6 MB)');
+
+      const baseAB = `${env.KH_SB_URL}/rest/v1/abonos_viajero`;
+      const pre = await fetch(`${baseAB}?id=eq.${abono_id}&select=id,viajero_id,foto_path,nota&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const ab = (await pre.json())[0];
+      if (!ab) return bad(headers, 'ese abono no existe');
+      const pv = await fetch(`${baseVE}?id=eq.${ab.viajero_id}&select=evento_id&limit=1`, { headers: sbHeaders });
+      if (!pv.ok) return upstream(headers, await pv.text(), 'consulta');
+      const evId = String(((await pv.json())[0] || {}).evento_id || 'sin-evento');
+
+      const nuevo = `${evId}/${ab.viajero_id}/${_uuid()}.${img.ext}`;
+      try { await _subirAbono(env, nuevo, img.bytes, img.mime); }
+      catch (e) { return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo subir el comprobante', detail: e.message }) }; }
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const rastro = ab.foto_path
+        ? `[FOTO ${hoyMx}] comprobante CAMBIADO (antes: ${ab.foto_path}) · ${quien}`
+        : `[FOTO ${hoyMx}] comprobante agregado · ${quien}`;
+      const nota = ((ab.nota ? ab.nota + ' · ' : '') + rastro).slice(0, 1000);
+      const esperado = ab.foto_path == null ? 'foto_path=is.null' : `foto_path=eq.${encodeURIComponent(ab.foto_path)}`;
+      const r = await fetch(`${baseAB}?id=eq.${abono_id}&${esperado}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ foto_path: nuevo, nota }),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien cambió este comprobante mientras subías el tuyo. Recarga y revisa antes de volver a intentar.', ya: true, huerfano: nuevo }) };
+      return ok(headers, { abono: filas[0], reemplazo: !!ab.foto_path, antes: ab.foto_path || null });
     }
 
     if (accion === 'abonos_listar') {

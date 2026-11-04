@@ -83,6 +83,11 @@ const pedir = (rol) => H({ httpMethod: 'POST', headers: { origin: 'https://conec
   af(html.includes('VIP × 2') && html.includes('Alanna · 👕 M') && html.includes('IG @marietta'), '[G4] creadora: cortesía zona × boletos, acompañante con su talla, redes');
   af((html.match(/sin dato/g) || []).length >= 3, '[G5] lo que falta se DICE «sin dato» (Reginna: celular, talla, emergencia)');
   af(sb._ccDatosEquipoHtml({ equipo: [], creadoras: [] }) === '', '[G6] sin equipo ni creadoras no pinta nada');
+  // [CC-EQUIPO-DATOS-1b] dentro del evento (pestaña Equipo) va ABIERTO; en la tarjeta, plegado
+  const abierto = sb._ccDatosEquipoHtml({ equipo: sl.equipo, creadoras: sl.creadoras }, true);
+  af(/<details class="cc-eq-datos"[^>]* open/.test(abierto) && !/<details class="cc-eq-datos"[^>]* open/.test(html), '[G7] abierto en Equipo, plegado en la tarjeta');
+  af(!/<(input|select|textarea|button)\b/.test(abierto), '[G8] solo lectura: el bloque no trae ningún control para editar');
+  af(/_ccDatosEquipoHtml\(ev\._res, true\) \+ htmlAsigs/.test(js) && /_ccDatosEquipoHtml\(ev\._res, true\) \+ htmlCreas/.test(js), '[G9] la pestaña Equipo lo pinta en sus DOS caminos (con y sin coordis)');
   const rc = await pedir('coordinador');
   af(rc.statusCode === 403, `[E] un coordi no lo ve (${rc.statusCode})`);
   console.log(`\n${R ? '🔴' : '🟢'} ${V} en verde · ${R} en rojo`);

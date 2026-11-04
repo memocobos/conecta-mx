@@ -5373,7 +5373,7 @@ function _ccTarjetaRes(e, pasado) {
 // muro) y sale del MISMO resumen que ya pinta la tarjeta — cero consultas de
 // más. El <details> frena el clic para no abrir el evento al desplegarlo.
 // Lo que no se sabe se DICE («sin dato»), no se esconde.
-function _ccDatosEquipoHtml(r) {
+function _ccDatosEquipoHtml(r, abierto) {
   const eq = (r && r.equipo) || [], cr = (r && r.creadoras) || [];
   if (!eq.length && !cr.length) return '';
   const esc = _esfEsc;
@@ -5411,8 +5411,11 @@ function _ccDatosEquipoHtml(r) {
       + fila('🆘 Emergencia', c.emergencia ? esc(c.emergencia.nombre || '') + (c.emergencia.telefono ? ' · ' + tel(c.emergencia.telefono) : '') : nd));
   }).join('');
   const n = eq.length + cr.length;
-  return `<details class="cc-eq-datos" onclick="event.stopPropagation()" style="margin-top:6px">
-    <summary style="cursor:pointer;font-size:11px;color:var(--orange);font-family:'JetBrains Mono',monospace">📋 Datos del equipo (${n})</summary>
+  // [CC-EQUIPO-DATOS-1b] En la tarjeta va plegado pero con cara de BOTÓN (en
+  // letra chiquita se pasaba de largo); dentro del evento, en la pestaña
+  // Equipo, va ABIERTO. Solo lectura en los dos lados: no hay un solo control.
+  return `<details class="cc-eq-datos" onclick="event.stopPropagation()"${abierto ? ' open' : ''} style="margin-top:8px${abierto ? ';margin-bottom:14px' : ''}">
+    <summary style="cursor:pointer;display:inline-block;font-size:12px;font-weight:700;color:var(--orange);font-family:'JetBrains Mono',monospace;padding:4px 10px;border:1px solid rgba(255,107,0,.45);border-radius:6px;background:rgba(255,107,0,.08)">📋 Datos del equipo (${n}) · tallas, teléfonos, cortesías</summary>
     <div style="font-size:11.5px;line-height:1.6">${htmlEq}${htmlCr}</div>
   </details>`;
 }
@@ -5667,7 +5670,7 @@ async function loadCCEquipo() {
     }).join('');
 
     if (!total) {
-      container.innerHTML = htmlCreas || '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
+      container.innerHTML = (_ccDatosEquipoHtml(ev._res, true) + htmlCreas) || '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
       if (countEl && _creas.length) countEl.textContent = `${_creas.length} creadora${_creas.length !== 1 ? 's' : ''}`;
       return;
     }
@@ -5758,7 +5761,7 @@ async function loadCCEquipo() {
       </div>`;
     }).join('');
 
-    container.innerHTML = htmlAsigs + htmlCreas + htmlPend;
+    container.innerHTML = _ccDatosEquipoHtml(ev._res, true) + htmlAsigs + htmlCreas + htmlPend;
   } catch(e) { container.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
 // [CC-CARDS-1] De la creadora en Capsule al panel de cortesía de Contratos.

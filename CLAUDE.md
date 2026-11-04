@@ -205,6 +205,14 @@ está caduco antes de escribirse.
   con talla). `mide:cc-cards-1` **23** (sabotaje al respaldo de talla → rojo →
   restaurado sha1 `9f57a07b`). Vecinos verdes: capsule-ux-1 83 · capsule-ux-2
   46 · crea-2 27 · viajero-edita-1 67. ⏳ Push de Memo → Bulma recarga.
+  **CC-EQUIPO-DATOS-1b (mismo día, «bulma y milk no lo ven»):** medido — el
+  servidor NO les negaba nada (capsule_resumen 200 para todos, 0 rechazos en
+  los logs) y el código ya estaba servido. Lo que fallaba era DÓNDE: ellas
+  entran al evento (aterrizan en Viajeros) y el bloque solo vivía plegado, en
+  letra chica, en la tarjeta de la parrilla. Hoy va también ABIERTO arriba de
+  la pestaña **Equipo** del evento (sus dos caminos: con y sin coordis) y en la
+  tarjeta el plegado tiene cara de botón. Solo lectura, sin un control
+  (afirmado en el careo). `mide:cc-cards-1` **26**.
 
 - ♀♂⏳ **GENERO-2 (3-nov-2026, en main local; la BASE ya escrita): el género se
   PREGUNTA al registrarse y se VE en las cards de Capsule.** Palabra de Bulma vía

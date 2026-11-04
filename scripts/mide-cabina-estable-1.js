@@ -171,6 +171,15 @@ const af = (c, m) => { try { c = typeof c === 'function' ? c() : c; } catch (e) 
   af((js.match(/if \(_cb\.micMono\) try \{ _cb\.micMono\.disconnect\(\); \} catch \(e\) \{\}/g) || []).length === 3, 'el nodo de suma se suelta en los 3 sitios donde se suelta el mic (apagar · cambiar mic · cambiar modo)');
   const htmlK = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
   af(htmlK.includes('id="cab-consola" onchange="cabConsola(this.checked)"') && /<input type="checkbox" id="cab-consola"[^>]*>/.test(htmlK) && !/id="cab-consola"[^>]*\schecked[\s>]/.test(htmlK), 'la casilla vive en la Mezcladora y nace APAGADA en el HTML (la preferencia de cada computadora la pinta loadRadioCabina)');
+  // [CABINA-MICMSG-1, reporte de Memo: «no me sale el mensaje de los canales»]
+  // El aviso del micrófono vivía en cab-msg (tarjeta de Transmisión, arriba) y
+  // los avisos del aire lo pisaban. Hoy vive JUNTO al botón del micrófono.
+  {
+    const iMez = htmlK.indexOf('id="cab-mic-btn"'), iMsg = htmlK.indexOf('id="cab-mic-msg"'), iVol = htmlK.indexOf('id="cab-vol-mic"');
+    af(iMez > 0 && iMsg > iMez && iMsg < iVol, 'el aviso del micrófono vive en la Mezcladora, entre el botón y el volumen (donde se mira)');
+    const cuerpoMic = js.slice(js.indexOf('async function cabMicToggle()'), js.indexOf('async function cabMicCambiar(sel)'));
+    af(!cuerpoMic.includes("_cbMsg('cab-msg'") && (cuerpoMic.match(/_cbMsg\('cab-mic-msg'/g) || []).length >= 6, 'ningún aviso del micrófono (canales, modo consola, permisos) va ya a cab-msg de la Transmisión');
+  }
   af(js.includes("localStorage.setItem('cab-consola'") && js.slice(js.indexOf('async function loadRadioCabina')).includes("_cbEl('cab-consola')"), 'la preferencia se recuerda por computadora y se pinta al abrir la cabina');
 
   console.log('\n[E] control positivo: BASE no tenía camino fuera de la pantalla');

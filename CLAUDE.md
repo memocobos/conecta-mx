@@ -211,7 +211,13 @@ está caduco antes de escribirse.
   (bloque [F]; sabotaje a la suma → rojo → restaurado sha1 `342570a4`; su control
   positivo se RE-ANCLÓ a `42e560b` — leía HEAD y caducó el día de su propio
   commit). Vecinos verdes: kaio-cabina-1 95 · radio-episodios-1 29 · kaio-v3 45 ·
-  radio-v2b 44. ⏳ Push de Memo → recargar Kaio-sama → prender «🎛 Uso consola».
+  radio-v2b 44. ✅ Pusheada y servida (ff323ad, verificado en producción).
+  **CABINA-MICMSG-1 (mismo día, Memo: «no me sale» el mensaje de los canales):**
+  el aviso del micrófono (canales, modo consola, permisos) se escribía en
+  `cab-msg` — la tarjeta de TRANSMISIÓN, arriba, donde los avisos del aire lo
+  pisan — y no junto al botón que Memo apretaba. Hoy vive en `cab-mic-msg`,
+  dentro de la Mezcladora entre el botón y el volumen; al apagar el mic se
+  limpia. `mide:cabina-estable-1` **50**. ⏳ Push de Memo → recargar Kaio-sama.
 
 - 📻⏳ **CABINA-ESTABLE-1 (3-nov-2026, en main local, cero SQL): la transmisión
   ya no se corta por la pantalla.** Reporte de Memo: *«la transmisión se escucha
@@ -236,9 +242,10 @@ está caduco antes de escribirse.
   contra el AzuraCast vivo lo estrena Memo. kaio-cabina-1 **95** (2 aserciones
   actualizadas con su razón: hello a 128 · `_cbAlAireUI` dueño del «al aire») ·
   radio-episodios-1 29 · kaio-v3 45 · radio-v2b 44 · radio-v2a 32.
-  ⏳ **Colchón de DJ de AzuraCast de 2 → 5 s**: la sesión del panel en Chrome
-  expiró — lo cambia Memo (Estación → Editar perfil → Transmisores/DJs → «Retraso
-  del búfer de DJ» = 5 → Guardar → reiniciar). ⏳ Push de Memo.
+  ✅ **Colchón de DJ de AzuraCast 2 → 5 s HECHO (3-nov 23:43, vía Chrome con la
+  sesión que Memo abrió):** guardado, «Reiniciar la transmisión», y verificado
+  por la API (`dj_buffer` = 5, estación online, sin banner de reinicio pendiente).
+  Push de Memo: ya hecho.
 
 - 🔴⏳ **ABONO-HASH-1 (4-nov-2026, en main local, cero SQL): el «#» del
   multifecha se COMÍA el comprobante — y en las altas, el dinero.** Reporte de

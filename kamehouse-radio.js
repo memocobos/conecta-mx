@@ -1896,6 +1896,7 @@ async function cabMicToggle() {
     if (_cb.micMono) try { _cb.micMono.disconnect(); } catch (e) {}
     _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
     if (btn) { btn.textContent = '🎤 Activar micrófono'; btn.style.color = ''; }
+    _cbMsg('cab-mic-msg', '');
     return;
   }
   try {
@@ -1926,14 +1927,14 @@ async function cabMicToggle() {
     const track = stream.getAudioTracks()[0];
     const etiqueta = (track && track.label) || 'micrófono sin nombre';
     if (track && track.muted) {
-      _cbMsg('cab-msg', '⚠️ «' + etiqueta + '» está entregando SILENCIO (el sistema lo tiene mudo). En Mac: Ajustes del Sistema → Privacidad y seguridad → Micrófono → activa tu navegador y vuelve a intentar.', true);
+      _cbMsg('cab-mic-msg', '⚠️ «' + etiqueta + '» está entregando SILENCIO (el sistema lo tiene mudo). En Mac: Ajustes del Sistema → Privacidad y seguridad → Micrófono → activa tu navegador y vuelve a intentar.', true);
     } else if (_cb.consola) {
       const canales = (track && track.getSettings && track.getSettings().channelCount) || '?';
-      _cbMsg('cab-msg', 'Modo consola: capturando «' + etiqueta + '» en crudo (' + canales + (canales === 1 ? ' canal' : ' canales') + ', sin filtros de llamada). Los volúmenes los manejas en la consola.' + (canales === 1 ? ' ⚠️ La tarjeta entrega UN solo canal: si el segundo micrófono no se oye, revisa en la V8 que su perilla esté arriba y que esté en modo mezcla.' : ''));
+      _cbMsg('cab-mic-msg', 'Modo consola: capturando «' + etiqueta + '» en crudo (' + canales + (canales === 1 ? ' canal' : ' canales') + ', sin filtros de llamada). Los volúmenes los manejas en la consola.' + (canales === 1 ? ' ⚠️ La tarjeta entrega UN solo canal: si el segundo micrófono no se oye, revisa en la V8 que su perilla esté arriba y que esté en modo mezcla.' : ''));
     } else {
-      _cbMsg('cab-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.' + (cabPareceConsola(etiqueta) ? ' 💡 Parece una consola o tarjeta de sonido: prende «🎛 Uso consola» para que la música no se corte y entren los dos micrófonos.' : ''));
+      _cbMsg('cab-mic-msg', 'Capturando «' + etiqueta + '» — habla y revisa que el medidor se mueva; si no se mueve, elige otro micrófono en el selector.' + (cabPareceConsola(etiqueta) ? ' 💡 Parece una consola o tarjeta de sonido: prende «🎛 Uso consola» para que la música no se corte y entren los dos micrófonos.' : ''));
     }
-    if (track) track.addEventListener('mute', () => _cbMsg('cab-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true));
+    if (track) track.addEventListener('mute', () => _cbMsg('cab-mic-msg', '⚠️ El sistema ENMUDECIÓ el micrófono «' + etiqueta + '»: la radio está recibiendo silencio.', true));
     _cbLlenarMics();
   } catch (e) {
     // [KAIO-CABINA-2, cazado por Memo: «Permission denied» pelado no dice el
@@ -1949,7 +1950,7 @@ async function cabMicToggle() {
     } else {
       como = e.message;
     }
-    _cbMsg('cab-msg', 'El micrófono no se pudo abrir: ' + como, true);
+    _cbMsg('cab-mic-msg', 'El micrófono no se pudo abrir: ' + como, true);
   }
 }
 
@@ -1978,7 +1979,7 @@ async function cabConsola(on) {
     _cb.micStream = null; _cb.micSrc = null; _cb.micMono = null;
     await cabMicToggle();
   } else {
-    _cbMsg('cab-msg', _cb.consola ? 'Modo consola prendido: al activar el micrófono se captura en crudo y en estéreo.' : 'Modo consola apagado: el micrófono vuelve a usar los filtros de llamada (para micrófono de laptop sin consola).');
+    _cbMsg('cab-mic-msg', _cb.consola ? 'Modo consola prendido: al activar el micrófono se captura en crudo y en estéreo.' : 'Modo consola apagado: el micrófono vuelve a usar los filtros de llamada (para micrófono de laptop sin consola).');
   }
 }
 async function cabMicCambiar(sel) {

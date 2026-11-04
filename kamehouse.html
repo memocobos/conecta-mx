@@ -2562,6 +2562,10 @@
       <label style="display:block;margin-top:6px;font-size:11px;color:var(--ts)">
        <input type="checkbox" id="cab-consola" onchange="cabConsola(this.checked)">
        🎛 Uso consola o tarjeta de sonido (V8, mezcladora): audio crudo, sin filtros de llamada, los dos micrófonos a la mezcla</label>
+      <!-- [CABINA-MICMSG-1] Lo que dice el micrófono vive AQUÍ, junto al botón:
+           en cab-msg (tarjeta de Transmisión, arriba) quedaba lejos y los avisos
+           del aire lo pisaban — Memo no lo veía. -->
+      <div id="cab-mic-msg" style="margin-top:6px;font-size:12px"></div>
       <div style="margin-top:6px"><label style="font-size:11px;color:var(--ts);display:flex;justify-content:space-between">🎤 Volumen del micrófono <b id="cab-vol-mic-pct" style="color:var(--text)">100%</b></label>
       <input type="range" id="cab-vol-mic" min="0" max="200" value="100" oninput="cabVol('mic',this.value)" style="width:100%"></div>
       <!-- [KAIO-CABINA-4] Monitoreo LOCAL del mic: la radia trae 15-30 s de

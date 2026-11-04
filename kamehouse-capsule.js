@@ -366,7 +366,10 @@ async function _migEnviar(d) {
     const v = r && r.viajero;
     if (!v) throw new Error('el servidor no devolvió el viajero');
     if (r && r.abono_error) {
-      showToast(`${v.nombre || 'El viajero'} quedó dado de alta, pero su abono de ${_vj3Money(r.abono_monto)} NO: regístralo con ➕ Abono (${r.abono_error})`, 'error');
+      // [ABONO-HASH-1] Si el servidor guardó el monto como pagado-antes, el
+      // dinero NO se perdió: solo falta la foto (se sube con 📎 Pagos).
+      if (/SÍ quedó guardado/.test(r.abono_error)) showToast(`${v.nombre || 'El viajero'} quedó dado de alta y sus ${_vj3Money(r.abono_monto)} quedaron guardados, pero la FOTO no subió: súbela con 📎 Pagos`, 'error');
+      else showToast(`${v.nombre || 'El viajero'} quedó dado de alta, pero su abono de ${_vj3Money(r.abono_monto)} NO: regístralo con ➕ Abono (${r.abono_error})`, 'error');
     }
     _migCapturados.unshift(v);
     _migPintarCapturados();

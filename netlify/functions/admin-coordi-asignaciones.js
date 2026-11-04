@@ -2427,7 +2427,7 @@ ${entregables}
       let abonoAlta = null, abonoError = null;
       if (creado && fotoAlta) {
         try {
-          const path = `${String(creado.evento_id || eventoId || 'sin-evento')}/${creado.id}/${_uuid()}.${fotoAlta.ext}`;
+          const path = `${_carpetaEvento(creado.evento_id || eventoId)}/${creado.id}/${_uuid()}.${fotoAlta.ext}`;
           await _subirAbono(env, path, fotoAlta.bytes, fotoAlta.mime);
           const ra = await fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero`, {
             method: 'POST',
@@ -2441,6 +2441,23 @@ ${entregables}
           if (!ra.ok) throw new Error(`abono ${ra.status}: ${await ra.text()}`);
           abonoAlta = (await ra.json())[0] || null;
         } catch (e) { abonoError = String((e && e.message) || e); }
+        // [ABONO-HASH-1] Si el abono con foto no nació, el DINERO no se pierde:
+        // con foto el alta nace con abonado_previo 0 (el monto iba al abono), así
+        // que un fallo dejaba al viajero debiendo lo que ya pagó — pasó con dos
+        // altas de FR el 3-nov. Se guarda como pagado-antes (lo mismo que sin
+        // foto), con valor esperado y nota; la foto se sube después con 📎.
+        if (!abonoAlta && abonado > 0) {
+          try {
+            const notaRespaldo = ((creado.notas ? creado.notas + ' · ' : '') +
+              `[ALTA] el comprobante no se pudo guardar; $${abonado} quedó como pagado-antes — sube la foto con 📎 Pagos`).slice(0, 1000);
+            const rp = await fetch(`${baseVE}?id=eq.${creado.id}&abonado_previo=eq.0`, {
+              method: 'PATCH',
+              headers: { ...sbHeaders, Prefer: 'return=representation' },
+              body: JSON.stringify({ abonado_previo: abonado, notas: notaRespaldo }),
+            });
+            if (rp.ok && (await rp.json()).length) abonoError = (abonoError || 'falló el abono') + ' · el monto SÍ quedó guardado como pagado-antes';
+          } catch (_) { /* el error original ya viaja en abono_error */ }
+        }
       }
 
       let contrato = null;
@@ -2609,7 +2626,7 @@ ${entregables}
         if (img.tooBig) return bad(headers, 'El comprobante pesa demasiado (máx 6 MB)');
         // <evento>/<viajero_id>/<uuid>.<ext> — el evento adelante para poder
         // barrer por evento sin abrir cada carpeta.
-        foto_path = `${String(vRows[0].evento_id || 'sin-evento')}/${viajero_id}/${_uuid()}.${img.ext}`;
+        foto_path = `${_carpetaEvento(vRows[0].evento_id)}/${viajero_id}/${_uuid()}.${img.ext}`;
         try { await _subirAbono(env, foto_path, img.bytes, img.mime); }
         catch (e) { return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo subir la foto', detail: e.message }) }; }
       }
@@ -2780,7 +2797,7 @@ ${entregables}
       if (!ab) return bad(headers, 'ese abono no existe');
       const pv = await fetch(`${baseVE}?id=eq.${ab.viajero_id}&select=evento_id&limit=1`, { headers: sbHeaders });
       if (!pv.ok) return upstream(headers, await pv.text(), 'consulta');
-      const evId = String(((await pv.json())[0] || {}).evento_id || 'sin-evento');
+      const evId = _carpetaEvento(((await pv.json())[0] || {}).evento_id);
 
       const nuevo = `${evId}/${ab.viajero_id}/${_uuid()}.${img.ext}`;
       try { await _subirAbono(env, nuevo, img.bytes, img.mime); }
@@ -3020,8 +3037,23 @@ function _decodeImagen(dataUri) {
   return { bytes, mime: t.mime, ext: t.ext };
 }
 
+// [ABONO-HASH-1 · 3-nov-2026] 🔴 EL «#» DEL MULTIFECHA SE COMÍA EL COMPROBANTE.
+// El path se armaba con el evento_id crudo («fuerzaregida#0/…») y encodeURI NO
+// escapa el «#»: la URL de Storage se cortaba ahí (fragmento) y el objeto nacía
+// llamado «fuerzaregida» — el primero «subía», los siguientes chocaban con él, y
+// la fila guardaba un path que no existe. Medido el 3-nov: 1 objeto huérfano
+// «fuerzaregida» y 2 altas de FR con su abono PERDIDO. Dos candados:
+//   · la CARPETA nunca lleva caracteres raros (`_carpetaEvento`: «#»→«_»);
+//   · el path viaja escapado SEGMENTO por segmento (`_encPath`), así un path
+//     raro que ya exista se firma bien en vez de cortarse en silencio.
+function _carpetaEvento(evId) {
+  return String(evId || 'sin-evento').replace(/[^A-Za-z0-9_-]/g, '_') || 'sin-evento';
+}
+function _encPath(path) {
+  return String(path).split('/').map(encodeURIComponent).join('/');
+}
 async function _subirAbono(env, path, bytes, contentType) {
-  const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/${BUCKET_ABONOS}/${encodeURI(path)}`, {
+  const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/${BUCKET_ABONOS}/${_encPath(path)}`, {
     method: 'POST',
     headers: {
       apikey: env.KH_SB_SERVICE,
@@ -3039,7 +3071,7 @@ async function _subirAbono(env, path, bytes, contentType) {
 
 async function _firmarAbono(env, path) {
   try {
-    const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/sign/${BUCKET_ABONOS}/${encodeURI(path)}`, {
+    const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/sign/${BUCKET_ABONOS}/${_encPath(path)}`, {
       method: 'POST',
       headers: {
         apikey: env.KH_SB_SERVICE,

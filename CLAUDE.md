@@ -188,6 +188,33 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴⏳ **ABONO-HASH-1 (4-nov-2026, en main local, cero SQL): el «#» del
+  multifecha se COMÍA el comprobante — y en las altas, el dinero.** Reporte de
+  Bulma/Milk: *«los comprobantes sí suben y guardan, pero cuando vuelves a buscar
+  al cliente ya no aparecen»*. Medido: el path del abono se armaba con el
+  `evento_id` crudo («fuerzaregida#0/…») y `encodeURI` NO escapa el «#»: la URL
+  de Storage se cortaba ahí (fragmento) → nació UN objeto huérfano llamado
+  «fuerzaregida» (sin carpeta, 3-nov 21:56 Reynosa) y los siguientes chocaban
+  con él (duplicado). En el ALTA con foto el viajero nace con pagado-antes 0 (el
+  monto va al abono), así que el abono fallido dejó **Veronica Julieet De la
+  fuente y Jessica Aylin Cervantes (FR 11-ene) con $0 pagado y cero abonos** — el
+  monto que se tecleó NO quedó en ningún lado (⏳ Bulma/Milk lo reponen con
+  ➕ Abono + su comprobante). Los eventos de UNA fecha sí funcionaban. Hoy:
+  `_carpetaEvento` («#»→«_», carpeta «fuerzaregida_0») en los TRES paths
+  (abono_crear · abono_foto · alta) + `_encPath` (escape por segmento) al subir
+  y firmar, también en el Portal; y si el abono del alta falla, el monto queda
+  como **pagado-antes** (PATCH con `abonado_previo=eq.0` + nota) y la pantalla
+  dice «dinero guardado, falta la foto». 🔴 **La lección del instrumento:** la
+  red falsa de ABONO-FOTO-3/4 hacía `decodeURIComponent(url)` — el «#» llegaba
+  intacto y la aserción BENDECÍA «frontera#0/…». El careo nuevo modela el
+  storage como el real (`new URL().pathname`, duplicado rebota) y BASE
+  (2639ad9) reproduce el defecto. `mide:abono-hash-1` **20** (sabotaje a la
+  carpeta → 2 rojos → restaurado sha1 `685d5c77`) · abono-foto-4 **21** (su
+  aserción vieja actualizada con su razón) · vecinos verdes: abono-foto-3 23 ·
+  capsule-ux-2 46 · capsule-ux-1 83 · ticket-circuito-1 32 · viajero-edita-1 67
+  · pagos-portal-2 38 · req-b1 52 · ride-sin-zona-1 9 · contrato-cliente-1 31.
+  ⏳ Push de Memo → Bulma/Milk recargan.
+
 - ⏺⏳ **RADIO-EPISODIOS-1 (3-nov-2026, en main local; la BASE ya escrita): la
   cabina GRABA y guarda EPISODIOS.** Palabra de Memo: *«dame la opción de
   guardar los episodios de los programas de radio, el audio sobre todo… quiero

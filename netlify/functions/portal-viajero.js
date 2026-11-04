@@ -237,7 +237,7 @@ exports.handler = async (event) => {
     if (!ab) return json(404, headers, { ok: false, error: 'No encontramos ese pago en tu cuenta' });
     if (!ab.foto_path) return json(404, headers, { ok: false, error: 'Este pago no tiene comprobante digital (se registró directo con el equipo)' });
     try {
-      const r = await fetch(`${KH_URL}/storage/v1/object/sign/abonos-viajeros/${encodeURI(ab.foto_path)}`, {
+      const r = await fetch(`${KH_URL}/storage/v1/object/sign/abonos-viajeros/${String(ab.foto_path).split('/').map(encodeURIComponent).join('/')}`, {
         method: 'POST',
         headers: { ...hKH, 'Content-Type': 'application/json' },
         body: JSON.stringify({ expiresIn: 600 }),   // 10 min: se pide al clic, no se guarda

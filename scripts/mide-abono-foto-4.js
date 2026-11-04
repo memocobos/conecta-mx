@@ -45,7 +45,10 @@ const call = (b, rol) => H({ httpMethod: 'POST', headers: { origin: 'https://con
   semilla(null);
   let res = await call({ foto: jpg }), j = JSON.parse(res.body);
   af(res.statusCode === 200 && j.ok && j.reemplazo === false, 'contesta 200 y no es reemplazo: ' + res.statusCode + ' ' + res.body.slice(0, 160));
-  af(/^frontera#0\/11111111-2222-3333-4444-555555555555\/.+\.jpg$/.test(DB.abono.foto_path), 'el path nuevo vive bajo evento/viajero: ' + DB.abono.foto_path);
+  // [ABONO-HASH-1] Esta aserción BENDECÍA el defecto: pedía «frontera#0/…» y su
+  // red falsa decodificaba la URL, así que el «#» llegaba intacto. Un fetch real
+  // lo corta como fragmento. La carpeta de un multifecha es «frontera_0».
+  af(/^frontera_0\/11111111-2222-3333-4444-555555555555\/.+\.jpg$/.test(DB.abono.foto_path), 'el path nuevo vive bajo evento/viajero, SIN «#»: ' + DB.abono.foto_path);
   af(LOG.some((x) => /^storage:POST/.test(x)) && LOG.indexOf('abonos:PATCH') > LOG.findIndex((x) => /^storage:POST/.test(x)), 'sube primero, luego el PATCH: ' + LOG.join(' → '));
   af(LOG.patch && Object.keys(LOG.patch).sort().join(',') === 'foto_path,nota', 'el PATCH toca SOLO foto_path + nota (cero dinero): ' + JSON.stringify(Object.keys(LOG.patch || {})));
   af(DB.abono.monto === 300 && DB.abono.fecha === '2026-11-02', 'monto y fecha intactos');

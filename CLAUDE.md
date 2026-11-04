@@ -188,6 +188,24 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📋⏳ **CC-EQUIPO-DATOS-1 (3-nov-2026, en main local, cero SQL): la tarjeta de
+  cada evento de Capsule trae los DATOS del equipo, plegados.** Palabra de Memo:
+  *«ver información en el card de cada evento de capsule corps de los
+  coordinadores, tallas, teléfonos, correos, y de las creadoras, cortesías,
+  zonas asignadas, nombre de acompañante, tallas de playeras»*. Un «📋 Datos del
+  equipo (N)» plegado en cada tarjeta (abierto en 60 tarjetas sería un muro):
+  coordi → celular (💬 WhatsApp), correo (`correo_notif` gana al de login),
+  talla (perfil; si falta, la de su fila de staff), boleto, emergencia con
+  parentesco · creadora → cortesía zona × boletos (o «sin firmar» / «falta
+  asignar»), celular, correo, talla, acompañante con SU talla, redes,
+  emergencia. 🔒 La cortesía asignada MANDA sobre lo del contrato (talla y
+  acompañante). Sale del MISMO `capsule_resumen` (cero consultas de más; solo
+  roshi/bulma/milk). Lo que falta se DICE «sin dato». Medido: equipo 22 activos
+  (20 con celular, 21 con talla) · creadoras 27 contratos (15 con celular, 18
+  con talla). `mide:cc-cards-1` **23** (sabotaje al respaldo de talla → rojo →
+  restaurado sha1 `9f57a07b`). Vecinos verdes: capsule-ux-1 83 · capsule-ux-2
+  46 · crea-2 27 · viajero-edita-1 67. ⏳ Push de Memo → Bulma recarga.
+
 - ♀♂⏳ **GENERO-2 (3-nov-2026, en main local; la BASE ya escrita): el género se
   PREGUNTA al registrarse y se VE en las cards de Capsule.** Palabra de Bulma vía
   Memo: *«tener la información del género en las cards de Capsule Corp … y de una

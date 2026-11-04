@@ -5362,7 +5362,59 @@ function _ccTarjetaRes(e, pasado) {
     <div>👥 <b>${r.viajeros || 0}</b> viajero${r.viajeros === 1 ? '' : 's'}${pq ? ` <span style="color:var(--ts)">(${pq})</span>` : ''}</div>
     <div>🧑‍✈️ ${eq || (sinEquipo ? '<span style="color:var(--red)">sin coordi asignado</span>' : '<span style="color:var(--ts)">sin equipo</span>')}</div>
     ${cr ? `<div>${cr}</div>` : ''}
+    ${_ccDatosEquipoHtml(r)}
   </div>`;
+}
+
+// [CC-EQUIPO-DATOS-1 3-nov] Palabra de Memo: «ver información en el card de
+// cada evento de Capsule de los coordinadores, tallas, teléfonos, correos, y de
+// las creadoras, cortesías, zonas asignadas, nombre de acompañante, tallas».
+// Va PLEGADO dentro de la tarjeta (la parrilla son ~60 tours: abierto sería un
+// muro) y sale del MISMO resumen que ya pinta la tarjeta — cero consultas de
+// más. El <details> frena el clic para no abrir el evento al desplegarlo.
+// Lo que no se sabe se DICE («sin dato»), no se esconde.
+function _ccDatosEquipoHtml(r) {
+  const eq = (r && r.equipo) || [], cr = (r && r.creadoras) || [];
+  if (!eq.length && !cr.length) return '';
+  const esc = _esfEsc;
+  const nd = '<span style="color:var(--ts)">sin dato</span>';
+  const tel = (t) => {
+    if (!t) return nd;
+    const d = _waDigits10(t);
+    return d ? `<a href="https://wa.me/52${d}" target="_blank" rel="noopener" style="color:var(--green)">💬 ${esc(t)}</a>` : esc(t);
+  };
+  const mail = (m) => m ? `<a href="mailto:${esc(m)}" style="color:var(--text)">${esc(m)}</a>` : nd;
+  const fila = (k, v) => `<div style="display:flex;gap:6px"><span style="color:var(--ts);min-width:84px">${k}</span><span style="word-break:break-word">${v}</span></div>`;
+  const caja = (borde, html) => `<div style="border-left:3px solid ${borde};background:rgba(255,255,255,.03);border-radius:6px;padding:8px 10px;margin-top:6px">${html}</div>`;
+  const ROL = { coordinador: 'Coordinador', maestro_roshi: 'Maestro Roshi', bulma: 'Bulma', milk: 'Milk', cc: 'Staff', mister_popo: 'Staff' };
+  const ST = { aceptado: '✓ aceptó', pendiente: '⏳ no ha aceptado' };
+  const htmlEq = eq.map(p => caja('var(--orange)',
+    `<div style="font-weight:700">${esc(p.nombre || '—')} <span style="font-weight:400;color:var(--ts)">· ${esc(ROL[p.rol] || p.rol || 'Equipo')} · ${esc(ST[p.status] || p.status || '')}</span></div>`
+    + fila('📱 Celular', tel(p.celular))
+    + fila('✉️ Correo', mail(p.correo))
+    + fila('👕 Talla', p.talla ? esc(p.talla) : nd)
+    + fila('🎟 Boleto', p.boleto ? esc(p.boleto) : (p.sin_boleto ? 'va sin boleto' : '<span style="color:#ffb020">sin boleto</span>'))
+    + fila('🆘 Emergencia', p.emergencia ? esc([p.emergencia.nombre, p.emergencia.parentesco ? '(' + p.emergencia.parentesco + ')' : ''].filter(Boolean).join(' ')) + (p.emergencia.telefono ? ' · ' + tel(p.emergencia.telefono) : '') : nd)
+  )).join('');
+  const htmlCr = cr.map(c => {
+    const cort = !c.firmado ? '<span style="color:#ffb020">sin firmar</span>'
+      : (c.cortesia ? `${esc(c.cortesia.zona || '—')} × ${esc(c.cortesia.boletos || 1)}` : '<span style="color:#ffb020">firmó · falta asignar</span>');
+    const redes = [c.instagram ? 'IG ' + esc(c.instagram) : '', c.tiktok ? 'TikTok ' + esc(c.tiktok) : ''].filter(Boolean).join(' · ');
+    return caja('#c77dff',
+      `<div style="font-weight:700">🎥 ${esc(c.nombre || '—')} <span style="font-weight:400;color:var(--ts)">· Creadora</span></div>`
+      + fila('🎟 Cortesía', cort)
+      + fila('📱 Celular', tel(c.celular))
+      + fila('✉️ Correo', mail(c.correo))
+      + fila('👕 Talla', c.talla ? esc(c.talla) : nd)
+      + fila('➕ Acompañante', c.acompanante ? esc(c.acompanante) + ' · 👕 ' + (c.acompanante_talla ? esc(c.acompanante_talla) : nd) : '<span style="color:var(--ts)">va sola</span>')
+      + (redes ? fila('📲 Redes', redes) : '')
+      + fila('🆘 Emergencia', c.emergencia ? esc(c.emergencia.nombre || '') + (c.emergencia.telefono ? ' · ' + tel(c.emergencia.telefono) : '') : nd));
+  }).join('');
+  const n = eq.length + cr.length;
+  return `<details class="cc-eq-datos" onclick="event.stopPropagation()" style="margin-top:6px">
+    <summary style="cursor:pointer;font-size:11px;color:var(--orange);font-family:'JetBrains Mono',monospace">📋 Datos del equipo (${n})</summary>
+    <div style="font-size:11.5px;line-height:1.6">${htmlEq}${htmlCr}</div>
+  </details>`;
 }
 
 function abrirModalEditarEvento(id) { abrirModalEvento(id); }

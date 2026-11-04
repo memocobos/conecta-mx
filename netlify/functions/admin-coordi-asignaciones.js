@@ -420,7 +420,7 @@ exports.handler = async (event) => {
         [ve, asigs, usus, ctrs] = await Promise.all([
           leer(`${baseVE}?select=evento_id,tipo_viajero,tipo_paquete,zona_boleto,boletos,usuario_id,nombre,talla_playera,sin_boleto&limit=20000`),
           leer(`${baseEC}?select=evento_id,coordi_id,status&limit=5000`),
-          leer(`${baseUsuarios}?select=id,nombre,rol&limit=1000`),
+          leer(`${baseUsuarios}?select=id,nombre,rol,correo,correo_notif,celular,talla_playera,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1000`),
           leer(`${baseContratos}?plantilla=eq.creadora&select=id,creador_nombre,creador_email,estado,evento_nombre,evento_fecha,datos&limit=2000`),
         ]);
       } catch (e) { return upstream(headers, e.message, 'consulta'); }
@@ -440,7 +440,12 @@ exports.handler = async (event) => {
         if (a.status === 'declinado') return;
         const u = uDe[a.coordi_id] || {};
         const fila = staffDe(a.evento_id, a.coordi_id);
-        de(a.evento_id).equipo.push({ nombre: u.nombre || '—', rol: u.rol || null, status: a.status || 'pendiente', boleto: fila ? (fila.zona_boleto || null) : null, sin_boleto: !!(fila && fila.sin_boleto), base: !String(a.evento_id).includes('#') });
+        de(a.evento_id).equipo.push({ nombre: u.nombre || '—', rol: u.rol || null, status: a.status || 'pendiente', boleto: fila ? (fila.zona_boleto || null) : null, sin_boleto: !!(fila && fila.sin_boleto), base: !String(a.evento_id).includes('#'),
+          // [CC-EQUIPO-DATOS-1] Lo que Bulma necesita a la mano en la tarjeta.
+          // Solo lo lee roshi/bulma/milk (capsule_resumen = ROLES_EDITA_VIAJERO).
+          correo: u.correo_notif || u.correo || null, celular: u.celular || null,
+          talla: u.talla_playera || (fila && fila.talla_playera) || null,
+          emergencia: (u.nombre_emergencia || u.num_emergencia) ? { nombre: u.nombre_emergencia || null, telefono: u.num_emergencia || null, parentesco: u.parentesco_emergencia || null } : null });
       });
       // Creadoras: la cortesía ya dice su tour; las que no, se cuelgan por FECHA
       // del contrato (la tarjeta casa fecha + nombre en el navegador).
@@ -451,10 +456,20 @@ exports.handler = async (event) => {
         const k = String(c.creador_email || c.creador_nombre).toLowerCase() + '|' + c.evento_fecha;
         if (vistas.has(k)) return; vistas.add(k);
         const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+        const cor = (d.cortesia && typeof d.cortesia === 'object') ? d.cortesia : null;
+        const acA = (d.acompanante && typeof d.acompanante === 'object') ? d.acompanante : {};
+        const emg = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : null;
         const item = { contrato_id: c.id, nombre: c.creador_nombre, firmado: c.estado === 'firmado',
-          cortesia: d.cortesia ? { zona: d.cortesia.zona, boletos: d.cortesia.boletos } : null,
-          acompanante: (d.cortesia && d.cortesia.acompanante) || (d.acompanante && d.acompanante.nombre) || null,
-          evento_nombre: c.evento_nombre, evento_fecha: c.evento_fecha };
+          cortesia: cor ? { zona: cor.zona, boletos: cor.boletos } : null,
+          acompanante: (cor && cor.acompanante) || acA.nombre || null,
+          evento_nombre: c.evento_nombre, evento_fecha: c.evento_fecha,
+          // [CC-EQUIPO-DATOS-1] La ficha de la creadora para la tarjeta. La
+          // cortesía manda (lo que se asignó); si no hay, lo del contrato.
+          correo: c.creador_email || null, celular: d.celular || null,
+          instagram: d.instagram || null, tiktok: d.tiktok || null,
+          talla: (cor && cor.talla) || d.talla || null,
+          acompanante_talla: (cor && cor.acompanante_talla) || acA.talla || null,
+          emergencia: emg && (emg.nombre || emg.telefono) ? { nombre: emg.nombre || null, telefono: emg.telefono || null } : null };
         if (d.cortesia && d.cortesia.evento_id) de(d.cortesia.evento_id).creadoras.push(item);
         else sinTour.push(item);
       });

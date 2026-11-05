@@ -32,4 +32,17 @@ function esEpocaNueva(fechaInicio, desde) {
   return typeof fechaInicio === 'string' && fechaInicio >= corte;
 }
 
-module.exports = { EPOCA_INICIO, esEpocaNueva };
+// [DONOMAR-PREVENTA-1, 4-nov-2026] ¿Qué fecha cuenta para la época de una FICHA?
+// La suya; y si todavía no tiene (Don Omar: ni ciudad ni fecha anunciadas), la
+// de su NACIMIENTO en Esferas — una ficha nacida después del corte es época
+// nueva por construcción: no puede ser migración vieja. Sin ficha → null
+// (época vieja, como siempre: melanie, fanfest, palnorte2026). Medido al
+// escribirla: las 5 fichas sin fecha que existían tenían 0 viajeros, así que
+// no cambia ningún número de hoy.
+function fechaParaEpoca(ficha) {
+  if (!ficha) return null;
+  if (ficha.fecha_inicio) return String(ficha.fecha_inicio).slice(0, 10);
+  return ficha.created_at ? String(ficha.created_at).slice(0, 10) : null;
+}
+
+module.exports = { EPOCA_INICIO, esEpocaNueva, fechaParaEpoca };

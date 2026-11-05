@@ -188,6 +188,39 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔥⏳ **DONOMAR-PREVENTA-1 (4-nov-2026, en main local; la FICHA ya escrita):
+  Don Omar entra a la PREVENTA A CIEGAS $300 — el molde de PN27/NSQK.** Palabra
+  de Memo: *«activemos una preventa como la de NSQK o Pal norte para DON OMAR en
+  Mexico · aun no se si viene a mexico, monterrey o donde · Separo de $300 ·
+  beneficios los mismos de nsqk pero incluyele aparte un boleto laminado y una
+  gorra conmemorativa Don Omar x Conecta Reynosa · es evento 2027»*.
+  - **La ficha** (acta `migraciones/DONOMAR-PREVENTA-1.sql`, INSERT…SELECT del
+    molde palnorte, `NOT EXISTS`): slug `donomar`, vivo cheapOnly con UNA zona
+    «Preventa a ciegas» $300, sep/sepCheap 300, inc = los 3 de NSQK + «Boleto
+    laminado conmemorativo» + «Gorra conmemorativa Don Omar x Conecta Reynosa».
+    🔒 **SIN FECHA y SIN VENUE a propósito**: cae en la sección «Por confirmar»
+    del catálogo (una fecha tentativa habría pintado el encabezado de un MES
+    que nadie anunció — ⚠️ palnorte sí sale bajo «Marzo 2027» por su ds). Sin
+    portada: el sitio busca la foto por el artista (`img:'Don Omar'`).
+  - **El código:** `_esPreventaCiegas` y `REQUISICION_EVENTOS` (index) ·
+    `EVENTOS_CORREO` (correo único al aprobar) · `KH_PREVENTA_EVENTOS` + su
+    espejo del Portal (etiqueta PREVENTA, banco BBVA) · `ANIO_A_MANO`
+    donomar→2027 del contador (palabra de Memo) · 🔒 **`_lib/epoca` ganó
+    `fechaParaEpoca`**: una ficha SIN fecha nacida después del corte es época
+    nueva (sin esto el dinero de Don Omar no salía en Resumen ni cobranza);
+    los dos lectores le preguntan. Medido: las 5 fichas sin fecha previas
+    tenían 0 viajeros — ningún número de hoy cambia.
+  - `mide:preventa-pn27` **83** (bloque [D] con la ficha real) · confirma-1 28
+    (su lista literal actualizada con su razón) · vecinos verdes: plan-pagos-1
+    81 · epoca-1 12 · capsule-ux-1 83 · capsule-ux-2 46 · paq-preventa-1 8 ·
+    req-2027-2 22 · req-b1 52 · acomp-1 76 · portal-solo-1 89 ·
+    preventa-portal-1 35 · concilia-1 83 · rechazo-1 71. (preventa-elegir-1 trae
+    su rojo preexistente; `mide:viajeros-contador` se cae igual en HEAD limpio.)
+  - 🔒⏳ **ORDEN: push de Memo PRIMERO → publish de Esferas DESPUÉS** (publicar
+    con el código viejo saca a donomar como CHEAP normal sin requisición) →
+    verificación en `conectareynosa.mx/donomar` → anuncio. Si se quiere
+    portada propia, se sube en Esferas antes del publish.
+
 - 🗓⏳ **REQ-FICHA-1 + PLAN-VJ-1 (4-nov-2026, en main local, cero SQL): la
   requisición dice su ficha sin abrir la cotización, y cada cliente tiene su
   ROL DE PAGOS con PNG.** Palabra de Memo: *«tengo que abrir ver la cotización

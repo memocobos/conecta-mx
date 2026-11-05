@@ -2435,7 +2435,8 @@ function showPage(name) {
 // [NSQK-VENTA-1, 27-oct] nsqkmty salió a la venta con costos reales: un CHEAP
 // nuevo de nsqk es CHEAP de verdad. Sus 5 de la preventa se siguen rotulando
 // por su ZONA («Preventa a ciegas») hasta que eligen paquete.
-const KH_PREVENTA_EVENTOS = ['palnorte'];
+// [DONOMAR-PREVENTA-1, 4-nov] donomar entra a la preventa: sus CHEAP son preventa.
+const KH_PREVENTA_EVENTOS = ['palnorte', 'donomar'];
 function khEsPreventaCiegas(v) {
   if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
   if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;

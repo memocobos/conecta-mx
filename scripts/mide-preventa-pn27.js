@@ -207,10 +207,68 @@ function extraerObj(contenido, id) {
        'el nombre tecleado del paquete ya no vive en el código');
     // El correo único y el redirect corto.
     const correoLib = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/correo-confirmacion.js'), 'utf8');
-    af(/EVENTOS_CORREO\s*=\s*\['palnorte',\s*'nsqkmty'\]/.test(correoLib),
+    // [DONOMAR-PREVENTA-1] la lista ganó a donomar al final: se exige el PREFIJO de los dos.
+    af(/EVENTOS_CORREO\s*=\s*\['palnorte',\s*'nsqkmty'[,\]]/.test(correoLib),
        'EVENTOS_CORREO trae a los dos — la confirmación de nsqk saldrá al aprobar');
     const redir = fs.readFileSync(path.join(RAIZ, '_redirects'), 'utf8');
     af(/^\/nsqk\s+\/nsqkmty\s+301/m.test(redir), 'el redirect corto /nsqk → /nsqkmty existe');
+  }
+
+  // ═══ [D] DONOMAR-PREVENTA-1 · Don Omar, sin ciudad ni fecha ═════════════
+  console.log('\n[D] donomar entra a la preventa — sin fecha pública ni mes inventado');
+  {
+    // La ficha TAL CUAL quedó en la base el 4-nov (to_jsonb), no reconstruida.
+    const FICHA_DON = {
+      slug: 'donomar', nombre: 'Don Omar', titulo: 'Don Omar en México 2027', tipo: 'concierto', status: '',
+      venue: '', ciudad: null, color: 'azul', publicado: true, archivado: false,
+      created_at: '2026-11-05T02:04:06.542757+00:00', fecha_inicio: null, fecha_fin: null, fechas_extra: null,
+      f_texto: 'Por confirmar', sep: 300, sep_cheap: 300, cheap_only: true,
+      cheap_zonas: '[{"n":"Preventa a ciegas","p":300,"ag":0,"prox":0,"vip":0,"sepEspecial":null,"requiereViajeros":null}]',
+      zonas: null, foto: '', static_img: null, mapa: '', mapa_null: true, festival: null, music: null,
+      inc: '["Costo preferencial en nuestra fase más baja","Prioridad para elegir tu zona y paquete al publicarse los costos","Tu separo de $300 se abona al paquete que elijas","Boleto laminado conmemorativo","Gorra conmemorativa Don Omar x Conecta Reynosa"]',
+      nota: 'PREVENTA A CIEGAS · Aparta tu lugar con solo $300. Ciudad, fecha, zonas y costos por anunciarse — tu separo asegura el costo preferencial de la fase más baja.',
+    };
+    const outD = compilarEV({ esferas: [FICHA_DON], indexHtml: INDEX });
+    const objD = extraerObj(outD.contenidoNuevo || '', 'donomar');
+    af(!!objD, 'el compilado trae el objeto donomar (cardinalidad)');
+    if (objD) {
+      af(!/st:'[a-z]/.test(objD), 'donomar queda VIVO (sin st de cierre)');
+      af(objD.includes('cheapOnly:true'), 'cheapOnly:true');
+      af(objD.includes("cheapZonas:[{n:'Preventa a ciegas',p:300}]"), 'la zona «Preventa a ciegas» vale $300 y es la ÚNICA');
+      af(objD.includes('sep:300') && objD.includes('sepCheap:300'), 'separo $300 (sep y sepCheap)');
+      af(objD.includes("f:'Por confirmar'"), "f:'Por confirmar'");
+      af(/ds:''/.test(objD), "ds:'' — sin fecha: cae en la sección «Por confirmar», no en un mes inventado");
+      af(objD.includes('Boleto laminado conmemorativo') && objD.includes('Gorra conmemorativa Don Omar x Conecta Reynosa'),
+         'los dos regalos de Memo viven en inc');
+      af(!objD.includes('cdmx:true'), 'sin ciudad no se declara CDMX');
+      af(/img:'Don Omar'/.test(objD), "sin portada propia: img:'Don Omar' (el sitio busca la foto por el artista)");
+    }
+    af(!(outD.medios_en_riesgo || []).some(m => String(m).includes('donomar')), 'MEDIA-GUARD no nombra a donomar');
+    // El gate real del index, con la forma que emite.
+    const src = [rebanarFn(INDEX, 'function _esPreventaCiegas(ev)'), rebanarFn(INDEX, 'function _preventaZona(ev)'),
+                 rebanarFn(INDEX, 'function _pvPkgNombre(ev)')].join('\n');
+    const ctx = { String }; vm.createContext(ctx); vm.runInContext(src, ctx);
+    const esPv = vm.runInContext('_esPreventaCiegas', ctx), nom = vm.runInContext('_pvPkgNombre', ctx);
+    af(esPv({ id: 'donomar', cheapOnly: true, cheapZonas: [{ n: 'Preventa a ciegas', p: 300 }] }) === true, 'donomar ES preventa a ciegas (index)');
+    af(nom({ a: 'Don Omar en México 2027' }) === 'PREVENTA A CIEGAS — Don Omar en México 2027', 'el paquete se llama como el evento');
+    af(/var REQUISICION_EVENTOS=\[[^\]]*'donomar'/.test(INDEX), 'la requisición prende en donomar');
+    const C = require(path.join(RAIZ, 'netlify/functions/_lib/correo-confirmacion.js'));
+    af(C.correoActivo('donomar') === true, 'el correo único de confirmación sale al aprobar donomar');
+    // Las dos listas de «¿este viajero es de preventa?» (KH y su espejo) iguales y con donomar.
+    const KHsrc = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
+    const mKH = /const KH_PREVENTA_EVENTOS\s*=\s*(\[[^\]]*\])/.exec(KHsrc);
+    const SRV = require(path.join(RAIZ, 'netlify/functions/portal-mi-plan-migrado.js'));
+    af(!!mKH && JSON.stringify(eval(mKH[1])) === JSON.stringify(SRV._PREVENTA_EVENTOS_ESPEJO) && SRV._PREVENTA_EVENTOS_ESPEJO.includes('donomar'),
+       'KH_PREVENTA_EVENTOS y su espejo del Portal son iguales y traen donomar (banco BBVA, etiqueta PREVENTA)');
+    // Época: sin fecha, la ficha nacida después del corte cuenta como nueva.
+    const EP = require(path.join(RAIZ, 'netlify/functions/_lib/epoca.js'));
+    af(EP.esEpocaNueva(EP.fechaParaEpoca(FICHA_DON)) === true, 'época: donomar (sin fecha, nacida 5-nov) es época nueva — su dinero sale en el Resumen');
+    af(EP.esEpocaNueva(EP.fechaParaEpoca({ slug: 'jisoo', fecha_inicio: null, created_at: '2026-08-19T00:00:00Z' })) === false,
+       'control: una ficha sin fecha nacida ANTES del corte sigue siendo vieja');
+    af(EP.esEpocaNueva(EP.fechaParaEpoca(null)) === false, 'control: sin ficha = vieja (melanie, palnorte2026)');
+    af(EP.fechaParaEpoca({ fecha_inicio: '2026-08-06', created_at: '2026-11-05' }) === '2026-08-06', 'con fecha, manda la fecha (no el nacimiento)');
+    const vc = fs.readFileSync(path.join(RAIZ, 'netlify/functions/viajeros-contador.js'), 'utf8');
+    af(/ANIO_A_MANO\s*=\s*\{[^}]*donomar:\s*'2027'/.test(vc), "el contador de la portada pone a donomar en 2027 (palabra de Memo)");
   }
 
   // ═══ [C] LA TIRA NO FUGA LA FECHA (la expresión real, ejecutada) ══════════

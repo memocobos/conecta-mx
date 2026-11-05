@@ -35,7 +35,7 @@ const PORTAL_URL = 'https://conectareynosa.mx/portal';
 const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 // Eventos donde el correo sale solo (palabra de Memo: «para los de Pa'l Norte,
 // solo esos por el momento»). Fuera de aquí la bandeja y la captura NO mandan.
-const EVENTOS_CORREO = ['palnorte', 'nsqkmty'];   // [NSQK-PREVENTA-1]
+const EVENTOS_CORREO = ['palnorte', 'nsqkmty', 'donomar'];   // [NSQK-PREVENTA-1] · [DONOMAR-PREVENTA-1]
 
 // [REQ-2027-1] Palabra de Memo (26-oct-2026, «solo requisiciones»): en los
 // eventos de 2027 en adelante el correo único (confirmación + invitación al

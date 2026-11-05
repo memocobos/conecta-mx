@@ -39,7 +39,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { EPOCA_INICIO, esEpocaNueva } = require('./_lib/epoca'); // [EPOCA-1]
+const { EPOCA_INICIO, esEpocaNueva, fechaParaEpoca } = require('./_lib/epoca'); // [EPOCA-1] · [DONOMAR-PREVENTA-1]
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
 // [CREA-1c] `consumeBoleto` viene de su DUEÑO. La cortesía suma a
@@ -2543,11 +2543,11 @@ ${entregables}
       // escondidos por una lectura caída) y se reporta.
       let epoca_aviso = null;
       try {
-        const rf = await fetch(`${env.KH_SB_URL}/rest/v1/esferas_eventos?select=slug,fecha_inicio&limit=10000`, { headers: sbHeaders });
+        const rf = await fetch(`${env.KH_SB_URL}/rest/v1/esferas_eventos?select=slug,fecha_inicio,created_at&limit=10000`, { headers: sbHeaders });
         if (rf.ok) {
           const filas = await rf.json();
           const fechaDe = {};
-          (Array.isArray(filas) ? filas : []).forEach((f) => { if (f && f.slug) fechaDe[f.slug] = f.fecha_inicio || null; });
+          (Array.isArray(filas) ? filas : []).forEach((f) => { if (f && f.slug) fechaDe[f.slug] = fechaParaEpoca(f); });
           const antes = viajeros.length;
           viajeros = viajeros.filter((v) => esEpocaNueva(fechaDe[String(v.evento_id || '').split('#')[0]], EPOCA_INICIO));
           epoca_aviso = { desde: EPOCA_INICIO, excluidos: antes - viajeros.length };

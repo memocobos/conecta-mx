@@ -5575,7 +5575,9 @@ function selViajeros(btn,n){
 // Pal Norte con preventa de $300»). La lista es el gate por evento; entrar aquí
 // arrastra TODO el camino de la preventa: paquete único, banco BBVA (getBanco),
 // datos de viaje (_reqPideViaje) y el nombre derivado del evento.
-function _esPreventaCiegas(ev){ return !!(ev&&ev.cheapOnly&&['palnorte','nsqkmty'].indexOf(ev.id)>-1&&_preventaZona(ev)); }
+// [DONOMAR-PREVENTA-1] (4-nov-2026, palabra de Memo: «activemos una preventa como
+// la de NSQK o Pal norte para DON OMAR») — tercer evento de la lista.
+function _esPreventaCiegas(ev){ return !!(ev&&ev.cheapOnly&&['palnorte','nsqkmty','donomar'].indexOf(ev.id)>-1&&_preventaZona(ev)); }
 function _preventaZona(ev){
   var z=((ev&&ev.cheapZonas)||[]).filter(function(x){return x&&!x.ag&&!x.prox&&x.p>0;});
   return z.length===1?z[0]:null;
@@ -6892,7 +6894,7 @@ var REQUISICION_VIVA=false;
 // Monterrey, por NOMBRE. CDMX espera la regla del vuelo; un evento nuevo entra
 // cuando Memo lo diga. La misma lista vive en RESERVA_2027 del correo único
 // (_lib/correo-confirmacion) y mide:req-2027-2 las carea.
-var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabriel','emmanuel','madero','interpol','anuelaa','oreja','scorpions','pitbull'];
+var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabriel','emmanuel','madero','interpol','anuelaa','oreja','scorpions','pitbull','donomar'];  // [DONOMAR-PREVENTA-1] donomar al final
 (function(){
   try{
     var v=new URLSearchParams(location.search).get('req');

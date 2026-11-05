@@ -75,7 +75,9 @@ const CACHE = 'public, max-age=60, s-maxage=600, stale-while-revalidate=3600';
 // 12-oct (el slug `palnorte` del catálogo es el festival 2027 — no es el mismo
 // evento, palabra de Memo). El mapeo firmado los sigue a su slug nuevo; el
 // `palnorte` vivo resolverá su año por el `ds` del catálogo cuando tenga fecha.
-const ANIO_A_MANO = { palnorte2026: '2026' };
+// [DONOMAR-PREVENTA-1] donomar no tiene fecha (ni ciudad) todavía; palabra de
+// Memo: «es evento 2027». El día que su ficha traiga fecha, esta entrada SOBRA.
+const ANIO_A_MANO = { palnorte2026: '2026', donomar: '2027' };
 
 const baseSlug = (s) => (s == null ? '' : String(s).split('#')[0].trim());
 const anioDe = (f) => {

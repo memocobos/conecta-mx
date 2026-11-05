@@ -618,12 +618,13 @@ async function cuentasDeTodos(opts) {
   // caída sería un cero falso — mejor enseñar de más y confesar.
   let epoca = null;
   if (o.epocaDesde) {
-    const rf = await leerKH('esferas_eventos', 'select=slug,fecha_inicio&limit=10000');
+    const rf = await leerKH('esferas_eventos', 'select=slug,fecha_inicio,created_at&limit=10000');
     if (rf.error || !Array.isArray(rf.data)) {
       epoca = { desde: o.epocaDesde, aplicada: false, error: rf.error || 'esferas ilegible' };
     } else {
       const fechaDe = {};
-      rf.data.forEach((f) => { if (f && f.slug) fechaDe[f.slug] = f.fecha_inicio || null; });
+      // [DONOMAR-PREVENTA-1] La fecha de época se le pregunta al dueño (_lib/epoca).
+      rf.data.forEach((f) => { if (f && f.slug) fechaDe[f.slug] = require('./epoca').fechaParaEpoca(f); });
       const antes = slugs.length;
       slugs = slugs.filter((s2) => {
         const f = fechaDe[baseSlug(s2)];

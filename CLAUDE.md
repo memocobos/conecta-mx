@@ -208,18 +208,23 @@ está caduco antes de escribirse.
   service_role): se aparta antes de mandar, se libera si el correo falla, y 🔒
   **sin bitácora NO se manda** (también a medias: un viaje apartado y otro no →
   se libera y no sale). Encenderlo no dispara un atraso acumulado: cada momento
-  cae solo en su día. Cron `rol-fijo-recordatorios-diario` (14:15 UTC) **APAGADO**
-  (`ROL_AVISOS_VIVO=false` en el lib; apagado no lee nada) · sin catálogo no
-  manda. **Ensayo en seco** en la bandeja de Requisiciones (fecha opcional,
+  cae solo en su día. Cron `rol-fijo-recordatorios-diario` (14:15 UTC ≈ 8:15 AM
+  Reynosa). 🔥 **ENCENDIDO 4-nov-2026, palabra de Memo («ya hice push,
+  enciéndelo»)**: `ROL_AVISOS_VIVO` VIVO por default (la forma de CORREOS_MODO;
+  `ROL_AVISOS_APAGAR_ARNES` solo existe para el careo) · sin catálogo no manda.
+  Medido al encender: hoy no sale nada; **9-nov ~95 correos (153 viajes, apertura
+  del 9-16 nov)**, 16-nov último día, 17-nov vencidos (solo a quien no cubrió),
+  24-nov ~99 correos. **Ensayo en seco** en la bandeja de Requisiciones (fecha opcional,
   enseña a quién y el correo en un iframe) — acción `rol_avisos_ensayo`, jamás
   manda. **«🗓 Fijar rol de pagos»** arriba de la bandeja (`plan_pendientes`, solo
   lee): publicados sin plan, con saldo y evento por venir — hoy **12** (careado
   por SQL); trae fecha/monto SUGERIDOS (primer abono) y fija por `plan_fijar`.
   Quien se registre y se publique cae solo ahí (publicar la refresca).
-  `mide:rol-avisos-1` **27** (sabotaje a «bitácora a medias» → rojo → restaurado
-  sha1 `ba7b51f2`). Vecinos verdes: plan-fijo-1 25 · plan-vj-1 35 · plan-pagos-1
-  81 · portal-solo-1 89 · req-b1 52 · capsule-ux-1 83. ⏳ Push de Memo →
-  ensayo con su visto → encender = palabra de Memo (`ROL_AVISOS_VIVO`).
+  `mide:rol-avisos-1` **28** (sabotaje a «bitácora a medias» → rojo → restaurado
+  sha1 `ba7b51f2`; [E] mide el default VIVO, el apagado por env y el cron
+  encendido mandando por la bitácora con red falsa). Vecinos verdes: plan-fijo-1 25 · plan-vj-1 35 · plan-pagos-1
+  81 · portal-solo-1 89 · req-b1 52 · capsule-ux-1 83. ⏳ Push de Memo del
+  encendido (ROL-AVISOS-1b).
 
 - 🗓🔒⏳ **PLAN-FIJO-1 (4-nov-2026, en main local; la BASE ya escrita): EL ROL DE
   PAGOS ES FIJO DESDE EL SEPARO.** Caso Sahid (FR 11-ene, STAY $4,200, separó $300

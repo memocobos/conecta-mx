@@ -4,8 +4,8 @@
 // día · vencido (día siguiente) · 7 días antes del evento si va en «Antes del
 // evento». La lógica, el correo y la bitácora viven en `_lib/rol-avisos`.
 //
-// 🔒 APAGADO hasta la palabra de Memo (ROL_AVISOS_VIVO en el lib): apagado no lee
-// nada ni manda nada. El ensayo en seco vive en KameHouse
+// 🔒 ENCENDIDO el 4-nov-2026 por palabra de Memo (ROL_AVISOS_VIVO en el lib;
+// apagado no lee ni manda nada). El ensayo en seco vive en KameHouse
 // (admin-coordi-asignaciones · rol_avisos_ensayo).
 const RA = require('./_lib/rol-avisos');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');

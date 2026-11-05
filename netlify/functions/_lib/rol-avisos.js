@@ -26,8 +26,7 @@
 // ANTES de mandar y se libera si el correo falla. 🔒 SIN BITÁCORA NO SE MANDA
 // (al revés que avisos_cobranza, que es fail-open): un cron diario sin memoria
 // repetiría el correo todos los días.
-// 🔒 El interruptor ROL_AVISOS_VIVO nace APAGADO: encenderlo es palabra de Memo
-// después de ver el ensayo (CORREOS_MODO está en 'real').
+// 🔒 El interruptor ROL_AVISOS_VIVO: ENCENDIDO el 4-nov-2026 (palabra de Memo).
 // =============================================================================
 
 const PF = require('./plan-fijo');
@@ -38,7 +37,10 @@ const { esCorreoUsable, llaveCorreo } = require('./correo-forma');
 const { fechaDeEventoId } = require('./fecha-evento');
 const { cajaCuentaHtml } = require('./cuenta-deposito');
 
-const ROL_AVISOS_VIVO = process.env.ROL_AVISOS_ARNES === '1' ? true : false;
+// ENCENDIDO 4-nov-2026 por palabra de Memo («ya hice push, enciéndelo»). El
+// default sin variable es VIVO (la forma de CORREOS_MODO); la env existe SOLO para
+// que el careo mida el camino apagado — producción jamás la define.
+const ROL_AVISOS_VIVO = process.env.ROL_AVISOS_APAGAR_ARNES === '1' ? false : true;
 const TIPOS = ['apertura', 'vence_hoy', 'vencido', 'antes_evento'];
 const PESO = { vencido: 4, vence_hoy: 3, apertura: 2, antes_evento: 1 };
 const DIAS_ANTES_EVENTO = 7;

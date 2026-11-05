@@ -104,13 +104,27 @@ async function corre(o, args) {
 
   console.log('[E] el cableo');
   const sc = (p) => fs.readFileSync(path.join(RAIZ, p), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  delete process.env.ROL_AVISOS_ARNES; delete require.cache[LIB];
-  af(require(LIB).ROL_AVISOS_VIVO === false, 'el interruptor nace APAGADO (encender = palabra de Memo)');
+  // ENCENDIDO 4-nov (palabra de Memo): sin variable es VIVO; la env del arnés lo apaga.
+  const CRON = path.join(RAIZ, 'netlify/functions/rol-fijo-recordatorios-diario.js');
+  delete process.env.ROL_AVISOS_APAGAR_ARNES; delete require.cache[LIB];
+  af(require(LIB).ROL_AVISOS_VIVO === true, 'el interruptor está ENCENDIDO sin variable (olvidar una env no lo apaga en silencio)');
+  process.env.ROL_AVISOS_APAGAR_ARNES = '1'; delete require.cache[LIB]; delete require.cache[CRON];
   let leyo = 0; global.fetch = async () => { leyo++; throw new Error('no debía leer'); };
-  delete require.cache[path.join(RAIZ, 'netlify/functions/rol-fijo-recordatorios-diario.js')];
-  const cron = require(path.join(RAIZ, 'netlify/functions/rol-fijo-recordatorios-diario.js'));
-  const cr = await cron.handler();
-  af(JSON.parse(cr.body).apagado === true && leyo === 0, 'apagado el cron no lee ni manda nada');
+  const cr = await require(CRON).handler();
+  af(JSON.parse(cr.body).apagado === true && leyo === 0, 'apagado (env del arnés) el cron no lee ni manda nada');
+  delete process.env.ROL_AVISOS_APAGAR_ARNES; delete require.cache[LIB]; delete require.cache[CRON];
+  // Encendido: el cron SÍ corre (con red falsa — jamás la real) y manda por la bitácora.
+  const nv = red({}); let mandados = 0;
+  process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh'; process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'x';
+  process.env.RESEND_KEY = 'x'; process.env.CORREOS_MODO = 'real';
+  const CI = require(path.join(RAIZ, 'netlify/functions/_lib/catalogo-index.js'));
+  const evOrig = CI.fetchEventosRaw; CI.fetchEventosRaw = async () => EV;
+  const RealDate = Date; global.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : ['2026-11-09T18:00:00Z'])); } static now() { return new RealDate('2026-11-09T18:00:00Z').getTime(); } };
+  global.fetch = async (url, init) => { if (/resend\.com/.test(url)) { mandados++; return { ok: true, status: 200, json: async () => ({ id: 'em-cron' }) }; } return nv.fetch(url, init); };
+  const cv = await require(CRON).handler();
+  global.Date = RealDate; CI.fetchEventosRaw = evOrig;
+  const jb = JSON.parse(cv.body);
+  af(cv.statusCode === 200 && jb.enviados === 1 && mandados === 1 && nv.st.bit.length === 1 && nv.st.bit[0].email_id === 'em-cron', () => 'encendido el cron manda el 9-nov por la bitácora (' + JSON.stringify({ s: cv.statusCode, e: jb.enviados, m: mandados, b: nv.st.bit.length }) + ')');
   af(/rol-fijo-recordatorios-diario[\s\S]{0,40}schedule/.test(fs.readFileSync(path.join(RAIZ, 'netlify.toml'), 'utf8')), 'el cron está en netlify.toml');
   const coordi = sc('netlify/functions/admin-coordi-asignaciones.js');
   af(/plan_pendientes: ROLES_EDITA_VIAJERO/.test(coordi) && /rol_avisos_ensayo: ROLES_EDITA_VIAJERO/.test(coordi), 'plan_pendientes y rol_avisos_ensayo están en ACCIONES');

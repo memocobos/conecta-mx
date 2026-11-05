@@ -6692,6 +6692,14 @@ function _vj2Pintar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Ver los pagos de ${_esfEsc(v.nombre || '')} con sus comprobantes"
             onclick="_vjPagosVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📎 Pagos</button>
+          <!-- [VJ-CORRIGE-JUNTO-1] palabra de Memo: «el botón de corregir a lado del de pagos».
+               [VIAJERO-EDITA-1] El editor que faltaba. Medido el 28-oct: el
+               único que tocaba total/paquete/zona colgaba de la bandeja del
+               Portal y había 0 revisiones pendientes — inalcanzable para los
+               2,790 del padrón, con 1,303 sin total. -->
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--yellow);border-color:var(--yellow)"
+            title="Corregir paquete, zona, lugares, total o lo pagado antes de ${_esfEsc(v.nombre || '')}"
+            onclick="_vjEditarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">✏️ Corregir</button>
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Rol de pagos de ${_esfEsc(v.nombre || '')}: fechas y montos que le faltan, con imagen para mandarle"
             onclick="_vjPlanVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🗓 Plan</button>
@@ -6704,13 +6712,6 @@ function _vj2Pintar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--green);border-color:var(--green)"
             title="Registrar un pago de ${_esfEsc(v.nombre || '')}"
             onclick="_vjAbonoAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">➕ Abono</button>
-          <!-- [VIAJERO-EDITA-1] El editor que faltaba. Medido el 28-oct: el
-               único que tocaba total/paquete/zona colgaba de la bandeja del
-               Portal y había 0 revisiones pendientes — inalcanzable para los
-               2,790 del padrón, con 1,303 sin total. -->
-          <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--yellow);border-color:var(--yellow)"
-            title="Corregir paquete, zona, lugares, total o lo pagado antes de ${_esfEsc(v.nombre || '')}"
-            onclick="_vjEditarAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">✏️ Corregir</button>
           <!-- [VIAJERO-MUDAR-1] El caso de Frida, hecho botón. -->
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Mover a ${_esfEsc(v.nombre || '')} a otra fecha de este mismo evento (su dinero viaja con ella)"

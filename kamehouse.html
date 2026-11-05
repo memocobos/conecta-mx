@@ -1203,6 +1203,17 @@
              <option value="XS">XS</option><option value="S">S</option><option value="M">M</option>
              <option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option>
            </select></div>
+           <!-- [ALTA-GEN-HAB-1] Palabra de Memo: «a la hora de registrar cliente no viene
+                la opción de poner género y habitación». Los dos nacen vacíos (DEFAULTS-1:
+                son datos de la persona, no se adivinan) y el servidor usa las mismas
+                reglas de ✏️ Corregir. La habitación solo vale si el paquete duerme. -->
+           <div><label class="mig-lbl">GÉNERO</label><select class="cot-input" id="mig-genero">
+             <option value="">— sin dato —</option><option value="M">♀ Mujer</option><option value="H">♂ Hombre</option>
+           </select></div>
+           <div><label class="mig-lbl">HABITACIÓN</label><select class="cot-input" id="mig-hab">
+             <option value="">— sin dato —</option><option value="Compartida">Compartida</option>
+             <option value="Doble">Doble</option><option value="Triple">Triple</option><option value="Individual">Individual</option>
+           </select><div id="mig-hab-nota" style="font-size:10px;color:var(--ts);margin-top:3px;min-height:13px"></div></div>
            <div><label class="mig-lbl">CONTACTO DE EMERGENCIA</label><input class="cot-input" id="mig-emerg-nombre" placeholder="nombre — opcional" autocomplete="off"></div>
            <div><label class="mig-lbl">SU TELÉFONO</label><input class="cot-input" id="mig-emerg-num" placeholder="opcional" autocomplete="off"></div>
           </div>

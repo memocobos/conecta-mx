@@ -202,8 +202,21 @@ function migZonas() {
 // regla del negocio, para que quien captura vea a dónde cae antes de guardar.
 // El espejo de `cuentaParaPaquete`: CHEAP → Banamex · el resto → el banco del
 // evento o BBVA.
+// [ALTA-GEN-HAB-1] La habitación solo existe en un paquete que duerme (PLUS ·
+// RIDE · STAY, la misma regla que _migCuenta dice abajo): en CHEAP se apaga y
+// se vacía — un cuarto sin cama detrás lo contaría el rooming.
+function _migHabSegunPaquete() {
+  const sel = _migEl('mig-hab'); const nota = _migEl('mig-hab-nota');
+  if (!sel) return;
+  const paq = (_migEl('mig-paquete') || {}).value || '';
+  const duerme = (paq === 'plus' || paq === 'ride' || paq === 'stay');
+  sel.disabled = !!paq && !duerme;
+  if (sel.disabled) sel.value = '';
+  if (nota) nota.textContent = sel.disabled ? 'CHEAP no lleva hotel' : '';
+}
 function _migCuenta() {
   const el = _migEl('mig-cuenta');
+  _migHabSegunPaquete();
   if (!el) return;
   const paq = (_migEl('mig-paquete') || {}).value || '';
   if (!paq) { el.textContent = ''; return; }
@@ -227,6 +240,9 @@ function _migLeer() {
     total_contrato: g('mig-total'),
     abonado_previo: g('mig-abonado'),
     talla_playera: g('mig-talla'),
+    // [ALTA-GEN-HAB-1] género y habitación (vacíos = sin dato; el servidor valida).
+    genero: g('mig-genero'),
+    hotel_tipo: g('mig-hab'),
     // [CAP-MIG-FIX] Las dos columnas ya existían en `viajeros_evento`; solo
     // faltaba pedirlas en la pantalla.
     emergencia_nombre: g('mig-emerg-nombre'),
@@ -386,7 +402,7 @@ async function _migEnviar(d) {
       else if (k && (k.aviso || (k.errores || []).length)) showToast('Contrato: ' + _esfEsc(k.aviso || k.errores.map((e) => e.aviso).join(' · ')), 'error'); }
     // Uno tras otro: se limpia lo de la persona y se CONSERVA paquete y zona,
     // que en una tanda del Excel se repiten. El foco vuelve al nombre.
-    ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-notas']
+    ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-genero','mig-hab','mig-notas']
       .forEach(id => { const el = _migEl(id); if (el) el.value = ''; });
     { const fEl = _migEl('mig-foto'); if (fEl) fEl.value = ''; }
     _migEl('mig-nombre') && _migEl('mig-nombre').focus();

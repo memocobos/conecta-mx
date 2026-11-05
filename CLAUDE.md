@@ -188,6 +188,23 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✏️⏳ **ALTA-GEN-HAB-1 + VJ-CORRIGE-JUNTO-1 (4-nov-2026, en main local, cero
+  SQL).** Palabra de Memo: *«en capsule en los clientes pon el botón de corregir
+  a lado del de pagos · a la hora de registrar cliente no viene la opción de
+  poner género y habitación»*. (1) En la fila del viajero **✏️ Corregir va justo
+  después de 📎 Pagos** (se MOVIÓ, no se duplicó). (2) El alta manual de Capsule
+  gana **GÉNERO** (♀/♂) y **HABITACIÓN** (Compartida/Doble/Triple/Individual),
+  los dos nacen «— sin dato —» (DEFAULTS-1) y se limpian entre persona y
+  persona; en CHEAP la habitación se apaga y lo dice. 🔒 `viajero_migrar` los
+  valida con las MISMAS reglas de `viajero_editar_full`: H/M o NULL · lista
+  cerrada del rooming · habitación solo si el paquete duerme (`duerme`/
+  `motivoNoDuerme`, sus dueños); raro → 400 sin escribir. `mide:alta-gen-hab-1`
+  **13** (handler real; sabotaje a `hotel_tipo` → 2 rojos → restaurado sha1
+  `dd231c55`). Vecinos verdes: ride-sin-zona-1 9 · abono-foto-3 23 ·
+  abono-hash-1 20 · capsule-ux-1 83 · capsule-ux-2 46 · capsule-comp-1 16 ·
+  viajero-edita-1 67 · plan-vj-1 26 · contrato-cliente-1 31 · rooming-auto-1 79.
+  ⏳ Push de Memo → Bulma/Milk recargan.
+
 - 🔥⏳ **DONOMAR-PREVENTA-1 (4-nov-2026, en main local; la FICHA ya escrita):
   Don Omar entra a la PREVENTA A CIEGAS $300 — el molde de PN27/NSQK.** Palabra
   de Memo: *«activemos una preventa como la de NSQK o Pal norte para DON OMAR en

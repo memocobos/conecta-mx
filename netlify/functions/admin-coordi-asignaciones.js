@@ -2352,6 +2352,22 @@ ${entregables}
         if (k === 'correo' && !EMAIL_RE.test(v)) return bad(headers, 'correo inválido');
         fila[k] = v;
       }
+      // [ALTA-GEN-HAB-1] Palabra de Memo: «a la hora de registrar cliente no
+      // viene la opción de poner género y habitación». Las MISMAS reglas de
+      // viajero_editar_full (sus dueños): género H/M o nada · habitación de la
+      // lista cerrada del rooming y SOLO en un paquete que duerme. Vacío = NULL
+      // (no se adivina: el rooming pregunta).
+      {
+        const gCrudo = String(body.genero == null ? '' : body.genero).trim().toUpperCase();
+        if (gCrudo && gCrudo !== 'H' && gCrudo !== 'M') return bad(headers, 'género inválido: H, M o vacío');
+        fila.genero = gCrudo || null;
+        const HOTELES = ['Compartida', 'Doble', 'Triple', 'Individual'];
+        const hCrudo = String(body.hotel_tipo == null ? '' : body.hotel_tipo).trim();
+        const h = hCrudo ? HOTELES.find((x) => x.toLowerCase() === hCrudo.toLowerCase()) : null;
+        if (hCrudo && !h) return bad(headers, 'habitación inválida: ' + HOTELES.join(', ') + ' (o vacío)');
+        if (h && !duerme(paquete)) return bad(headers, motivoNoDuerme(paquete));
+        fila.hotel_tipo = h;
+      }
 
       // El evento tiene que existir. Sin esto, un slug con dedo gordo crea una
       // población fantasma que no aparece en ninguna pantalla y que nadie

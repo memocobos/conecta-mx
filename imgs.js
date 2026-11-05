@@ -43,6 +43,7 @@ window.STATIC_IMGS={
   'beele':'imgs/beele.webp',
   'arre':'imgs/arre.webp',
   'anuelaa':'imgs/anuelaa.webp',
+  'donomar':'imgs/donomar.webp',
   'vaiven':'imgs/vaiven.webp',
   'monlaferte':'imgs/monlaferte.webp',
   'juniorh':'imgs/juniorh.webp',

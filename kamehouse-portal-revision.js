@@ -45,6 +45,8 @@ function _prvCaja() {
 }
 
 async function loadRevisionesPortal() {
+  // [ROL-AVISOS-1] Al publicar, quien no tiene rol fijo cae a «🗓 Fijar rol».
+  try { if (typeof loadRolPendientes === 'function') loadRolPendientes(); } catch (_) {}
   const box = _prvCaja();
   if (!box) return;
   const j = await _prvCall({ accion: 'listar' }).catch((e) => ({ error: e.message }));

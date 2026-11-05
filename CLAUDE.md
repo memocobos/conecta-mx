@@ -188,6 +188,39 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📨🗓⏳ **ROL-AVISOS-1 (4-nov-2026, en main local; la bitácora ya escrita): los
+  RECORDATORIOS caen en las fechas del ROL FIJO + la tarjeta «🗓 Fijar rol».**
+  Palabra de Memo: *«lo de los correos con los recordatorios ya estaba construido
+  en el viejo portal … ponme en alertas o requisiciones los 12 que vienen de los
+  tours viejos para poner su fecha de separo … los otros 425 únicamente nos
+  preocupamos si entran al portal y activan su cuenta»*. Medido: los crons viejos
+  (portal-recordatorios-diario · vence-hoy-diario · portal-morosidad-diario) leen
+  la tabla `pagos` del PORTAL, VACÍA — no le llegan a nadie de `viajeros_evento`.
+  No se tocaron. `_lib/rol-avisos` copia su escalera y su forma de correo (misma
+  caja de cuenta, el banco lo decide `_bancoDeViajero` del Portal) sobre
+  `plan_pagos`: **apertura** (día que abre su ventana) · **vence_hoy** (su último
+  día) · **vencido** (el día siguiente, si no la cubrió — una sola vez) ·
+  **antes_evento** (7 días antes, si su saldo va en «Antes del evento»). Lo
+  cubierto lo cuenta `estadoPlan` (el dueño): cuota pagada no recibe nada. Solo
+  publicados (sellados), no del equipo, correo usable; UN correo por buzón.
+  🔒 Bitácora `rol_avisos` (KH, acta `migraciones/ROL-AVISOS-1.sql` YA CORRIDA,
+  candados mordidos: tipo · minúsculas · UNIQUE viajero+cuota+tipo; RLS + GRANT
+  service_role): se aparta antes de mandar, se libera si el correo falla, y 🔒
+  **sin bitácora NO se manda** (también a medias: un viaje apartado y otro no →
+  se libera y no sale). Encenderlo no dispara un atraso acumulado: cada momento
+  cae solo en su día. Cron `rol-fijo-recordatorios-diario` (14:15 UTC) **APAGADO**
+  (`ROL_AVISOS_VIVO=false` en el lib; apagado no lee nada) · sin catálogo no
+  manda. **Ensayo en seco** en la bandeja de Requisiciones (fecha opcional,
+  enseña a quién y el correo en un iframe) — acción `rol_avisos_ensayo`, jamás
+  manda. **«🗓 Fijar rol de pagos»** arriba de la bandeja (`plan_pendientes`, solo
+  lee): publicados sin plan, con saldo y evento por venir — hoy **12** (careado
+  por SQL); trae fecha/monto SUGERIDOS (primer abono) y fija por `plan_fijar`.
+  Quien se registre y se publique cae solo ahí (publicar la refresca).
+  `mide:rol-avisos-1` **27** (sabotaje a «bitácora a medias» → rojo → restaurado
+  sha1 `ba7b51f2`). Vecinos verdes: plan-fijo-1 25 · plan-vj-1 35 · plan-pagos-1
+  81 · portal-solo-1 89 · req-b1 52 · capsule-ux-1 83. ⏳ Push de Memo →
+  ensayo con su visto → encender = palabra de Memo (`ROL_AVISOS_VIVO`).
+
 - 🗓🔒⏳ **PLAN-FIJO-1 (4-nov-2026, en main local; la BASE ya escrita): EL ROL DE
   PAGOS ES FIJO DESDE EL SEPARO.** Caso Sahid (FR 11-ene, STAY $4,200, separó $300
   el 29-oct): el 3-nov su Portal decía 4 pagos de $975 y el 4-nov 3 de $1,300 sin

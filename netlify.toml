@@ -122,6 +122,12 @@
 [functions."portal-morosidad-diario"]
   schedule = "0 14 17,2 * *"
 
+# [ROL-AVISOS-1] Recordatorios en las fechas del ROL FIJO de viajeros_evento
+# (apertura · último día · vencido · antes del evento). APAGADO en el lib
+# (ROL_AVISOS_VIVO) hasta la palabra de Memo. 14:15 UTC, después de la ola de las 8.
+[functions."rol-fijo-recordatorios-diario"]
+  schedule = "15 14 * * *"
+
 # Recordatorios de pago de /rol — 14:00 UTC = 8:00 AM CDMX
 [functions."rol-recordatorios"]
   schedule = "0 14 * * *"

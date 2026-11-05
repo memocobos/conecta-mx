@@ -133,6 +133,10 @@ const ACCIONES = {
   // [PLAN-VJ-1] El rol de pagos de UN viajero (fechas y montos), solo lectura.
   plan_viajero: ROLES_EDITA_VIAJERO,
   plan_fijar: ROLES_EDITA_VIAJERO,
+  // [ROL-AVISOS-1] Bandeja «🗓 Fijar rol» (solo LEE) y el ensayo en seco de los
+  // recordatorios del rol fijo (solo LEE, jamás manda).
+  plan_pendientes: ROLES_EDITA_VIAJERO,
+  rol_avisos_ensayo: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
   grupo_wa_guardar: ROLES_EDITA_VIAJERO,
@@ -2984,6 +2988,38 @@ ${entregables}
       });
       if (!r.ok) return { statusCode: r.ya_tenia ? 409 : 400, headers, body: JSON.stringify({ error: r.error }) };
       return ok(headers, { ok: true, plan: r.plan });
+    }
+
+    // ── [ROL-AVISOS-1] ¿Quién falta de fijar su rol? (solo LEE) ────────────
+    // Palabra de Memo: «ponme en alertas o requisiciones los que vienen de los
+    // tours viejos para poner su fecha de separo». Publicados en el Portal, sin
+    // plan, con saldo y evento por venir. Quien se registre después y se
+    // publique entra solo a esta lista.
+    if (accion === 'plan_pendientes') {
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo: sin la fecha del evento no se sabe quién viene.' }) };
+      try {
+        const r = await require('./_lib/rol-avisos').listarPendientes({ url: env.KH_SB_URL, headers: sbHeaders, EV, ahora: new Date() });
+        return ok(headers, { ok: true, pendientes: r.lista, sin_fecha: r.sin_fecha });
+      } catch (e) { return upstream(headers, e.message, 'consulta'); }
+    }
+
+    // ── [ROL-AVISOS-1] Ensayo EN SECO de los recordatorios del rol fijo ─────
+    // Jamás manda ni escribe: dice a quién le tocaría el correo ese día y
+    // enseña los primeros. `dia` opcional (AAAA-MM-DD) para ver otro día.
+    if (accion === 'rol_avisos_ensayo') {
+      const d = body.dia ? String(body.dia).trim() : '';
+      if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return bad(headers, 'el día va como AAAA-MM-DD');
+      const ahora = d ? new Date(d + 'T18:00:00Z') : new Date();
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo.' }) };
+      const RA = require('./_lib/rol-avisos');
+      try {
+        const r = await RA.correrAvisos({ url: env.KH_SB_URL, headers: sbHeaders, EV, ahora, seco: true });
+        return ok(headers, Object.assign({ ok: true, vivo: RA.ROL_AVISOS_VIVO }, r));
+      } catch (e) { return upstream(headers, e.message, 'consulta'); }
     }
 
     // ── viajeros_evento: poner/quitar cuarto (admin) ─────────────────────

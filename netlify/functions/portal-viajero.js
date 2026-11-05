@@ -365,7 +365,7 @@ async function repartir({ body, viajero_id, correo, KH_URL, KH_KEY, hKH }) {
 
   let t;
   try {
-    const r = await fetch(`${VE}?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,boletos,total_contrato,abonado_previo,tipo_paquete,zona_boleto,tipo_viajero,grupo_viaje,notas&limit=1`, { headers: hKH });
+    const r = await fetch(`${VE}?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,boletos,total_contrato,abonado_previo,tipo_paquete,zona_boleto,tipo_viajero,grupo_viaje,notas,fecha_separo,plan_pagos&limit=1`, { headers: hKH });
     if (!r.ok) return bad('No pude leer tu viaje', 502);
     t = (await r.json())[0];
   } catch (_) { return bad('No pude leer tu viaje', 502); }
@@ -489,6 +489,25 @@ async function repartir({ body, viajero_id, correo, KH_URL, KH_KEY, hKH }) {
       avisoDinero = 'Tus acompañantes ya tienen su lugar, pero su parte del pago no se pudo acomodar: el equipo lo hace a mano y te avisa.';
       console.error('[ACOMP-2] reparto de dinero falló', viajero_id, JSON.stringify(quitados));
     }
+  }
+
+  // 3b · [PLAN-FIJO-1] El rol de pagos se REPARTE igual que el dinero: las
+  // MISMAS fechas (las del separo del titular) para todos, y el separo al peso.
+  // Best-effort: si falla, el titular conserva su plan y los acompañantes se
+  // fijan desde 🗓 Plan en Capsule.
+  if (t.plan_pagos && t.fecha_separo && dineroOk) {
+    try {
+      const PF = require('./_lib/plan-fijo');
+      const lista = await require('./_lib/catalogo-index').fetchEventosRaw().catch(() => null);
+      const evP = Array.isArray(lista) ? (lista.find((x) => x && x.id === String(t.evento_id).split('#')[0]) || null) : null;
+      const sepT = Math.round(Number(t.plan_pagos.separo_monto) || 0);
+      const parteS = Math.floor(sepT / B);
+      for (const v of nacidos) {
+        await PF.fijarEnBase({ url: KH_URL, headers: hKH, viajero: v, ev: evP, fecha_separo: t.fecha_separo, separo_monto: parteS, por: `portal:${correo}` });
+      }
+      await PF.fijarEnBase({ url: KH_URL, headers: hKH, viajero: Object.assign({}, t, { total_contrato: T == null ? null : T - parteT * k }),
+        ev: evP, fecha_separo: t.fecha_separo, separo_monto: sepT - parteS * k, por: `portal:${correo}`, reemplazar: true });
+    } catch (e) { console.error('[PLAN-FIJO-1] reparto del plan falló', viajero_id, e && e.message); }
   }
 
   // 4 · El correo único con la invitación, a los correos distintos del titular.

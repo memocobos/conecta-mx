@@ -132,6 +132,7 @@ const ACCIONES = {
   abonos_listar: ROLES_EDITA_VIAJERO,
   // [PLAN-VJ-1] El rol de pagos de UN viajero (fechas y montos), solo lectura.
   plan_viajero: ROLES_EDITA_VIAJERO,
+  plan_fijar: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
   grupo_wa_guardar: ROLES_EDITA_VIAJERO,
@@ -2902,7 +2903,7 @@ ${entregables}
     if (accion === 'plan_viajero') {
       const viajero_id = String(body.viajero_id || '').trim();
       if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
-      const vr = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,nombre,evento_id,tipo_paquete,zona_boleto,hotel_tipo,boletos,total_contrato,abonado_previo,celular,correo&limit=1`, { headers: sbHeaders });
+      const vr = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,nombre,evento_id,tipo_paquete,zona_boleto,hotel_tipo,boletos,total_contrato,abonado_previo,celular,correo,fecha_separo,plan_pagos&limit=1`, { headers: sbHeaders });
       if (!vr.ok) return upstream(headers, await vr.text(), 'consulta');
       const v = (await vr.json())[0];
       if (!v) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
@@ -2916,10 +2917,18 @@ ${entregables}
       const ev = Array.isArray(EV) ? (EV.find((e) => e && e.id === String(v.evento_id).split('#')[0]) || null) : null;
       const s = saldoMigrado(v, abonos);
       const ds = ev ? PP.dsDeEvento(ev, v.evento_id) : null;
-      const plan = Array.isArray(EV) ? PP.planDelViaje({
-        total: s ? s.total : null, abonado: s ? s.abonado : 0, ds,
-        paquete: v.tipo_paquete, diasAntes: ev ? ev.diasAntes : null, ahora: new Date(),
-      }) : null;
+      // [PLAN-FIJO-1] El rol es FIJO desde su separo: se LEE, no se recalcula
+      // (el mismo dueño que el Portal — lo que se le manda al cliente dice lo
+      // mismo que su Portal). Sin plan fijo, se ofrece fijarlo con una fecha de
+      // separo SUGERIDA (su primer abono registrado), que un humano confirma.
+      const PF = require('./_lib/plan-fijo');
+      const plan = v.plan_pagos
+        ? PF.estadoPlan(v.plan_pagos, { total: s ? s.total : null, abonado: s ? s.abonado : 0, ahora: new Date() })
+        : (!s || s.total == null || s.total <= 0) ? { estado: 'sin_total', resta: null, cuotas: [] }
+        : (s.resta <= 0) ? { estado: 'liquidado', resta: 0, cuotas: [] }
+        : { estado: 'sin_plan_fijo', resta: s.resta, cuotas: [] };
+      const primero = abonos.find((a) => Number(a.monto) > 0 && a.fecha) || null;
+      const sugerido = primero ? { fecha: String(primero.fecha).slice(0, 10), monto: Number(primero.monto) || 0, origen: 'su primer abono registrado' } : null;
       // La cuenta: la decide el dueño del Portal (con la excepción de la
       // preventa) y los datos salen de las constantes del catálogo — sin
       // banco legible no se pinta ninguna cuenta (señalar la mala es peor).
@@ -2938,11 +2947,44 @@ ${entregables}
         total: s ? s.total : null, abonado: s ? s.abonado : null, resta: s ? s.resta : null,
         abonado_previo: Number(v.abonado_previo) || 0,
         abonos: abonos.map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null, tiene_foto: !!a.foto_path })),
-        plan, plan_error: Array.isArray(EV) ? null : 'No se pudo leer el catálogo: sin él no se arma el calendario.',
+        plan, plan_error: null, sugerido, fecha_separo: v.fecha_separo || null,
         banco,
       });
     }
 
+
+    // ── [PLAN-FIJO-1] FIJAR EL ROL DE PAGOS desde una fecha de separo ──────
+    // Palabra de Memo (4-nov): los migrados del Excel no tienen fecha de separo
+    // real — «que Bulma/Milk lo capturen». Se arma UNA vez con la fórmula de
+    // siempre (desde el separo) y queda fijo. Ya fijado, rehacerlo exige
+    // `reemplazar:true` (le cambia las fechas al cliente: es decisión humana).
+    if (accion === 'plan_fijar') {
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+      const fs = String(body.fecha_separo || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fs)) return bad(headers, 'la fecha de separo va como AAAA-MM-DD');
+      const sm = Number(body.separo_monto);
+      if (!Number.isFinite(sm) || sm < 0) return bad(headers, 'el monto del separo tiene que ser un número (0 o más)');
+      const vr = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,evento_id,tipo_paquete,total_contrato,plan_pagos&limit=1`, { headers: sbHeaders });
+      if (!vr.ok) return upstream(headers, await vr.text(), 'consulta');
+      const v = (await vr.json())[0];
+      if (!v) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
+      if (!(Number(v.total_contrato) > 0)) return bad(headers, 'Este viaje no trae total de contrato: corrígelo con ✏️ antes de fijar el plan.');
+      if (v.plan_pagos && body.reemplazar !== true) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ya tiene su rol fijo. Rehacerlo le cambia las fechas al cliente — confírmalo.', ya_tiene: true }) };
+      }
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo: sin la fecha del evento no se arma el plan.' }) };
+      const ev = EV.find((e) => e && e.id === String(v.evento_id).split('#')[0]) || null;
+      const PF = require('./_lib/plan-fijo');
+      const r = await PF.fijarEnBase({
+        url: env.KH_SB_URL, headers: sbHeaders, viajero: v, ev, fecha_separo: fs, separo_monto: sm,
+        por: (auth && auth.user && auth.user.correo) || jwtRol, reemplazar: !!v.plan_pagos,
+      });
+      if (!r.ok) return { statusCode: r.ya_tenia ? 409 : 400, headers, body: JSON.stringify({ error: r.error }) };
+      return ok(headers, { ok: true, plan: r.plan });
+    }
 
     // ── viajeros_evento: poner/quitar cuarto (admin) ─────────────────────
     // [VJ-5] Los migrados del Excel no se podían acomodar: `habitacion_id`

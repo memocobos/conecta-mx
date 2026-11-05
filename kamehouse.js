@@ -2197,6 +2197,7 @@ const khViajeros = {
   abonosDe(viajero_id) { return this._call({ accion: 'abonos_listar', viajero_id }).then(j => j.abonos || []); },
   // [PLAN-VJ-1] el rol de pagos de un viajero (lo arma el servidor; aquí se pinta)
   planDe(viajero_id) { return this._call({ accion: 'plan_viajero', viajero_id }); },
+  planFijar(viajero_id, fecha_separo, separo_monto, reemplazar) { return this._call({ accion: 'plan_fijar', viajero_id, fecha_separo, separo_monto, reemplazar: !!reemplazar }); },
   abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
   // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
@@ -6822,6 +6823,7 @@ const _VJPLAN_ESTADO = {
   sin_fecha: 'El catálogo no trae la fecha de este viaje: no se puede armar el calendario.',
   evento_pasado: 'El evento ya pasó.',
   liquidar: 'Ya no caben quincenas: lo que falta se liquida antes del evento.',
+  sin_plan_fijo: 'Todavía no tiene su rol de pagos fijo: captura su fecha de separo abajo y queda fijo (es lo que verá en su Portal).',
 };
 function _vjPlanFecha(ds) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ds || ''));
@@ -6829,10 +6831,15 @@ function _vjPlanFecha(ds) {
   return Number(m[3]) + ' ' + ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(m[2]) - 1] + ' ' + m[1];
 }
 // Las líneas del calendario que FALTA (lo pagado va aparte, con su fecha).
+// [PLAN-FIJO-1] El plan es FIJO: lo pagado llena las cuotas en orden. Aquí van
+// solo las que todavía deben algo (con lo que les FALTA); una vencida lo dice.
 function _vjPlanCuotas(d) {
   const pl = d && d.plan;
-  if (!pl || !(pl.estado === 'calendario' || pl.estado === 'liquidar')) return [];
-  return (pl.cuotas || []).map((q) => ({ lbl: pl.estado === 'liquidar' ? 'Liquidar' : 'Pago ' + q.n, cuando: q.lbl, monto: q.monto }));
+  if (!pl || pl.estado !== 'calendario') return [];
+  return (pl.cuotas || []).filter((q) => q.estado !== 'pagada').map((q) => ({
+    lbl: (q.liq ? 'Liquidar' : 'Pago ' + q.n) + (q.estado === 'vencida' ? ' (VENCIDO)' : ''),
+    cuando: q.lbl, monto: q.falta != null ? q.falta : q.monto, vencida: q.estado === 'vencida',
+  }));
 }
 function _vjPlanTitulo(d) {
   const v = d.viajero || {}, e = d.evento || {};
@@ -6873,7 +6880,19 @@ async function _vjPlanVer(id, nombre) {
     </div>
     ${cuotas.length ? `<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ts)">Lo que le falta</div>
       <table class="cob-table" style="width:100%;margin:4px 0 10px"><tbody>${cuotas.map((q) => fila(_esfEsc(q.lbl), _esfEsc(q.cuando), _spFmtMxn(q.monto))).join('')}</tbody></table>` : ''}
+    ${pl && pl.estado === 'calendario' ? `<div style="font-size:12px;color:var(--ts);margin-bottom:6px">Rol FIJO desde su separo del <b style="color:var(--text)">${_esfEsc(_vjPlanFecha(pl.separo_fecha))}</b> ($${Number(pl.separo_monto || 0).toLocaleString('es-MX')})${pl.atrasado > 0 ? ` · <b style="color:var(--red)">vencido ${_spFmtMxn(pl.atrasado)}</b>` : ''}</div>
+      <details style="margin-bottom:8px"><summary style="font-size:12px;cursor:pointer">Su rol completo (${(pl.cuotas || []).length} pagos)</summary>
+      <table class="cob-table" style="width:100%;margin-top:4px"><tbody>${(pl.cuotas || []).map((q) => fila(_esfEsc((q.liq ? 'Liquidar' : 'Pago ' + q.n)), _esfEsc(q.lbl) + ' · ' + ({ pagada: '✓ pagado', vencida: '⚠ vencido', parcial: 'abonado ' + _spFmtMxn(q.pagado) }[q.estado] || 'pendiente'), _spFmtMxn(q.monto), q.estado === 'pagada' ? 'var(--green)' : q.estado === 'vencida' ? 'var(--red)' : '')).join('')}</tbody></table></details>` : ''}
     ${nota ? `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">${_esfEsc(nota)}</div>` : ''}
+    ${pl && (pl.estado === 'sin_plan_fijo' || pl.estado === 'calendario') ? `<details ${pl.estado === 'sin_plan_fijo' ? 'open' : ''} style="margin-bottom:8px;border:1px solid var(--line,#333);border-radius:8px;padding:8px">
+      <summary style="font-size:12px;cursor:pointer;font-weight:700">${pl.estado === 'sin_plan_fijo' ? '🗓 Fijar su rol de pagos' : '🔁 Rehacer su rol (cambiar fecha de separo)'}</summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">
+        <label style="font-size:11px">FECHA DE SEPARO<br><input type="date" id="vjpf-f-${_attrJs(id)}" class="input" value="${_esfEsc((pl.estado === 'calendario' ? pl.separo_fecha : (d.sugerido && d.sugerido.fecha)) || '')}"></label>
+        <label style="font-size:11px">MONTO DEL SEPARO<br><input type="number" min="0" step="1" id="vjpf-m-${_attrJs(id)}" class="input" style="width:110px" value="${_esfEsc(String((pl.estado === 'calendario' ? pl.separo_monto : (d.sugerido && d.sugerido.monto)) ?? ''))}"></label>
+        <button class="btn btn-primary btn-sm" onclick="_vjPlanFijar('${_attrJs(id)}','${_attrJs(nombre)}',${pl.estado === 'calendario' ? 'true' : 'false'})">${pl.estado === 'sin_plan_fijo' ? 'Fijar rol' : 'Rehacer rol'}</button>
+      </div>
+      ${pl.estado === 'sin_plan_fijo' && d.sugerido ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">Sugerido: ${_esfEsc(d.sugerido.origen)} — confírmalo contra el Excel o el comprobante.</div>` : ''}
+    </details>` : ''}
     ${pagados.length ? `<details><summary style="font-size:12px;cursor:pointer">Lo que ya pagó (${pagados.length})</summary>
       <table class="cob-table" style="width:100%;margin-top:4px"><tbody>${pagados.map((p) => fila('✓', _esfEsc(p.cuando), _spFmtMxn(p.monto), 'var(--green)')).join('')}</tbody></table></details>` : ''}
     ${d.banco ? `<div style="font-size:12px;color:var(--ts);margin-top:8px">Paga en <b style="color:var(--text)">${_esfEsc(d.banco.nombre)}</b> · CLABE ${_esfEsc(d.banco.clabe)} · Tarjeta ${_esfEsc(d.banco.tarjeta)} · ${_esfEsc(d.banco.titular)}</div>` : ''}
@@ -6883,13 +6902,28 @@ async function _vjPlanVer(id, nombre) {
     </div>
   </div>`;
 }
+async function _vjPlanFijar(id, nombre, reemplazar) {
+  const f = (document.getElementById('vjpf-f-' + id) || {}).value || '';
+  const mRaw = (document.getElementById('vjpf-m-' + id) || {}).value;
+  const m = Number(mRaw);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) { showToast('Pon la fecha de separo', 'error'); return; }
+  if (mRaw === '' || !Number.isFinite(m) || m < 0) { showToast('Pon el monto del separo (0 si no dio separo)', 'error'); return; }
+  if (reemplazar && !confirm(`¿Rehacer el rol de ${nombre}? Sus fechas de pago cambian (el cliente las verá distintas en su Portal).`)) return;
+  try {
+    const j = await khViajeros.planFijar(id, f, m, reemplazar);
+    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo fijar');
+    showToast('✓ Rol de pagos fijo', 'success');
+    const tr = document.getElementById(`vj-ab-${id}`); if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
+    _vjPlanVer(id, nombre);
+  } catch (e) { showToast('No se pudo fijar el rol: ' + ((e && e.message) || ''), 'error'); }
+}
 function _vjPlanTexto(d) {
   const v = d.viajero || {}, t = _vjPlanTitulo(d), cuotas = _vjPlanCuotas(d);
   const l = [`Hola ${String(v.nombre || '').split(' ')[0]} 👋, este es tu plan de pagos:`, '', `*${t.evento}*`];
   if (t.fecha) l.push(t.fecha);
   if (t.paq) l.push(t.paq);
   l.push('', `Total: ${d.total == null ? '—' : _spFmtMxn(d.total)}`, `Pagado: ${d.abonado == null ? '—' : _spFmtMxn(d.abonado)}`, `*Te falta: ${d.resta == null ? '—' : _spFmtMxn(Math.max(0, d.resta))}*`);
-  if (cuotas.length) { l.push('', '*Tus próximos pagos*'); cuotas.forEach((q) => l.push(`• ${q.lbl} (${q.cuando}): ${_spFmtMxn(q.monto)}`)); }
+  if (cuotas.length) { l.push('', '*Tus pagos pendientes*'); cuotas.forEach((q) => l.push(`• ${q.lbl} (${q.cuando}): ${_spFmtMxn(q.monto)}`)); }
   const n = d.plan ? _VJPLAN_ESTADO[d.plan.estado] : ''; if (n && d.plan.estado !== 'calendario') l.push('', n);
   if (d.banco) l.push('', `Cuenta ${d.banco.nombre}`, `CLABE ${d.banco.clabe}`, `Tarjeta ${d.banco.tarjeta}`, `A nombre de ${d.banco.titular}`);
   l.push('', 'Mándanos tu comprobante por aquí. Conecta Reynosa');

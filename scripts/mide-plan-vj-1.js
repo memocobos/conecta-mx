@@ -53,14 +53,25 @@ const INDEX = `<script>var EV=[
   zonas:[{n:'Oro',p:6500}],cheapZonas:[],hotel:[]}
 ];</script>`;
 
-let DB, CATALOGO_OK;
+let DB, CATALOGO_OK, PERMITE_PLAN = false;
 const ESCR = [];
 const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => (typeof b === 'string' ? JSON.parse(b) : b), text: async () => (typeof b === 'string' ? b : JSON.stringify(b)), headers: { get: () => null } });
 const eq = (q, c) => { const m = q.match(new RegExp('[?&]' + c + '=eq\\.([^&]*)')); return m ? decodeURIComponent(m[1]) : null; };
 
 global.fetch = async (url, init) => {
   init = init || {}; const m = (init.method || 'GET').toUpperCase(); const u = decodeURIComponent(String(url));
-  if (m !== 'GET') { ESCR.push(m + ' ' + u); return resp(500, { error: 'escritura en un careo de solo lectura' }); }
+  if (m !== 'GET') {
+    ESCR.push(m + ' ' + u);
+    // [PLAN-FIJO-1] Solo el bloque [F] deja escribir: el PATCH del plan, con su
+    // valor esperado `plan_pagos=is.null` respetado como lo haría PostgREST.
+    if (PERMITE_PLAN && m === 'PATCH' && u.includes('/rest/v1/viajeros_evento')) {
+      const id = eq(u, 'id'); const b = JSON.parse(init.body || '{}');
+      const filas = DB.v.filter((x) => String(x.id) === id && (!/plan_pagos=is\.null/.test(u) || x.plan_pagos == null));
+      filas.forEach((x) => Object.assign(x, b));
+      return resp(200, filas);
+    }
+    return resp(500, { error: 'escritura en un careo de solo lectura' });
+  }
   if (u.includes('/index.html') || /conectareynosa\.mx\/?($|\?)/.test(u)) return CATALOGO_OK ? resp(200, INDEX) : resp(503, 'caído');
   if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u', activo: true, rol: 'bulma' }]);
   const filtra = (rows, cols) => {
@@ -77,7 +88,9 @@ global.fetch = async (url, init) => {
 const semilla = () => {
   DB = {
     v: [
-      { id: U(1), evento_id: 'eventox', nombre: 'Laura Pérez', tipo_paquete: 'plus', zona_boleto: 'Pista', hotel_tipo: 'Compartida', boletos: 1, total_contrato: 3000, abonado_previo: 0, celular: '8991112233' },
+      // [PLAN-FIJO-1] su rol FIJO desde su separo (300 el 20-oct)
+      { id: U(1), evento_id: 'eventox', nombre: 'Laura Pérez', tipo_paquete: 'plus', zona_boleto: 'Pista', hotel_tipo: 'Compartida', boletos: 1, total_contrato: 3000, abonado_previo: 0, celular: '8991112233',
+        fecha_separo: '2026-10-20', plan_pagos: require(path.join(RAIZ, 'netlify/functions/_lib/plan-fijo.js')).armarPlanFijo({ separo_fecha: '2026-10-20', separo_monto: 300, total: 3000, paquete: 'plus', ds: '2027-02-01' }) },
       { id: U(2), evento_id: 'eventox', nombre: 'Beto Cheap', tipo_paquete: 'cheap', zona_boleto: 'Pista', hotel_tipo: null, boletos: 1, total_contrato: 1500, abonado_previo: 500, celular: null },
       { id: U(3), evento_id: 'multix#1', nombre: 'Ana Multi', tipo_paquete: 'plus', zona_boleto: 'Oro', hotel_tipo: 'Doble', boletos: 1, total_contrato: 6500, abonado_previo: 0, celular: null },
     ],
@@ -108,8 +121,12 @@ const llamar = async (archivo, b) => {
   const a = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_viajero', viajero_id: U(1) });
   af(a.s === 200 && a.j.ok !== false, 'contesta 200: ' + a.s + ' ' + (a.j.error || ''));
   af(a.j.total === 3000 && a.j.abonado === 800 && a.j.resta === 2200, () => 'total/pagado/falta = saldoMigrado (3000/800/2200): ' + [a.j.total, a.j.abonado, a.j.resta].join('/'));
-  const dueno = PP.planDelViaje({ total: 3000, abonado: 800, ds: '2027-02-01', paquete: 'plus', diasAntes: null, ahora: new Date() });
-  af(a.j.plan && JSON.stringify(a.j.plan) === JSON.stringify(dueno), 'el calendario ES el de planDelViaje (byte a byte con el dueño)');
+  // [PLAN-FIJO-1] El calendario ES el rol FIJO guardado, leído por su dueño
+  // (estadoPlan) — ya no se arma desde hoy con planDelViaje.
+  const PF = require(path.join(RAIZ, 'netlify/functions/_lib/plan-fijo.js'));
+  const dueno = PF.estadoPlan(DB.v[0].plan_pagos, { total: 3000, abonado: 800, ahora: new Date() });
+  af(a.j.plan && JSON.stringify(a.j.plan) === JSON.stringify(dueno), 'el calendario ES el rol fijo leído por estadoPlan (byte a byte con el dueño)');
+  af(a.j.plan && a.j.plan.fijo === true && a.j.plan.separo_fecha === '2026-10-20', 'y dice desde qué separo es fijo');
   af(a.j.plan && a.j.plan.estado === 'calendario' && a.j.plan.cuotas.length > 0, () => 'trae cuotas: ' + (a.j.plan && a.j.plan.cuotas.length));
   af(a.j.evento && a.j.evento.fecha === '1 feb 2027' && a.j.evento.nombre === 'Evento X' && a.j.evento.venue === 'Arena Monterrey', () => 'evento con nombre/fecha/venue: ' + JSON.stringify(a.j.evento));
   af(a.j.banco && a.j.banco.clave === 'bbva' && /BBVA/.test(a.j.banco.nombre) && a.j.banco.clabe, 'PLUS paga en BBVA (con CLABE)');
@@ -117,6 +134,7 @@ const llamar = async (archivo, b) => {
   const c2 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_viajero', viajero_id: U(2) });
   af(c2.j.banco && c2.j.banco.clave === 'banamex', 'CHEAP paga en Banamex (la regla del Portal)');
   af(c2.j.abonado === 500 && c2.j.abonado_previo === 500, 'lo pagado antes del sistema cuenta y viaja aparte');
+  af(c2.j.plan && c2.j.plan.estado === 'sin_plan_fijo' && c2.j.plan.resta === 1000, () => '[PLAN-FIJO-1] sin fecha de separo NO se inventa calendario: ' + JSON.stringify(c2.j.plan));
   const m3 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_viajero', viajero_id: U(3) });
   af(m3.j.evento && m3.j.evento.fecha === '12 ene 2027' && m3.j.evento.ds === '2027-01-12', () => 'multifecha #1 → SOLO su fecha (12 ene): ' + JSON.stringify(m3.j.evento));
   af(ESCR.length === 0, () => 'CERO escrituras en todo el bloque: ' + ESCR.join(' | '));
@@ -124,7 +142,9 @@ const llamar = async (archivo, b) => {
   console.log('[B] catálogo ilegible');
   CATALOGO_OK = false;
   const b = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_viajero', viajero_id: U(1) });
-  af(b.s === 200 && b.j.plan === null && /catálogo/.test(b.j.plan_error || ''), () => 'plan null CON su motivo (no calendario vacío): ' + JSON.stringify({ plan: b.j.plan, e: b.j.plan_error }));
+  // ⚰️ [PLAN-FIJO-1] Antes: plan null sin catálogo. Hoy el rol es FIJO y está
+  // guardado — el catálogo caído no lo borra (solo el nombre/fecha del evento).
+  af(b.s === 200 && b.j.plan && b.j.plan.fijo === true && b.j.plan.cuotas.length > 0, () => 'el rol fijo sigue con el catálogo caído: ' + JSON.stringify({ plan: b.j.plan && b.j.plan.estado, e: b.j.plan_error }));
   af(b.j.total === 3000, 'el dinero sigue diciéndose aunque falte el calendario');
   CATALOGO_OK = true;
 
@@ -158,13 +178,32 @@ const llamar = async (archivo, b) => {
   const ctx2 = { khPaqueteTexto: (v) => String(v.tipo_paquete || '').toUpperCase(), _spFmtMxn: (n) => '$' + Number(n).toLocaleString('en-US') };
   vm.createContext(ctx2); vm.runInContext(kj.slice(s0, s1) + kj.slice(s2, s3), ctx2);
   const cuotas = vm.runInContext('_vjPlanCuotas', ctx2)(a.j);
-  af(cuotas.length === dueno.cuotas.length && cuotas.every((q, i) => q.monto === dueno.cuotas[i].monto), 'las cuotas pintadas son EXACTAS las del servidor');
+  const pend = dueno.cuotas.filter((q) => q.estado !== 'pagada');
+  af(cuotas.length === pend.length && cuotas.every((q, i) => q.monto === pend[i].falta), 'las cuotas pintadas son EXACTAS las del servidor (lo que FALTA en cada una)');
   const txt = vm.runInContext('_vjPlanTexto', ctx2)(a.j);
-  af(/Laura/.test(txt) && /Te falta: \$2,200/.test(txt) && dueno.cuotas.every((q) => txt.includes('$' + q.monto.toLocaleString('en-US'))), 'el texto de WhatsApp dice nombre, lo que falta y cada pago');
+  af(/Laura/.test(txt) && /Te falta: \$2,200/.test(txt) && pend.every((q) => txt.includes('$' + q.falta.toLocaleString('en-US'))), 'el texto de WhatsApp dice nombre, lo que falta y cada pago pendiente');
   af(/CLABE 012822004639334319/.test(txt), 'y la cuenta donde paga');
   const cuerpo = kj.slice(kj.indexOf('async function _vjPlanVer'), kj.indexOf('function _vjPlanTexto'));
   af(!/quincenasEntre|Math\.ceil\(/.test(cuerpo), 'la pantalla no arma quincenas por su cuenta');
   af(/document\.querySelectorAll\('tr\[id\^="vj-ab-"\]'\)/.test(cuerpo), 'abre en el renglón plegable de siempre (un panel a la vez)');
+
+  console.log('[F] [PLAN-FIJO-1] fijar el rol desde Capsule (plan_fijar)');
+  semilla(); CATALOGO_OK = true; PERMITE_PLAN = true; ESCR.length = 0;
+  const f0 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_viajero', viajero_id: U(2) });
+  af(f0.s === 200 && f0.j.plan && f0.j.plan.estado === 'sin_plan_fijo' && f0.j.sugerido === null, () => 'sin abonos con fecha → sin sugerido (no inventa una fecha): ' + JSON.stringify(f0.j.sugerido));
+  const f1 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_fijar', viajero_id: U(2), fecha_separo: '2026-10-15', separo_monto: 500 });
+  af(f1.s === 200 && f1.j.plan && f1.j.plan.separo_fecha === '2026-10-15' && f1.j.plan.cuotas.length === 4, () => 'fija el rol (CHEAP → 4 pagos): ' + f1.s + ' ' + JSON.stringify(f1.j.error || (f1.j.plan && f1.j.plan.cuotas.map((c) => c.monto))));
+  af(DB.v[1].fecha_separo === '2026-10-15' && DB.v[1].plan_pagos && ESCR.filter((e) => /^PATCH/.test(e) && /plan_pagos=is\.null/.test(e)).length === 1, 'escribe UNA vez con valor esperado plan_pagos=is.null');
+  const f2 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_fijar', viajero_id: U(2), fecha_separo: '2026-10-20', separo_monto: 500 });
+  af(f2.s === 409 && DB.v[1].fecha_separo === '2026-10-15', 'ya fijado → 409 sin reemplazar (sus fechas no se mueven solas)');
+  const f3 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_fijar', viajero_id: U(2), fecha_separo: '2026-10-20', separo_monto: 500, reemplazar: true });
+  af(f3.s === 200 && DB.v[1].fecha_separo === '2026-10-20', 'con reemplazar:true (confirmado por un humano) sí se rehace');
+  const f4 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_fijar', viajero_id: U(3), fecha_separo: 'ayer', separo_monto: 300 });
+  af(f4.s === 400, 'fecha inválida → 400');
+  CATALOGO_OK = false;
+  const f5 = await llamar('admin-coordi-asignaciones.js', { accion: 'plan_fijar', viajero_id: U(3), fecha_separo: '2026-10-20', separo_monto: 300 });
+  af(f5.s === 502 && DB.v[2].plan_pagos == null, 'sin catálogo NO se fija a ciegas (502)');
+  CATALOGO_OK = true; PERMITE_PLAN = false;
 
   console.log('\n' + (V === 0 ? 'NADA MEDIDO · esto NO es un verde' : (R ? '🔴 ROJO' : '✅ VERDE')) + ' · ' + V + ' en verde, ' + R + ' en rojo');
   process.exit(R || !V ? 1 : 0);

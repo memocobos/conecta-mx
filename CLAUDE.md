@@ -188,6 +188,59 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🗓🔒⏳ **PLAN-FIJO-1 (4-nov-2026, en main local; la BASE ya escrita): EL ROL DE
+  PAGOS ES FIJO DESDE EL SEPARO.** Caso Sahid (FR 11-ene, STAY $4,200, separó $300
+  el 29-oct): el 3-nov su Portal decía 4 pagos de $975 y el 4-nov 3 de $1,300 sin
+  que hiciera nada — `planDelViaje` se recalculaba desde HOY y la regla de 5 días
+  (pensada para el SEPARO) le borró la quincena del 9-16 nov. Palabra de Memo:
+  *«el calendario debe de quedar fijo … a partir de la fecha de separo … si lo
+  estás cambiando la gente va a depositar de más»*. Sus tres decisiones:
+  (1) migrados del Excel sin fecha de separo → **no ven calendario hasta que
+  Bulma/Milk la capturen** («🗓 Plan» → «Fijar su rol») · (2) pago no hecho →
+  **VENCIDO y se suma aparte**, los demás no cambian; lo abonado de más se aplica
+  a los pagos EN ORDEN · (3) cambia el total → **mismas fechas, nuevo monto en
+  las que faltan**.
+  - **La base** (acta `migraciones/PLAN-FIJO-1.sql`, YA CORRIDA): columnas
+    `viajeros_evento.fecha_separo` + `plan_pagos jsonb` (CHECK objeto con cuotas)
+    + trigger `viajeros_plan_pagos_resplit` (BEFORE UPDATE OF total_contrato,
+    tipo_paquete): las cuotas cuya ventana YA empezó conservan su monto, las
+    futuras se re-reparten; sin ventanas, «Antes del evento». 🔒 Vive en la base
+    para que NINGÚN escritor de total (careo, ✏️, elegir paquete, cancelar) se lo
+    salte; probado en tabla temporal (975 → 975,1109,1109,1107) y careado contra
+    su espejo JS `rerepartir`.
+  - **`_lib/plan-fijo` es el dueño**: `armarPlanFijo` (las quincenas de SIEMPRE de
+    `quincenasEntre`, corridas UNA vez con from = separo; guarda las 10 ventanas
+    aunque el paquete use 4, para que una preventa que elige PLUS tenga sus
+    fechas) · `estadoPlan` (cascada de lo pagado − separo: pagada/parcial/vencida/
+    pendiente, `atrasado`, `proxima`) · `fijarEnBase` (PATCH con
+    `plan_pagos=is.null`; jamás lanza).
+  - **Cableo:** aprobar requisición fija el rol con el día de `creado_en` en
+    Reynosa y el abono de cada quien como separo · Portal y «🗓 Plan» de Capsule
+    LEEN el rol (⚰️ `planDelViaje` desde hoy murió en los dos; el 🧮 Cotizador lo
+    conserva — ahí sí es un separo nuevo) · acción `plan_fijar` (roles de
+    siempre; ya fijado → 409 salvo `reemplazar:true` con confirm) · reparto ACOMP-2
+    reparte el rol con las MISMAS fechas · el Portal pinta ✓ Pagado / Vencido /
+    abonado $X, aviso rojo del atraso y «fijo desde tu separo (29 oct)»; sin plan
+    fijo: «Estamos preparando tu calendario».
+  - **Backfill:** los **189** viajeros nacidos de requisición ya tienen su rol fijo
+    (separo = día de su requisición; SQL careado contra la lib por firma md5,
+    189/189 idénticos). Sahid: 4×$975 desde el 9-16 nov, como lo vio al separar.
+  - ⏳ **Quedan sin plan fijo los migrados:** 427 con saldo en eventos que vienen
+    (12 de ellos ya publicados en el Portal verán «estamos preparando»). Bulma/Milk
+    los fijan desde 🗓 Plan (trae sugerido su primer abono, rotulado).
+  - ⏳ **Recordatorios por correo en las fechas del rol: NO construidos** (hoy no
+    sale ningún recordatorio de pago a estos clientes — `portal-recordatorios-
+    diario` lee la tabla `pagos` del Portal, vacía). Cron nuevo = palabra de Memo
+    + seco + visto.
+  - `mide:plan-fijo-1` **25** (control positivo: el cálculo viejo SÍ brinca 4→3) ·
+    plan-pagos-1 **81** y plan-vj-1 **35** (actualizados a la verdad nueva: el plan
+    ya no viaja en null sin catálogo — está guardado; [F] `plan_fijar` por el
+    handler real). Vecinos verdes: req-b1 52 · acomp-1 76 · acomp-2 43 ·
+    portal-solo-1 89 · preventa-portal-1 35 · confirma-1 28 · req-corrige-1 40 ·
+    ticket-circuito-1 32 · portal-edit-1 31 · contrato-cliente-1 31 · rechazo-1 71
+    · capsule-ux-1 83 · capsule-ux-2 46 · portal-vivo-1 45 · cotiza-vend-1 38.
+    ⏳ Push de Memo.
+
 - ✏️⏳ **ALTA-GEN-HAB-1 + VJ-CORRIGE-JUNTO-1 (4-nov-2026, en main local, cero
   SQL).** Palabra de Memo: *«en capsule en los clientes pon el botón de corregir
   a lado del de pagos · a la hora de registrar cliente no viene la opción de

@@ -874,6 +874,29 @@ exports.handler = async (event) => {
       });
     }
 
+    // 6b · [PLAN-FIJO-1] EL ROL DE PAGOS FIJO, desde el día del separo (el día
+    // que el cliente mandó su requisición, en Reynosa). Palabra de Memo (4-nov):
+    // «esas fechas de pago serán las que siempre verá en el portal». Se arma UNA
+    // vez aquí; si el total cambia después, la base re-reparte solo lo que falta.
+    // Jamás deshace la aprobación: si no se pudo, la respuesta lo DICE y se fija
+    // a mano desde 🗓 Plan en Capsule.
+    let planFijo = null;
+    try {
+      const PF = require('./_lib/plan-fijo');
+      const lista = await fetchEventosRaw().catch(() => null);
+      const evP = Array.isArray(lista) ? (lista.find((x) => x && x.id === String(evEf).split('#')[0]) || null) : null;
+      const fSep = PF.diaReynosa(req.creado_en) || PF.diaReynosa(new Date());
+      const res = [];
+      for (let i = 0; i < nacidos.length; i++) {
+        res.push(await PF.fijarEnBase({
+          url: SB_URL, headers: sbH, viajero: nacidos[i], ev: evP, fecha_separo: fSep,
+          separo_monto: N > 1 ? montos[i] : monto, por: quien,
+        }));
+      }
+      const malos = res.filter((x) => !x.ok);
+      planFijo = malos.length ? { ok: false, error: 'El rol de pagos no se pudo fijar (' + malos[0].error + ') — fíjalo desde 🗓 Plan en Capsule.' } : { ok: true, separo: fSep };
+    } catch (e) { planFijo = { ok: false, error: 'El rol de pagos no se pudo fijar — fíjalo desde 🗓 Plan en Capsule.' }; }
+
     // 7 · Colgarle el viajero TITULAR a la requisición (informativo; si falla, se dice).
     let enlaceOk = true;
     try {
@@ -925,6 +948,7 @@ exports.handler = async (event) => {
         ? 'Sin comprobante y sin monto: NO se registró ningún abono — el viajero nace debiendo todo. Captura el pago cuando llegue (➕ Abono o el comprobante que suba por su Portal).'
         : undefined,
       enlace_registrado: enlaceOk,
+      plan_fijo: planFijo,
       portal,
     });
   }

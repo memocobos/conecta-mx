@@ -3665,30 +3665,42 @@ function _migPagosHtml(t){
       + (Number(p.resta) > 0 ? '. Quedó un saldo de <b>' + money(p.resta) + '</b>: escríbenos por WhatsApp para cerrarlo.' : '.') + '</div>' + hist);
   }
 
-  // 'calendario' y 'liquidar' comparten la forma: cuotas con su ventana.
+  // [PLAN-FIJO-1] Sin plan fijo (migrado del Excel sin fecha de separo): NO se
+  // inventa un calendario — el equipo captura su fecha y entonces aparece, fijo.
+  if (p.estado === 'sin_plan_fijo') {
+    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. Estamos preparando tu calendario de pagos: en cuanto quede listo aparece aquí con tus fechas fijas. Si tienes dudas, escríbenos por WhatsApp.</div>' + comoPago + mandaComp + hist);
+  }
+
+  // [PLAN-FIJO-1] El calendario es FIJO desde tu separo: las fechas y montos no
+  // se mueven solos. Lo pagado llena los pagos EN ORDEN; un pago que se pasó sin
+  // cubrir sale VENCIDO (y se suma aparte), los demás siguen igual.
   const cuotas = Array.isArray(p.cuotas) ? p.cuotas : [];
   const prox = p.proxima;
+  const atr = Number(p.atrasado) || 0;
+  const avisoAtr = atr > 0
+    ? '<div style="margin:2px 0 10px;padding:10px 13px;border-radius:10px;background:rgba(255,40,59,.12);border:1px solid rgba(255,40,59,.5);font-size:13px">'
+      + '⚠️ Tienes <b>' + money(atr) + '</b> de pagos vencidos. Ponte al corriente cuanto antes para no perder tu lugar.</div>'
+    : '';
   const destacado = prox
     ? '<div style="margin:2px 0 12px;padding:11px 13px;border-radius:10px;background:rgba(232,255,76,.1);border:1px solid rgba(232,255,76,.4)">'
       + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.75">Tu próximo pago</div>'
       + '<div style="font-size:19px;font-weight:900;margin-top:2px">' + money(prox.monto)
       + ' <span style="font-size:13px;font-weight:600;opacity:.8">· ' + escapeHtml(prox.lbl) + '</span></div></div>'
     : '';
+  const ETQ = { pagada: '<span style="color:#88ea4e">✓ Pagado</span>', vencida: '<span style="color:#ff283b">Vencido</span>' };
   let lista = '';
   cuotas.forEach((c) => {
-    lista += '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px">'
-      + '<span style="opacity:.85">Pago ' + c.n + ' <span style="opacity:.7">· ' + escapeHtml(c.lbl) + '</span></span>'
+    const est = ETQ[c.estado] || (c.estado === 'parcial' ? '<span style="opacity:.75">abonado ' + money(c.pagado) + '</span>' : '');
+    const tach = c.estado === 'pagada' ? 'opacity:.55;' : '';
+    lista += '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;' + tach + '">'
+      + '<span style="opacity:.85">' + (c.liq ? 'Liquidar' : 'Pago ' + c.n) + ' <span style="opacity:.7">· ' + escapeHtml(c.lbl) + '</span>' + (est ? ' <span style="font-size:11px;font-weight:700">' + est + '</span>' : '') + '</span>'
       + '<span><b>' + money(c.monto) + '</b></span></div>';
   });
-  const nota = p.estado === 'liquidar'
-    ? '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Ya no alcanzan más quincenas antes del viaje: este saldo se liquida antes de la fecha del evento.</div>'
-    : '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Las fechas son las quincenas de siempre (del 9 al 16 y del 24 al 1). Si abonas de más, los siguientes pagos bajan solos.</div>';
+  const sep = p.separo_fecha ? (function(){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.separo_fecha); const MM = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return m ? Number(m[3]) + ' ' + MM[Number(m[2]) - 1] : ''; })() : '';
+  const nota = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Tu calendario es fijo desde tu separo' + (sep ? ' (' + sep + ')' : '') + ': las fechas son las quincenas de siempre (del 9 al 16 y del 24 al 1). Si abonas de más, se aplica a tus siguientes pagos.</div>';
 
-  return caja(barra + destacado
-    // El encabezado ATA el número de arriba con la lista de abajo: sin él, el
-    // «Te falta $5,500» de la tarjeta y una lista de cuotas sueltas se leen como
-    // dos datos distintos en vez de uno repartido.
-    + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;margin-bottom:2px">Te faltan ' + money(p.resta) + ' en ' + cuotas.length + (cuotas.length === 1 ? ' pago' : ' pagos') + '</div>'
+  return caja(barra + avisoAtr + destacado
+    + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;margin-bottom:2px">Tu rol de pagos · te faltan ' + money(p.resta) + '</div>'
     + lista + nota + comoPago + mandaComp + hist);
 }
 

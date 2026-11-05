@@ -199,7 +199,10 @@ function semilla() {
   return {
     escrituras: [], rev: [], wa: [],
     v: [
-      { id: U(1), evento_id: 'juniorh', nombre: 'Laura Gómez', correo: 'laura@correo.mx', tipo_paquete: 'plus', zona_boleto: 'General', total_contrato: 9000, abonado_previo: 2000, boletos: 1, portal_revisado_at: sello },
+      // [PLAN-FIJO-1] El plan del Portal ya no se arma desde «hoy»: es el rol FIJO
+      // guardado en la fila desde su separo (palabra de Memo, 4-nov).
+      { id: U(1), evento_id: 'juniorh', nombre: 'Laura Gómez', correo: 'laura@correo.mx', tipo_paquete: 'plus', zona_boleto: 'General', total_contrato: 9000, abonado_previo: 2000, boletos: 1, portal_revisado_at: sello,
+        plan_pagos: require(path.join(RAIZ, 'netlify/functions/_lib/plan-fijo.js')).armarPlanFijo({ separo_fecha: '2026-10-01', separo_monto: 2000, total: 9000, paquete: 'plus', ds: '2027-02-13' }) },
     ],
     abonos: [{ viajero_id: U(1), monto: 1500, fecha: '2026-10-01' }],
   };
@@ -228,10 +231,12 @@ async function correr() {
   af(() => tA && typeof tA.evento_ds === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(tA.evento_ds), () => 'viaja la fecha del evento derivada del catálogo: ' + (tA && tA.evento_ds));
   af(() => A.j.plan_error == null, 'sin motivo de error cuando el catálogo se leyó');
   // 🔒 La suma de las cuotas es exactamente lo que le falta, dicho por el handler.
+  // [PLAN-FIJO-1] Las cuotas son las del ROL FIJO (suman lo que debía tras el
+  // separo) y lo que FALTA en ellas es exactamente la resta del saldo.
   af(() => {
-    const p = tA && tA.plan; if (!p || !Array.isArray(p.cuotas) || !p.cuotas.length) return false;
-    return p.cuotas.reduce((a, c) => a + c.monto, 0) === p.resta && p.resta === tA.resta;
-  }, 'las cuotas que salen del handler suman exactamente la resta del saldo');
+    const p = tA && tA.plan; if (!p || p.fijo !== true || !Array.isArray(p.cuotas) || !p.cuotas.length) return false;
+    return p.cuotas.reduce((a, c) => a + c.falta, 0) === p.resta && p.resta === tA.resta;
+  }, 'el rol FIJO del handler: lo que falta en sus cuotas suma exactamente la resta del saldo');
   af(() => !DB.escrituras.filter((e) => /PATCH|DELETE/.test(e)).length, 'el plan NO escribe nada: cero PATCH y cero DELETE');
 
   // ── (b) catálogo ILEGIBLE: no se inventa calendario, y se DICE
@@ -239,7 +244,9 @@ async function correr() {
   const B = await correr();
   const tB = (B.j.tours || [])[0];
   af(() => B.status === 200 && !!tB, 'con el catálogo caído el tour SIGUE viajando (su dinero no depende del index)');
-  af(() => tB && tB.plan === null, 'su plan viaja en null — NO con cuotas vacías, que se leerían como «ya no debes pagos»');
+  // ⚰️ [PLAN-FIJO-1] Antes el plan viajaba en null sin catálogo (se armaba con su
+  // fecha). Hoy el rol es FIJO y está guardado: el catálogo caído NO lo borra.
+  af(() => tB && tB.plan && tB.plan.fijo === true && tB.plan.cuotas.length > 0, 'el rol FIJO sigue viajando con el catálogo caído (está guardado, no depende del index)');
   af(() => typeof B.j.plan_error === 'string' && B.j.plan_error.length > 0, () => 'y el motivo viaja dicho: «' + B.j.plan_error + '»');
   af(() => tB && tB.total === 9000 && tB.resta === 5500, 'el saldo sigue siendo el mismo con o sin catálogo');
 

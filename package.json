@@ -141,6 +141,7 @@
     "mide:cabina-estable-1": "node scripts/mide-cabina-estable-1.js",
     "mide:radio-episodios-1": "node scripts/mide-radio-episodios-1.js",
     "mide:plan-vj-1": "node scripts/mide-plan-vj-1.js",
-    "mide:alta-gen-hab-1": "node scripts/mide-alta-gen-hab-1.js"
+    "mide:alta-gen-hab-1": "node scripts/mide-alta-gen-hab-1.js",
+    "mide:plan-fijo-1": "node scripts/mide-plan-fijo-1.js"
   }
 }

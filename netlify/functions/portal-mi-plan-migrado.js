@@ -141,7 +141,7 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero,fecha_separo,plan_pagos&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
@@ -245,14 +245,19 @@ exports.handler = async (event) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
       const evCat = evPorSlug[String(v.evento_id).split('#')[0]] || null;
       const dsEv = evCat ? PP.dsDeEvento(evCat, v.evento_id) : null;
-      const plan = evRaw ? PP.planDelViaje({
-        total: s ? s.total : null,
-        abonado: s ? s.abonado : 0,
-        ds: dsEv,
-        paquete: v.tipo_paquete,
-        diasAntes: evCat ? evCat.diasAntes : null,
-        ahora,
-      }) : null;
+      // [PLAN-FIJO-1] El rol es FIJO desde la fecha de separo (palabra de
+      // Memo, 4-nov): se arma UNA vez y aquí solo se LEE — lo pagado se aplica
+      // a las cuotas en orden y lo no pagado sale vencido. ⚰️ El plan ya NO se
+      // recalcula desde «hoy» con planDelViaje: eso le cambiaba la cuota al
+      // cliente de un día para otro (caso Sahid, $975 → $1,300). Sin plan fijo
+      // (los migrados del Excel) no se inventa calendario: Bulma/Milk capturan
+      // su fecha de separo en Capsule.
+      const PF = require('./_lib/plan-fijo');
+      const plan = v.plan_pagos
+        ? PF.estadoPlan(v.plan_pagos, { total: s ? s.total : null, abonado: s ? s.abonado : 0, ahora })
+        : (!s || s.total == null || s.total <= 0) ? { estado: 'sin_total', resta: null, cuotas: [] }
+        : (s.resta <= 0) ? { estado: 'liquidado', resta: 0, cuotas: [] }
+        : { estado: 'sin_plan_fijo', resta: s.resta, cuotas: [] };
       return {
         // [PORTAL-EDIT-1] el id y los datos EDITABLES viajan para que el cliente
         // los complete/corrija (portal-viajero vuelve a comprobar que son suyos).

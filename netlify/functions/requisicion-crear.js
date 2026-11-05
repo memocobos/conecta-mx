@@ -286,6 +286,7 @@ exports.handler = async (event) => {
   // ── Comprobante: obligatorio salvo link_pago ──────────────────────────────
   let comprobante_path = null;
   let comprobante_tipo = null;
+  let comprobante_md5 = null;
   const b64 = String(body.comprobante_base64 || '').replace(/^data:[^;]+;base64,/, '');
   if (forma_pago !== 'link_pago' && !b64) {
     return json(400, headers, { ok: false, error: 'Sube la foto de tu comprobante para apartar tu lugar' });
@@ -298,6 +299,17 @@ exports.handler = async (event) => {
     try { buf = Buffer.from(b64, 'base64'); } catch (_) { buf = null; }
     const tipo = tipoPorMagia(buf);
     if (!tipo) return json(400, headers, { ok: false, error: 'El comprobante tiene que ser foto (JPG/PNG) o PDF' });
+    // [COMPROBANTE-DUP-1] Un comprobante YA registrado (vivo: no rechazado) no
+    // vuelve a entrar. Una requisición RECHAZADA que se re-manda con su mismo
+    // pago SÍ pasa (la base no la cuenta). Antes de subir: cero huérfanos.
+    const CH = require('./_lib/comprobante-huella');
+    comprobante_md5 = CH.huella(buf);
+    const dup = await CH.buscarDuplicado({ url: SB_URL, headers: sbH, md5: comprobante_md5 });
+    if (!dup.ok) console.warn('[requisicion-crear] huella sin verificar (entra igual):', dup.error);
+    if (dup.duplicado) {
+      console.warn('[requisicion-crear] comprobante repetido', celular, JSON.stringify(dup.duplicado));
+      return json(409, headers, { ok: false, duplicado: true, error: CH.MSG_RESERVA });
+    }
     const path = `req/${folio}/${require('crypto').randomUUID()}.${tipo.ext}`;
     let up;
     try {
@@ -333,7 +345,7 @@ exports.handler = async (event) => {
     total_sistema: precio.total,
     separo_sistema: precio.separo,
     cotizacion_texto,
-    comprobante_path, comprobante_tipo,
+    comprobante_path, comprobante_tipo, comprobante_md5,
     estado: 'pendiente',
   };
   // Nombre del evento, derivado del catálogo (informativo, best-effort).

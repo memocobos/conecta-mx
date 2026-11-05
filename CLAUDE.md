@@ -188,6 +188,37 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔒⏳ **COMPROBANTE-DUP-1 (5-nov-2026, en main local; la BASE ya escrita): un
+  comprobante YA registrado no vuelve a entrar.** Palabra de Memo: *«claro hazlo,
+  es para evitar estafas»*. Caso que lo destapó: Erik Rivera Cruz (FR 12-ene)
+  subió desde su Portal el MISMO archivo de su separo de $300 (116,549 bytes,
+  eTag idéntico); el 30-oct Cristian Noriega hizo lo mismo y Bulma/Milk lo
+  cazaron a ojo. Hoy `portal-viajero subir_pago` y `requisicion-crear` sacan el
+  md5 de los bytes ANTES de subir (cero huérfanos) y le preguntan a la función
+  `comprobante_duplicado` (acta `migraciones/COMPROBANTE-DUP-1.sql`, YA CORRIDA;
+  solo service_role) → 409 con mensaje GENÉRICO (jamás dice de quién es el otro
+  registro). La huella queda en `cambios_viajero.foto_md5` /
+  `requisiciones.comprobante_md5` y la función también mira el eTag de
+  `storage.objects` (cubre todo lo viejo y lo que el equipo sube en Capsule).
+  🔒 **Lo RECHAZADO y lo anulado en $0 NO cuentan** (COMPROBANTE-DUP-1b, medido
+  antes de encender: 9 requisiciones rechazadas por «zona agotada» se re-mandaron
+  con su mismo pago y se aprobaron — el flujo correcto de RECHAZO-AVISO-1). Un
+  huérfano tampoco bloquea (el reintento de REQ-LENTO-1). 🔒 **Fail-OPEN**: base
+  caída → entra y se registra en el log (lo revisa una persona igual). ⚠️ Lo que
+  NO caza: una foto del mismo ticket re-tomada o re-codificada distinto (otros
+  bytes) — para eso sigue el ojo de Bulma/Milk. ⚠️ Las subidas del EQUIPO en
+  Capsule no se bloquean a propósito (un mismo ticket para un grupo es legítimo:
+  caso Carlos/Damileth). `mide:comprobante-dup-1` **17** (sabotaje al candado →
+  5 rojos → restaurado sha1 `ffeff4d5`). Vecinos verdes: pagos-portal-2 38 ·
+  req-b1 52 · portal-edit-1 31 · portal-solo-1 89 · acomp-2 43 ·
+  ticket-circuito-1 32 · preventa-portal-1 35. ⏳ Push de Memo.
+  **De paso (5-nov):** Jenny Guerrero (R-8K6KZ, FR 12-ene) tecleó mal su correo →
+  viaje, requisición y contrato pasaron a `gcjenny187@gmail.com` (valor esperado
+  en cada WHERE, nota anexada), nueva ficha walk-in del Portal ligada, y
+  `guerrerojenny86@gmail.com` quedó en la lista de supresión de Resend. Sus dos
+  cuentas del Portal sin confirmar (86 y «187» con otro prefijo) no ven nada y no
+  se borraron.
+
 - 📨🗓⏳ **ROL-AVISOS-1 (4-nov-2026, en main local; la bitácora ya escrita): los
   RECORDATORIOS caen en las fechas del ROL FIJO + la tarjeta «🗓 Fijar rol».**
   Palabra de Memo: *«lo de los correos con los recordatorios ya estaba construido

@@ -282,6 +282,17 @@ exports.handler = async (event) => {
       }
     } catch (_) { return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' }); }
 
+    // [COMPROBANTE-DUP-1] Un comprobante YA registrado no vuelve a entrar (caso
+    // Erik: re-subió el de su separo). ANTES de subir nada: cero objetos huérfanos.
+    const CH = require('./_lib/comprobante-huella');
+    const foto_md5 = CH.huella(buf);
+    const dup = await CH.buscarDuplicado({ url: KH_URL, headers: hKH, md5: foto_md5 });
+    if (!dup.ok) console.warn('[portal-viajero] huella sin verificar (entra igual):', dup.error);
+    if (dup.duplicado) {
+      console.warn('[portal-viajero] comprobante repetido', viajero_id, JSON.stringify(dup.duplicado));
+      return json(409, headers, { ok: false, duplicado: true, error: CH.MSG_PORTAL });
+    }
+
     // La foto PRIMERO (sin comprobante no nace la solicitud — el CHECK
     // cambios_viajero_pago_foto lo exige también desde la base).
     const foto_path = `portal/${viajero_id}/${require('crypto').randomUUID()}.${tipoImg.ext}`;
@@ -296,7 +307,7 @@ exports.handler = async (event) => {
     if (!up.ok) return json(502, headers, { ok: false, error: 'No se pudo guardar tu comprobante. Inténtalo otra vez.' });
 
     const detallePago = ('Comprobante subido desde el Portal' + montoTxt + (notaCliente ? ' · «' + notaCliente + '»' : '')).slice(0, 600);
-    const fPago = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'pago', detalle: detallePago, foto_path };
+    const fPago = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'pago', detalle: detallePago, foto_path, foto_md5 };
     const rI = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
       method: 'POST',
       headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),

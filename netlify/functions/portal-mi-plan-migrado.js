@@ -141,7 +141,7 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero,fecha_separo,plan_pagos&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero,fecha_separo,plan_pagos,vuelo&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
@@ -274,6 +274,13 @@ exports.handler = async (event) => {
         // al titular darle su ficha a cada acompañante.
         boletos: Number(v.boletos) || 1,
         grupo_whatsapp: linksWA[v.evento_id] || null,
+        // [VUELO-1] Los datos de su vuelo (aerolínea, horarios, clave). 🔒 El
+        // COSTO no viaja: palabra de Memo, «un solo total» — ya va dentro del
+        // total de arriba y el cliente no ve el desglose.
+        vuelo: (v.vuelo && typeof v.vuelo === 'object') ? {
+          aerolinea: v.vuelo.aerolinea || null, salida: v.vuelo.salida || null,
+          regreso: v.vuelo.regreso || null, clave: v.vuelo.clave || null,
+        } : null,
         paquete: v.tipo_paquete || null,
         zona: v.zona_boleto || null,
         // `null` cuando la fila no trae total: «no sé» dicho con su nombre, en

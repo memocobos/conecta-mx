@@ -2198,6 +2198,9 @@ const khViajeros = {
   // [PLAN-VJ-1] el rol de pagos de un viajero (lo arma el servidor; aquí se pinta)
   planDe(viajero_id) { return this._call({ accion: 'plan_viajero', viajero_id }); },
   planFijar(viajero_id, fecha_separo, separo_monto, reemplazar) { return this._call({ accion: 'plan_fijar', viajero_id, fecha_separo, separo_monto, reemplazar: !!reemplazar }); },
+  // [VUELO-1] el vuelo de un viajero (uno por uno): prellenado de la Nube + guardar
+  vueloPrellenar(viajero_id) { return this._call({ accion: 'vuelo_prellenar', viajero_id }); },
+  vueloGuardar(payload) { return this._call(Object.assign({ accion: 'vuelo_guardar' }, payload)); },
   abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
   // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
@@ -6704,6 +6707,12 @@ function _vj2Pintar() {
           <button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Rol de pagos de ${_esfEsc(v.nombre || '')}: fechas y montos que le faltan, con imagen para mandarle"
             onclick="_vjPlanVer('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🗓 Plan</button>
+          <!-- [VUELO-1] palabra de Memo (pedido de Bulma/Milk): el costo del vuelo se
+               captura en la card del viajero, se suma a su total y se reparte en
+               las cuotas que faltan. -->
+          <button class="btn btn-ghost btn-sm" style="font-size:10px${v.vuelo ? ';color:var(--green);border-color:var(--green)' : ''}"
+            title="${v.vuelo ? 'Vuelo de ' + _esfEsc(v.nombre || '') + ' ($' + Number(v.vuelo.costo || 0).toLocaleString('es-MX') + ' ya en su total)' : 'Agregar el vuelo de ' + _esfEsc(v.nombre || '') + ': se suma a su total y se reparte en sus pagos'}"
+            onclick="_vjVueloAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">✈️ ${v.vuelo ? 'Vuelo ✓' : 'Vuelo'}</button>
           ${khEsPreventaCiegas(v) ? `<button class="btn btn-primary btn-sm" style="font-size:10px"
             title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
             onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
@@ -6901,6 +6910,79 @@ async function _vjPlanVer(id, nombre) {
       <button class="btn btn-ghost btn-sm" onclick="_vjPlanCopiar('${_attrJs(id)}')">📋 Copiar para WhatsApp</button>
     </div>
   </div>`;
+}
+// ── [VUELO-1] ✈️ El vuelo del viajero ─────────────────────────────────────
+// Cinco respuestas de Memo: un solo total (no se le desglosa al cliente) · se
+// reparte en las cuotas que faltan (lo hace la base) · uno por uno · precargado
+// de la Nube voladora, editable o a mano, con aerolínea/horarios/clave · y se le
+// avisa al cliente cada vez. 🔒 La pantalla no suma un peso: manda el costo y
+// el servidor mueve el total por la diferencia.
+async function _vjVueloAbrir(id, nombre) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'vuelo';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'vuelo';
+  const celda = tr.firstElementChild;
+  celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--ts)">Leyendo el vuelo de ${_esfEsc(nombre)} y la Nube voladora…</div>`;
+  let d;
+  try { d = await khViajeros.vueloPrellenar(id); }
+  catch (e) { celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudo leer: ${_esfEsc(e.message)}</div>`; return; }
+  const v = d.vuelo || null, n = d.nube || null;
+  // Precargado: lo que ya tiene; si no tiene vuelo, la Nube vigente (decisión 4).
+  const costo = v ? v.costo : (n ? n.precio : '');
+  const horNube = (!v && n && n.horarios) ? n.horarios : '';
+  const val = (k) => _esfEsc(v && v[k] != null ? String(v[k]) : '');
+  const origen = v ? (v.origen || 'manual') : (n ? 'nube' : 'manual');
+  const tot = d.viajero && d.viajero.total;
+  celda.innerHTML = `<div style="padding:12px;border:1px dashed var(--yellow);border-radius:8px" data-vuelo-origen="${origen}" id="vjv-box-${_attrJs(id)}">
+    <div style="font-weight:800">✈️ Vuelo de ${_esfEsc(nombre)}</div>
+    <div style="font-size:12px;color:var(--ts);margin:2px 0 10px">Total actual del viaje: <b style="color:var(--text)">${tot == null ? 'sin total' : _spFmtMxn(tot)}</b>${v ? ` (ya incluye su vuelo de ${_spFmtMxn(v.costo)})` : ''}. El costo se SUMA a su total y se reparte en los pagos que le faltan; al cliente le llega un correo con un solo total y los datos del vuelo.</div>
+    ${!v && n ? `<div style="font-size:12px;margin-bottom:8px">Precargado de la <b>${_esfEsc(n.fuente)}</b>: ${_spFmtMxn(n.precio)} por persona${n.horarios ? ' · ' + _esfEsc(n.horarios) : ''}. Cámbialo si su vuelo costó otra cosa.</div>` : ''}
+    ${!v && !n ? `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">${_esfEsc(d.nube_error || 'No hay cotización de avión vigente en la Nube para este evento')}: captúralo a mano.</div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <label style="font-size:11px">COSTO DEL VUELO<br><input type="number" min="0" step="1" id="vjv-costo-${_attrJs(id)}" class="input" style="width:120px" value="${_esfEsc(String(costo ?? ''))}" oninput="document.getElementById('vjv-box-${_attrJs(id)}').dataset.vueloOrigen='manual'"></label>
+      <label style="font-size:11px">AEROLÍNEA<br><input type="text" maxlength="80" id="vjv-aer-${_attrJs(id)}" class="input" style="width:140px" value="${val('aerolinea')}" placeholder="Viva, Volaris…"></label>
+      <label style="font-size:11px">CLAVE DE RESERVACIÓN<br><input type="text" maxlength="40" id="vjv-clave-${_attrJs(id)}" class="input" style="width:130px" value="${val('clave')}"></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">
+      <label style="font-size:11px;flex:1;min-width:200px">SALIDA (vuelo, fecha y hora)<br><input type="text" maxlength="200" id="vjv-sal-${_attrJs(id)}" class="input" style="width:100%" value="${v ? val('salida') : _esfEsc(horNube)}" placeholder="VB 1234 · 14 nov 7:05 AM MTY→CDMX"></label>
+      <label style="font-size:11px;flex:1;min-width:200px">REGRESO (vuelo, fecha y hora)<br><input type="text" maxlength="200" id="vjv-reg-${_attrJs(id)}" class="input" style="width:100%" value="${val('regreso')}" placeholder="VB 4321 · 16 nov 9:40 PM CDMX→MTY"></label>
+    </div>
+    <label style="font-size:11px;display:block;margin-top:8px">NOTAS (internas)<br><input type="text" maxlength="300" id="vjv-notas-${_attrJs(id)}" class="input" style="width:100%" value="${val('notas')}"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-primary btn-sm" onclick="_vjVueloGuardar('${_attrJs(id)}','${_attrJs(nombre)}',false)">${v ? 'Guardar cambios' : 'Agregar vuelo'}</button>
+      ${v ? `<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="_vjVueloGuardar('${_attrJs(id)}','${_attrJs(nombre)}',true)">Quitar vuelo</button>` : ''}
+      <span id="vjv-msg-${_attrJs(id)}" style="font-size:12px;align-self:center"></span>
+    </div>
+  </div>`;
+}
+async function _vjVueloGuardar(id, nombre, quitar) {
+  const g = (k) => (document.getElementById(`vjv-${k}-${id}`) || {}).value || '';
+  const msg = document.getElementById(`vjv-msg-${id}`);
+  const box = document.getElementById(`vjv-box-${id}`);
+  const payload = { viajero_id: id };
+  if (quitar) {
+    if (!confirm(`¿Quitar el vuelo de ${nombre}? Su costo sale de su total y se le avisa por correo.`)) return;
+    payload.quitar = true;
+  } else {
+    const c = Number(g('costo'));
+    if (!(c > 0)) { showToast('Pon el costo del vuelo (mayor a 0)', 'error'); return; }
+    Object.assign(payload, { costo: c, aerolinea: g('aer'), clave: g('clave'), salida: g('sal'), regreso: g('reg'), notas: g('notas'),
+      origen: box && box.dataset.vueloOrigen === 'nube' ? 'nube' : 'manual' });
+  }
+  if (msg) { msg.style.color = 'var(--ts)'; msg.textContent = 'Guardando…'; }
+  try {
+    const j = await khViajeros.vueloGuardar(payload);
+    const av = j.aviso || {};
+    const correo = av.ok ? `correo enviado a ${av.enviado}` : `sin correo: ${av.aviso || 'no se pudo'}`;
+    showToast(`✓ Vuelo ${quitar ? 'quitado' : 'guardado'} · total ${_spFmtMxn(j.total_de || 0)} → ${_spFmtMxn(j.total_a || 0)}${j.plan_repartido ? ' · repartido en sus pagos' : ''} · ${correo}`, av.ok ? 'success' : 'warning');
+    await _vj2Cargar();
+  } catch (e) {
+    if (msg) { msg.style.color = 'var(--red)'; msg.textContent = (e && e.message) || 'No se pudo guardar'; }
+  }
 }
 async function _vjPlanFijar(id, nombre, reemplazar) {
   const f = (document.getElementById('vjpf-f-' + id) || {}).value || '';

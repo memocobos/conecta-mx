@@ -133,6 +133,8 @@ const ACCIONES = {
   // [PLAN-VJ-1] El rol de pagos de UN viajero (fechas y montos), solo lectura.
   plan_viajero: ROLES_EDITA_VIAJERO,
   plan_fijar: ROLES_EDITA_VIAJERO,
+  vuelo_prellenar: ROLES_EDITA_VIAJERO, // [VUELO-1] solo LEE (su vuelo + la Nube vigente)
+  vuelo_guardar: ROLES_EDITA_VIAJERO,   // [VUELO-1] costo del vuelo → total → cuotas que faltan + correo
   // [ROL-AVISOS-1] Bandeja «🗓 Fijar rol» (solo LEE) y el ensayo en seco de los
   // recordatorios del rol fijo (solo LEE, jamás manda).
   plan_pendientes: ROLES_EDITA_VIAJERO,
@@ -1363,7 +1365,7 @@ ${entregables}
         });
         return ok(headers, { viajeros, equipo, vista: 'coordi' });
       }
-      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo,portal_revisado_at,portal_revisado_por,fecha_nacimiento` : VE_READ_COLS; // [PORTAL-SOLO-1] el sello del Portal viaja solo a quien ve dinero
+      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo,portal_revisado_at,portal_revisado_por,fecha_nacimiento,vuelo` : VE_READ_COLS; // [PORTAL-SOLO-1] el sello del Portal viaja solo a quien ve dinero · [VUELO-1] el vuelo (trae su costo) también
       const sp = new URLSearchParams();
       sp.set('select', cols);
       sp.append('evento_id', `eq.${evento_id}`);
@@ -2956,6 +2958,124 @@ ${entregables}
       });
     }
 
+
+    // ── [VUELO-1] EL VUELO DE UN VIAJERO, uno por uno ─────────────────────
+    // Palabra de Memo (5-nov, pedido de Bulma y Milk) y sus cinco respuestas:
+    //   1 · UN solo total: el costo del vuelo se SUMA a `total_contrato` y al
+    //       cliente no se le desglosa.
+    //   2 · se reparte entre las cuotas que FALTAN: lo hace el trigger de
+    //       PLAN-FIJO-1 al moverse el total (las cuotas ya empezadas conservan
+    //       su monto). Aquí no se arma ni una cuota.
+    //   3 · siempre uno por uno (esta acción toca UNA fila).
+    //   4 · precargado de la Nube voladora, editable o a mano, y se guardan
+    //       TODOS los datos (aerolínea, salida, regreso, clave).
+    //   5 · se le avisa al cliente de todo: el correo sale SIEMPRE que se pueda.
+    // 🔒 El total se mueve por la DIFERENCIA contra el costo anterior del vuelo
+    // (cambiarlo de 4,000 a 4,500 suma 500, no 4,500), con valor esperado en el
+    // PATCH: si otro escribió el total o el vuelo en medio, 409 sin escribir.
+    if (accion === 'vuelo_prellenar') {
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+      const vr = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,nombre,evento_id,tipo_paquete,total_contrato,vuelo&limit=1`, { headers: sbHeaders });
+      if (!vr.ok) return upstream(headers, await vr.text(), 'consulta');
+      const v = (await vr.json())[0];
+      if (!v) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
+      const slug = String(v.evento_id || '').split('#')[0];
+      let avion = null, nube_error = null;
+      try {
+        const pedir = async (qs) => {
+          const r = await fetch(`${env.KH_SB_URL}/rest/v1/${qs}`, { headers: sbHeaders });
+          if (!r.ok) throw new Error('SB ' + r.status);
+          return r.json();
+        };
+        const nv = await require('./_lib/nube').vigentes(pedir, Date.now(), slug);
+        avion = (nv && nv.avion) || null;
+      } catch (_) { nube_error = 'no se pudo leer la Nube voladora: captura el costo a mano'; }
+      return ok(headers, {
+        ok: true,
+        viajero: { id: v.id, nombre: v.nombre || null, evento_id: v.evento_id, paquete: v.tipo_paquete || null, total: v.total_contrato == null ? null : Number(v.total_contrato) },
+        vuelo: v.vuelo || null,
+        nube: avion ? { precio: Number(avion.precio) || 0, horarios: avion.horarios || null, vigente_hasta: avion.vigente_hasta || null,
+          fuente: avion.heredado ? 'Nube · tarifa general CDMX' : 'Nube · cotización del evento' } : null,
+        nube_error,
+      });
+    }
+
+    if (accion === 'vuelo_guardar') {
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+      const quitar = body.quitar === true;
+      const txt = (k, max) => {
+        const t = String(body[k] == null ? '' : body[k]).replace(/\s+/g, ' ').trim();
+        return t.length > max ? null : t;
+      };
+      let costo = 0, datos = null;
+      if (!quitar) {
+        costo = Number(body.costo);
+        if (!Number.isFinite(costo) || costo <= 0 || costo > 200000) return bad(headers, 'el costo del vuelo tiene que ser un número mayor a 0 (para quitarlo usa «Quitar vuelo»)');
+        costo = Math.round(costo * 100) / 100;
+        const aerolinea = txt('aerolinea', 80), salida = txt('salida', 200), regreso = txt('regreso', 200), clave = txt('clave', 40), notas = txt('notas', 300);
+        if ([aerolinea, salida, regreso, clave, notas].some((x) => x == null)) return bad(headers, 'algún dato del vuelo es demasiado largo');
+        const origen = String(body.origen || '') === 'nube' ? 'nube' : 'manual';
+        datos = { costo, aerolinea: aerolinea || null, salida: salida || null, regreso: regreso || null, clave: clave || null, notas: notas || null, origen };
+      }
+      const pre = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,total_contrato,vuelo,notas,portal_revisado_at&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const v = (await pre.json())[0];
+      if (!v) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
+      const viejo = (v.vuelo && typeof v.vuelo === 'object') ? v.vuelo : null;
+      if (quitar && !viejo) return bad(headers, 'Este viajero no tiene vuelo que quitar.');
+      const costoViejo = viejo ? (Number(viejo.costo) || 0) : 0;
+      const totalViejo = v.total_contrato == null ? null : Number(v.total_contrato);
+      // 🔒 Sin total del paquete NO se suma el vuelo: el total quedaría siendo
+      // SOLO el vuelo y el cliente leería eso como el precio de su viaje.
+      if (!quitar && !(totalViejo > 0)) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Este viaje no trae total de contrato: corrígelo con ✏️ antes de agregar el vuelo.' }) };
+      }
+      const totalNuevo = Math.round(((totalViejo || 0) - costoViejo + costo) * 100) / 100;
+      if (totalNuevo < 0) return { statusCode: 409, headers, body: JSON.stringify({ error: 'El total quedaría negativo: revisa el total del viaje con ✏️.' }) };
+      const mismosDatos = !quitar && viejo && ['costo', 'aerolinea', 'salida', 'regreso', 'clave', 'notas'].every((k) => String(viejo[k] == null ? '' : viejo[k]) === String(datos[k] == null ? '' : datos[k]));
+      if (mismosDatos) return bad(headers, 'No cambiaste nada del vuelo.');
+
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+      const nuevoVuelo = quitar ? null : Object.assign({}, datos, { por: quien, at: new Date().toISOString() });
+      const frase = quitar
+        ? `vuelo QUITADO (era $${costoViejo})`
+        : (viejo ? `vuelo $${costoViejo} → $${costo}` : `vuelo agregado $${costo}`)
+          + (datos.aerolinea ? ` · ${datos.aerolinea}` : '') + (datos.clave ? ` · clave ${datos.clave}` : '');
+      const linea = `[VUELO ${hoyMx}] ${frase} · total $${totalViejo == null ? '—' : totalViejo} → $${totalNuevo} · ${quien}`;
+      const patch = { vuelo: nuevoVuelo, total_contrato: totalNuevo, notas: (v.notas ? v.notas + ' · ' : '') + linea };
+      // Valor esperado: el total y el vuelo que se LEYERON.
+      const fTotal = totalViejo == null ? 'total_contrato=is.null' : `total_contrato=eq.${totalViejo}`;
+      const fVuelo = viejo ? (viejo.at ? `vuelo->>at=eq.${encodeURIComponent(viejo.at)}` : 'vuelo=not.is.null') : 'vuelo=is.null';
+      const pr = await fetch(`${baseVE}?id=eq.${viajero_id}&${fTotal}&${fVuelo}`, {
+        method: 'PATCH', headers: Object.assign({}, sbHeaders, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+        body: JSON.stringify(patch),
+      });
+      if (!pr.ok) return upstream(headers, await pr.text(), 'actualizar');
+      const filas = await pr.json();
+      if (!Array.isArray(filas) || !filas.length) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien cambió el total o el vuelo de este viajero mientras tanto. Recarga y vuelve a intentarlo.' }) };
+      }
+      const f = filas[0];
+      // Decisión 5: se le avisa SIEMPRE que se pueda. Un viaje sin publicar en
+      // el Portal no se avisa (el correo manda a una pantalla que aún no lo
+      // enseña — PRV-EDITA-1a) y se DICE.
+      let aviso;
+      if (!v.portal_revisado_at) aviso = { ok: false, aviso: 'su viaje aún no está publicado en el Portal: no se mandó correo (avísale por WhatsApp o publícalo primero)' };
+      else {
+        aviso = await require('./_lib/correo-ajuste').avisarAjuste({
+          v: f, cambios: [frase], modo: 'vuelo',
+          vuelo: quitar ? { quitado: true } : Object.assign({ nuevo: !viejo }, datos),
+          KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE,
+        });
+      }
+      return ok(headers, {
+        ok: true, vuelo: f.vuelo || null, total_de: totalViejo, total_a: Number(f.total_contrato),
+        plan_repartido: !!f.plan_pagos, aviso,
+      });
+    }
 
     // ── [PLAN-FIJO-1] FIJAR EL ROL DE PAGOS desde una fecha de separo ──────
     // Palabra de Memo (4-nov): los migrados del Excel no tienen fecha de separo

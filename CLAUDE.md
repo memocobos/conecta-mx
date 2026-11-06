@@ -188,6 +188,35 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✈️⏳ **VUELO-1 (5-nov-2026, en main local; la BASE ya escrita): el COSTO DEL
+  VUELO por viajero, uno por uno.** Pedido de Bulma/Milk vía Memo; sus cinco
+  respuestas: (1) UN solo total — el vuelo se suma a `total_contrato` y al
+  cliente NO se le desglosa · (2) se reparte entre las cuotas que FALTAN (lo hace
+  el trigger de PLAN-FIJO-1 al moverse el total; las ya empezadas conservan su
+  monto) · (3) siempre uno por uno · (4) precargado de la Nube voladora (la del
+  evento gana; sin ella la general, rotulada), editable o a mano, y se guardan
+  aerolínea · salida · regreso · clave · notas · (5) se le avisa de TODO.
+  Columna `viajeros_evento.vuelo jsonb` (acta `migraciones/VUELO-1.sql`, YA
+  CORRIDA, CHECK mordido: costo negativo y no-objeto → 23514). Acciones
+  `vuelo_prellenar` (solo lee) y `vuelo_guardar` (roles de siempre): el total se
+  mueve por la DIFERENCIA contra el costo anterior (4,000→4,500 suma 500),
+  valor esperado en el PATCH (`total_contrato` + `vuelo->>at`; carrera → 409),
+  sin total de paquete → 409 (el total no puede quedar siendo solo el vuelo),
+  «Quitar vuelo» resta lo suyo, nota ANEXADA `[VUELO fecha]`. Correo: modo
+  `vuelo` de `_lib/correo-ajuste` (aerolínea/horarios/clave + total único + las
+  cuotas que faltan por `estadoPlan`); viaje sin publicar = sin correo, DICHO.
+  Portal: «✈️ Tu vuelo» en la card (sin costo — el costo ni viaja). Capsule:
+  botón **✈️ Vuelo** en la fila del viajero (verde «Vuelo ✓» si ya tiene), mismo
+  renglón plegable. `mide:vuelo-1` **39** (handler real + trigger por su espejo
+  `rerepartir`, con candado de cuotas ya empezadas; sabotaje «sumar el costo
+  completo» → 3 rojos → restaurado sha1 `64b6408d`). Vecinos verdes: plan-vj-1
+  35 · plan-fijo-1 25 · plan-pagos-1 81 · viajero-edita-1 67 · capsule-ux-1 83
+  · capsule-ux-2 46 · portal-solo-1 89 · portal-edit-1 31 · preventa-portal-1
+  35 · nube-4 74 · rol-avisos-1 28 · pagos-portal-2 38 · fecha-correo-1 39 ·
+  ticket-circuito-1 32 · cancelar-lugar-1 51. ⚠️ No verificado en navegador
+  (careado en vm). ⚠️ «En las cuentas» (Cobranza) NO se tocó: el botón vive en
+  la card del viajero de Capsule. ⏳ Push de Memo → Bulma/Milk recargan.
+
 - 🌙⏳ **SOYLUNA-DIC-1 (5-nov-2026, la FICHA ya escrita): Soy Luna «El último
   show» NUEVA FECHA 8-dic.** Palabra de Memo: PLUS = costo + $2,200 · CHEAP =
   costo + $600. Ficha NUEVA `soylunadic` (la vieja `soyluna` del 21-oct se queda

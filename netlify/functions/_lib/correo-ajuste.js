@@ -33,17 +33,24 @@ const WA = '528119771072';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 
-// `modo`: 'ajuste' (se corrigió algo de su viaje) · 'mudanza' (cambió de fecha).
+// `modo`: 'ajuste' (se corrigió algo de su viaje) · 'mudanza' (cambió de fecha) · 'vuelo' [VUELO-1].
 // [ZONA-AVISO-1] `zona` = { de, a, totalCambio } cuando el ajuste MOVIÓ su zona
 // (palabra de Memo, 30-oct: «establécelo para siempre que se corrija una zona …
 // en preventas o ventas calientes nos funciona mucho»). Las dos zonas las da el
 // editor (lo que el PATCH escribió), no se recalculan aquí.
-function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios, cuenta, nota, zona }) {
+// [VUELO-1] modo 'vuelo': `vuelo` = { aerolinea, salida, regreso, clave, quitado,
+// nuevo } y `cuotas` = las cuotas que le FALTAN (de `estadoPlan`, el dueño).
+// 🔒 Palabra de Memo (decisión 1): UN SOLO TOTAL — el costo del vuelo NO se
+// desglosa al cliente; se dicen sus datos (aerolínea, horarios, clave) y su
+// total nuevo.
+function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios, cuenta, nota, zona, vuelo, cuotas }) {
   const primer = (String(nombre || '').trim().split(/\s+/)[0]) || 'Hola';
   const esMudanza = modo === 'mudanza';
-  const esZona = !esMudanza && zona && zona.a;
+  const esVuelo = modo === 'vuelo' && vuelo;
+  const esZona = !esMudanza && !esVuelo && zona && zona.a;
   const subject = esMudanza
     ? `Tu viaje cambió de fecha · ${evento}`
+    : esVuelo ? (vuelo.quitado ? `Actualizamos tu vuelo · ${evento}` : (vuelo.nuevo ? `Ya está tu vuelo · ${evento}` : `Actualizamos tu vuelo · ${evento}`))
     : (esZona ? `Tu lugar cambió de zona · ${evento}` : `Actualizamos tu viaje · ${evento}`);
   const celda = 'padding:8px 10px;border-bottom:1px solid #333333;color:#ffffff;font-size:14px';
   const fila = (a, b) => `<tr><td style="${celda};color:#b3b3b3">${esc(a)}</td><td style="${celda};text-align:right"><b style="color:#ffffff">${b}</b></td></tr>`;
@@ -51,12 +58,27 @@ function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios
   // ANEXADA en sus notas: lo que el cliente lee y lo que el equipo ve coinciden.
   // En el aviso de zona, la zona se dice en su propio recuadro: la frase cruda
   // «zona «X» → «Y»» no se repite en la lista.
-  const lista = (Array.isArray(cambios) ? cambios : []).filter(Boolean)
+  const lista = esVuelo ? [] : (Array.isArray(cambios) ? cambios : []).filter(Boolean)
     .filter((c) => !(esZona && /^zona «/.test(c)));
   const bloqueCambios = lista.length
     ? `<ul style="margin:0 0 18px;padding-left:20px;color:#ffffff">${lista.map((c) => `<li style="margin:0 0 6px">${esc(c)}</li>`).join('')}</ul>`
     : '';
-  const encabezado = esMudanza
+  const filaV = (a, b) => b ? fila(a, esc(b)) : '';
+  const bloqueVuelo = !esVuelo ? '' : vuelo.quitado
+    ? `<p style="margin:0 0 14px;color:#ffffff">Quitamos el vuelo de tu viaje a <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''} y tu total se actualizó.</p>`
+    : `<p style="margin:0 0 14px;color:#ffffff">${vuelo.nuevo ? 'Agregamos tu vuelo' : 'Actualizamos tu vuelo'} para <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Ya va incluido en el total de tu viaje:</p>
+       <table style="width:100%;border-collapse:collapse;margin:0 0 18px;border:1px solid #333333">
+         ${filaV('✈️ Aerolínea', vuelo.aerolinea)}
+         ${filaV('Salida', vuelo.salida)}
+         ${filaV('Regreso', vuelo.regreso)}
+         ${filaV('Clave de reservación', vuelo.clave)}
+       </table>`;
+  const listaCuotas = (esVuelo && Array.isArray(cuotas) ? cuotas : []).filter((c) => c && Number(c.falta) > 0);
+  const bloqueCuotas = listaCuotas.length
+    ? `<p style="margin:0 0 8px;color:#ffffff">Tus pagos que faltan quedaron así:</p>
+       <table style="width:100%;border-collapse:collapse;margin:0 0 18px">${listaCuotas.map((c) => fila((c.lbl || ('Pago ' + c.n)) + (c.estado === 'vencida' ? ' · vencido' : ''), mxn(c.falta))).join('')}</table>`
+    : '';
+  const encabezado = esVuelo ? bloqueVuelo : esMudanza
     ? `<p style="margin:0 0 14px;color:#ffffff">Tu lugar en <b style="color:#e8ff4c">${esc(evento)}</b> se movió${fechaAntes ? ' de <b>' + esc(fechaAntes) + '</b>' : ''}${fecha ? ' a <b style="color:#e8ff4c">' + esc(fecha) + '</b>' : ''}. <b>Tu dinero se fue contigo completo</b>: no se perdió ningún pago.</p>`
     : esZona
       ? `<p style="margin:0 0 14px;color:#ffffff">Hicimos un ajuste en tu lugar para <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Tu boleto ahora es en otra zona:</p>
@@ -72,7 +94,7 @@ function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000000;color:#ffffff">
         <div style="background:#e8ff4c;color:#000000;padding:18px 22px;border-bottom:4px solid #ff283b">
           <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#000000">Conecta Reynosa · ${esc(evento)}</div>
-          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, ${esMudanza ? 'tu viaje cambió de fecha' : (esZona ? 'tu lugar cambió de zona' : 'actualizamos tu viaje')}</div>
+          <div style="font-size:24px;font-weight:900;margin-top:4px;color:#000000">${esc(primer)}, ${esMudanza ? 'tu viaje cambió de fecha' : esVuelo ? (vuelo.quitado || !vuelo.nuevo ? 'actualizamos tu vuelo' : 'ya está tu vuelo') : (esZona ? 'tu lugar cambió de zona' : 'actualizamos tu viaje')}</div>
         </div>
         <div style="padding:22px;font-size:15px;line-height:1.6;color:#ffffff">
           ${encabezado}
@@ -83,6 +105,7 @@ function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios
             ${fila('Lo que llevas pagado', mxn(cuenta.abonado))}
             ${fila('Te falta', mxn(Math.max(0, cuenta.resta)))}
           </table>
+          ${bloqueCuotas}
           <p style="margin:0 0 20px;color:#ffffff">En tu <b>Portal</b> ves tu plan de pagos al día, con las fechas de cada quincena.</p>
           <p style="margin:0 0 12px;text-align:center"><a href="${PORTAL}" style="display:inline-block;background:#e8ff4c;color:#000000;font-weight:800;text-decoration:none;padding:14px 26px;border-radius:8px;font-size:15px">Ver mi plan en el Portal →</a></p>
           <p style="margin:18px 0 0;font-size:13px;color:#b3b3b3">Entra con este mismo correo (<span style="color:#e8ff4c">${esc(correo)}</span>). Si algo no cuadra, escríbenos al <a href="https://wa.me/${WA}" style="color:#e8ff4c">81 1977 1072</a> y lo revisamos.</p>
@@ -96,7 +119,7 @@ function renderAjuste({ modo, nombre, correo, evento, fecha, fechaAntes, cambios
 //   cambios  : las frases que el editor acabó de anexar a sus notas
 //   modo     : 'ajuste' | 'mudanza'
 //   fechaAntes: solo en mudanza — el texto de la fecha de donde venía
-async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, zona, KH_URL, KH_KEY }) {
+async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, zona, vuelo, KH_URL, KH_KEY }) {
   const out = { ok: false, enviado: null, aviso: null };
   try {
     if (!v) return Object.assign(out, { aviso: 'sin viajero' });
@@ -128,9 +151,18 @@ async function avisarAjuste({ v, cambios, modo, fechaAntes, nota, zona, KH_URL, 
     }
     const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
     if (!RESEND_KEY) return Object.assign(out, { aviso: 'falta RESEND_API_KEY: avísale por WhatsApp' });
+    // [VUELO-1] las cuotas que le faltan, por el dueño del rol fijo (el trigger
+    // ya las re-repartió al mover el total). Sin plan fijo no se pinta lista.
+    let cuotas = null;
+    if (modo === 'vuelo' && v.plan_pagos) {
+      try {
+        const ep = require('./plan-fijo').estadoPlan(v.plan_pagos, { total: cuenta.total, abonado: cuenta.abonado, ahora: new Date() });
+        cuotas = ep && Array.isArray(ep.cuotas) ? ep.cuotas : null;
+      } catch (_) { cuotas = null; }
+    }
     const r = renderAjuste({
       modo, nombre: v.nombre, correo, evento: evNombre, fecha: evFecha, fechaAntes,
-      cambios, cuenta, nota, zona,
+      cambios, cuenta, nota, zona, vuelo, cuotas,
     });
     const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
     const resp = await fetch('https://api.resend.com/emails', {

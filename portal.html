@@ -3399,7 +3399,7 @@ async function renderPlanMigrado(){
         + '<div class="mig-body">'
         + '<div style="font-size:12px;opacity:.7;margin-bottom:10px">'
         + escapeHtml([t.nombre, (t.zona === 'Preventa a ciegas' ? null : String(t.paquete || '').toUpperCase()), t.zona].filter(Boolean).join(' · ') || '—') + '</div>'
-        + cuenta + _migMediaHtml(t) + _migPagosHtml(t) + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div></div>';
+        + cuenta + _migMediaHtml(t) + _migVueloHtml(t) + _migPagosHtml(t) + _migGrupoHtml(t) + _migPaqHtml(t) + _migCtrHtml(t) + _migAcompHtml(t) + _migDatosHtml(t) + '</div></div>';
     }).join('');
 
     cont.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px">'
@@ -3704,6 +3704,17 @@ function _migPagosHtml(t){
     + lista + nota + comoPago + mandaComp + hist);
 }
 
+// [VUELO-1] Los datos de su vuelo. Sin costo a propósito (palabra de Memo:
+// «un solo total» — el vuelo ya va dentro del total de arriba).
+function _migVueloHtml(t){
+  const v = t && t.vuelo;
+  if (!v || !(v.aerolinea || v.salida || v.regreso || v.clave)) return '';
+  const fila = (a, b) => b ? '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px"><span style="opacity:.7">' + a + '</span><b style="text-align:right">' + escapeHtml(b) + '</b></div>' : '';
+  return '<div style="margin:14px 0 2px;padding:14px;border:1px solid rgba(232,255,76,.35);border-radius:12px">'
+    + '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;margin-bottom:8px">✈️ Tu vuelo</div>'
+    + fila('Aerolínea', v.aerolinea) + fila('Salida', v.salida) + fila('Regreso', v.regreso) + fila('Clave de reservación', v.clave)
+    + '<div style="font-size:11px;opacity:.6;margin-top:8px">Ya va incluido en el total de tu viaje.</div></div>';
+}
 function _migGrupoHtml(t){
   const l = String(t.grupo_whatsapp || '');
   if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/.test(l)) return '';

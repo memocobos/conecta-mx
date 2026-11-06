@@ -143,6 +143,7 @@
     "mide:plan-vj-1": "node scripts/mide-plan-vj-1.js",
     "mide:alta-gen-hab-1": "node scripts/mide-alta-gen-hab-1.js",
     "mide:plan-fijo-1": "node scripts/mide-plan-fijo-1.js",
+    "mide:vuelo-1": "node scripts/mide-vuelo-1.js",
     "mide:rol-avisos-1": "node scripts/mide-rol-avisos-1.js",
     "mide:comprobante-dup-1": "node scripts/mide-comprobante-dup-1.js"
   }

@@ -188,6 +188,16 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔔⏳ **WL-DUP-1 (6-nov-2026, en main local, cero SQL): el «Avísame» ya no
+  dice «No pudimos registrarte» a quien YA está en la lista.** Caso Jessica
+  (Ozzfest): su 1er intento 10:17 dio 200 y quedó registrada; los 4 siguientes
+  (10:22-10:26) dieron 502. Causa: `resolution=ignore-duplicates` sin
+  `on_conflict` apunta a la PK (`id`), así que el duplicado chocaba con
+  `idx_wl_unique (evento_id,email)` → 409/23505 → 502. Hoy INSERT directo y el
+  23505 se CONFIRMA por el nombre del índice → «Ya estás en la lista»; otro
+  índice o base caída siguen en 502. Medido: 8 de 24 llamadas de la semana
+  fueron 502. `mide:wl-dup-1` **6** (código viejo → 3 rojos). ⏳ Push de Memo.
+
 - 👤⏳ **VJ-CONTACTO-1 (5-nov-2026, en main local, cero SQL): el ✏️ Corregir de
   Capsule trae CONTACTO Y EMERGENCIA.** Palabra de Memo: *«en el botón de
   corregir en Capsule quiero tener la información de corregir también a los

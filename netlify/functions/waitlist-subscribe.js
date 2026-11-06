@@ -48,28 +48,34 @@ exports.handler = async function (event) {
   if (!nombre)        return bad(H, 400, "nombre requerido");
   if (!email || !EMAIL_RE.test(email)) return bad(H, 400, "email inválido");
 
-  // PostgREST: header 'Prefer: resolution=ignore-duplicates' hace que el
-  // unique index (evento_id, email) descarte el insert duplicado sin fallar.
+  // [WL-DUP-1 · 6-nov-2026] INSERT directo. ⚰️ Antes iba con
+  // 'Prefer: resolution=ignore-duplicates', y eso NO hacía lo que prometía:
+  // sin on_conflict, PostgREST usa la PRIMARY KEY (id) como blanco del
+  // conflicto, así que el duplicado chocaba con idx_wl_unique (evento_id,email),
+  // la base contestaba 409/23505 y esto devolvía 502 → el modal decía «No
+  // pudimos registrarte» a quien YA estaba en la lista (caso Jessica, Ozzfest:
+  // 1er intento 200, los 4 siguientes 502). Hoy el 23505 de ESE índice se
+  // CONFIRMA por su nombre y se contesta «ya estás en la lista».
   const res = await fetch(`${SB_URL}/rest/v1/eventos_waitlist`, {
     method: "POST",
     headers: {
       apikey:        SB_KEY,
       Authorization: `Bearer ${SB_KEY}`,
       "Content-Type": "application/json",
-      Prefer:        "return=representation,resolution=ignore-duplicates",
+      Prefer:        "return=minimal",
     },
     body: JSON.stringify({ evento_id, evento_nombre, nombre, email }),
   });
 
   if (!res.ok) {
     const detail = await res.text();
+    // Duplicado confirmado: el código 23505 Y el índice (evento_id,email).
+    if (res.status === 409 && /23505/.test(detail) && /idx_wl_unique/.test(detail)) {
+      return ok(H, { ok: true, already: true, new: false, nombre });
+    }
     console.error("[waitlist-subscribe] SB error:", res.status, detail);
     return bad(H, 502, "Supabase insert failed");
   }
 
-  // Cuando es duplicado, PostgREST devuelve un array vacío.
-  const rows = await res.json().catch(() => []);
-  const already = !Array.isArray(rows) || rows.length === 0;
-
-  return ok(H, { ok: true, already, new: !already, nombre });
+  return ok(H, { ok: true, already: false, new: true, nombre });
 };

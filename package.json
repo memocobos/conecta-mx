@@ -146,6 +146,7 @@
     "mide:vuelo-1": "node scripts/mide-vuelo-1.js",
     "mide:vj-contacto-1": "node scripts/mide-vj-contacto-1.js",
     "mide:rol-avisos-1": "node scripts/mide-rol-avisos-1.js",
-    "mide:comprobante-dup-1": "node scripts/mide-comprobante-dup-1.js"
+    "mide:comprobante-dup-1": "node scripts/mide-comprobante-dup-1.js",
+    "mide:wl-dup-1": "node scripts/mide-wl-dup-1.js"
   }
 }

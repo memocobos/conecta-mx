@@ -109,7 +109,8 @@ const ev = (b, t) => ({ httpMethod: 'POST', headers: { origin: 'https://conectar
   // [REQ-2027-1] La lista creció con NSQK-PREVENTA-1 (26-oct) y este renglón se
   // quedó diciendo «solo palnorte» — rojo pre-existente, actualizado a la verdad.
   // [DONOMAR-PREVENTA-1, 4-nov] la lista ganó a donomar (tercera preventa, palabra de Memo).
-  af(JSON.stringify(H.lib.EVENTOS_CORREO) === JSON.stringify(['palnorte', 'nsqkmty', 'donomar']), '[E1] eventos con correo en TODO momento: palnorte, nsqkmty y donomar (palabra de Memo)');
+    // [SOYLUNA-DIC-1, 5-nov] ganó soylunadic: venta normal 2026 por requisición (palabra de Memo).
+  af(JSON.stringify(H.lib.EVENTOS_CORREO) === JSON.stringify(['palnorte', 'nsqkmty', 'donomar', 'soylunadic']), '[E1] eventos con correo en TODO momento: palnorte, nsqkmty, donomar y soylunadic (palabra de Memo)');
   const rr = H.lib.renderConfirmacion({ tipo: 'reserva', correo: 'a@b.mx', ev: null, nombres: ['A'], recibido: 1 });
   af(!!rr.error, '[E2] sin catálogo no hay correo (no se manda «tu viaje» sin decir cuál)');
   af(!st.log.some((l) => l.startsWith('DELETE')), '[E3] cero DELETEs');

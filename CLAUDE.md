@@ -188,6 +188,20 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🌙⏳ **SOYLUNA-DIC-1 (5-nov-2026, la FICHA ya escrita): Soy Luna «El último
+  show» NUEVA FECHA 8-dic.** Palabra de Memo: PLUS = costo + $2,200 · CHEAP =
+  costo + $600. Ficha NUEVA `soylunadic` (la vieja `soyluna` del 21-oct se queda
+  como pasado con su historia), molde `soyluna` (venue, mapa, portada, sep 300,
+  ride 2700), 23 zonas abiertas sin pedido (venden a ciegas hasta cargar el
+  pedido). Acta `migraciones/SOYLUNA-DIC-1.sql`. Código: `REQUISICION_EVENTOS` y
+  `EVENTOS_CORREO` ganaron soylunadic (careado: confirma-1 28 · req-2027-2 22 ·
+  req-b1 52 · acomp-1 76; preventa-pn27 trae su rojo PREEXISTENTE de «red fuera
+  del guion», idéntico en HEAD). Verificado por compilarEV + _calcularPrecio.
+  🔒⏳ Push de Memo PRIMERO → publish de Esferas DESPUÉS → /soylunadic.
+  **De paso (5-nov):** cortesías de 11 creadoras y zonas de 12 coordis asignadas
+  por SQL con su palabra (contratos sellados; los «vendidos fuera» de 2 que eran
+  ellas pasaron a sus filas); Melissa Julet se mudó de frontera#1 a frontera#2.
+
 - 🔒⏳ **COMPROBANTE-DUP-1 (5-nov-2026, en main local; la BASE ya escrita): un
   comprobante YA registrado no vuelve a entrar.** Palabra de Memo: *«claro hazlo,
   es para evitar estafas»*. Caso que lo destapó: Erik Rivera Cruz (FR 12-ene)

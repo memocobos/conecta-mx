@@ -136,7 +136,8 @@ const de = (n) => DB.v.find((x) => x.id === U(n));
 
   console.log('\n[B] el semáforo');
   const comp = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-compras.js'), 'utf8');
-  af(/semaforo:\s*\[\.\.\.ROLES_STOCK,\s*'milk'\]/.test(comp), 'Milk LEE el semáforo');
+  // [YAJIROBE-1] la lista ganó a yajirobe (su ayudante en Capsule): la aserción mide que milk SIGUE ahí, no la lista literal.
+  af(/semaforo:\s*\[\.\.\.ROLES_STOCK,\s*'milk'[\],]/.test(comp), 'Milk LEE el semáforo');
   af(/ajuste_guardar:\s*ROLES_STOCK\b/.test(comp) && /ROLES_STOCK = \['maestro_roshi', 'bulma'\]/.test(comp), 'capturar vendidos_fuera sigue solo roshi/bulma');
 
   console.log('\n[C] la pantalla');

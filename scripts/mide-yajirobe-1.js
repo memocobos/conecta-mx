@@ -1,0 +1,127 @@
+#!/usr/bin/env node
+// =============================================================================
+// mide-yajirobe-1.js — [YAJIROBE-1 · 6-nov-2026]
+// Palabra de Memo: «un perfil similar a bulma o milk pero para Yajirobe, para
+// que se dedique a ayudar a milk a ingresar viajeros, revisar capsule corps y
+// requisiciones». Sus respuestas: aprueba/rechaza requisiciones; en Capsule
+// registra abonos, corrige el viaje, cancela lugares y elimina viajeros.
+//   [A] servidor por los handlers REALES con rol VIVO yajirobe: le abren las
+//       puertas de su trabajo y le cierran las del dinero de la casa.
+//       Control positivo: un rol inexistente rebota en las mismas puertas.
+//   [B] KameHouse: sus pantallas, su aterrizaje, sus gemelos de listas.
+//   [C] la base: el CHECK del acta = ROLES_VALIDOS del servidor, y Montaña Pai
+//       ofrece los mismos roles (si no, editar a alguien lo cambia de rol).
+// SIN ANCLA a propósito (árbol de trabajo).
+// =============================================================================
+const path = require('path');
+const fs = require('fs');
+const vm = require('vm');
+const RAIZ = path.join(__dirname, '..');
+process.env.JWT_SECRET = 'secreto-de-arnes';
+process.env.SUPABASE_URL_KAMEHOUSE = 'https://kh.falso.test';
+process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE = 'svc';
+process.env.PORTAL_SUPABASE_URL = 'https://portal.falso.test';
+process.env.PORTAL_SUPABASE_SERVICE_KEY = 'svc';
+process.env.CORREOS_MODO = 'real';
+process.env.CONTRATO_CLIENTE_APAGAR_ARNES = '1';
+
+let V = 0, R = 0;
+const af = (c, m) => { let ok = false; try { ok = !!(typeof c === 'function' ? c() : c); } catch (_) {}
+  const t = typeof m === 'function' ? (() => { try { return m(); } catch (e) { return '(msg) ' + e.message; } })() : m;
+  if (ok) { V++; console.log('  ✓ ' + t); } else { R++; console.log('  ✗ ' + t); } };
+const resp = (s, b) => ({ ok: s < 300, status: s, json: async () => b, text: async () => JSON.stringify(b), headers: { get: () => null } });
+
+let ROL_VIVO = 'yajirobe';
+global.fetch = async (url) => {
+  const u = decodeURIComponent(String(url));
+  if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u-' + ROL_VIVO, activo: true, rol: ROL_VIVO, sesion_desde: null, sesiones_cerradas_at: null }]);
+  return resp(200, []);
+};
+const { jwtSign } = require(path.join(RAIZ, 'netlify/functions/_lib/verify-admin.js'));
+async function llamar(fn, body, rol) {
+  ROL_VIVO = rol;
+  for (const k of Object.keys(require.cache)) if (k.includes('/netlify/functions/') && !k.includes('verify-admin')) delete require.cache[k];
+  const H = require(path.join(RAIZ, 'netlify/functions', fn + '.js')).handler;
+  // La sesión viva se cachea POR USUARIO dentro de verify-admin: un id por rol, o el
+  // control positivo heredaría el rol vivo del primer llamado (pasó en la 1ª corrida).
+  const jw = jwtSign({ id: 'u-' + rol, rol, correo: 'y@x.mx', nombre: 'Yajirobe' }, process.env.JWT_SECRET, 3600);
+  let r;
+  try { r = await H({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + jw }, body: JSON.stringify(body), queryStringParameters: {} }); }
+  catch (e) { return { s: 'TRONÓ', err: e.message }; }
+  let j = {}; try { j = JSON.parse(r.body || '{}'); } catch (_) {}
+  return { s: r.statusCode, j };
+}
+const sinPermiso = (r) => r.s === 403 && /sin permiso|no autorizado|permiso/i.test(r.j.error || '');
+
+(async () => {
+  console.log('[A] servidor — las puertas de su trabajo, abiertas');
+  const ABIERTAS = [
+    ['admin-requisiciones', { accion: 'listar', estado: 'pendiente' }, 'bandeja de requisiciones'],
+    ['admin-coordi-asignaciones', { accion: 'capsule_resumen' }, 'Capsule (resumen)'],
+    ['admin-coordi-asignaciones', { accion: 'abono_crear' }, '➕ Abono'],
+    ['admin-coordi-asignaciones', { accion: 'viajero_editar_full' }, '✏️ Corregir viaje'],
+    ['admin-coordi-asignaciones', { accion: 'viajero_cancelar' }, '⛔ Cancelar lugar'],
+    ['admin-coordi-asignaciones', { accion: 'viajero_eliminar' }, 'eliminar viajero'],
+    ['admin-coordi-asignaciones', { accion: 'viajero_migrar' }, 'alta manual'],
+    ['admin-portal-revision', { accion: 'listar' }, 'tarjetas 🪪 del Portal'],
+    ['admin-rooming', { accion: 'listar', evento_id: 'karolg#0' }, 'Rooming'],
+    ['admin-rooming-grupos', { accion: 'listar', evento_id: 'karolg#0' }, 'grupos del rooming'],
+    ['admin-transporte', { accion: 'listar', evento_id: 'karolg#0' }, 'Transporte'],
+    ['admin-compras', { accion: 'semaforo', evento_id: 'karolg#0' }, 'marcador de boletos por zona'],
+  ];
+  for (const [fn, body, que] of ABIERTAS) {
+    const r = await llamar(fn, body, 'yajirobe');
+    af(r.s !== 'TRONÓ' && !sinPermiso(r) && r.s !== 401, () => `${que} (${fn}/${body.accion}) le abre: ${r.s} ${r.j.error || r.err || ''}`);
+    const c = await llamar(fn, body, 'rol_inventado');
+    af(sinPermiso(c), () => `control: un rol inventado rebota en ${que}: ${c.s}`);
+  }
+
+  console.log('[A2] servidor — el dinero de la casa, cerrado');
+  const CERRADAS = [
+    ['admin-coordi-asignaciones', { accion: 'crear' }, 'asignar coordis a un evento'],
+    ['admin-cuenta-evento', { evento_id: 'karolg' }, 'Números del evento'],
+    ['admin-utilidad-evento', {}, 'Resumen / utilidad'],
+    ['admin-compras', { accion: 'listar' }, 'pedidos de boletos'],
+    ['admin-gasto-crear', { monto: 1 }, 'capturar gastos'],
+    ['admin-saldos', {}, 'saldos'],
+    ['admin-excel-aplicar', { evento_id: 'karolg#0' }, 'careo del Excel'],
+    ['esferas-publicar', {}, 'publicar Esferas'],
+  ];
+  for (const [fn, body, que] of CERRADAS) {
+    if (!fs.existsSync(path.join(RAIZ, 'netlify/functions', fn + '.js'))) { af(false, `${fn} no existe`); continue; }
+    const r = await llamar(fn, body, 'yajirobe');
+    af(sinPermiso(r), () => `${que} (${fn}) le dice que no: ${r.s} ${r.j.error || r.err || ''}`);
+  }
+  const inv = await llamar('admin-usuarios', { accion: 'crear', rol: 'yajirobe', nombre: 'X', correo: 'x@x.mx' }, 'bulma');
+  af(inv.s === 403, () => 'solo Maestro Roshi crea un Yajirobe (bulma → 403): ' + inv.s);
+
+  console.log('[B] KameHouse');
+  const kj = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
+  const sacar = (nombre) => { const i = kj.indexOf('const ' + nombre + ' = '); const j = kj.indexOf('\n};', i); return vm.runInNewContext('(' + kj.slice(kj.indexOf('{', i), j + 2) + ')'); };
+  const PT = sacar('PERMISOS_TABS');
+  af(JSON.stringify(PT.yajirobe) === JSON.stringify(['requisiciones', 'capsule', 'equipo']), () => 'sus pantallas: ' + JSON.stringify(PT.yajirobe));
+  const DINERO = ['resumen', 'gastos', 'ingresos', 'saldos', 'inventario', 'reportes', 'kamisama', 'radar', 'montana', 'yamcha', 'esferas', 'herramientas', 'cotizador', 'nube'];
+  af(!DINERO.some((t) => PT.yajirobe.includes(t)), 'ninguna pantalla del dinero de la casa');
+  const HP = sacar('HOME_PREFERIDO');
+  af(HP.yajirobe === 'requisiciones' && PT.yajirobe.includes(HP.yajirobe), 'aterriza en Requisiciones (y la puede ver)');
+  af(JSON.stringify(sacar('GZ_TABS_PERMITIDAS').yajirobe) === '["miperfil"]', 'en Guerreros Z solo su perfil');
+  af(/const VJ_ROLES_ALTA = \[[^\]]*'yajirobe'/.test(kj) && /const VJ_ROLES_ELIMINAR = \[[^\]]*'yajirobe'/.test(kj), 'alta y eliminar viajero: gemelos con yajirobe');
+  af(/const CC_SUB_OCULTAS = \{ yajirobe: \['numeros'\] \}/.test(kj), 'la sub-pestaña Números se le esconde');
+  af(/CC_SUB_POR_ROL = \{[^}]*yajirobe: 'viajeros'/.test(kj), 'en Capsule abre en Viajeros');
+  const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');
+  af(/<option value="yajirobe">/.test(html), 'se puede invitar desde Guerreros Z');
+
+  console.log('[C] la base y Montaña Pai');
+  const acta = fs.readFileSync(path.join(RAIZ, 'migraciones/YAJIROBE-1.sql'), 'utf8');
+  const delActa = (acta.match(/array\[([^\]]+)\]/) || [])[1].split(',').map((x) => x.trim().replace(/'/g, '')).sort();
+  const us = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-usuarios.js'), 'utf8');
+  const validos = vm.runInNewContext(us.match(/const ROLES_VALIDOS = (\[[^\]]+\])/)[1]).sort();
+  af(JSON.stringify(delActa) === JSON.stringify(validos), () => 'CHECK del acta = ROLES_VALIDOS: ' + delActa.join(','));
+  const mt = fs.readFileSync(path.join(RAIZ, 'kamehouse-montana.js'), 'utf8');
+  const opts = vm.runInNewContext(mt.match(/const rolOpts = (\[[^\]]+\])/)[1]).sort();
+  af(JSON.stringify(opts) === JSON.stringify(validos), () => 'Montaña Pai ofrece los mismos roles (si falta uno, editar a esa persona la cambia de rol): ' + opts.join(','));
+  af(/if \(u\.rol && !rolOpts\.includes\(u\.rol\)\) rolOpts\.push\(u\.rol\)/.test(mt), 'un rol que no esté en la lista se agrega: el select nace en el rol real');
+
+  console.log(`\n${R ? '🔴' : '✅'} ${V} en verde · ${R} en rojo`);
+  process.exit(R ? 1 : 0);
+})();

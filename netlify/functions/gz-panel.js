@@ -27,7 +27,7 @@ const { gruposDe, baseSlug } = require('./_lib/grupo-whatsapp');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]{1,120}$/;
-const ROLES = ['coordinador', 'cc', 'mister_popo', 'maestro_roshi', 'bulma', 'milk'];
+const ROLES = ['coordinador', 'cc', 'mister_popo', 'maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);

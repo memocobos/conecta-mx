@@ -76,7 +76,7 @@ function aplicarPermisosUI() {
   if (selInv) {
     const soloRoshi = rol === 'maestro_roshi';
     Array.from(selInv.options).forEach(opt => {
-      if (opt.value === 'bulma' || opt.value === 'milk') {
+      if (opt.value === 'bulma' || opt.value === 'milk' || opt.value === 'yajirobe') {
         opt.hidden = !soloRoshi;
         opt.disabled = !soloRoshi;
       }
@@ -534,7 +534,7 @@ async function loadMTResumen() {
     ]);
     const porRol = {};
     usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC' };
 
     el.innerHTML = `
       <!-- Métricas rápidas -->
@@ -596,7 +596,7 @@ function filtrarMTUsuarios() {
 function renderMTUsuarios(lista) {
   const list = document.getElementById('mt-usuarios-list');
   if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   list.innerHTML = lista.map(u => `
     <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
@@ -677,8 +677,14 @@ async function abrirEditarUsuarioMT(id) {
   }
   // Source of truth para guardarUsuarioMT — no dependemos de un input hidden.
   _mtEditandoUserId = u.id;
-  const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc'];
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+  // [YAJIROBE-1] La lista NO traía a milk: al editar a Milk el select nacía en
+  // la PRIMERA opción («Maestro Roshi») porque ninguna casaba con su rol, y
+  // «Guardar» la subía a roshi sin que nadie lo eligiera. Hoy van los siete
+  // roles del CHECK de la base, y si un rol raro no está en la lista se agrega
+  // para que el select SIEMPRE nazca en el rol real de la persona.
+  const rolOpts = ['maestro_roshi','bulma','milk','yajirobe','mister_popo','coordinador','cc'];
+  if (u.rol && !rolOpts.includes(u.rol)) rolOpts.push(u.rol);
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   // Tabs extra / bloqueadas actuales
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
@@ -705,7 +711,7 @@ async function abrirEditarUsuarioMT(id) {
           <div class="form-group">
             <label>Rol</label>
             <select class="cot-input" id="mtu-rol" style="width:100%">
-              ${rolOpts.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${rolLabels[r]}</option>`).join('')}
+              ${rolOpts.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${rolLabels[r]||r}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -840,7 +846,7 @@ async function loadMTStrikes() {
     const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
     const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
     const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
 
     list.innerHTML = `
       <div style="margin-bottom:20px">

@@ -102,7 +102,13 @@ const PERMISOS_TABS = {
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist','cotizador']
+  milk:          ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','herramientas','nube','waitlist','cotizador'],
+  // [YAJIROBE-1 · 6-nov] Palabra de Memo: «ayudar a milk a ingresar viajeros,
+  // revisar capsule corps más que nada y requisiciones en su mayoría». Aprueba y
+  // rechaza requisiciones y en Capsule registra abonos, corrige, cancela y
+  // elimina viajeros. SIN dinero de la casa (resumen, gastos, ingresos, saldos,
+  // inventario, reportes) ni herramientas. `equipo` es solo para su Mi Perfil.
+  yajirobe:      ['requisiciones','capsule','equipo']
 };
 
 // [GZ-TOURS-1] Pantallas que el rol PUEDE abrir pero que no llevan botón en el
@@ -118,6 +124,7 @@ const GZ_TABS_PERMITIDAS = {
   coordinador:   ['miperfil'],   // [GZ-TOURS-1] solo su perfil; la lista del equipo no
   cc:            ['lista','miperfil'],
   milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
+  yajirobe:      ['miperfil'],           // [YAJIROBE-1] solo su perfil
 };
 
 // F5 Milk: gate de UI para botones DESTRUCTIVOS que milk tiene VETADOS en el
@@ -675,7 +682,7 @@ function checkSession() {
 function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', milk:'Milk' };
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', milk:'Milk', yajirobe:'Yajirobe' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();
@@ -834,6 +841,7 @@ const HOME_PREFERIDO = {
   // y ranking para coordis/creadoras (antes caían directo a Bodega de Karin).
   bulma: 'resumen',   // [OPS-MIN-1] su resumen ES el Resumen (con las alarmas)
   milk: 'resumen',
+  yajirobe: 'requisiciones',   // [YAJIROBE-1] su trabajo del día es la bandeja
   coordinador: 'inicio',
   cc: 'inicio',
   mister_popo: 'inicio',
@@ -885,7 +893,9 @@ function _homeDeRol() {
 // entero** — la página completa, no solo el atajo. Lo cazó el arnés antes de
 // que nadie la abriera. Hermana de «declarar la constante en un runtime y
 // usarla en otro»: aquí el runtime es el mismo y lo que falla es el ORDEN.
-const VJ_ROLES_ALTA = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1] yajirobe también da de alta (el comentario va ARRIBA: los arneses
+// cortan estas declaraciones en su primer «;\n»).
+const VJ_ROLES_ALTA = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 function _vjPuedeAlta() {
   return !!(currentUser && VJ_ROLES_ALTA.includes(currentUser.rol));
 }
@@ -4293,6 +4303,7 @@ const ROL_LABELS = {
   maestro_roshi: 'Maestro Roshi',
   bulma: 'Bulma',
   milk: 'Milk',
+  yajirobe: 'Yajirobe',
   mister_popo: 'Maestro Karin',
   coordinador: 'Coordinador',
   cc: 'Creador de Contenido',
@@ -4365,6 +4376,7 @@ const ROL_CONTRATOS = {
   maestro_roshi: [],
   bulma:         ['auxiliar_admin', 'coordinador'], // Sofía también coordina
   milk:          ['auxiliar_admin', 'coordinador'], // Ximena igual: auxiliar Y coordinadora
+  yajirobe:      ['auxiliar_admin'], // [YAJIROBE-1] auxiliar de Milk
   mister_popo:   ['auxiliar_admin', 'coordinador'], // Maestro Karin: auxiliar Y coordinador; la custodia va como casilla en su contrato de coordinador
   coordinador:   ['coordinador'],
   cc:            ['creadora_team'],
@@ -5072,7 +5084,7 @@ function showCCTab(tab, btn) {
 // `ATAJOS_HOME`, que evalúa su lista al cargar y por eso su constante tuvo que
 // subir 4,700 líneas en UX-8. Aquí el orden no muerde, pero se dice para que
 // nadie deduzca la regla equivocada del ejemplo de al lado.
-const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros', maestro_roshi: 'viajeros' };
+const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros', maestro_roshi: 'viajeros', yajirobe: 'viajeros' };
 function _ccSubDefault() {
   return (currentUser && CC_SUB_POR_ROL[currentUser.rol]) || 'equipo';
 }
@@ -5083,7 +5095,14 @@ let _ccSubElegida = null;
 // `deLaCasa` = la eligió el CÓDIGO, no la persona. Sin ese aviso, la llamada
 // que abre la ficha se registraría como una elección y el default se estaría
 // «recordando» a sí mismo, borrando la costumbre real de quien navega.
+// [YAJIROBE-1] Sub-pestañas que un rol NO ve. «Números» es la cuenta del evento
+// (gastos, inversión, utilidad): fuera del alcance de yajirobe, y su servidor
+// (admin-cuenta-evento) solo atiende a roshi/bulma.
+const CC_SUB_OCULTAS = { yajirobe: ['numeros'] };
 function showCCSubTab(sub, btn, deLaCasa) {
+  const _ocultas = (currentUser && CC_SUB_OCULTAS[currentUser.rol]) || [];
+  _ocultas.forEach(s => { const b = document.getElementById(`cc-sub-btn-${s}`); if (b) b.style.display = 'none'; });
+  if (_ocultas.includes(sub)) { sub = _ccSubDefault(); btn = document.getElementById(`cc-sub-btn-${sub}`); }
   if (!deLaCasa) _ccSubElegida = sub;
   document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -5393,7 +5412,7 @@ function _ccDatosEquipoHtml(r, abierto) {
   const mail = (m) => m ? `<a href="mailto:${esc(m)}" style="color:var(--text)">${esc(m)}</a>` : nd;
   const fila = (k, v) => `<div style="display:flex;gap:6px"><span style="color:var(--ts);min-width:84px">${k}</span><span style="word-break:break-word">${v}</span></div>`;
   const caja = (borde, html) => `<div style="border-left:3px solid ${borde};background:rgba(255,255,255,.03);border-radius:6px;padding:8px 10px;margin-top:6px">${html}</div>`;
-  const ROL = { coordinador: 'Coordinador', maestro_roshi: 'Maestro Roshi', bulma: 'Bulma', milk: 'Milk', cc: 'Staff', mister_popo: 'Staff' };
+  const ROL = { coordinador: 'Coordinador', maestro_roshi: 'Maestro Roshi', bulma: 'Bulma', milk: 'Milk', yajirobe: 'Yajirobe', cc: 'Staff', mister_popo: 'Staff' };
   const ST = { aceptado: '✓ aceptó', pendiente: '⏳ no ha aceptado' };
   const htmlEq = eq.map(p => caja('var(--orange)',
     `<div style="font-weight:700">${esc(p.nombre || '—')} <span style="font-weight:400;color:var(--ts)">· ${esc(ROL[p.rol] || p.rol || 'Equipo')} · ${esc(ST[p.status] || p.status || '')}</span></div>`
@@ -5689,7 +5708,7 @@ async function loadCCEquipo() {
     // [STAFF-BOLETO-1] El boleto de cada quien en ESTA fecha: su lugar de
     // viajero (por `usuario_id`) y las zonas de la ficha. Solo los roles que
     // mueven inventario lo ven; un tropiezo aquí no tumba la lista del equipo.
-    const _puedeBoleto = !!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol));
+    const _puedeBoleto = !!(currentUser && ['maestro_roshi', 'bulma', 'milk', 'yajirobe'].includes(currentUser.rol));
     let _zonaDe = {}, _zonasEv = [];
     if (_puedeBoleto && asigs.length) {
       try {
@@ -6009,7 +6028,7 @@ async function loadViajeros() {
 async function grupoWaCargar() {
   const box = document.getElementById('cc-grupo-wa');
   if (!box || !_ccEventoActual) return;
-  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) { box.style.display = 'none'; return; }
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk', 'yajirobe'].includes(currentUser.rol))) { box.style.display = 'none'; return; }
   box.style.display = '';
   const inp = document.getElementById('cc-grupo-wa-link');
   const est = document.getElementById('cc-grupo-wa-estado');
@@ -6067,7 +6086,8 @@ let _vj2Filas = [];
 // [ET3-b] Quién puede ver el botón de eliminar. Espeja ROLES_ADMIN de
 // `admin-coordi-asignaciones.js` (línea 47), leído de ahí y no de memoria: el
 // servidor es el candado, esto sólo evita ofrecer un botón que daría 403.
-const VJ_ROLES_ELIMINAR = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1] gemelo de ROLES_ELIMINA_VIAJERO (admin-coordi-asignaciones).
+const VJ_ROLES_ELIMINAR = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 function _vjPuedeEliminar() {
   return !!(currentUser && VJ_ROLES_ELIMINAR.includes(currentUser.rol));
 }

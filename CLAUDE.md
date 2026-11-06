@@ -188,6 +188,40 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🍚⏳ **YAJIROBE-1 (6-nov-2026, en main local; la BASE ya escrita): un rol
+  nuevo, `yajirobe`, el ayudante de Milk.** Palabra de Memo: *«un perfil similar
+  a bulma o milk pero para Yajirobe, para que se dedique a ayudar a milk a
+  ingresar viajeros, revisar capsule corps y requisiciones»*. Sus respuestas:
+  **aprueba y rechaza requisiciones** (como Milk) · en Capsule **registra
+  abonos, corrige el viaje, cancela lugares y elimina viajeros**. Pantallas:
+  **Requisiciones (su aterrizaje) · Capsule · Guerreros Z solo «Mi perfil»** —
+  SIN resumen, gastos, ingresos, saldos, inventario, reportes, herramientas ni
+  la sub-pestaña «Números» de Capsule. Acta `migraciones/YAJIROBE-1.sql` (YA
+  CORRIDA: `usuarios_rol_check` con 7 roles). Servidor: entra a
+  `ROLES_BANDEJA` (requisiciones) · `ROLES_EDITA_VIAJERO` (Capsule) · lista
+  PROPIA `ROLES_ELIMINA_VIAJERO` para borrar viajero (ROLES_ADMIN también
+  asigna coordis y eso no se le dio) · portal-revision · rooming(+grupos) ·
+  transporte · semáforo de compras · viajeros-evento · gz-panel ·
+  `ROLES_VALIDOS` y `ROLES_INVITA_SOLO_ROSHI` (solo Roshi lo invita). Contrato
+  sugerido: `auxiliar_admin`. 🔴 **De paso, un defecto PREEXISTENTE cerrado:**
+  el editor de usuario de Montaña Pai NO traía a `milk` en su lista de roles —
+  al abrir a Milk el select nacía en «Maestro Roshi» (la primera opción) y
+  «Guardar» la SUBÍA a roshi sin que nadie lo eligiera. Hoy ofrece los 7 roles
+  del CHECK y, si aparece uno raro, lo agrega para que nazca en el rol real.
+  `mide:yajirobe-1` **44** (12 puertas abiertas por los handlers reales, cada
+  una con su control de rol inventado → 403 · 8 puertas de dinero cerradas ·
+  CHECK = ROLES_VALIDOS = Montaña; sabotaje a ROLES_BANDEJA → rojo → restaurado
+  sha1 `02a85bb3`). ⚠️ Mordida del instrumento: la sesión viva se cachea POR
+  USUARIO en verify-admin — con un solo id el control positivo heredaba el rol
+  del primer llamado y salía verde en falso. Vecinos verdes: capsule-ux-1 83 ·
+  capsule-ux-2 46 (su `decl` corta en el primer «;\n»: los comentarios de los
+  gemelos van ARRIBA) · cancelar-lugar-1 51 (su regex literal del semáforo se
+  actualizó con su razón) · viajero-edita-1 67 · req-b1 52 · portal-solo-1 89 ·
+  rooming-auto-1 79 · mas-alla-1 73 · nav-min-1 30 · nube-1 60 · nube-4 74 ·
+  rechazo-1 71 · req-corrige-1 40. (`mide:emma-1` trae 1 rojo PREEXISTENTE,
+  idéntico en HEAD.) ⏳ Push de Memo → invitarlo desde Guerreros Z con rol
+  «Yajirobe».
+
 - 🔔⏳ **WL-DUP-1 (6-nov-2026, en main local, cero SQL): el «Avísame» ya no
   dice «No pudimos registrarte» a quien YA está en la lista.** Caso Jessica
   (Ozzfest): su 1er intento 10:17 dio 200 y quedó registrada; los 4 siguientes

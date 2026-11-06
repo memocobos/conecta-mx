@@ -44,7 +44,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk','yajirobe']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

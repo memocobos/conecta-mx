@@ -29,7 +29,8 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const PR = require('./_lib/portal-revision');
 
-const ROLES = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1 · 6-nov] yajirobe ayuda a milk: Capsule + Requisiciones (palabra de Memo).
+const ROLES = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 const ACCIONES = ['listar', 'excel', 'ligar', 'publicar', 'rechazar', 'adelanto', 'fila_editar', 'fila_publicar', 'fila_no_procede', 'cerrar_resuelta'];
 // [PRV-FILA-1] Palabra de Memo (27-oct): «no puedo editar nada de lo que dice
 // ella … estaría bueno poder editar e ir aceptando uno por uno, no tener que

@@ -24,7 +24,8 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[a-zA-Z0-9_#-]{1,80}$/; // [CC-FECHAS-1] acepta slug#idx (una fecha de un multifecha)
-const ROLES = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1 · 6-nov] yajirobe ayuda a milk: Capsule + Requisiciones (palabra de Memo).
+const ROLES = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 
 // [ROOMING-AUTO-1] armar_propuesta SOLO LEE (viajeros + cuartos → propuesta);
 // genero_guardar escribe únicamente la columna `genero` (H/M/null, GENERO-1) —

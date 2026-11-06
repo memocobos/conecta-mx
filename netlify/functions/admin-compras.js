@@ -59,7 +59,7 @@ const ACCIONES = {
   // [CAPSULE-DISPO-1] Milk LEE el semáforo (solo leer: cuántos quedan por
   // zona) porque opera Capsule y ahí se hace el cambio de zona. Capturar
   // vendidos_fuera sigue siendo roshi/bulma.
-  semaforo: [...ROLES_STOCK, 'milk'],
+  semaforo: [...ROLES_STOCK, 'milk', 'yajirobe'], // [YAJIROBE-1] el marcador de boletos de Capsule
   ajuste_guardar: ROLES_STOCK,  // FASE B t3: captura de vendidos_fuera (stock_ajustes)
 };
 

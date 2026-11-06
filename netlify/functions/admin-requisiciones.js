@@ -34,7 +34,8 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { puertaZona } = require('./_lib/zona-ficha');
 
-const ROLES_BANDEJA = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1 · 6-nov] yajirobe ayuda a milk: Capsule + Requisiciones (palabra de Memo).
+const ROLES_BANDEJA = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 const ACCIONES = {
   listar: ROLES_BANDEJA,
   detalle: ROLES_BANDEJA,

@@ -937,7 +937,7 @@ async function exportarViajeros(formato) {
   // tabla; un export con su propia suma sería la fórmula número doce.
   // [COORDI-LISTA-1] Quien no ve dinero baja la lista del coordi (sin CHEAP,
   // sin contactos, sin notas, con el equipo). El servidor ya recorta igual.
-  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk'].includes(currentUser.rol))) {
+  if (!(currentUser && ['maestro_roshi', 'bulma', 'milk', 'yajirobe'].includes(currentUser.rol))) {
     return descargarListaViajeros(_ccEventoActual);
   }
   let lista = [], porViajero = {};

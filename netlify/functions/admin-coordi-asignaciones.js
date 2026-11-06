@@ -90,7 +90,12 @@ const PAQUETE_POR_PLANTILLA = {
 // mayor no es un candado, es una molestia con cara de candado.
 // Queda como constante propia y NO como ROLES_ADMIN a secas: si algún día
 // ROLES_ADMIN crece por otra razón, esta lista no se mueve sola.
-const ROLES_EDITA_VIAJERO = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1 · 6-nov] yajirobe ayuda a milk: Capsule + Requisiciones (palabra de Memo).
+const ROLES_EDITA_VIAJERO = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
+// [YAJIROBE-1] Eliminar viajeros: los de ROLES_ADMIN + yajirobe (palabra de Memo).
+// Lista PROPIA: ROLES_ADMIN también gobierna crear/eliminar ASIGNACIONES de
+// coordis, y eso no se le dio a yajirobe.
+const ROLES_ELIMINA_VIAJERO = [...ROLES_ADMIN, 'yajirobe'];
 
 const ACCIONES = {
   listar: null,
@@ -99,7 +104,7 @@ const ACCIONES = {
   responder: null,
   viajero_upsert_staff: null,
   viajero_listar: null,
-  viajero_eliminar: ROLES_ADMIN,
+  viajero_eliminar: ROLES_ELIMINA_VIAJERO,
   viajero_editar: ROLES_EDITA_VIAJERO,
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
   // [VIAJERO-EDITA-1] corregir paquete/zona/lugares/total/pagado-antes de

@@ -54,7 +54,8 @@ const { fetchCatalogo } = require('./_lib/catalogo-index');   // [v2] forma temp
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/;   // evento_id (slug del EV, p.ej. 'karolg#2')
-const ROLES = ['maestro_roshi', 'bulma', 'milk'];
+// [YAJIROBE-1 · 6-nov] yajirobe ayuda a milk: Capsule + Requisiciones (palabra de Memo).
+const ROLES = ['maestro_roshi', 'bulma', 'milk', 'yajirobe'];
 
 const TIPOS_UNIDAD = ['Van', 'Autobús', 'Otro'];
 const TIPOS_PASAJERO = ['lugar', 'viajero', 'usuario']; // == CHECK de la F1

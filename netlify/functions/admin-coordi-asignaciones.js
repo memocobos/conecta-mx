@@ -1404,9 +1404,17 @@ ${entregables}
       const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
       if (!campos) return bad(headers, 'campos inválido');
 
-      const PERMITIDOS = ['correo', 'celular', 'talla_playera', 'num_emergencia', 'emergencia_nombre', 'notas'];
+      // [VJ-CONTACTO-1] palabra de Memo (5-nov): «en el botón de corregir de
+      // Capsule tener también corregir los contactos de emergencia etc».
+      // Entraron el PARENTESCO y la FECHA DE NACIMIENTO (la del contrato: el
+      // Portal la pide UNA vez y solo Bulma/Milk la corrigen — esta es esa
+      // puerta). Cada campo se valida con la regla de la casa SOLO si viene:
+      // los llamadores mandan únicamente lo que cambió.
+      const PERMITIDOS = ['correo', 'celular', 'talla_playera', 'num_emergencia', 'emergencia_nombre', 'emergencia_parentesco', 'fecha_nacimiento', 'notas'];
       const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
       if (ajenos.length) return bad(headers, 'campo no editable: ' + ajenos.join(', '));
+      const CF = require('./_lib/correo-forma');
+      const soloDig = (x) => String(x).replace(/\D/g, '');
 
       const patch = {};
       for (const k of PERMITIDOS) {
@@ -1417,16 +1425,56 @@ ${entregables}
         // en blanco. Ausente es ausente.
         if (v === '') { patch[k] = null; continue; }
         if (v.length > 500) return bad(headers, `${k} demasiado largo`);
-        if (k === 'correo' && !EMAIL_RE.test(v)) return bad(headers, 'correo inválido');
+        if (k === 'correo') {
+          // [VJ-CONTACTO-1] el MISMO dueño que el sitio y la bandeja: dice el
+          // porqué (dos puntos, «.con»…) y se guarda en minúsculas — el Portal
+          // casa por correo y el trigger del Portal lo baja igual.
+          const prob = CF.problemaCorreo(v);
+          if (prob) return bad(headers, 'correo: ' + prob);
+          patch[k] = v.toLowerCase(); continue;
+        }
+        if (k === 'celular' || k === 'num_emergencia') {
+          const d = soloDig(v);
+          if (d.length < 10 || d.length > 13) return bad(headers, `${k === 'celular' ? 'celular' : 'número de emergencia'}: van 10 dígitos (sin espacios ni guiones)`);
+          patch[k] = d; continue;
+        }
+        if (k === 'talla_playera') {
+          const t = CF.tallaNormalizada(v);
+          if (!t) return bad(headers, 'talla: ' + CF.TALLAS_VALIDAS.join(', '));
+          patch[k] = t; continue;
+        }
+        if (k === 'fecha_nacimiento') {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return bad(headers, 'fecha de nacimiento: va como AAAA-MM-DD');
+          const dt = new Date(v + 'T12:00:00Z');
+          const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+          if (isNaN(dt) || dt.toISOString().slice(0, 10) !== v) return bad(headers, 'fecha de nacimiento: ese día no existe');
+          if (v > hoy || v < '1920-01-01') return bad(headers, 'fecha de nacimiento: fuera de rango');
+          patch[k] = v; continue;
+        }
         patch[k] = v;
       }
       if (!Object.keys(patch).length) return bad(headers, 'nada que actualizar');
 
       // La fila tiene que existir ANTES de escribirle: un PATCH sobre un id que
       // no está contesta 200 con cero filas y se leería como "guardado".
-      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id&limit=1`, { headers: sbHeaders });
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,celular,num_emergencia,correo,notas&limit=1`, { headers: sbHeaders });
       if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
-      if (!(await pre.json()).length) return bad(headers, 'ese viajero no existe');
+      const preF = (await pre.json())[0];
+      if (!preF) return bad(headers, 'ese viajero no existe');
+      // [VJ-CONTACTO-1] la emergencia es de OTRA persona (regla de ACOMP-1b).
+      const celFinal = 'celular' in patch ? patch.celular : preF.celular;
+      const emFinal = 'num_emergencia' in patch ? patch.num_emergencia : preF.num_emergencia;
+      if (emFinal && celFinal && soloDig(emFinal) === soloDig(celFinal) && ('celular' in patch || 'num_emergencia' in patch)) {
+        return bad(headers, 'el número de emergencia tiene que ser de OTRA persona (es igual a su celular)');
+      }
+      // Un correo que cambia deja su rastro ANEXADO en las notas (caso Jenny:
+      // el viejo es el dato que explica por qué no le llegaba nada). Si quien
+      // captura editó las notas en el mismo clic, manda lo suyo.
+      if ('correo' in patch && !('notas' in patch) && String(preF.correo || '') !== String(patch.correo || '')) {
+        const quienC = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+        const hoyC = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+        patch.notas = (preF.notas ? preF.notas + ' · ' : '') + `[CONTACTO ${hoyC}] correo «${preF.correo || '—'}» → «${patch.correo || '—'}» · ${quienC}`;
+      }
 
       const r = await fetch(`${baseVE}?id=eq.${id}`, {
         method: 'PATCH',

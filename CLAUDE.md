@@ -188,6 +188,30 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 👤⏳ **VJ-CONTACTO-1 (5-nov-2026, en main local, cero SQL): el ✏️ Corregir de
+  Capsule trae CONTACTO Y EMERGENCIA.** Palabra de Memo: *«en el botón de
+  corregir en Capsule quiero tener la información de corregir también a los
+  contactos de emergencia etc»*. Sección «👤 Contacto y emergencia» dentro del
+  MISMO panel: correo · celular · talla · nacimiento · emergencia (nombre ·
+  parentesco · número), prellenados. 🔒 Se guarda por SU puerta
+  (`viajero_editar`, la de contacto) y solo viaja lo que CAMBIÓ — no se mezcla
+  con `viajero_editar_full` (que mueve dinero); si solo cambió el contacto, el
+  «no cambiaste nada» del viaje no es error. `viajero_editar` ganó
+  `emergencia_parentesco` y `fecha_nacimiento` (la del contrato: el Portal la
+  pide una vez y esta es la puerta de Bulma/Milk para corregirla) y valida SOLO
+  lo que viene: correo por `problemaCorreo` (dice el porqué) y en minúsculas ·
+  celular/emergencia a dígitos (10-13) · talla de la lista · fecha real y no
+  futura · emergencia ≠ su celular · un correo que cambia deja
+  `[CONTACTO fecha] correo «viejo» → «nuevo»` ANEXADO en notas (caso Jenny).
+  ⚠️ Montaña Pai usa la misma puerta: una talla libre («Mediana») ahí ya rebota
+  con la lista. `mide:vj-contacto-1` **21** (handler real; sabotaje a
+  «emergencia ≠ celular» → 2 rojos → restaurado sha1 `831c1c40`) ·
+  rooming-auto-1 **79** (su sandbox de `_vjEditarGuardar` aprendió `_vj2Filas`
+  y `_vjContactoCambios`, con su razón) · vecinos verdes: viajero-edita-1 67 ·
+  capsule-ux-1 83 · capsule-ux-2 46 · capsule-comp-1 16 · alta-gen-hab-1 13 ·
+  vuelo-1 39 · plan-vj-1 35 · cancelar-lugar-1 51. ⚠️ No verificado en
+  navegador. ⏳ Push de Memo → Bulma/Milk recargan.
+
 - ✈️⏳ **VUELO-1 (5-nov-2026, en main local; la BASE ya escrita): el COSTO DEL
   VUELO por viajero, uno por uno.** Pedido de Bulma/Milk vía Memo; sus cinco
   respuestas: (1) UN solo total — el vuelo se suma a `total_contrato` y al

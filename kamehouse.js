@@ -7213,6 +7213,7 @@ function _vjEditarAbrir(id, nombre) {
       <label style="font-size:10px;color:var(--ts)" title="[GENERO-1] El insumo de las Compartidas del rooming (H con H, M con M — regla firmada). Vacío = no se sabe.">GÉNERO<br><select class="cot-input" id="vjx-g-${e}" style="width:70px">
         ${[['', '—'], ['M', 'Mujer'], ['H', 'Hombre']].map(([val, et]) => `<option value="${val}"${String(v.genero || '') === val ? ' selected' : ''}>${et}</option>`).join('')}</select></label>
       <label style="font-size:10px;color:var(--ts);flex-basis:100%" title="[VJ-INDICA-1] Lo que el equipo tiene que saber de esta persona: cuarto especial, planta baja, alergia, viaja con silla de ruedas… La ven el rooming y la coordinadora. Vacío = sin indicaciones.">📌 INDICACIONES (cuarto especial, algo específico)<br><input class="cot-input" id="vjx-i-${e}" maxlength="500" value="${_esfEsc(v.indicaciones || '')}" placeholder="Ej. cama matrimonial con su pareja · planta baja · alérgica a mariscos" style="width:100%"></label>
+      ${_vjContactoHtml(v, e)}
       <label style="font-size:10px;color:var(--ts)">TOTAL<br><input class="cot-input" id="vjx-t-${e}" type="number" min="0" step="1" value="${v.total_contrato == null ? '' : Number(v.total_contrato)}" placeholder="sin capturar" style="width:110px"></label>
       <label style="font-size:10px;color:var(--ts)" title="[PAGADO-CLARO-1] Lo pagado FUERA del sistema. Los pagos capturados (📎 Pagos) se suman aparte: no los repitas aquí.">PAGADO ANTES (sin capturados)<br><input class="cot-input" id="vjx-a-${e}" type="number" min="0" step="1" value="${v.abonado_previo == null ? '' : Number(v.abonado_previo)}" placeholder="0" style="width:110px" oninput="_vjPagadoPintar('${_attrJs(id)}')"></label>
       <div id="vjx-pt-${e}" style="flex-basis:100%;font-size:11px;color:var(--ts)">${_vjPagadoTxt(id, v.abonado_previo)}</div>
@@ -7228,6 +7229,48 @@ function _vjEditarAbrir(id, nombre) {
       <div id="vjx-e-${e}" style="flex-basis:100%;font-size:11px;color:var(--red)"></div>
     </div>`;
   _vjEditarZonas(id, v);
+}
+// [VJ-CONTACTO-1] Palabra de Memo (5-nov): «en el botón de corregir de
+// Capsule tener también corregir los contactos de emergencia etc». Vive en el
+// MISMO panel pero se guarda por su propia puerta (`viajero_editar`, la de
+// contacto): mezclarla con `viajero_editar_full` haría que «editar datos»
+// pudiera mover dinero sin que nadie lo pidiera. Solo viaja lo que CAMBIÓ.
+const VJ_CONTACTO = [
+  { k: 'correo', et: 'CORREO', w: 210, tipo: 'email' },
+  { k: 'celular', et: 'CELULAR (WhatsApp)', w: 130, tipo: 'tel' },
+  { k: 'talla_playera', et: 'TALLA', w: 80, tipo: 'talla' },
+  { k: 'fecha_nacimiento', et: 'NACIMIENTO', w: 140, tipo: 'date' },
+  { k: 'emergencia_nombre', et: 'EMERGENCIA · NOMBRE', w: 180, tipo: 'text' },
+  { k: 'emergencia_parentesco', et: 'PARENTESCO', w: 120, tipo: 'text' },
+  { k: 'num_emergencia', et: 'EMERGENCIA · NÚMERO', w: 130, tipo: 'tel' },
+];
+function _vjContactoHtml(v, e) {
+  const campo = (c) => {
+    const val = v[c.k] == null ? '' : String(v[c.k]).slice(0, c.tipo === 'date' ? 10 : 500);
+    const id = `vjx-c-${c.k}-${e}`;
+    if (c.tipo === 'talla') {
+      const ops = ['', 'XS', 'S', 'M', 'L', 'XL', 'XXL'];
+      if (val && !ops.includes(val)) ops.push(val);   // una talla vieja no se pierde al abrir
+      return `<label style="font-size:10px;color:var(--ts)">${c.et}<br><select class="cot-input" id="${id}" style="width:${c.w}px">${ops.map((t) => `<option value="${_esfEsc(t)}"${t === val ? ' selected' : ''}>${t || '—'}</option>`).join('')}</select></label>`;
+    }
+    return `<label style="font-size:10px;color:var(--ts)">${c.et}<br><input class="cot-input" id="${id}" type="${c.tipo === 'tel' ? 'tel' : c.tipo}" value="${_esfEsc(val)}" style="width:${c.w}px"></label>`;
+  };
+  return `<div style="flex-basis:100%;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:8px;margin-top:2px">
+      <div style="font-size:11px;color:var(--ts);min-width:140px">👤 <b style="color:var(--text)">Contacto y emergencia</b><br><i>la emergencia es de OTRA persona</i></div>
+      ${VJ_CONTACTO.map(campo).join('')}
+    </div>`;
+}
+// Lo que cambió del contacto, campo por campo ('' = quitarlo).
+function _vjContactoCambios(id, v) {
+  const out = {};
+  VJ_CONTACTO.forEach((c) => {
+    const el = document.getElementById(`vjx-c-${c.k}-${id}`);
+    if (!el) return;
+    const nuevo = String(el.value || '').trim();
+    const viejo = v[c.k] == null ? '' : String(v[c.k]).trim().slice(0, c.tipo === 'date' ? 10 : 500);
+    if (nuevo !== viejo) out[c.k] = nuevo;
+  });
+  return out;
 }
 // [ZONA-SELECT-1] La zona se ELIGE, no se teclea: el input con datalist solo
 // enseñaba la zona ya escrita (Chrome filtra por el valor) y obligaba a
@@ -7369,14 +7412,34 @@ async function _vjEditarGuardar(id) {
     abonado_previo: String(g('a').value || '') === '' ? null : Number(g('a').value),
   };
   const avisar = !!(document.getElementById(`vjx-av-${id}`) || {}).checked;
+  // [VJ-CONTACTO-1] el contacto que cambió viaja por su propia puerta.
+  const vRow = (_vj2Filas || []).find((x) => String(x.id) === String(id)) || {};
+  const contacto = _vjContactoCambios(id, vRow);
+  const hayContacto = Object.keys(contacto).length > 0;
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    const j = await khViajeros.editarFull(id, campos, { avisar });
-    if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo guardar');
-    const partes = ['✓ ' + (j.cambios || []).join('; ')];
-    if (j.zona_aviso) partes.push('· ' + j.zona_aviso);
-    if (j.stock_aviso) partes.push('· ⚠️ ' + j.stock_aviso);
-    if (j.aviso) partes.push(j.aviso.ok ? '· 📨 avisado a ' + j.aviso.enviado : '· ⚠️ ' + (j.aviso.aviso || 'el correo no salió'));
+    const partes = [];
+    let j = null;
+    try { j = await khViajeros.editarFull(id, campos, { avisar }); }
+    catch (e1) {
+      // Si solo cambió el contacto, el viaje contesta «no cambiaste nada»: no es error.
+      if (!(hayContacto && /no cambiaste nada/i.test((e1 && e1.message) || ''))) throw e1;
+    }
+    if (j) {
+      if (!j.ok) throw new Error(j.error || 'No se pudo guardar');
+      partes.push('✓ ' + (j.cambios || []).join('; '));
+      if (j.zona_aviso) partes.push('· ' + j.zona_aviso);
+      if (j.stock_aviso) partes.push('· ⚠️ ' + j.stock_aviso);
+      if (j.aviso) partes.push(j.aviso.ok ? '· 📨 avisado a ' + j.aviso.enviado : '· ⚠️ ' + (j.aviso.aviso || 'el correo no salió'));
+    }
+    if (hayContacto) {
+      try {
+        await khViajeros.editar(id, contacto);
+        partes.push('✓ contacto: ' + Object.keys(contacto).map((k) => (VJ_CONTACTO.find((c) => c.k === k) || {}).et || k).join(', ').toLowerCase());
+      } catch (e2) {
+        throw new Error((j ? 'El viaje sí se guardó, pero el contacto NO: ' : 'El contacto no se guardó: ') + ((e2 && e2.message) || ''));
+      }
+    }
     if (ok) ok.innerHTML = _esfEsc(partes.join(' '));
     showToast('Corrección guardada', 'success');
     await _vj2Cargar();

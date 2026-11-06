@@ -283,6 +283,9 @@ console.log('\n[B] armar_propuesta por el handler REAL (cero escrituras)');
     document: { getElementById: (x) => nodos[x] || null, querySelectorAll: () => [] },
     khViajeros: { editarFull: async (id, campos) => { payloadEnviado = campos; return { ok: true, cambios: ['género — → M'] }; } },
     showToast: () => {}, _vj2Cargar: async () => {}, _esfEsc: (s) => String(s == null ? '' : s), Number, String, console,
+    // [VJ-CONTACTO-1] _vjEditarGuardar ahora lee la fila y pregunta qué cambió del
+    // contacto (su propia puerta). Aquí el contacto no se toca: cero cambios.
+    _vj2Filas: [{ id: 'v-1' }], _vjContactoCambios: () => ({}),
   };
   vm.createContext(ctx);
   vm.runInContext(fGuardar, ctx);

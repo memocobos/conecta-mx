@@ -198,7 +198,7 @@ está caduco antes de escribirse.
   `migraciones/VIVELATINO-VENTA-1.sql`, valor esperado en el WHERE, 1 fila):
   tipo festival→**concierto** con multifecha de 3 entradas — orden del
   selector por palabra de Memo (VIVELATINO-VENTA-1b): **#0 2 Días · #1 Sábado 13 ·
-  #2 Domingo 14** (reordenado con 0 viajeros/requisiciones colgando de un #N), zona «General», status vacío, el lineup pasa a la columna
+  #2 Domingo 14** (reordenado con 0 viajeros/requisiciones colgando de un #N) — ⚠️ VIVELATINO-VENTA-1c: un guardado de Esferas con la pantalla abierta desde antes regresó el orden viejo; se repitió el reordenamiento (recargar Esferas antes de publicar), zona «General», status vacío, el lineup pasa a la columna
   `lineup` (URL; el objeto `festival` sin paquetes ya compilaba por el camino de
   concierto y se dejó intacto). Código: `REQUISICION_EVENTOS` (index) y
   `RESERVA_2027` (correo único) ganaron vivelatino — 🔒 es una excepción CDMX

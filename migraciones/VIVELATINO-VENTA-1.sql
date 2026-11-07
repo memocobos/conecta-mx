@@ -42,3 +42,14 @@ update public.esferas_eventos
 set multifecha = (select jsonb_build_array(m->2, m->0, m->1)::text from (select multifecha::jsonb m) x),
     updated_at = now()
 where slug = 'vivelatino' and md5(multifecha) = 'de3d01cb43e19d0bdac9820aef687511';
+
+-- ── VIVELATINO-VENTA-1c (7-nov-2026, 15:55 UTC). Un guardado de Esferas con
+-- la pantalla abierta desde ANTES del 1b (15:43 UTC) regresó el orden viejo
+-- (Sábado · Domingo · 2 Días) y así se publicó. Se repite el reordenamiento.
+-- Medido antes: 0 viajeros, requisiciones, compras, ajustes, historial,
+-- solicitudes del Más Allá y recordatorios con vivelatino#N.
+-- CORRIDA: 7-nov-2026 vía MCP (md5 nuevo e53460ec4ced13d8797201624ff63cf1).
+update public.esferas_eventos
+set multifecha = (select jsonb_build_array(m->2, m->0, m->1)::text from (select multifecha::jsonb m) x),
+    updated_at = now()
+where slug = 'vivelatino' and md5(multifecha) = '81a44407538e9d86ecf3a7b1dc9e43fe';

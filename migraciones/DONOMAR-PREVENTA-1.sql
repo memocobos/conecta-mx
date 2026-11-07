@@ -64,3 +64,15 @@ where p.slug = 'palnorte'
 -- Careo de salida (1 fila):
 -- select slug, status, cheap_only, cheap_zonas, sep, sep_cheap, fecha_inicio, f_texto, inc
 --   from esferas_eventos where slug = 'donomar';
+
+-- ── DONOMAR-FECHA-1 (7-nov-2026, palabra de Memo: «ponle fecha de 9 de
+-- noviembre al evento de don omar»). La fecha (2027-11-09) y el venue
+-- (Walmart Park, Mty) ya los había puesto Memo en Esferas; f_texto seguía en
+-- 'Por confirmar' y TAPABA la fecha. Se quita, y la nota deja de decir que
+-- ciudad y fecha están por anunciarse. Compilado: f:'9 nov 2027'.
+-- CORRIDA: 7-nov-2026 vía MCP.
+update public.esferas_eventos
+set f_texto = null,
+    nota = 'PREVENTA A CIEGAS · Aparta tu lugar con solo $300. Zonas y costos por anunciarse — tu separo asegura el costo preferencial de la fase más baja.',
+    updated_at = now()
+where slug = 'donomar' and f_texto = 'Por confirmar' and fecha_inicio = '2027-11-09';

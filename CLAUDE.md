@@ -196,8 +196,9 @@ está caduco antes de escribirse.
   Doble +$800 · Individual +$2,400 por noche, x2 en 2 días) · separo **$300**
   PLUS y CHEAP · **con formulario** (requisición). Ficha (acta
   `migraciones/VIVELATINO-VENTA-1.sql`, valor esperado en el WHERE, 1 fila):
-  tipo festival→**concierto** con multifecha de 3 entradas (Sábado 13 · Domingo
-  14 · 2 Días), zona «General», status vacío, el lineup pasa a la columna
+  tipo festival→**concierto** con multifecha de 3 entradas — orden del
+  selector por palabra de Memo (VIVELATINO-VENTA-1b): **#0 2 Días · #1 Sábado 13 ·
+  #2 Domingo 14** (reordenado con 0 viajeros/requisiciones colgando de un #N), zona «General», status vacío, el lineup pasa a la columna
   `lineup` (URL; el objeto `festival` sin paquetes ya compilaba por el camino de
   concierto y se dejó intacto). Código: `REQUISICION_EVENTOS` (index) y
   `RESERVA_2027` (correo único) ganaron vivelatino — 🔒 es una excepción CDMX

@@ -31,3 +31,14 @@ where slug = 'vivelatino'
   and zonas is null
   and multifecha is null
   and sep = 500;
+
+-- ── VIVELATINO-VENTA-1b (7-nov-2026, palabra de Memo: «primero 2 días luego
+-- sábado y domingo en el selector del día»). Se reordena el multifecha:
+-- #0 = 2 Días · #1 = Sábado · #2 = Domingo. Medido antes: 0 viajeros,
+-- 0 requisiciones, 0 compras/ajustes/historial con vivelatino#N — ningún
+-- índice de fecha colgaba de nadie. Valor esperado: el md5 del orden viejo.
+-- CORRIDA: 7-nov-2026 vía MCP (md5 nuevo d25eda1faa05ae03279ace1d1ab9ce77).
+update public.esferas_eventos
+set multifecha = (select jsonb_build_array(m->2, m->0, m->1)::text from (select multifecha::jsonb m) x),
+    updated_at = now()
+where slug = 'vivelatino' and md5(multifecha) = 'de3d01cb43e19d0bdac9820aef687511';

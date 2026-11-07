@@ -188,6 +188,17 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎵⏳ **MUSICA-FEST-CONC-1 (7-nov-2026, en main local, cero SQL): la música
+  del panel «festival» de Esferas por fin suena.** Reporte de Memo: «puse música
+  en vive latino pero no se reproduce». Medido: Esferas escribe la lista rotativa
+  SOLO en `festival.musica`, y el camino de CONCIERTO (el que usan los festivales
+  sin paquetes y vivelatino) leía `musicList` SOLO de la columna `music_list`,
+  que ninguna pantalla escribe — las 7 rolas de vivelatino nunca llegaron al
+  index. Hoy `musicListConcSeg` cae a `festival.musica` cuando la columna viene
+  vacía (la columna sigue mandando). ⚠️ Arrastra el mismo arreglo a bahidora,
+  edc27, dialibre y ozzfest (1 rola cada uno, también mudos). ⏳ Push de Memo →
+  recargar Esferas → publicar.
+
 - 🎸⏳ **VIVELATINO-VENTA-1 (7-nov-2026, la FICHA ya escrita): Vive Latino 2027
   sale a la venta — el PRIMER CDMX por requisición.** Palabra de Memo: festival a
   CDMX, vuelos aparte «como Flow o Corona» · PLUS 2 días $6,200 · Sábado $4,500

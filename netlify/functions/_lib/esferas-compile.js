@@ -598,9 +598,19 @@ function musicListConcSeg(esfera) {
   // fila; ahí se escribe el catálogo. Son dos nombres para el mismo dato a
   // propósito, y confundirlos fue el PGRST204 de la siembra.
   let l = esfera.music_list;
-  if (typeof l === 'string') { if (!l.trim()) return ''; try { l = JSON.parse(l); } catch (_) { return ''; } }
-  if (!Array.isArray(l) || !l.length) return '';
-  const ids = l.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof l === 'string') { if (!l.trim()) l = null; else { try { l = JSON.parse(l); } catch (_) { l = null; } } }
+  let ids = Array.isArray(l) ? l.map((x) => String(x).trim()).filter(Boolean) : [];
+  // [MUSICA-FEST-CONC-1] Sin `music_list`, la lista rotativa del panel de festival
+  // de Esferas (`festival.musica`) ES la lista: Esferas solo escribe ahí, y una
+  // ficha que pasó de festival a concierto con multifecha (vivelatino, 7-nov-2026)
+  // se quedaba MUDA con 7 rolas capturadas. La columna sigue mandando si trae algo.
+  if (!ids.length) {
+    let f = esfera.festival;
+    if (typeof f === 'string') { try { f = f.trim() ? JSON.parse(f) : null; } catch (_) { f = null; } }
+    if (f && Array.isArray(f.musica)) {
+      ids = f.musica.map((m) => (m && m.id != null) ? String(m.id).trim() : '').filter(Boolean);
+    }
+  }
   return ids.length ? ("musicList:['" + ids.map(escStr).join("','") + "'],") : '';
 }
 

@@ -188,6 +188,33 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎸⏳ **VIVELATINO-VENTA-1 (7-nov-2026, la FICHA ya escrita): Vive Latino 2027
+  sale a la venta — el PRIMER CDMX por requisición.** Palabra de Memo: festival a
+  CDMX, vuelos aparte «como Flow o Corona» · PLUS 2 días $6,200 · Sábado $4,500
+  · Domingo $4,500 · CHEAP 2 días $4,300 · Sábado $2,600 · Domingo $2,600. Sus
+  respuestas: RIDE como Flow ($2,900 / $4,800) · hotel como Flow (Triple +$300 ·
+  Doble +$800 · Individual +$2,400 por noche, x2 en 2 días) · separo **$300**
+  PLUS y CHEAP · **con formulario** (requisición). Ficha (acta
+  `migraciones/VIVELATINO-VENTA-1.sql`, valor esperado en el WHERE, 1 fila):
+  tipo festival→**concierto** con multifecha de 3 entradas (Sábado 13 · Domingo
+  14 · 2 Días), zona «General», status vacío, el lineup pasa a la columna
+  `lineup` (URL; el objeto `festival` sin paquetes ya compilaba por el camino de
+  concierto y se dejó intacto). Código: `REQUISICION_EVENTOS` (index) y
+  `RESERVA_2027` (correo único) ganaron vivelatino — 🔒 es una excepción CDMX
+  CON NOMBRE: el total de la requisición nace SIN transporte (como siempre en
+  CDMX) y el bus/vuelo se suma en la bandeja o con ✈️ Vuelo en Capsule;
+  `_evHoraInicio` lo trata como festival (14:00). Verificado con `compilarEV` +
+  `resolverPrecioVenta` sobre el index compilado: 21 combinaciones (3 fechas ×
+  PLUS/CHEAP/RIDE × habitación) con sus totales y separo $300 ($600 en Doble);
+  STAY rebota (CDMX). `mide:req-2027-2` **25** (actualizado con su razón:
+  `CDMX_ABIERTOS`). Vecinos verdes: confirma-1 28 · req-b1 52 · mas-alla-1 73 ·
+  fecha-correo-1 39 · rechazo-1 71 · nube-4 74 · cotiza-vend-1 38 ·
+  ride-callejon-1 11 (acomp-1, req-2027-1, preventa-pn27 y req-corrige-1 traen
+  su rojo PREEXISTENTE, idéntico en HEAD). ⚠️ Sin pedido cargado: vende a
+  ciegas hasta cargarlo en Kamisama. ⚠️ El publish avisa a los **2** de su
+  lista de espera. ⚠️ No verificado en navegador. 🔒⏳ **Push de Memo PRIMERO →
+  publish de Esferas DESPUÉS** → `/vivelatino`.
+
 - 🍚⏳ **YAJIROBE-1 (6-nov-2026, en main local; la BASE ya escrita): un rol
   nuevo, `yajirobe`, el ayudante de Milk.** Palabra de Memo: *«un perfil similar
   a bulma o milk pero para Yajirobe, para que se dedique a ayudar a milk a

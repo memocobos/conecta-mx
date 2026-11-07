@@ -3991,7 +3991,7 @@ function _searchNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\
 // siempre, 23:59 de su `ds`).
 function _evHoraInicio(ev){
   if(!ev)return '21:00';
-  var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
+  var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes','vivelatino'];
   var claves=['festival','fest','machaca','warped','edc','knotfest'];
   var id=(ev.id||'').toLowerCase(), nom=(ev.a||'').toLowerCase();
   var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
@@ -6898,7 +6898,7 @@ var REQUISICION_VIVA=false;
 // Monterrey, por NOMBRE. CDMX espera la regla del vuelo; un evento nuevo entra
 // cuando Memo lo diga. La misma lista vive en RESERVA_2027 del correo único
 // (_lib/correo-confirmacion) y mide:req-2027-2 las carea.
-var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabriel','emmanuel','madero','interpol','anuelaa','oreja','scorpions','pitbull','donomar','soylunadic'];  // [DONOMAR-PREVENTA-1] donomar · [SOYLUNA-DIC-1] soylunadic (Soy Luna 8-dic, palabra de Memo 5-nov)
+var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabriel','emmanuel','madero','interpol','anuelaa','oreja','scorpions','pitbull','donomar','soylunadic','vivelatino'];  // [DONOMAR-PREVENTA-1] donomar · [SOYLUNA-DIC-1] soylunadic (Soy Luna 8-dic, palabra de Memo 5-nov) · [VIVELATINO-VENTA-1] vivelatino: el PRIMER CDMX por requisición (palabra de Memo 7-nov; el total nace SIN transporte y el vuelo se suma en Capsule con ✈️ Vuelo)
 (function(){
   try{
     var v=new URLSearchParams(location.search).get('req');

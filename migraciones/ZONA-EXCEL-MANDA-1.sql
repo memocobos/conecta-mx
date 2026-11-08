@@ -137,3 +137,14 @@ commit;
 -- 🔒 Y CADA RENGLÓN SE RELEE DESPUÉS DEL UPDATE (no se confía en el conteo del
 -- propio UPDATE): el censo de la FASE 2 se vuelve a correr y tiene que dar CERO
 -- en toda zona vieja y los totales exactos en las nuevas.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- REGISTRO 8-nov-2026 · ZONA-EXCEL-MANDA-1b · caifanes «Perfil B/C» → «Perfiles B/C»
+-- Palabra de Memo (8-nov): «sí, ya habíamos quedado hace meses que sí».
+-- Medido antes: 0 filas en viajeros_evento / compras / stock_ajustes con esas
+-- zonas (las dos van ag:1 en la ficha) → el renombre es SOLO de ficha.
+-- UPDATE con md5 de (zonas|cheap_zonas|multifecha) = ce280038dd8b1e8aa3d69ff35d250a42
+-- como valor esperado, ancla con comilla de cierre ("n":"Perfil B") → 1 fila.
+-- Salida: viejo 0 · "Perfiles B" 6 · "Perfiles C" 6 · las tres columnas parsean.
+-- ⏳ Entra al index en el próximo publish de Esferas.
+-- ─────────────────────────────────────────────────────────────────────────────

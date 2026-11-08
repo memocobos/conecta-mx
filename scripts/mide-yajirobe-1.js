@@ -46,7 +46,9 @@ async function llamar(fn, body, rol) {
   // control positivo heredaría el rol vivo del primer llamado (pasó en la 1ª corrida).
   const jw = jwtSign({ id: 'u-' + rol, rol, correo: 'y@x.mx', nombre: 'Yajirobe' }, process.env.JWT_SECRET, 3600);
   let r;
-  try { r = await H({ httpMethod: 'POST', headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + jw }, body: JSON.stringify(body), queryStringParameters: {} }); }
+  // `path` como lo manda Netlify: la puerta del director (DIRECTOR-1) reconoce la
+  // función por ahí; sin él, un director rebota en todo y el arnés mide su propia falta.
+  try { r = await H({ httpMethod: 'POST', path: '/.netlify/functions/' + fn, headers: { origin: 'https://conectareynosa.mx', authorization: 'Bearer ' + jw }, body: JSON.stringify(body), queryStringParameters: {} }); }
   catch (e) { return { s: 'TRONÓ', err: e.message }; }
   let j = {}; try { j = JSON.parse(r.body || '{}'); } catch (_) {}
   return { s: r.statusCode, j };
@@ -92,6 +94,39 @@ const sinPermiso = (r) => r.s === 403 && /sin permiso|no autorizado|permiso/i.te
     const r = await llamar(fn, body, 'yajirobe');
     af(sinPermiso(r), () => `${que} (${fn}) le dice que no: ${r.s} ${r.j.error || r.err || ''}`);
   }
+  // [A3 · YAJIROBE-1b, 8-nov] Lo que Yajirobe vio en su primera noche (captura de
+  // Memo): «No se pudo cargar la lista de viajeros: No tienes asignación a este
+  // evento». La red falsa no devuelve asignaciones (eventos_coordi vacío), así que
+  // ÉSTE es exactamente el caso: la lista le abre por ser quien EDITA viajeros, no
+  // por una asignación de coordi; el coordi sin asignación sigue rebotando.
+  console.log('[A3] la lista de viajeros y «Mi perfil» le abren sin asignación de coordi');
+  {
+    const r = await llamar('admin-coordi-asignaciones', { accion: 'viajero_listar', evento_id: 'fuerzaregida#0' }, 'yajirobe');
+    af(r.s !== 403, () => `viajero_listar como yajirobe no dice «No tienes asignación»: ${r.s} ${r.j.error || ''}`);
+    const d = await llamar('admin-coordi-asignaciones', { accion: 'viajero_listar', evento_id: 'fuerzaregida#0' }, 'director');
+    af(d.s !== 403, () => `viajero_listar como director (DIRECTOR-1) tampoco: ${d.s} ${d.j.error || ''}`);
+    const c = await llamar('admin-coordi-asignaciones', { accion: 'viajero_listar', evento_id: 'fuerzaregida#0' }, 'coordinador');
+    af(c.s === 403 && /asignación/i.test(c.j.error || ''), () => `control: un coordinador SIN asignación sigue rebotando: ${c.s} ${c.j.error || ''}`);
+    const m = await llamar('admin-contratos', { accion: 'mio' }, 'yajirobe');
+    af(!sinPermiso(m), () => `admin-contratos/mio (su contrato en «Mi perfil») le abre: ${m.s} ${m.j.error || ''}`);
+    const ml = await llamar('admin-contratos', { accion: 'listar' }, 'yajirobe');
+    af(sinPermiso(ml), () => `control: admin-contratos/listar (todos los contratos) le sigue diciendo que no: ${ml.s}`);
+  }
+
+  // [A4 · REP-MULTIFECHA-1, 8-nov] El reporte post-evento de un coordi de
+  // multifecha (reno.ava, omar#0 — captura de Memo: «evento_id inválido»).
+  console.log('[A4] el reporte post-evento acepta el evento_id con fecha (omar#0)');
+  {
+    const body = { accion: 'guardar_mio', status: 'borrador', evento_id: 'omar#0', kits_detalle: [], gastos_detalle: [] };
+    const r = await llamar('admin-reportes', body, 'coordinador');
+    af(!(r.s === 400 && /evento_id inválido/.test(r.j.error || '')), () => `guardar_mio con omar#0 ya no rebota con «evento_id inválido»: ${r.s} ${r.j.error || ''}`);
+    const raro = await llamar('admin-reportes', { ...body, evento_id: 'omar#x' }, 'coordinador');
+    af(raro.s === 400 && /evento_id inválido/.test(raro.j.error || ''), () => `control: un evento_id raro (omar#x) sigue rebotando: ${raro.s}`);
+    const src = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-reportes.js'), 'utf8');
+    af(/salidas_bodega\?evento_id=in\.\(\$\{llaves\}\)/.test(src) && /split\('#'\)\[0\]/.test(src.slice(src.indexOf('async function salidasAutorizadasDe'), src.indexOf('async function salidasAutorizadasDe') + 900)),
+      'el puente salida↔reporte pregunta por la fecha Y por el evento base (las salidas viven en `omar`, el reporte en `omar#0`)');
+  }
+
   const inv = await llamar('admin-usuarios', { accion: 'crear', rol: 'yajirobe', nombre: 'X', correo: 'x@x.mx' }, 'bulma');
   af(inv.s === 403, () => 'solo Maestro Roshi crea un Yajirobe (bulma → 403): ' + inv.s);
 

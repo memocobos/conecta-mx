@@ -188,6 +188,32 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🚑⏳ **REP-MULTIFECHA-1 + YAJIROBE-1b (8-nov-2026, en main local, cero SQL):
+  «el kamehouse no les funciona» — eran DOS huecos viejos que estrenó el fin de
+  semana de Karol G / Omar, NO el push de DIRECTOR-1.** Medido en Netlify: desde
+  el deploy, gz-panel, requisiciones, usuarios, tours, rooming… todos 200; el
+  cliente carga sin errores JS; la puerta de roles quedó idéntica para todos los
+  roles que no son director (careado contra el diff). Lo que SÍ falló, con sus
+  capturas: (1) **reno.ava (coordi de `omar#0`) al ENVIAR su reporte post-evento →
+  «evento_id inválido»**: el `SLUG_RE` de `admin-reportes` (jun-2026) no admitía
+  el `#N` de CC-FECHAS-1 — era el PRIMER reporte de un coordi asignado a una fecha
+  de multifecha (todos los reportes previos son de slug pelado). Hoy acepta
+  `slug#N` y el puente salida↔reporte (`salidasAutorizadasDe`) pregunta por la
+  fecha Y por el evento base (medido: las salidas de bodega viven en `karolg`/
+  `omar`). (2) **yajirobe_97 en Capsule → «No se pudo cargar la lista de
+  viajeros: No tienes asignación a este evento»**: `viajero_listar` exigía
+  asignación de coordi a todo el que no fuera ROLES_ADMIN, y YAJIROBE-1 lo metió
+  en ROLES_EDITA_VIAJERO pero no ahí — su trabajo entero estaba cerrado. Hoy la
+  lista abre a quien EDITA viajeros (y al director, que ya pasó por
+  LECTURAS_DIRECTOR); el coordi sin asignación sigue rebotando. De paso
+  `admin-contratos/mio` (su «Mi perfil») ganó `yajirobe`. Los 6 logins 401 de
+  las 9 pm eran yajirobe equivocándose de contraseña. `mide:yajirobe-1` **53**
+  ([A3]+[A4]; el código viejo reproduce los 5 rojos exactos de las capturas; su
+  `llamar` ganó el `path` de Netlify — sin él el director rebotaba por el
+  instrumento). Vecinos verdes: director-1 79 · gz-rep-1 27 · capsule-ux-1 83 ·
+  req-b1 52 · cancelar-lugar-1 51. ⏳ Push de Memo → reno.ava reintenta enviar
+  su reporte (lo tiene en borrador) y yajirobe recarga.
+
 - 👔⏳ **DIRECTOR-1 (7-nov-2026, en main local; la BASE ya escrita): el rol de
   SOLO LECTURA para la dirección, nombres profesionales por usuario y el tema
   «Ejecutivo».** Palabra de Memo: *«Mi jefe quiere ver el kamehouse, puedes

@@ -46,7 +46,11 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
+// [REP-MULTIFECHA-1 · 8-nov-2026] El evento_id de una asignación de multifecha
+// lleva su fecha: `omar#0`, `karolg#1` (CC-FECHAS-1). Este regex nació sin el
+// `#` y el primer reporte de un coordi de multifecha (reno.ava, omar#0) rebotó
+// con «evento_id inválido». Misma forma que SLUG_RE de admin-coordi-asignaciones.
+const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}(#\d{1,2})?$/;
 
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 // Milk (auxiliar): ve, aprueba y gestiona reportes como Bulma, pero NO los ELIMINA.
@@ -564,10 +568,14 @@ exports.handler = async (event) => {
   }
 
   // Salidas AUTORIZADAS del (evento, coordi) — el puente entre bodega y reporte.
+  // [REP-MULTIFECHA-1] El reporte de un multifecha lleva `omar#0`; la salida de
+  // bodega se pide por el evento BASE (`omar`, medido en salidas_bodega). Se
+  // pregunta por las dos llaves (la forma de CC-FECHAS-1 en viajero_listar).
   async function salidasAutorizadasDe(eventoId, coordiId) {
     if (!eventoId || !coordiId) return [];
+    const llaves = [...new Set([String(eventoId), String(eventoId).split('#')[0]])].map(encodeURIComponent).join(',');
     const r = await fetch(
-      `${env.KH_SB_URL}/rest/v1/salidas_bodega?evento_id=eq.${encodeURIComponent(String(eventoId))}` +
+      `${env.KH_SB_URL}/rest/v1/salidas_bodega?evento_id=in.(${llaves})` +
       `&solicitante_id=eq.${encodeURIComponent(String(coordiId))}&estado=eq.autorizada` +
       `&select=id,detalle,estado,faltantes_monto,faltantes_vence,devolucion_recibida_at&limit=100`,
       { headers: sbHeaders }

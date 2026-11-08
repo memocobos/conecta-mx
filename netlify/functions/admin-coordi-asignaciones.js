@@ -1280,7 +1280,13 @@ ${entregables}
       // [CC-FECHAS-1] El equipo se asigna al evento BASE; la lista vive por
       // fecha (`soyluna`, `omar#1`). La puerta pregunta por las dos llaves.
       const eventoBase = evento_id.split('#')[0];
-      if (!esAdmin) {
+      // [YAJIROBE-1b · 8-nov-2026] Yajirobe opera Capsule (ROLES_EDITA_VIAJERO)
+      // pero no está en ROLES_ADMIN: con `!esAdmin` la lista le exigía una
+      // asignación de coordi y le contestaba «No tienes asignación a este evento».
+      // La puerta de la lista es la de quien EDITA viajeros; el coordi sigue
+      // acotado a sus eventos.
+      // El director (DIRECTOR-1) lee todo: su puerta ya pasó por LECTURAS_DIRECTOR.
+      if (!esAdmin && !ROLES_EDITA_VIAJERO.includes(jwtRol) && jwtRol !== 'director') {
         // El coordi debe tener una asignación a ese evento.
         const llaves = [...new Set([evento_id, eventoBase])].map(encodeURIComponent).join(',');
         const cr = await fetch(

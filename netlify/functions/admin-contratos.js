@@ -100,7 +100,8 @@ exports.handler = async (event) => {
   // que mande el cliente: el anti-spoofing de capturado_por, aplicado a leer).
   // Las demás acciones siguen exigiendo rol admin, igual que siempre.
   const accion = body.accion;
-  const ROLES_TODOS = ['maestro_roshi', 'bulma', 'milk', 'mister_popo', 'coordinador', 'cc'];
+  // [YAJIROBE-1b] yajirobe también tiene «Mi perfil» (su contrato de auxiliar).
+  const ROLES_TODOS = ['maestro_roshi', 'bulma', 'milk', 'mister_popo', 'coordinador', 'cc', 'yajirobe'];
   const auth = await verifyAdminAuthLive(event, accion === 'mio' ? ROLES_TODOS : ROLES_ADMIN);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 

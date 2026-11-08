@@ -56,6 +56,10 @@ const ACCIONES = {
   // [REQ-CORRIGE-1] «🔁 Corregir y aprobar»: lo que SÍ hay para esta solicitud
   // (fechas, paquetes, zonas con cupo, habitaciones) — SOLO LEE.
   correccion_opciones: ROLES_BANDEJA,
+  // [MP-LINK-1] El link de pago de Mercado Pago de una requisición PENDIENTE:
+  // devuelve el guardado o genera uno (monto = separo + comisión, del servidor).
+  // Cero dinero: un link es una invitación a pagar, no un pago.
+  mp_link: ROLES_BANDEJA,
 };
 // [CONFIRMA-1] Al aprobar sale UN correo: confirmación + invitación al Portal
 // (palabra de Memo: «correo único»). El dueño es _lib/correo-confirmacion; sus
@@ -630,6 +634,30 @@ exports.handler = async (event) => {
     return j(200, headers, Object.assign({ pidio: { evento_id: req.evento_id, paquete: req.paquete, zona: req.zona || null, hotel: req.hotel || null, num_personas: req.num_personas } }, res));
   }
 
+  // ── [MP-LINK-1] mp_link: el link de pago de una requisición pendiente ────
+  if (accion === 'mp_link') {
+    const r0 = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
+    if (!r0.ok) return j(502, headers, { error: 'No se pudo leer la requisición' });
+    const rows0 = await r0.json();
+    if (!rows0.length) return j(404, headers, { error: 'Esa requisición no existe' });
+    const req = rows0[0];
+    if (req.estado !== 'pendiente') return j(409, headers, { error: `Ya está ${req.estado}: no se genera link` });
+    if (req.mp_pago_id) return j(409, headers, { error: 'Esta requisición YA tiene un pago aprobado en Mercado Pago', mp_pago_id: req.mp_pago_id });
+    const { disponible, crearLinkRequisicion } = require('./_lib/mp-link');
+    // El guardado sirve tal cual salvo que pidan regenerar (cambió el separo,
+    // o el link viejo murió). Regenerar escribe uno nuevo encima — el viejo
+    // sigue vivo en MP y, si alguien paga por él, el webhook lo anota igual
+    // (la referencia es el folio, no la preferencia).
+    if (req.mp_init_point && !body.regenerar) {
+      return j(200, headers, { ok: true, url: req.mp_init_point, monto: req.mp_monto_cobrar, preference_id: req.mp_preference_id, guardado: true });
+    }
+    const d = disponible();
+    if (!d.ok) return j(409, headers, { error: 'Mercado Pago no está disponible: ' + d.motivo });
+    const link = await crearLinkRequisicion({ req, SB_URL, sbH });
+    if (!link.ok) return j(502, headers, { error: 'No se pudo generar el link: ' + link.motivo });
+    return j(200, headers, { ok: true, url: link.url, monto: link.total_pesos, comision: link.comision_pesos, neto: link.neto_pesos, preference_id: link.preference_id, guardado: false });
+  }
+
   if (accion === 'aprobar') {
     // 1 · Leer la fila (para armar el viajero con sus datos).
     const r0 = await fetch(`${base}?id=eq.${id}&select=*`, { headers: sbH });
@@ -693,8 +721,21 @@ exports.handler = async (event) => {
     // que nadie pagó). Con comprobante el monto sigue siendo OBLIGATORIO; sin
     // él, monto 0/omitido = aprobar SIN abono: el viajero nace debiendo todo y
     // el pago real se captura como abono cuando de verdad llegue.
-    const sinComprobante = !req.comprobante_path;
-    const monto = Math.round(Number(body.monto)) || 0;
+    // [MP-LINK-1] Un pago APROBADO en Mercado Pago (lo marcó el webhook tras
+    // leer el pago del GET autenticado) CUENTA como comprobante: el id del pago
+    // es el ticket. El monto del abono es lo que MP cobró MENOS la comisión que
+    // se le cargó al cliente — a la casa le entra el neto del separo, no el
+    // bruto; abonar el bruto le regalaría la comisión de MP al cliente.
+    const pagoMP = req.mp_pago_id ? (() => {
+      const bruto = Math.round(Number(req.mp_monto) || 0);
+      // La comisión que el LINK le cargó = lo que pedía el link − el separo.
+      // Sin link propio (mp_monto_cobrar null) no se le resta nada: el bruto.
+      const comisionCargada = (req.mp_monto_cobrar != null && req.separo_sistema != null)
+        ? Math.max(0, Math.round(Number(req.mp_monto_cobrar) - Number(req.separo_sistema))) : 0;
+      return { id: String(req.mp_pago_id), bruto, comision: comisionCargada, neto: Math.max(0, bruto - comisionCargada) };
+    })() : null;
+    const sinComprobante = !req.comprobante_path && !pagoMP;
+    const monto = Math.round(Number(body.monto)) || (pagoMP ? pagoMP.neto : 0);
     if (!(monto > 0) && !sinComprobante) return j(400, headers, { error: 'El monto del abono va en pesos y mayor a cero — es lo que dice el comprobante que verificaste' });
     const total_contrato = (body.total_contrato != null && body.total_contrato !== '')
       ? Math.round(Number(body.total_contrato))
@@ -850,11 +891,14 @@ exports.handler = async (event) => {
       monto: montos[i],
       nota: `Requisición ${req.folio} · ` + (req.comprobante_path
         ? 'comprobante verificado al aprobar'
-        : `sin comprobante adjunto (${req.forma_pago || 'pago'}) — monto confirmado por ${quien}`)
+        : (pagoMP
+          ? `pagado en Mercado Pago #${pagoMP.id} (cobró $${pagoMP.bruto}${pagoMP.comision ? `, comisión al cliente $${pagoMP.comision}` : ''}) — aprobó ${quien}`
+          : `sin comprobante adjunto (${req.forma_pago || 'pago'}) — monto confirmado por ${quien}`))
         + (N > 1 ? (desgloseUsado
           ? ` · su parte del pago del grupo según el desglose confirmado por ${quien} (${i + 1} de ${N}, total $${monto}, comprobante enviado por ${req.nombre})`
           : ` · pagado por ${req.nombre} (${i + 1} de ${N}, total $${monto})`) : ''),
       foto_path: req.comprobante_path || null,
+      mp_pago_id: pagoMP ? pagoMP.id : null,   // [MP-LINK-1] su comprobante es el id del pago
       capturado_por: quien,
     })).filter((a) => a.monto > 0);
     // [REQ-LINK-1] Con monto 0 no hay nada que insertar: el POST se salta

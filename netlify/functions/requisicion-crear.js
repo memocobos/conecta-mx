@@ -378,5 +378,23 @@ exports.handler = async (event) => {
     return json(502, headers, { ok: false, error: 'No se pudo registrar tu reservación. Inténtalo otra vez o escríbenos por WhatsApp.' });
   }
 
-  return json(200, headers, { ok: true, folio: fila.folio });
+  // [MP-LINK-1] Si pidió link de pago, se intenta generar AQUÍ MISMO para que
+  // la pantalla lo enseñe en el acto. Fail-soft: sin MP (apagado, sin tarifa,
+  // rechazo) la respuesta es la de siempre y Bulma/Milk mandan el link a mano.
+  // El monto lo pone el servidor (separo_sistema + comisión); el cliente no
+  // manda un peso. La fila ya existe: el link no decide si la reservación nace.
+  let pago = null;
+  if (forma_pago === 'link_pago') {
+    let filaIns = null;
+    try { const arr = await ins.json(); filaIns = Array.isArray(arr) ? arr[0] : null; } catch (_) { /* sin id, el link no se guarda en la fila */ }
+    const { crearLinkRequisicion } = require('./_lib/mp-link');
+    const link = await crearLinkRequisicion({
+      req: Object.assign({}, fila, { id: filaIns && filaIns.id }),
+      SB_URL, sbH,
+    });
+    if (link.ok) pago = { url: link.url, total: link.total_pesos, comision: link.comision_pesos, neto: link.neto_pesos };
+    else console.log('[requisicion-crear] sin link de MP para', fila.folio, '·', link.motivo);
+  }
+
+  return json(200, headers, Object.assign({ ok: true, folio: fila.folio }, pago ? { pago } : {}));
 };

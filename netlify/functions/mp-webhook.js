@@ -41,6 +41,7 @@
 // =============================================================================
 
 const mp = require('./_lib/mercadopago');
+const mpLink = require('./_lib/mp-link');   // [MP-LINK-1] `req:<folio>` → KameHouse
 
 // El nombre del índice único de mp_webhook_eventos. Se comprueba por NOMBRE:
 // un 23505 de OTRA restricción es un error de verdad y no puede confundirse con
@@ -51,6 +52,119 @@ const INDICE_IDEMPOTENCIA = 'mp_webhook_evento_uq';
 
 const headers = { 'Content-Type': 'application/json' };
 const res = (code, body) => ({ statusCode: code, headers, body: JSON.stringify(body) });
+
+// ── [MP-LINK-1] El pago de una REQUISICIÓN de KameHouse ─────────────────────
+// Bitácora + marca, en la base de KH (SUPABASE_URL_KAMEHOUSE).
+//
+//  · `mp_pagos` es la bitácora Y la idempotencia: UNIQUE(mp_payment_id). El
+//    INSERT va directo (jamás on_conflict); un 23505 DE ESE ÍNDICE
+//    (`mp_pagos_mp_payment_id_key`) se confirma como «ya anotado» y entonces
+//    se ACTUALIZA el estado — OXXO nace `pending` y llega `approved` días
+//    después como OTRA notificación del MISMO pago, y la fila tiene que
+//    contarlo. Un 23505 de otra restricción es error de verdad → 500.
+//  · La marca en la requisición solo con `approved`, con valor esperado
+//    `mp_pago_id=is.null`: un segundo pago aprobado de la misma requisición
+//    NO pisa al primero — queda en mp_pagos a la vista (hay un cobro duplicado
+//    que devolver) y se grita en el log.
+//  · El monto se CAREA (lo que el link pedía vs lo que MP cobró) y la
+//    diferencia viaja en la fila para que la bandeja la enseñe; jamás bloquea.
+//  · Una requisición que ya no está pendiente (aprobada/rechazada) se marca
+//    IGUAL: el pago existe y alguien tiene que verlo. Bulma decide.
+const INDICE_MP_PAGOS = 'mp_pagos_mp_payment_id_key';
+
+async function marcarRequisicion({ pago, paymentId, folioReq, notifId, tipo, accion }) {
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  if (!KH_URL || !KH_KEY) return res(500, { error: 'Faltan env vars de KameHouse' });
+  const kh = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY, 'Content-Type': 'application/json' };
+  const crudo = pago.crudo || {};
+
+  // La requisición. Sin ella, se anota el pago igual (es dinero que llegó) y
+  // se dice: un pago sin requisición es un caso para mirar, no para perder.
+  let req = null;
+  try {
+    const r = await fetch(`${KH_URL}/rest/v1/requisiciones?folio=eq.${encodeURIComponent(folioReq)}&select=id,folio,estado,separo_sistema,mp_monto_cobrar,mp_pago_id`, { headers: kh });
+    const arr = r.ok ? await r.json() : [];
+    req = Array.isArray(arr) ? arr[0] || null : null;
+  } catch (e) { console.error('[mp-webhook] KH: no pude leer la requisición', folioReq, e.message); }
+
+  const esperado = req ? Number(req.mp_monto_cobrar != null ? req.mp_monto_cobrar : req.separo_sistema) : null;
+  const cobrado = Number(pago.monto);
+  const fila = {
+    mp_payment_id: paymentId,
+    preference_id: crudo.preference_id || (crudo.order && crudo.order.id) || null,
+    external_reference: String(pago.referencia),
+    requisicion_id: req ? req.id : null,
+    monto_esperado: Number.isFinite(esperado) ? esperado : 0,
+    monto_cobrado: Number.isFinite(cobrado) ? cobrado : 0,
+    comision: Math.max(0, Math.round(((crudo.transaction_amount || 0) - (crudo.transaction_details && crudo.transaction_details.net_received_amount != null ? crudo.transaction_details.net_received_amount : (crudo.transaction_amount || 0))) * 100) / 100),
+    neto: crudo.transaction_details && crudo.transaction_details.net_received_amount != null ? crudo.transaction_details.net_received_amount : null,
+    metodo: crudo.payment_type_id || pago.metodo || null,
+    estado: pago.estado,
+    status_detail: pago.detalle || null,
+    payload: crudo,
+    actualizado_en: new Date().toISOString(),
+  };
+
+  // Bitácora: INSERT directo; 23505 del índice = ya anotado → UPDATE de estado.
+  let yaEstaba = false;
+  try {
+    const ins = await fetch(`${KH_URL}/rest/v1/mp_pagos`, {
+      method: 'POST', headers: { ...kh, Prefer: 'return=minimal' }, body: JSON.stringify(fila),
+    });
+    if (!ins.ok) {
+      const txt = await ins.text();
+      if (/23505/.test(txt) && txt.includes(INDICE_MP_PAGOS)) {
+        yaEstaba = true;
+        const up = await fetch(`${KH_URL}/rest/v1/mp_pagos?mp_payment_id=eq.${encodeURIComponent(paymentId)}&estado=neq.${encodeURIComponent(pago.estado)}`, {
+          method: 'PATCH', headers: { ...kh, Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: fila.estado, status_detail: fila.status_detail, neto: fila.neto, comision: fila.comision, metodo: fila.metodo, payload: crudo, actualizado_en: fila.actualizado_en }),
+        });
+        if (!up.ok) console.error('[mp-webhook] KH: no se actualizó mp_pagos', paymentId, up.status);
+      } else {
+        console.error('[mp-webhook] KH: no se anotó el pago', paymentId, txt.slice(0, 300));
+        return res(500, { error: 'No se pudo anotar el pago; MP reintenta' });
+      }
+    }
+  } catch (e) {
+    console.error('[mp-webhook] KH: insert mp_pagos falló', e.message);
+    return res(500, { error: 'No se pudo anotar el pago; MP reintenta' });
+  }
+
+  if (pago.estado !== 'approved') {
+    return res(200, { ok: true, req: folioReq, anotado: true, estado: pago.estado, ya_estaba: yaEstaba });
+  }
+  if (!req) {
+    console.error('[mp-webhook] pago APROBADO de una requisición que no existe:', folioReq, paymentId);
+    return res(200, { ok: true, req: folioReq, sin_requisicion: true, payment_id: paymentId });
+  }
+
+  // La marca, con valor esperado: la primera aprobación es la buena.
+  try {
+    const up = await fetch(`${KH_URL}/rest/v1/requisiciones?id=eq.${encodeURIComponent(req.id)}&mp_pago_id=is.null`, {
+      method: 'PATCH', headers: { ...kh, Prefer: 'return=representation' },
+      body: JSON.stringify({ mp_pago_id: paymentId, mp_monto: fila.monto_cobrado, mp_pagado_at: new Date().toISOString() }),
+    });
+    const filas = up.ok ? await up.json().catch(() => null) : null;
+    if (!up.ok) {
+      console.error('[mp-webhook] KH: no se marcó la requisición', folioReq, up.status);
+      return res(200, { ok: true, req: folioReq, anotado: true, marcado: false, payment_id: paymentId });
+    }
+    if (!Array.isArray(filas) || !filas.length) {
+      if (req.mp_pago_id && req.mp_pago_id !== paymentId) {
+        console.error('[mp-webhook] SEGUNDO PAGO aprobado de la misma requisición — revisar duplicado:', folioReq, req.mp_pago_id, paymentId);
+      }
+      return res(200, { ok: true, req: folioReq, anotado: true, ya_marcada: true, payment_id: paymentId });
+    }
+  } catch (e) {
+    console.error('[mp-webhook] KH: PATCH requisición falló', folioReq, e.message);
+    return res(200, { ok: true, req: folioReq, anotado: true, marcado: false, payment_id: paymentId });
+  }
+  if (Number.isFinite(esperado) && Math.abs(esperado - fila.monto_cobrado) >= 1) {
+    console.error('[mp-webhook] monto distinto al del link:', folioReq, 'esperado', esperado, 'cobrado', fila.monto_cobrado);
+  }
+  return res(200, { ok: true, req: folioReq, anotado: true, marcado: true, payment_id: paymentId, monto: fila.monto_cobrado, estado_req: req.estado });
+}
 
 exports.handler = async (event) => {
   // ── 1. INTERRUPTOR ─────────────────────────────────────────────────────────
@@ -98,11 +212,6 @@ exports.handler = async (event) => {
   }
   if (!dataId) return res(400, { error: 'Falta data.id' });
 
-  const SB_URL = process.env.PORTAL_SUPABASE_URL;
-  const SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-  if (!SB_URL || !SB_SERVICE) return res(500, { error: 'Faltan env vars del Portal' });
-  const sb = { apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE, 'Content-Type': 'application/json' };
-
   // ── 3. LA VERDAD DEL DINERO ────────────────────────────────────────────────
   // Si el GET falla se responde 500 SIN escribir nada, para que MP reintente.
   // Un 200 aquí sería perder el pago en silencio.
@@ -113,6 +222,19 @@ exports.handler = async (event) => {
   }
   const paymentId = String(pago.id);
   const solicitudId = pago.referencia || null;   // external_reference, del GET
+
+  // ── [MP-LINK-1] LA REQUISICIÓN DE KAMEHOUSE (`req:<folio>`) ───────────────
+  // El flujo vivo del rumbo del 12-oct: el pago se ANOTA en `mp_pagos` (KH) y
+  // la requisición queda MARCADA «pagado en MP» para que Bulma/Milk aprueben
+  // con eso enfrente. Aquí no nace viajero ni abono: nada automático decide
+  // dinero. El uuid pelado de abajo es el flujo viejo del Portal y no se toca.
+  const folioReq = mpLink.folioDeReferencia(solicitudId);
+  if (folioReq) return await marcarRequisicion({ pago, paymentId, folioReq, notifId, tipo, accion });
+
+  const SB_URL = process.env.PORTAL_SUPABASE_URL;
+  const SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+  if (!SB_URL || !SB_SERVICE) return res(500, { error: 'Faltan env vars del Portal' });
+  const sb = { apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE, 'Content-Type': 'application/json' };
 
   // ── 4. IDEMPOTENCIA: leer ANTES de escribir ────────────────────────────────
   try {

@@ -86,4 +86,60 @@ function calcularTotal(separoPesos, metodo) {
   };
 }
 
-module.exports = { ETIQUETAS, ORDEN, METODOS_MSI, PCT_ENV, pct, absorbeLaCasa, umbralMsi, metodosPara, calcularTotal };
+// ── [MP-LINK-1] EL LINK DE PAGO (8-nov-2026) ────────────────────────────────
+// El link de Checkout Pro deja al cliente elegir el método EN la página de MP
+// (tarjeta, OXXO, SPEI…), así que el cargo no puede depender del método: se
+// cobra UNA tarifa configurada para el link, decidida ANTES de generarlo.
+// Palabra de Memo (8-nov): «se la cobra al cliente».
+//
+//   MP_PCT_LINK   fracción (0.0349 = 3.49 %). SIN ella el link NO se genera y la
+//                 requisición sigue como hoy («te mandamos tu link») — la misma
+//                 regla de arriba: jamás un número de respaldo en dinero.
+//   MP_FIJA_LINK  pesos fijos por operación (sin ella, 0).
+//   MP_IVA_CARGO  IVA sobre la comisión de MP (default 0.16 — MP factura IVA
+//                 sobre su comisión; es la única constante que trae default,
+//                 porque es ley, no negociación).
+//
+// La fórmula despeja el TOTAL para que a la casa le quede EXACTO el neto:
+//   total − total·pct·(1+iva) − fija·(1+iva) = neto
+//   total = (neto + fija·(1+iva)) / (1 − pct·(1+iva))
+// y se redondea HACIA ARRIBA al peso: un peso de más se le explica al cliente,
+// un peso de menos descuadra el separo. `MP_ABSORBE_CARGO=1` lo apaga igual
+// que a las tarifas por método.
+function pctLink() { return pct('MP_PCT_LINK'); }
+function fijaLink() {
+  const n = Number(process.env.MP_FIJA_LINK);
+  return (Number.isFinite(n) && n >= 0) ? n : 0;
+}
+function ivaCargo() {
+  const v = process.env.MP_IVA_CARGO;
+  if (v == null || String(v).trim() === '') return 0.16;
+  const n = Number(v);
+  return (Number.isFinite(n) && n >= 0 && n < 1) ? n : 0.16;
+}
+// ¿Se puede ofrecer el link? Solo con tarifa configurada.
+function linkConfigurado() { return pctLink() != null; }
+
+// { neto_pesos, comision_pesos, total_pesos } o { error }.
+function calcularLink(netoPesos) {
+  const neto = Number(netoPesos);
+  if (!Number.isFinite(neto) || neto <= 0) return { error: 'monto inválido' };
+  const p = pctLink();
+  if (p == null) return { error: 'sin tarifa configurada para el link (MP_PCT_LINK)' };
+  if (absorbeLaCasa()) {
+    const n = Math.round(neto * 100) / 100;
+    return { neto_pesos: n, comision_pesos: 0, total_pesos: n };
+  }
+  const f = (1 + ivaCargo());
+  const total = Math.ceil((neto + fijaLink() * f) / (1 - p * f));
+  return {
+    neto_pesos: Math.round(neto * 100) / 100,
+    comision_pesos: Math.round((total - neto) * 100) / 100,
+    total_pesos: total,
+  };
+}
+
+module.exports = {
+  ETIQUETAS, ORDEN, METODOS_MSI, PCT_ENV, pct, absorbeLaCasa, umbralMsi, metodosPara, calcularTotal,
+  pctLink, fijaLink, ivaCargo, linkConfigurado, calcularLink,
+};

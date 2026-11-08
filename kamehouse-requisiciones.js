@@ -296,6 +296,40 @@ function _reqFichaHtml(r, np) {
     </div>`;
 }
 
+// [MP-LINK-1] Un pago APROBADO en Mercado Pago (lo marcó el webhook) cuenta
+// como comprobante: el id del pago es el ticket. El NETO es lo que MP cobró
+// menos la comisión que el link le cargó al cliente — es lo que entra como
+// abono (espejo de la fórmula del servidor en admin-requisiciones · aprobar).
+function _reqTieneComprobante(r) { return !!(r && (r.comprobante_path || r.mp_pago_id)); }
+function _reqMpNeto(r) {
+  if (!r || !r.mp_pago_id) return null;
+  const bruto = Math.round(Number(r.mp_monto) || 0);
+  const com = (r.mp_monto_cobrar != null && r.separo_sistema != null) ? Math.max(0, Math.round(Number(r.mp_monto_cobrar) - Number(r.separo_sistema))) : 0;
+  return { bruto, comision: com, neto: Math.max(0, bruto - com) };
+}
+function _reqMpChip(r) {
+  if (r.mp_pago_id) {
+    const m = _reqMpNeto(r);
+    return `<div style="margin:6px 0;padding:6px 10px;border:1px solid var(--green);border-radius:8px;font-size:11px;color:var(--green)">💳 <b>Pagado en Mercado Pago</b> · cobró ${_reqBdjMxn(m.bruto)}${m.comision ? ` (incluye ${_reqBdjMxn(m.comision)} de comisión al cliente → abono ${_reqBdjMxn(m.neto)})` : ''} · pago #${_reqBdjEsc(r.mp_pago_id)}${r.mp_pagado_at ? ' · ' + _reqBdjEsc(_tsToDate(r.mp_pagado_at).toLocaleDateString('es-MX', { timeZone: 'America/Matamoros', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : ''}${r.estado !== 'pendiente' ? ' · ⚠️ la requisición ya estaba ' + _reqBdjEsc(r.estado) + ' cuando cayó el pago' : ''}</div>`;
+  }
+  if (r.forma_pago === 'link_pago' && r.estado === 'pendiente') {
+    return `<div style="margin:6px 0;padding:6px 10px;border:1px dashed var(--ts);border-radius:8px;font-size:11px;color:var(--ts)">🔗 Pidió link de pago${r.mp_init_point ? ` · el link ya salió por ${_reqBdjMxn(r.mp_monto_cobrar)} (separo + comisión) y <b>todavía no paga</b>` : ' · <b>sin link generado</b> (Mercado Pago apagado o sin tarifa cuando reservó)'}. <button class="rq-btn" style="padding:2px 8px;font-size:11px" onclick="_reqBdjMpLink('${r.id}')">🔗 ${r.mp_init_point ? 'Ver / copiar link' : 'Generar link'}</button><span id="req-mpl-${r.id}"></span></div>`;
+  }
+  return '';
+}
+async function _reqBdjMpLink(id, regenerar) {
+  const out = document.getElementById('req-mpl-' + id);
+  if (out) out.textContent = ' …';
+  const j = await _reqBdjCall({ accion: 'mp_link', id, regenerar: !!regenerar }).catch((e) => ({ error: e.message }));
+  if (!out) return;
+  if (!j || !j.ok) { out.innerHTML = ' <span style="color:var(--red)">' + _reqBdjEsc((j && j.error) || 'no se pudo') + '</span>'; return; }
+  const r = _reqBdjRows.find((x) => x.id === id);
+  if (r) { r.mp_init_point = j.url; r.mp_monto_cobrar = j.monto; }
+  const cel = String((r && r.celular) || '').replace(/\D/g, '');
+  const txt = 'Hola ' + (String((r && r.nombre) || '').split(' ')[0]) + ', aquí está tu link de pago de Conecta Reynosa (reservación ' + ((r && r.folio) || '') + ') por ' + _reqBdjMxn(j.monto) + ' — incluye la comisión de Mercado Pago. Pagas con tarjeta, OXXO o transferencia: ' + j.url;
+  out.innerHTML = ` <a href="${_reqBdjEsc(j.url)}" target="_blank" rel="noopener" style="color:var(--green);font-weight:700">abrir</a> · <a href="#" data-u="${_reqBdjEsc(j.url)}" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.dataset.u);this.textContent='copiado ✓';return false" style="color:var(--green)">copiar</a>${cel.length === 10 ? ` · <a href="https://wa.me/52${cel}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener" style="color:#25d366;font-weight:700">mandar por WhatsApp</a>` : ''} · <a href="#" onclick="_reqBdjMpLink('${id}',true);return false" style="color:var(--ts)">regenerar</a> <span style="color:var(--ts)">(${_reqBdjMxn(j.monto)}${j.comision ? ', comisión ' + _reqBdjMxn(j.comision) : ''})</span>`;
+}
+
 function _reqBdjCard(r) {
   const esPend = r.estado === 'pendiente';
   const cls = r.estado === 'aprobada' ? 'ok' : r.estado === 'rechazada' ? 'no' : 'pend';
@@ -335,8 +369,9 @@ function _reqBdjCard(r) {
     <div class="rq-nums">
       <div class="rq-num"><small>Separo</small><b>${_reqBdjMxn(r.separo_sistema)}</b></div>
       <div class="rq-num"><small>Total</small><b>${_reqBdjMxn(r.total_sistema)}</b>${(r.transporte && r.total_sistema != null) ? '<i>sin transporte CDMX</i>' : ''}</div>
-      <div class="rq-num"><small>Pagó por</small><b style="font-size:14px">${_reqBdjEsc(formaTxt)}</b>${r.comprobante_path ? '<i>📎 con comprobante</i>' : '<i>sin comprobante</i>'}</div>
+      <div class="rq-num"><small>Pagó por</small><b style="font-size:14px">${_reqBdjEsc(formaTxt)}</b>${r.comprobante_path ? '<i>📎 con comprobante</i>' : (r.mp_pago_id ? '<i style="color:var(--green)">💳 pagado en MP</i>' : '<i>sin comprobante</i>')}</div>
     </div>
+    ${_reqMpChip(r)}
     <div class="rq-body">
       <div class="rq-contact">
         <span>WhatsApp <b>${_reqBdjEsc(r.celular)}</b></span>
@@ -389,10 +424,11 @@ function _reqBdjAprobarUI(id) {
   const rch = document.getElementById('req-rch-' + id); if (rch) rch.style.display = 'none';
   const esRide = r.paquete === 'ride';
   box.innerHTML = `
-    <h4>Al aprobar nace el viajero${r.comprobante_path ? ' con su abono' : ''}</h4>
-    ${r.comprobante_path ? '' : `<div style="margin:0 0 8px;padding:8px 10px;border:1px solid var(--red);border-radius:8px;font-size:12px;color:var(--red)">⚠️ <b>SIN COMPROBANTE</b> (${_reqBdjEsc(r.forma_pago === 'link_pago' ? 'pidió link de pago: todavía no paga' : 'no subió comprobante')}). Si aún no hay pago, <b>deja el monto vacío</b>: el viajero nace SIN abono, debiendo todo, y el pago se captura cuando llegue. Solo teclea un monto si verificaste el pago por otro lado.</div>`}
+    <h4>Al aprobar nace el viajero${_reqTieneComprobante(r) ? ' con su abono' : ''}</h4>
+    ${r.mp_pago_id ? `<div style="margin:0 0 8px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;font-size:12px;color:var(--green)">💳 <b>Pagado en Mercado Pago</b> (pago #${_reqBdjEsc(r.mp_pago_id)}): el abono se prellena con el NETO (${_reqBdjMxn(_reqMpNeto(r).neto)} — lo cobrado menos la comisión que pagó el cliente). Revisa que cuadre con el separo antes de confirmar.</div>` : ''}
+    ${_reqTieneComprobante(r) ? '' : `<div style="margin:0 0 8px;padding:8px 10px;border:1px solid var(--red);border-radius:8px;font-size:12px;color:var(--red)">⚠️ <b>SIN COMPROBANTE</b> (${_reqBdjEsc(r.forma_pago === 'link_pago' ? 'pidió link de pago: todavía no paga' : 'no subió comprobante')}). Si aún no hay pago, <b>deja el monto vacío</b>: el viajero nace SIN abono, debiendo todo, y el pago se captura cuando llegue. Solo teclea un monto si verificaste el pago por otro lado.</div>`}
     <div class="rq-grid">
-      <label class="rq-field">${r.comprobante_path ? 'Abono verificado (lo que dice el comprobante) *' : 'Abono (vacío = sin pago todavía)'}<input type="number" id="req-apr-monto-${id}" value="${_reqBdjMontoInicial(r)}" min="0" step="1" oninput="_reqBdjDesgloseSuma('${id}')"></label>
+      <label class="rq-field">${r.comprobante_path ? 'Abono verificado (lo que dice el comprobante) *' : (r.mp_pago_id ? 'Abono (neto del pago en Mercado Pago) *' : 'Abono (vacío = sin pago todavía)')}<input type="number" id="req-apr-monto-${id}" value="${_reqBdjMontoInicial(r)}" min="0" step="1" oninput="_reqBdjDesgloseSuma('${id}')"></label>
       <label class="rq-field">Total del contrato *<input type="number" id="req-apr-total-${id}" value="${r.total_sistema != null ? Math.round(Number(r.total_sistema)) : ''}" min="1" step="1"></label>
       ${esRide ? '' : `<label class="rq-field">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}"></label>`}
     </div>
@@ -521,6 +557,10 @@ function _reqBdjMontoInicial(r) {
   // fue exactamente cómo nació el abono fantasma de Daniela (link_pago, 30-oct)
   // — un número ya puesto se acepta sin mirar. El monto lo teclea quien tenga
   // el pago enfrente; si aún no hay pago, se aprueba con el campo VACÍO.
+  // [MP-LINK-1] Con pago APROBADO en MP el prellenado es el NETO del pago —
+  // aquí sí hay un pago verificado por el webhook (GET autenticado), no un
+  // separo supuesto: la lección de Daniela no aplica.
+  if (r.mp_pago_id) { const m = _reqMpNeto(r); return m && m.neto > 0 ? m.neto : ''; }
   if (!r.comprobante_path) return '';
   const ps = _reqBdjPersonas(r);
   if (ps && Array.isArray(r.desglose) && r.desglose.length === ps.length) {
@@ -578,7 +618,7 @@ async function _reqBdjAprobar(id) {
   // con confirm explícito: el viajero nace debiendo todo y el pago se captura
   // cuando llegue. CON comprobante el monto sigue siendo obligatorio.
   const rFila = _reqBdjRows.find((x) => x.id === id);
-  const sinComp = !(rFila && rFila.comprobante_path);
+  const sinComp = !_reqTieneComprobante(rFila);   // [MP-LINK-1] el pago en MP cuenta
   if (!(monto > 0)) {
     if (!sinComp) { if (msg) { msg.textContent = 'El abono va en pesos, mayor a cero.'; msg.style.color = 'var(--red)'; } return; }
     if (!confirm('SIN COMPROBANTE Y SIN MONTO: el viajero nace SIN ningún abono, debiendo el total completo. El pago se captura cuando llegue (➕ Abono o su Portal).\n\n¿Aprobar así?')) return;

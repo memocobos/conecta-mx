@@ -6906,6 +6906,32 @@ var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabri
     else if(v==='0')sessionStorage.removeItem('conecta_req_preview');
   }catch(e){}
 })();
+// [MP-LINK-1] El regreso desde Mercado Pago (`back_urls` del link): `?pago=ok|
+// pendiente|error&folio=R-XXXXX`. Es SOLO un letrero: el pago lo confirma el
+// webhook en el servidor, jamás esta URL (cualquiera puede teclearla). Se
+// pinta cuando el DOM existe (este script corre a media parseada — ley CARDS).
+(function(){
+  try{
+    var qs=new URLSearchParams(location.search);
+    var p=qs.get('pago'); if(!p)return;
+    var folio=String(qs.get('folio')||'').replace(/[^A-Za-z0-9-]/g,'').slice(0,20);
+    var txt=p==='ok'?'✅ ¡Gracias! Recibimos tu pago'+(folio?' de la reservación '+folio:'')+'. El equipo lo confirma y te escribe por WhatsApp.'
+      :p==='pendiente'?'⏳ Tu pago quedó pendiente'+(folio?' (reservación '+folio+')':'')+'. Si pagaste en OXXO, se confirma cuando la tienda lo reporte (hasta 1 día hábil).'
+      :'⚠️ El pago no se completó'+(folio?' (reservación '+folio+')':'')+'. Tu reservación sigue registrada: escríbenos por WhatsApp y te ayudamos.';
+    var pintar=function(){
+      var d=document.createElement('div');
+      d.id='mp-regreso';
+      d.style.cssText='position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99999;max-width:min(92vw,520px);padding:12px 16px;border-radius:10px;background:#000;border:1px solid '+(p==='ok'?'#88ea4e':p==='pendiente'?'#e8ff4c':'#ff283b')+';color:#fff;font-family:Montserrat,sans-serif;font-size:13px;line-height:1.45;box-shadow:0 8px 30px rgba(0,0,0,.6)';
+      d.innerHTML='<span></span> <button type="button" style="float:right;margin-left:10px;background:none;border:none;color:#fff;font-size:16px;cursor:pointer" aria-label="Cerrar">✕</button>';
+      d.firstChild.textContent=txt;
+      d.lastChild.onclick=function(){d.remove();};
+      document.body.appendChild(d);
+      setTimeout(function(){try{d.remove();}catch(e){}},20000);
+      try{history.replaceState(null,'',location.pathname);}catch(e){}
+    };
+    if(document.body)pintar();else document.addEventListener('DOMContentLoaded',pintar);
+  }catch(e){}
+})();
 function _requisicionActiva(){
   if(REQUISICION_VIVA)return true;
   // Por evento: `cur` es el evento abierto (puesto por showDetail antes de que
@@ -6947,7 +6973,7 @@ function _reqPintar(){
       '<label for="req-file" id="req-file-lbl" style="display:block;text-align:center;padding:12px;border:1.5px dashed rgba(232,255,76,.5);border-radius:8px;color:#e8ff4c;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin:0 0 8px">📎 Subir foto de tu comprobante *</label>'+
       '<input type="file" id="req-file" accept="image/*,application/pdf" style="display:none">'+
     '</div>'+
-    '<div id="req-link-msg" style="display:none;font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 8px">Te mandamos tu link de pago por WhatsApp — pagas con tarjeta u OXXO en la página segura de Mercado Pago.</div>'+
+    '<div id="req-link-msg" style="display:none;font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 8px">Al enviar tu reservación te damos tu link de pago (o te lo mandamos por WhatsApp) — pagas con tarjeta, OXXO o transferencia en la página segura de Mercado Pago. El link incluye la comisión de Mercado Pago.</div>'+
     '<input type="text" id="req-web" name="web" value="" style="display:none" tabindex="-1" autocomplete="off">'+
     '<button type="button" id="req-enviar" onclick="_reqEnviar()" style="width:100%;padding:13px;background:#e8ff4c;color:#000;border:none;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer">Enviar mi reservación</button>'+
     '<div id="req-msg" style="font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.45;margin:8px 0 0;min-height:1px"></div>'+
@@ -7278,7 +7304,13 @@ function _reqEnviar(){
         '<div style="font-size:26px;margin-bottom:4px">✅</div>'+
         '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">¡Recibimos tu reservación!</div>'+
         '<div style="font-family:Montserrat,sans-serif;font-size:12px;color:#fff;margin-bottom:6px">Tu folio: <b style="color:#e8ff4c;letter-spacing:.06em">'+r.j.folio+'</b></div>'+
-        '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">El equipo revisa tu '+(_reqEstado.forma==='link_pago'?'solicitud y te manda tu link de pago':'comprobante')+' y te confirma por WhatsApp. Guarda tu folio.</div>'+
+        // [MP-LINK-1] Si el servidor generó el link de Mercado Pago, se enseña
+        // AQUÍ MISMO con su monto (separo + comisión, dicho con todas sus letras).
+        // Sin link (MP apagado / sin tarifa) sale la frase de siempre.
+        (r.j.pago&&r.j.pago.url
+          ?'<a href="'+String(r.j.pago.url).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" id="req-mp-btn" style="display:block;margin:8px 0 6px;padding:12px;background:#009ee3;color:#fff;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;text-decoration:none;letter-spacing:.03em">💳 Pagar $'+Number(r.j.pago.total).toLocaleString('es-MX')+' en Mercado Pago →</a>'+
+           '<div style="font-family:Montserrat,sans-serif;font-size:10.5px;color:rgba(255,255,255,.7);line-height:1.45;margin-bottom:6px">Separo $'+Number(r.j.pago.neto).toLocaleString('es-MX')+(Number(r.j.pago.comision)>0?' + $'+Number(r.j.pago.comision).toLocaleString('es-MX')+' de comisión de Mercado Pago':'')+'. Pagas con tarjeta, OXXO o transferencia en su página segura; en cuanto cae el pago, el equipo confirma tu lugar. Si prefieres transferencia directa, mándanos el comprobante por WhatsApp con tu folio.</div>'
+          :'<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">El equipo revisa tu '+(_reqEstado.forma==='link_pago'?'solicitud y te manda tu link de pago':'comprobante')+' y te confirma por WhatsApp. Guarda tu folio.</div>')+
         '</div>';
     }else{
       try{trackMainEvent('main_requisicion_error',{st:r.st});}catch(e){}

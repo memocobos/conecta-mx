@@ -188,6 +188,72 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳⏳ **MP-LINK-1 (8-nov-2026, en main local; la BASE ya escrita): LOS LINKS DE
+  PAGO DE MERCADO PAGO EN LA REQUISICIÓN — el rumbo del 12-oct hecho botón.**
+  Palabra de Memo (domingo, «vamos uno por uno»): links **en el index al
+  reservar, en el Portal por cuota y como botón en KameHouse** · **la comisión
+  se la cobra al cliente** · al caer el pago el sistema **marca «pagado en MP»
+  y Bulma aprueba** (nada automático decide dinero). Esta tuerca es la FASE A
+  (index + bandeja); Portal por cuota (1c) y botón por viajero en Capsule (1b)
+  siguen, sobre la misma tabla.
+  - 🔒 **REUSA el contrato de agosto, no lo duplica:** `_lib/mercadopago`
+    (interruptor `PAGOS_MP_MODO` live/test — la AUSENCIA es apagado—, llave
+    coherente APP_USR-/TEST-, `apiPost`, `obtenerPago` del GET autenticado,
+    firma HMAC del manifest) y `mp-webhook` (que sigue atendiendo el uuid
+    pelado del Portal viejo). Lo nuevo: `_lib/mp-link` (dueño del link de una
+    requisición: `disponible()`, `req:<folio>` ida y vuelta,
+    `crearLinkRequisicion`), la **tarifa del link** en `_lib/mp-tarifas`
+    (`MP_PCT_LINK` fracción · `MP_FIJA_LINK` · `MP_IVA_CARGO` default 0.16;
+    **sin `MP_PCT_LINK` el link NO se ofrece** — jamás un número de respaldo en
+    dinero; `MP_ABSORBE_CARGO=1` la absorbe la casa), y la rama `req:` del
+    webhook en la base de KH.
+  - **La fórmula (cliente paga la comisión, la casa recibe EXACTO el separo):**
+    `total = ceil((neto + fija·(1+iva)) / (1 − pct·(1+iva)))` → separo $300 al
+    3.49 % = **$313** (comisión $13). Redondeo HACIA ARRIBA al peso: un peso de
+    más se explica, uno de menos descuadra.
+  - **Acta `migraciones/MP-1.sql` (YA CORRIDA, CHECKs mordidos, GRANT leído):**
+    tabla `mp_pagos` (UNIQUE `mp_payment_id` = la idempotencia; RLS deny-all +
+    GRANT service_role) · `requisiciones` gana `mp_preference_id · mp_init_point
+    · mp_monto_cobrar · mp_pago_id · mp_monto · mp_pagado_at` ·
+    `abonos_viajero.mp_pago_id`.
+  - **El circuito:** `requisicion-crear` con `forma_pago=link_pago` → tras el
+    INSERT genera la preferencia (monto = **separo del dueño + comisión**, el
+    cliente no manda un peso; `external_reference=req:<folio>`; `binary_mode`
+    false y SIN métodos excluidos: tarjeta/OXXO/SPEI en la página de MP) y
+    devuelve `pago{url,total,comision,neto}` → el index pinta **«💳 Pagar $313
+    en Mercado Pago →»** con la comisión DICHA. 🔒 **Fail-soft a lo de hoy:**
+    MP apagado / sin tarifa / rechazo → la requisición nace IGUAL y la pantalla
+    dice «te mandamos tu link». `mp-webhook` (firma verificada → GET del pago →
+    `req:` → KH): INSERT en `mp_pagos` (23505 del índice `mp_pagos_mp_payment_
+    id_key` = ya anotado → UPDATE de estado, así OXXO pending→approved
+    actualiza la MISMA fila) y, solo con `approved`, PATCH a la requisición con
+    **valor esperado `mp_pago_id=is.null`** (un 2º pago aprobado NO pisa: queda
+    en mp_pagos a la vista y se grita). Pago sin requisición → se anota igual.
+    **Bandeja:** chip verde «💳 Pagado en Mercado Pago · cobró $313 (incluye $13
+    de comisión → abono $300) · #id»; en `link_pago` pendiente, botón **🔗
+    Generar / Ver-copiar link** (acción `mp_link`: devuelve el guardado, o
+    genera; `regenerar:true` hace uno nuevo; 409 si ya hay pago) con abrir ·
+    copiar · mandar por WhatsApp. **Aprobar:** el pago en MP CUENTA como
+    comprobante; el abono se prellena y nace por el **NETO** (bruto − comisión
+    cargada al cliente = el separo), con `mp_pago_id` y nota «pagado en Mercado
+    Pago #id (cobró $X, comisión al cliente $Y) — aprobó quien»; sin foto. El
+    regreso `?pago=ok|pendiente|error&folio=` en el index es SOLO un letrero.
+  - `mide:mp-link-1` **57** (tres handlers reales + red falsa que modela MP,
+    KH con filtros y el índice único; dos sabotajes mordidos: sin el valor
+    esperado del PATCH → 2 rojos; abonar el bruto → 1 rojo; restaurados por
+    `cp`). Vecinos verdes: req-b1 52 · rechazo-1 71 · confirma-1 28 ·
+    comprobante-dup-1 17 · ticket-circuito-1 32 · concilia-1 83 (req-corrige-1
+    y acomp-1 traen su rojo PREEXISTENTE, idéntico en HEAD limpio).
+  - ⏳ **ENCENDER = Memo, en Netlify (yo no toco llaves):** `PAGOS_MP_MODO=live`
+    · `MP_ACCESS_TOKEN` de PRODUCCIÓN (APP_USR-…) de la cuenta de **CONECTA**
+    (ahí cae el dinero) · `MP_WEBHOOK_SECRET` (panel → Webhooks → URL
+    `https://conectareynosa.mx/.netlify/functions/mp-webhook`, evento Pagos) ·
+    `MP_PCT_LINK` con la tarifa REAL de su panel (0.0349 si es 3.49 %). Sin la
+    última el link no sale y nada cambia. Luego push → prueba de punta a punta
+    con un pago chico real → ver el chip verde → aprobar. ⚠️ El manifest de la
+    firma sigue sin ver una notificación REAL (lo dice el lib desde agosto): el
+    primer webhook de verdad lo confirma o se corrige ahí, en un solo archivo.
+
 - 🚑⏳ **REP-MULTIFECHA-1 + YAJIROBE-1b (8-nov-2026, en main local, cero SQL):
   «el kamehouse no les funciona» — eran DOS huecos viejos que estrenó el fin de
   semana de Karol G / Omar, NO el push de DIRECTOR-1.** Medido en Netlify: desde

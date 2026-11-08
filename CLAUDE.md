@@ -248,8 +248,19 @@ está caduco antes de escribirse.
     · `MP_ACCESS_TOKEN` de PRODUCCIÓN (APP_USR-…) de la cuenta de **CONECTA**
     (ahí cae el dinero) · `MP_WEBHOOK_SECRET` (panel → Webhooks → URL
     `https://conectareynosa.mx/.netlify/functions/mp-webhook`, evento Pagos) ·
-    `MP_PCT_LINK` con la tarifa REAL de su panel (0.0349 si es 3.49 %). Sin la
-    última el link no sale y nada cambia. Luego push → prueba de punta a punta
+    `MP_PCT_LINK` con la tarifa REAL de su panel. **Leída del panel de Memo
+    (8-nov, pestaña Checkout de «Comisiones y meses»): tarjeta/SPEI/saldo
+    3.49 % + $4.00 al instante · OXXO y depósitos 3.79 % + $4.00 a 3 días**,
+    sin IVA (MP lo cobra aparte sobre su comisión). Como el cliente elige el
+    método YA en la página de MP, la tarifa del link es UNA: con
+    `MP_PCT_LINK=0.0379` + `MP_FIJA_LINK=4` nunca entra menos del separo (en
+    tarjeta sobra ~$1); con 0.0349 un pago en OXXO deja ~$1 corto. Decisión de
+    Memo. **Medido también: la cuenta es la PERSONAL («Guillermo Alexander»)
+    y su única aplicación es «El Club de los Perdedores – Tienda»
+    (webhook a elclubdelosperdedores.com.mx, credenciales de producción SIN
+    activar)** — Conecta necesita su PROPIA aplicación (la crea Memo: pide
+    industria, sitio web, aceptar términos y captcha). Sin la
+    tarifa el link no sale y nada cambia. Luego push → prueba de punta a punta
     con un pago chico real → ver el chip verde → aprobar. ⚠️ El manifest de la
     firma sigue sin ver una notificación REAL (lo dice el lib desde agosto): el
     primer webhook de verdad lo confirma o se corrige ahí, en un solo archivo.

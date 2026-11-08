@@ -38,6 +38,113 @@ const ALLOWED_ORIGINS_DEV = [
 const NETLIFY_PREVIEW_RE = /^https:\/\/[a-z0-9-]+--conectareynosa\.netlify\.app$/;
 
 // ───────────────────────────────────────────────────────────────────────
+// [DIRECTOR-1 · 7-nov-2026] EL ROL `director` ES SOLO LECTURA, Y SU PUERTA
+// ES ÚNICA: ESTA LISTA.
+//
+// Palabra de Memo: su jefe quiere VER KameHouse («ver todo, sin poder cambiar
+// nada»). En vez de agregar 'director' a las ~60 listas de roles repartidas
+// por los handlers —una lista a mano al lado de cada endpoint envejece sola,
+// y UNA que se olvide en una acción de escritura es dinero—, el rol se decide
+// AQUÍ, en el único sitio por el que pasan TODOS los handlers admin
+// (verifyAdminAuth / verifyAdminAuthLive). Para `director`:
+//   · se IGNORA la lista `allowedRoles` del handler (ni lo abre ni lo cierra);
+//   · entra SOLO si (function, accion) está en LECTURAS_DIRECTOR;
+//   · todo lo demás es 403 — fail-CLOSED: una lectura que falte aquí se ve
+//     como un renglón vacío en su pantalla y se agrega; una escritura que
+//     sobrara no se puede colar porque nunca se lista.
+// 🔒 Aquí SOLO van acciones que LEEN. Antes de agregar una, leer su handler.
+// `'*'` = la function no despacha por accion (o todas sus acciones leen).
+// ───────────────────────────────────────────────────────────────────────
+const LECTURAS_DIRECTOR = {
+  // Resumen / dinero (solo lectura)
+  'admin-utilidad-evento': '*',
+  'admin-saldos': '*',
+  'admin-gastos-list': '*',
+  'admin-ingresos-list': '*',
+  'admin-cobranza-list': '*',
+  'admin-pagos-list': '*',
+  'admin-pagos-auditoria-list': '*',
+  'admin-clientes-min': '*',
+  'admin-solicitudes-list': '*',
+  'admin-conexiones': ['hoy', 'historial'],
+  'admin-concilia': ['radar', 'reporte'],
+  'admin-cuenta-evento': '*',
+  // Capsule Corp (viajeros, rooming, transporte, contratos de cliente)
+  'admin-coordi-asignaciones': ['listar', 'viajero_listar', 'capsule_resumen', 'alarmas_operacion',
+    'deudores_migrados', 'contrato_cliente_estado', 'contrato_cliente_lista', 'abonos_listar',
+    'plan_viajero', 'plan_pendientes', 'fechas_de_evento', 'perfiles_portal', 'grupo_wa_ver',
+    'precio_sugerido', 'vuelo_prellenar'],
+  'admin-viajeros-evento': '*',
+  'admin-rooming': ['listar'],
+  'admin-rooming-grupos': ['listar'],
+  'admin-transporte': ['listar'],
+  'admin-requisiciones': ['listar', 'detalle', 'cambios_listar'],
+  'admin-portal-revision': ['listar'],
+  'admin-mas-alla': ['listar'],
+  'admin-waitlist': ['listar'],
+  // Inventario (Palacio de Kamisama) y Torre
+  'admin-compras': ['listar', 'semaforo'],
+  'admin-proveedores': ['listar'],
+  'admin-abonos': ['listar'],
+  'admin-kits': ['listar'],
+  'admin-salidas': ['listar'],
+  // Catálogo / Esferas (solo ver; publicar, guardar y cancelar quedan fuera)
+  'esferas-listar': '*',
+  'admin-venues-catalogo': ['listar'],
+  'admin-eventos': ['listar', 'obtener', 'meta_por_slug', 'meta_por_slugs'],
+  'admin-nube': ['listar', 'cobertura', 'eventos', 'historial'],
+  'admin-cotizador': '*',
+  // Radar (sin marcar alertas como vistas: eso escribe)
+  'admin-radar': ['metricas', 'main_metrics', 'fetch', 'ventas_trafico', 'alertas_listar',
+    'alertas_no_vistas', 'dia', 'tops', 'giru'],
+  // Reportes y contratos del equipo
+  'admin-reportes': ['listar', 'ticket_ver'],
+  'admin-contratos': ['listar', 'obtener', 'mio'],
+  'admin-creadoras': ['ranking', 'entregables_listar'],
+  'admin-deliverables': ['listar'],
+  'admin-tours': ['listar'],
+  // Equipo (lista y su propio perfil) y utilería de la pantalla
+  'admin-usuarios': ['listar', 'obtener'],
+  'gz-panel': ['panel'],
+  'notificaciones': ['list'],
+  'sistema-config-get': '*',
+};
+
+function _functionDeEvent(event) {
+  const p = String((event && (event.path || event.rawUrl)) || '');
+  const m = p.match(/\/\.netlify\/functions\/([a-z0-9-]+)/i) || p.match(/\/([a-z0-9-]+)\/?$/i);
+  return m ? m[1] : '';
+}
+
+function _accionDeEvent(event) {
+  if (!event) return '';
+  const q = event.queryStringParameters || {};
+  if (q.accion) return String(q.accion);
+  if (typeof event.body === 'string' && event.body.length && event.body.length < 2_000_000) {
+    try { const b = JSON.parse(event.body); if (b && typeof b.accion === 'string') return b.accion; } catch (_) { /* no es JSON */ }
+  }
+  return '';
+}
+
+// ¿Puede el director con ESTE request? Solo si (function, accion) está listado.
+function directorPuedeLeer(event) {
+  const fn = _functionDeEvent(event);
+  const regla = Object.prototype.hasOwnProperty.call(LECTURAS_DIRECTOR, fn) ? LECTURAS_DIRECTOR[fn] : null;
+  if (!regla) return false;
+  if (regla === '*') return true;
+  const accion = _accionDeEvent(event);
+  return Array.isArray(regla) && !!accion && regla.includes(accion);
+}
+
+// El veredicto de rol, en UN sitio: `director` va por su lista; los demás por
+// la lista del handler (sin lista = cualquier rol logueado, como siempre).
+function rolPermitido(rol, allowedRoles, event) {
+  if (rol === 'director') return directorPuedeLeer(event);
+  if (Array.isArray(allowedRoles) && allowedRoles.length > 0) return allowedRoles.includes(rol);
+  return true;
+}
+
+// ───────────────────────────────────────────────────────────────────────
 // JWT helpers (HS256 manual — sin dependencias externas)
 // ───────────────────────────────────────────────────────────────────────
 
@@ -173,10 +280,10 @@ function verifyAdminAuth(event, allowedRoles) {
   if (!payload) {
     return { valid: false, status: 401, error: 'Token inválido o expirado' };
   }
-  if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    if (!allowedRoles.includes(payload.rol)) {
-      return { valid: false, status: 403, error: `Rol '${payload.rol}' sin permiso para este endpoint` };
-    }
+  // [DIRECTOR-1] `allowedRoles === null` = «solo firma» (lo usa verifyAdminAuthLive
+  // antes de resolver el rol vivo); el veredicto de rol se da una sola vez.
+  if (allowedRoles !== null && !rolPermitido(payload.rol, allowedRoles, event)) {
+    return { valid: false, status: 403, error: `Rol '${payload.rol}' sin permiso para este endpoint` };
   }
   return { valid: true, user: payload };
 }
@@ -228,10 +335,8 @@ async function verifyAdminAuthLive(event, allowedRoles) {
 
   // 3) El rol VIVO manda para el permiso y para el resto del handler.
   const rolVivo = viva.rolVivo || payload.rol;
-  if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    if (!allowedRoles.includes(rolVivo)) {
-      return { valid: false, status: 403, error: `Rol '${rolVivo}' sin permiso para este endpoint` };
-    }
+  if (!rolPermitido(rolVivo, allowedRoles, event)) {
+    return { valid: false, status: 403, error: `Rol '${rolVivo}' sin permiso para este endpoint` };
   }
   return { valid: true, user: { ...payload, rol: rolVivo } };
 }
@@ -245,5 +350,9 @@ module.exports = {
   corsHeaders,
   jsonError,
   ALLOWED_ORIGINS,
+  // [DIRECTOR-1] expuestos para el careo (mide:director-1): la lista y el veredicto.
+  LECTURAS_DIRECTOR,
+  rolPermitido,
+  directorPuedeLeer,
 };
 

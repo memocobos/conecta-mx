@@ -4513,3 +4513,116 @@ button.vj-chip:hover{border-color:var(--orange)}
    Token de la casa (var(--green)), cero literales — vigia:color-literal no crece. */
 .vj2-wa{color:var(--green);text-decoration:none;white-space:nowrap}
 .vj2-wa:hover{text-decoration:underline}
+
+/* ═══════════════════════════════════════════════
+   [DIRECTOR-1 · 7-nov-2026] TEMA EJECUTIVO — claro, sobrio, sin neones.
+   Palabra de Memo: «cámbiale el template a algo más profesional» para la
+   dirección (eligió el claro). Copia la ESTRUCTURA de tema-america —el único
+   tema claro completo que ya funciona en todas las pantallas— con paleta
+   gris/azul marino. Tipografía de la casa, sin text-shadow ni brillos.
+═══════════════════════════════════════════════ */
+body.tema-ejecutivo {
+  --orange: #1F3A5F;
+  --orange2: #2E5C8A;
+  --gold: #1F3A5F;
+  --gold2: #D6E0EC;
+  --green: #2E8B57;
+  --red: #B23A3A;
+  --blue: #2E5C8A;
+  --bg: #F4F6F9;
+  --bg2: #FFFFFF;
+  --bg3: #EEF2F6;
+  --bg4: #E4E9F0;
+  --surface: #FFFFFF;
+  --card: #FFFFFF;
+  --border: #D6DEE8;
+  --border2: rgba(31,58,95,.35);
+  --text: #1C2430;
+  --ts: #5B6B7D;
+  --ts2: #8A97A6;
+  --shadow: 0 2px 10px rgba(16,32,56,.08);
+  --sh-card: 0 2px 10px rgba(16,32,56,.08);
+  background: #F4F6F9 !important;
+  color: #1C2430 !important;
+}
+body.tema-ejecutivo .topbar { background: #FFFFFF !important; border-bottom: 1px solid #D6DEE8 !important; box-shadow: 0 1px 8px rgba(16,32,56,.06); }
+body.tema-ejecutivo .topbar-brand { color: #1F3A5F !important; }
+body.tema-ejecutivo #topbar-user-info { color: #5B6B7D !important; }
+body.tema-ejecutivo .nav-btn { color: #34455A !important; }
+body.tema-ejecutivo .nav-btn:hover { background: #EEF2F6 !important; color: #1F3A5F !important; border-radius: 8px !important; }
+body.tema-ejecutivo .nav-btn.active { background: #1F3A5F !important; color: #FFFFFF !important; border-radius: 8px !important; }
+body.tema-ejecutivo .nav-btn.active .nav-ic, body.tema-ejecutivo .nav-btn.active svg { color: #FFFFFF !important; fill: currentColor; }
+body.tema-ejecutivo .content, body.tema-ejecutivo #app { background: #F4F6F9 !important; }
+body.tema-ejecutivo .k-card, body.tema-ejecutivo .perfil-card, body.tema-ejecutivo .gz-card, body.tema-ejecutivo .card {
+  background: #FFFFFF !important; border: 1px solid #D6DEE8 !important; border-radius: 10px !important;
+  box-shadow: 0 2px 10px rgba(16,32,56,.06); color: #1C2430 !important;
+}
+body.tema-ejecutivo .k-card:hover, body.tema-ejecutivo .gz-card:hover { border-color: #2E5C8A !important; box-shadow: 0 4px 14px rgba(16,32,56,.12); transform: none; }
+body.tema-ejecutivo .btn-primary, body.tema-ejecutivo .login-btn { background: #1F3A5F !important; color: #FFFFFF !important; border-radius: 8px !important; border: none !important; box-shadow: none !important; }
+body.tema-ejecutivo .btn-primary:hover, body.tema-ejecutivo .login-btn:hover { background: #2E5C8A !important; transform: none; box-shadow: none !important; }
+body.tema-ejecutivo .btn-ghost { border-radius: 8px !important; border-color: #C5D0DD !important; color: #1F3A5F !important; background: #FFFFFF !important; }
+body.tema-ejecutivo .btn-ghost:hover { background: #EEF2F6 !important; border-color: #2E5C8A !important; }
+body.tema-ejecutivo .btn-red { background: #B23A3A !important; color: #fff !important; border-radius: 8px !important; }
+body.tema-ejecutivo h1, body.tema-ejecutivo h2, body.tema-ejecutivo h3, body.tema-ejecutivo .page-title { color: #1F3A5F !important; text-shadow: none !important; }
+body.tema-ejecutivo .stat-number, body.tema-ejecutivo .gz-stat-num, body.tema-ejecutivo .stat-val { color: #1F3A5F !important; text-shadow: none !important; }
+body.tema-ejecutivo .stat-label, body.tema-ejecutivo .gz-stat-label, body.tema-ejecutivo .label, body.tema-ejecutivo td, body.tema-ejecutivo p { color: #34455A !important; }
+body.tema-ejecutivo input, body.tema-ejecutivo select, body.tema-ejecutivo textarea, body.tema-ejecutivo .cot-input {
+  background: #FFFFFF !important; border: 1px solid #C5D0DD !important; border-radius: 8px !important; color: #1C2430 !important;
+}
+body.tema-ejecutivo input:focus, body.tema-ejecutivo select:focus, body.tema-ejecutivo textarea:focus, body.tema-ejecutivo .cot-input:focus { border-color: #2E5C8A !important; box-shadow: 0 0 0 3px rgba(46,92,138,.15) !important; }
+body.tema-ejecutivo table th { color: #1F3A5F !important; border-bottom: 2px solid #D6DEE8 !important; background: #EEF2F6 !important; }
+body.tema-ejecutivo table tr:hover { background: #F4F6F9 !important; }
+body.tema-ejecutivo table td { color: #1C2430 !important; }
+body.tema-ejecutivo .modal-content { background: #FFFFFF !important; border: 1px solid #D6DEE8 !important; border-radius: 12px !important; color: #1C2430 !important; }
+body.tema-ejecutivo .modal-header { border-bottom: 1px solid #D6DEE8 !important; }
+body.tema-ejecutivo ::selection { background: #1F3A5F !important; color: #fff !important; }
+body.tema-ejecutivo .perfil-card-header { background: #EEF2F6 !important; border-radius: 10px 10px 0 0 !important; }
+body.tema-ejecutivo .gz-stat-bar { background: #1F3A5F !important; }
+body.tema-ejecutivo .tour-item { border-left-color: #1F3A5F !important; border-radius: 8px !important; background: #FFFFFF !important; }
+body.tema-ejecutivo .alert-success { background: #EEF7F1 !important; border-color: #2E8B57 !important; color: #1F5E3A !important; border-radius: 8px !important; }
+body.tema-ejecutivo .alert-error { background: #FBEFEF !important; border-color: #B23A3A !important; color: #8A2626 !important; border-radius: 8px !important; }
+body.tema-ejecutivo .sidebar, body.tema-ejecutivo #sidebar { background: #FFFFFF !important; border-right: 1px solid #D6DEE8 !important; }
+body.tema-ejecutivo .badge { border-radius: 6px !important; }
+body.tema-ejecutivo .k-mono { color: #1F3A5F !important; }
+body.tema-ejecutivo .kh-bottombar { background: #FFFFFF !important; border-top: 1px solid #D6DEE8 !important; }
+
+/* ═══════════════════════════════════════════════
+   [DIRECTOR-1] SOLO LECTURA · body.kh-solo-lectura
+   La PUERTA vive en el servidor (LECTURAS_DIRECTOR): esto solo quita de la
+   vista los controles que para este rol contestarían 403. Se casa por el
+   onclick (insensible a mayúsculas) para alcanzar también lo que las
+   pantallas pintan después; lo que se cuela se agrega aquí, no en 40 pantallas.
+═══════════════════════════════════════════════ */
+body.kh-solo-lectura [onclick*="guardar" i], body.kh-solo-lectura [onclick*="crear" i], body.kh-solo-lectura [onclick*="nuevo" i],
+body.kh-solo-lectura [onclick*="nueva" i], body.kh-solo-lectura [onclick*="eliminar" i], body.kh-solo-lectura [onclick*="borrar" i],
+body.kh-solo-lectura [onclick*="aprobar" i], body.kh-solo-lectura [onclick*="rechazar" i], body.kh-solo-lectura [onclick*="publicar" i],
+body.kh-solo-lectura [onclick*="archivar" i], body.kh-solo-lectura [onclick*="invitar" i], body.kh-solo-lectura [onclick*="enviar" i],
+body.kh-solo-lectura [onclick*="marcar" i], body.kh-solo-lectura [onclick*="asignar" i], body.kh-solo-lectura [onclick*="editar" i],
+body.kh-solo-lectura [onclick*="corregir" i], body.kh-solo-lectura [onclick*="abono" i], body.kh-solo-lectura [onclick*="mudar" i],
+body.kh-solo-lectura [onclick*="juntar" i], body.kh-solo-lectura [onclick*="separar" i], body.kh-solo-lectura [onclick*="subir" i],
+body.kh-solo-lectura [onclick*="capturar" i], body.kh-solo-lectura [onclick*="fijar" i], body.kh-solo-lectura [onclick*="recordar" i],
+body.kh-solo-lectura [onclick*="aplicar" i], body.kh-solo-lectura [onclick*="sembrar" i], body.kh-solo-lectura [onclick*="importar" i],
+body.kh-solo-lectura [onclick*="revivir" i], body.kh-solo-lectura [onclick*="justificar" i], body.kh-solo-lectura [onclick*="agregar" i],
+body.kh-solo-lectura [onclick*="agotar" i], body.kh-solo-lectura [onclick*="posponer" i], body.kh-solo-lectura [onclick*="transferir" i],
+body.kh-solo-lectura [onclick*="traspasar" i], body.kh-solo-lectura [onclick*="desmarcar" i], body.kh-solo-lectura [onclick*="revertir" i],
+body.kh-solo-lectura [onclick*="darSalida" i], body.kh-solo-lectura [onclick*="darBaja" i], body.kh-solo-lectura [onclick*="reset" i],
+body.kh-solo-lectura [onclick*="strike" i], body.kh-solo-lectura [onclick*="toggleActivo" i], body.kh-solo-lectura [onclick*="cambiarRol" i],
+body.kh-solo-lectura [onclick*="confirmar" i], body.kh-solo-lectura [onclick*="notificar" i], body.kh-solo-lectura [onclick*="avisar" i],
+body.kh-solo-lectura [onclick*="cancelarEvento" i], body.kh-solo-lectura [onclick*="cancelarSalida" i], body.kh-solo-lectura [onclick*="_vjCancelarAbrir" i],
+body.kh-solo-lectura [onclick*="_vjElegirAbrir" i], body.kh-solo-lectura [onclick*="_vjVuelo" i], body.kh-solo-lectura [onclick*="vjAltaIr" i],
+body.kh-solo-lectura [onclick*="migAbrir" i], body.kh-solo-lectura [onclick*="vjPortalAdelanto" i], body.kh-solo-lectura [onclick*="excel" i],
+body.kh-solo-lectura [onclick*="resumenActualizar" i], body.kh-solo-lectura [onclick*="submitEsfera" i], body.kh-solo-lectura [onclick*="probarCompilado" i],
+body.kh-solo-lectura [onclick*="roomingAuto" i], body.kh-solo-lectura [onclick*="staffBoleto" i], body.kh-solo-lectura [onclick*="grupoWa" i],
+body.kh-solo-lectura [onclick*="cortAbrir" i], body.kh-solo-lectura [onclick*="ctrEnt" i], body.kh-solo-lectura [onclick*="ctrBaja" i],
+body.kh-solo-lectura [onclick*="ctrRevive" i], body.kh-solo-lectura [onclick*="ctrAviso" i], body.kh-solo-lectura [onclick*="wlEliminar" i],
+body.kh-solo-lectura [onclick*="maMarcar" i], body.kh-solo-lectura [onclick*="nube" i]:not([onclick*="loadNube" i]):not([onclick*="nubeConsultar" i]),
+body.kh-solo-lectura [onclick*="abrirModal" i], body.kh-solo-lectura [onclick*="abrirFormPagar" i], body.kh-solo-lectura [onclick*="abrirCambiarEstado" i],
+body.kh-solo-lectura [onclick*="abrirEditarUsuario" i], body.kh-solo-lectura [onclick*="abrirVerComo" i], body.kh-solo-lectura [onclick*="abrirAgregarTour" i],
+body.kh-solo-lectura [onclick*="gzEditarPerfil" i], body.kh-solo-lectura [onclick*="gzCambiarFoto" i], body.kh-solo-lectura [onclick*="gzTourResponder" i],
+body.kh-solo-lectura [onclick*="_reqPaqAbrir" i], body.kh-solo-lectura [onclick*="_reqPagoAbrir" i], body.kh-solo-lectura [onclick*="_reqCambioCerrar" i],
+body.kh-solo-lectura [onclick*="ajuste" i], body.kh-solo-lectura [onclick*="kms" i], body.kh-solo-lectura [onclick*="completar" i],
+body.kh-solo-lectura [onclick*="ejecutar" i], body.kh-solo-lectura [onclick*="repTicket" i], body.kh-solo-lectura [onclick*="ponerStrike" i],
+body.kh-solo-lectura [onclick*="quitarStrike" i], body.kh-solo-lectura [onclick*="agregarPago" i], body.kh-solo-lectura [onclick*="markAll" i],
+body.kh-solo-lectura .kh-solo-lectura-oculto { display: none !important; }
+/* Un botón de «escribir» dentro de un formulario sin onclick (type=submit) tampoco se ofrece. */
+body.kh-solo-lectura #app form button[type="submit"], body.kh-solo-lectura #app form input[type="submit"] { display: none !important; }

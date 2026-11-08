@@ -108,7 +108,13 @@ const PERMISOS_TABS = {
   // rechaza requisiciones y en Capsule registra abonos, corrige, cancela y
   // elimina viajeros. SIN dinero de la casa (resumen, gastos, ingresos, saldos,
   // inventario, reportes) ni herramientas. `equipo` es solo para su Mi Perfil.
-  yajirobe:      ['requisiciones','capsule','equipo']
+  yajirobe:      ['requisiciones','capsule','equipo'],
+  // [DIRECTOR-1 · 7-nov] SOLO LECTURA (palabra de Memo: su jefe «ve todo, sin
+  // poder cambiar nada»). La puerta real vive en el SERVIDOR
+  // (LECTURAS_DIRECTOR en _lib/verify-admin: solo entra por lecturas listadas);
+  // aquí se decide qué pantallas se le PINTAN y `body.kh-solo-lectura` esconde
+  // los controles de escritura. Sin radio, baba, genkidama, emma ni diseño.
+  director:      ['resumen','requisiciones','gastos','ingresos','saldos','inventario','reportes','capsule','equipo','kamisama','herramientas','radar','esferas','contratos','waitlist','nube','cotizador']
 };
 
 // [GZ-TOURS-1] Pantallas que el rol PUEDE abrir pero que no llevan botón en el
@@ -125,6 +131,7 @@ const GZ_TABS_PERMITIDAS = {
   cc:            ['lista','miperfil'],
   milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
   yajirobe:      ['miperfil'],           // [YAJIROBE-1] solo su perfil
+  director:      ['lista','miperfil'],   // [DIRECTOR-1] ve al equipo; no invita
 };
 
 // F5 Milk: gate de UI para botones DESTRUCTIVOS que milk tiene VETADOS en el
@@ -653,6 +660,7 @@ function doLogout() {
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem('_roshi_session_backup'); // [SES-CRUCE-1] un «Ver como» no sobrevive a la salida
   khSetJwt(null);
+  document.body.classList.remove('kh-solo-lectura'); // [DIRECTOR-1]
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-pass').value = '';
@@ -682,11 +690,13 @@ function checkSession() {
 function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', milk:'Milk', yajirobe:'Yajirobe' };
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', milk:'Milk', yajirobe:'Yajirobe', director:'Director' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();
   applyTema(currentUser.tema_acento);
+  _aplicarSoloLectura();   // [DIRECTOR-1] body.kh-solo-lectura para el rol director
+  _aplicarNombresPro();    // [DIRECTOR-1] etiquetas profesionales si el usuario las tiene
   // [PERF v1] Boot mínimo: el CRITICAL PATH carga solo sesión/permisos (arriba,
   // sin fetch) + la pestaña visible (bootApp → loadResumen). Los badges de
   // chrome (notificaciones, pendientes) NO bloquean el primer render: se
@@ -782,6 +792,8 @@ const PLANTILLAS_KH = [
   { id: 'tema-axel',     nombre: 'Plata',             bg: '#0c0f16', a: '#94A3C8', b: '#E8F0FF' },
   { id: 'tema-america',  nombre: 'Rosa claro',        bg: '#F8F4F6', a: '#E8739A', b: '#D4688A' },
   { id: 'tema-laura',    nombre: 'Dorado claro',      bg: '#F5F0E8', a: '#C9973A', b: '#DDB86A' },
+  // [DIRECTOR-1] Claro y sobrio, sin neones: el de la dirección (palabra de Memo, 7-nov).
+  { id: 'tema-ejecutivo', nombre: 'Ejecutivo',        bg: '#F4F6F9', a: '#1F3A5F', b: '#2E5C8A' },
   // [GZ-PLANTILLA-2] Temas de colección (paletas originales, sin logos ni personajes).
   { id: 'tema-ki', nombre: 'Ki Explosivo', bg: '#0b0a14', a: '#FF8A00', b: '#2E7BFF', coleccion: true },
   { id: 'tema-mutante', nombre: 'Escuadrón Mutante', bg: '#070b18', a: '#FFC20E', b: '#1F4FD8', coleccion: true },
@@ -834,6 +846,74 @@ const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
 // EL ROL YA PUEDE VER. Ejemplo firmado: milk SÍ tiene 'resumen', pero su
 // aterrizaje es su captura. Si la preferencia no pasa el candado —le bloquearon
 // esa pantalla— se cae sola a la siguiente permitida.
+// ── [DIRECTOR-1 · 7-nov-2026] SOLO LECTURA + NOMBRES PROFESIONALES ──────────
+// Palabra de Memo: su jefe entra a VER. (1) `director` no puede escribir —la
+// puerta real es LECTURAS_DIRECTOR en el servidor; aquí solo se esconden los
+// controles que le contestarían 403 (kamehouse.css, body.kh-solo-lectura).
+// (2) `nombres_pro` es FORMA, no permiso: a quien lo tenga prendido se le
+// pintan nombres normales en lugar de los de Dragon Ball. El equipo no cambia.
+function _aplicarSoloLectura() {
+  document.body.classList.toggle('kh-solo-lectura', !!(currentUser && currentUser.rol === 'director'));
+}
+
+// El diccionario: literal → literal, con límite de palabra. 🔒 Ningún
+// resultado contiene una llave (si no, el observador se perseguiría la cola).
+const NOMBRES_PRO = [
+  ['KAMEHOUSE', 'PANEL DE CONTROL'], ['KameHouse', 'Panel de control'], ['Kamehouse', 'Panel de control'],
+  ['CAPSULE CORP', 'VIAJEROS'], ['Capsule Corp', 'Viajeros'], ['Capsule', 'Viajeros'],
+  ['GUERREROS Z', 'EQUIPO'], ['Guerreros Z', 'Equipo'],
+  ['ESFERAS DEL DRAGÓN', 'EVENTOS'], ['Esferas del Dragón', 'Eventos'], ['Esferas', 'Eventos'],
+  ['PALACIO DE KAMISAMA', 'INVENTARIO DE BOLETOS'], ['Palacio de Kamisama', 'Inventario de boletos'], ['Kamisama', 'Inventario'],
+  ['LA DERROTA DE YAMCHA', 'REEMBOLSOS'], ['La derrota de Yamcha', 'Reembolsos'], ['Yamcha', 'Reembolsos'],
+  ['LA CASA DE URANAI BABA', 'CÓDIGOS DE DESCUENTO'], ['La Casa de Uranai Baba', 'Códigos de descuento'], ['Uranai Baba', 'Códigos de descuento'], ['Baba', 'Códigos'],
+  ['MONTAÑA PAI', 'RESUMEN'], ['Montaña Pai', 'Resumen'],
+  ['RADAR DEL DRAGÓN', 'MÉTRICAS'], ['Radar del Dragón', 'Métricas'],
+  ['TORRE DE KARIN', 'BODEGA'], ['Torre de Karin', 'Bodega'], ['Bodega de Karin', 'Bodega'],
+  ['NUBE VOLADORA', 'TRANSPORTE CDMX'], ['Nube Voladora', 'Transporte CDMX'], ['Nube voladora', 'Transporte CDMX'],
+  ['EL MÁS ALLÁ', 'SOLICITUDES DE AGOTADOS'], ['El Más Allá', 'Solicitudes de agotados'],
+  ['GENKIDAMA', 'CORREOS MASIVOS'], ['Genkidama', 'Correos masivos'],
+  ['EMMA KAIOSAMA', 'ASISTENTE'], ['Emma Kaiosama', 'Asistente'],
+  ['Kaio-sama', 'Radio'], ['Kaio-Sama', 'Radio'],
+  ['Maestro Roshi', 'Administrador'], ['Maestro Karin', 'Supervisor'],
+  ['Yajirobe', 'Auxiliar'], ['Bulma', 'Auxiliar administrativa'], ['Milk', 'Auxiliar administrativa'],
+];
+const _NP_RE = NOMBRES_PRO.map(([a, b]) => [new RegExp('(^|[^A-Za-zÁÉÍÓÚÑáéíóúñ])' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![A-Za-zÁÉÍÓÚÑáéíóúñ])', 'g'), b]);
+const _NP_SALTA = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']);
+function _npTexto(t) {
+  if (!t || t.length < 4) return t;
+  let out = t;
+  for (const [re, b] of _NP_RE) out = out.replace(re, (m, pre) => pre + b);
+  return out;
+}
+function _npNodo(root) {
+  if (!root) return;
+  if (root.nodeType === 3) { const v = _npTexto(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; return; }
+  if (root.nodeType !== 1 && root.nodeType !== 11) return;
+  if (root.nodeType === 1 && _NP_SALTA.has(root.tagName)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode && _NP_SALTA.has(n.parentNode.tagName)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const cambios = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) { const v = _npTexto(n.nodeValue); if (v !== n.nodeValue) cambios.push([n, v]); }
+  cambios.forEach(([n, v]) => { n.nodeValue = v; });
+  // placeholders y titles también se leen
+  const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title]')] : [...root.querySelectorAll('[placeholder],[title]')];
+  els.forEach((el) => { ['placeholder', 'title'].forEach((a) => { const v = el.getAttribute && el.getAttribute(a); if (v) { const nv = _npTexto(v); if (nv !== v) el.setAttribute(a, nv); } }); });
+}
+let _npObs = null;
+function _aplicarNombresPro() {
+  const on = !!(currentUser && currentUser.nombres_pro === true);
+  if (!on) { if (_npObs) { _npObs.disconnect(); _npObs = null; } return; }
+  _npNodo(document.body);
+  document.title = _npTexto(document.title);
+  if (_npObs) return;
+  _npObs = new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'characterData') _npNodo(m.target);
+      else m.addedNodes.forEach((n) => _npNodo(n));
+    }
+  });
+  _npObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
 const HOME_PREFERIDO = {
   maestro_roshi: 'resumen',
   // [HOME-ROL-1 · orden de Memo, 12-oct] Bulma/Milk y los Guerreros Z entran a
@@ -842,6 +922,7 @@ const HOME_PREFERIDO = {
   bulma: 'resumen',   // [OPS-MIN-1] su resumen ES el Resumen (con las alarmas)
   milk: 'resumen',
   yajirobe: 'requisiciones',   // [YAJIROBE-1] su trabajo del día es la bandeja
+  director: 'resumen',         // [DIRECTOR-1] entra a los números
   coordinador: 'inicio',
   cc: 'inicio',
   mister_popo: 'inicio',
@@ -4304,6 +4385,7 @@ const ROL_LABELS = {
   bulma: 'Bulma',
   milk: 'Milk',
   yajirobe: 'Yajirobe',
+  director: 'Director',
   mister_popo: 'Maestro Karin',
   coordinador: 'Coordinador',
   cc: 'Creador de Contenido',
@@ -4377,6 +4459,7 @@ const ROL_CONTRATOS = {
   bulma:         ['auxiliar_admin', 'coordinador'], // Sofía también coordina
   milk:          ['auxiliar_admin', 'coordinador'], // Ximena igual: auxiliar Y coordinadora
   yajirobe:      ['auxiliar_admin'], // [YAJIROBE-1] auxiliar de Milk
+  director:      [], // [DIRECTOR-1] solo mira; no es empleado de la sucursal
   mister_popo:   ['auxiliar_admin', 'coordinador'], // Maestro Karin: auxiliar Y coordinador; la custodia va como casilla en su contrato de coordinador
   coordinador:   ['coordinador'],
   cc:            ['creadora_team'],
@@ -4384,6 +4467,7 @@ const ROL_CONTRATOS = {
 // Por qué un rol NO firma. Vacío = el rol sí firma (o no aplica el aviso).
 const ROL_SIN_CONTRATO = {
   maestro_roshi: 'no aplica: es la dirección',
+  director: 'no aplica: acceso de solo lectura para la dirección', // [DIRECTOR-1]
 };
 // [EQ-6] Las plantillas que NO cuelgan de un evento. Decisión de negocio de
 // Memo: el contrato de coordinador es ANUAL (cubre los eventos que le toquen
@@ -5084,7 +5168,7 @@ function showCCTab(tab, btn) {
 // `ATAJOS_HOME`, que evalúa su lista al cargar y por eso su constante tuvo que
 // subir 4,700 líneas en UX-8. Aquí el orden no muerde, pero se dice para que
 // nadie deduzca la regla equivocada del ejemplo de al lado.
-const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros', maestro_roshi: 'viajeros', yajirobe: 'viajeros' };
+const CC_SUB_POR_ROL = { bulma: 'viajeros', milk: 'viajeros', maestro_roshi: 'viajeros', yajirobe: 'viajeros', director: 'viajeros' };
 function _ccSubDefault() {
   return (currentUser && CC_SUB_POR_ROL[currentUser.rol]) || 'equipo';
 }
@@ -5412,7 +5496,7 @@ function _ccDatosEquipoHtml(r, abierto) {
   const mail = (m) => m ? `<a href="mailto:${esc(m)}" style="color:var(--text)">${esc(m)}</a>` : nd;
   const fila = (k, v) => `<div style="display:flex;gap:6px"><span style="color:var(--ts);min-width:84px">${k}</span><span style="word-break:break-word">${v}</span></div>`;
   const caja = (borde, html) => `<div style="border-left:3px solid ${borde};background:rgba(255,255,255,.03);border-radius:6px;padding:8px 10px;margin-top:6px">${html}</div>`;
-  const ROL = { coordinador: 'Coordinador', maestro_roshi: 'Maestro Roshi', bulma: 'Bulma', milk: 'Milk', yajirobe: 'Yajirobe', cc: 'Staff', mister_popo: 'Staff' };
+  const ROL = { coordinador: 'Coordinador', maestro_roshi: 'Maestro Roshi', bulma: 'Bulma', milk: 'Milk', yajirobe: 'Yajirobe', director: 'Director', cc: 'Staff', mister_popo: 'Staff' };
   const ST = { aceptado: '✓ aceptó', pendiente: '⏳ no ha aceptado' };
   const htmlEq = eq.map(p => caja('var(--orange)',
     `<div style="font-weight:700">${esc(p.nombre || '—')} <span style="font-weight:400;color:var(--ts)">· ${esc(ROL[p.rol] || p.rol || 'Equipo')} · ${esc(ST[p.status] || p.status || '')}</span></div>`

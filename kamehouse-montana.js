@@ -76,7 +76,7 @@ function aplicarPermisosUI() {
   if (selInv) {
     const soloRoshi = rol === 'maestro_roshi';
     Array.from(selInv.options).forEach(opt => {
-      if (opt.value === 'bulma' || opt.value === 'milk' || opt.value === 'yajirobe') {
+      if (opt.value === 'bulma' || opt.value === 'milk' || opt.value === 'yajirobe' || opt.value === 'director') {
         opt.hidden = !soloRoshi;
         opt.disabled = !soloRoshi;
       }
@@ -534,7 +534,7 @@ async function loadMTResumen() {
     ]);
     const porRol = {};
     usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', director:'Director', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC' };
 
     el.innerHTML = `
       <!-- Métricas rápidas -->
@@ -596,7 +596,7 @@ function filtrarMTUsuarios() {
 function renderMTUsuarios(lista) {
   const list = document.getElementById('mt-usuarios-list');
   if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', director:'Director', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   list.innerHTML = lista.map(u => `
     <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
@@ -682,9 +682,9 @@ async function abrirEditarUsuarioMT(id) {
   // «Guardar» la subía a roshi sin que nadie lo eligiera. Hoy van los siete
   // roles del CHECK de la base, y si un rol raro no está en la lista se agrega
   // para que el select SIEMPRE nazca en el rol real de la persona.
-  const rolOpts = ['maestro_roshi','bulma','milk','yajirobe','mister_popo','coordinador','cc'];
+  const rolOpts = ['maestro_roshi','bulma','milk','yajirobe','director','mister_popo','coordinador','cc']; // [DIRECTOR-1]
   if (u.rol && !rolOpts.includes(u.rol)) rolOpts.push(u.rol);
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', director:'Director', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   // Tabs extra / bloqueadas actuales
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
@@ -723,6 +723,11 @@ async function abrirEditarUsuarioMT(id) {
             <input class="cot-input" id="mtu-pass" placeholder="Dejar vacío para no cambiar" style="width:100%">
           </div>
         </div>
+        <!-- [DIRECTOR-1] Nombres profesionales: es FORMA (etiquetas), no permiso -->
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;margin-top:12px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm,8px)">
+          <input type="checkbox" id="mtu-nombres-pro" ${u.nombres_pro ? 'checked' : ''} style="accent-color:var(--orange)">
+          <span><b>Nombres profesionales</b> — ve «Panel de control», «Viajeros», «Equipo», «Eventos»… en lugar de KameHouse, Capsule Corp, Guerreros Z, Esferas. Solo cambia las etiquetas de SU pantalla.</span>
+        </label>
         <!-- Tabs extra -->
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
           <div class="k-mono" style="margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
@@ -768,6 +773,7 @@ async function guardarUsuarioMT() {
   const body = {
     nombre, rol, username: username||null,
     permisos_extra: { tabs_extra: tabsExtra, tabs_bloqueados: tabsBloq },
+    nombres_pro: !!document.getElementById('mtu-nombres-pro')?.checked, // [DIRECTOR-1]
   };
   if (pass) body.password = pass; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
@@ -846,7 +852,7 @@ async function loadMTStrikes() {
     const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
     const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
     const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', milk:'Milk', yajirobe:'Yajirobe', director:'Director', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
 
     list.innerHTML = `
       <div style="margin-bottom:20px">

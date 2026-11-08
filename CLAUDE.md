@@ -188,6 +188,67 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 👔⏳ **DIRECTOR-1 (7-nov-2026, en main local; la BASE ya escrita): el rol de
+  SOLO LECTURA para la dirección, nombres profesionales por usuario y el tema
+  «Ejecutivo».** Palabra de Memo: *«Mi jefe quiere ver el kamehouse, puedes
+  hacerme un usuario y contraseña provisional para él, también cámbiale el
+  template a algo más profesional y los nombres ponlos como debe de ser»*. Sus
+  respuestas: **ver todo sin poder cambiar nada** · nombres normales **solo
+  para él** · tema **Ejecutivo claro**.
+  - 🔒 **La puerta del rol `director` es ÚNICA y vive en el servidor:**
+    `LECTURAS_DIRECTOR` en `_lib/verify-admin.js`. Para ese rol se IGNORA la
+    lista de roles de cada handler y entra SOLO si `(function, accion)` está
+    listado; lo demás es 403, fail-closed. Razón: 'director' en las ~60 listas
+    repartidas envejecería sola y UNA olvidada en una escritura es dinero. La
+    lista solo trae lecturas (resumen/dinero · Capsule · Kamisama · Esferas
+    listar · Radar sin «vista» · reportes · contratos · equipo listar/obtener).
+    Fuera a propósito: `contrato_cliente_ine` (fotos de INE), Yamcha, Baba,
+    radio, Genkidama, Emma, Montaña Pai (editor de usuarios).
+  - **Acta `migraciones/DIRECTOR-1.sql` (YA CORRIDA, candados mordidos 23514):**
+    CHECK de rol con 8 valores · `tema-ejecutivo` en el CHECK de plantilla ·
+    columna `usuarios.nombres_pro boolean default false` (0 usuarios en true
+    antes del alta).
+  - **KameHouse:** `PERMISOS_TABS.director` (resumen, requisiciones, dinero,
+    inventario, reportes, capsule, equipo, kamisama, radar, esferas, contratos,
+    waitlist, nube, cotizador) · aterriza en Resumen · GZ solo lista + perfil ·
+    7 mapas de etiquetas de rol ganaron «Director» · select de invitación y
+    Montaña Pai lo ofrecen (solo roshi lo invita: ve todo el dinero) ·
+    `body.kh-solo-lectura` + CSS que esconde los controles de escritura por su
+    `onclick` (insensible a mayúsculas; acotado a `#app` para no esconder el
+    botón de login). **NOMBRES PROFESIONALES** (`_aplicarNombresPro`): con
+    `nombres_pro` prendido, un diccionario con límite de palabra reescribe los
+    textos (KameHouse→Panel de control · Capsule Corp→Viajeros · Guerreros
+    Z→Equipo · Esferas→Eventos · Kamisama→Inventario de boletos · Yamcha→
+    Reembolsos · Baba→Códigos de descuento · Montaña Pai→Resumen · Radar→
+    Métricas · Torre de Karin→Bodega · Nube→Transporte CDMX · Más Allá→
+    Solicitudes de agotados · Genkidama→Correos masivos · Kaio-sama→Radio ·
+    Maestro Roshi→Administrador · Bulma/Milk→Auxiliar administrativa…) con
+    MutationObserver para lo que se pinta después. 🔒 El diccionario es
+    ESTABLE (ningún resultado vuelve a casar: el observador no se persigue la
+    cola) y el careo lo afirma. Casilla «Nombres profesionales» en el editor
+    de Montaña Pai (`ADMIN_FIELDS` ganó `nombres_pro`; auth-login lo manda).
+  - **Tema «Ejecutivo»** (`body.tema-ejecutivo`, en `PLANTILLAS_KH`): claro,
+    gris/azul marino, sin neones; copia la estructura de `tema-america`.
+  - **El usuario:** `direccion` / `direccion@conectareynosa.mx`, rol director,
+    plantilla Ejecutivo, nombres_pro true, contraseña provisional (se le dio a
+    Memo en el chat; NO vive en el repo). Nombre «Dirección Conecta MX» hasta
+    que Memo diga el nombre real.
+  - `mide:director-1` **79** (puerta central con sabotaje «director en la
+    lista del handler no abre una escritura» · 14 lecturas abiertas y 26
+    escrituras cerradas por los handlers REALES con rol vivo · CERO escrituras
+    por el HECHO con control positivo (roshi sí escribe) · detector estático
+    de verbos de escritura en cada rama listada, cortada por balance de llaves
+    con regex neutralizados · diccionario estable · CHECK = ROLES_VALIDOS =
+    PERMISOS_TABS). `mide:yajirobe-1` **45** (su «CHECK del acta = 7 roles» se
+    actualizó a la verdad nueva: sus 7 siguen y el acta VIGENTE es DIRECTOR-1).
+    Vecinos verdes: req-b1 52 · capsule-ux-1 83 · portal-solo-1 89.
+  - ⚠️ **No verificado en navegador**: la puerta nueva vive en el servidor y
+    producción no la trae hasta el push — con el código viejo el director
+    recibe 403 en todo. ⏳ Push de Memo → entrar como `direccion` → recorrer
+    Resumen, Viajeros, Inventario y Eventos: lo que salga vacío con 403 es una
+    lectura que falta en `LECTURAS_DIRECTOR` (se agrega), y cualquier botón de
+    escritura que asome se agrega al CSS.
+
 - 🎵⏳ **MUSICA-FEST-CONC-1 (7-nov-2026, en main local, cero SQL): la música
   del panel «festival» de Esferas por fin suena.** Reporte de Memo: «puse música
   en vive latino pero no se reproduce». Medido: Esferas escribe la lista rotativa

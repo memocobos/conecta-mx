@@ -116,7 +116,14 @@ const sinPermiso = (r) => r.s === 403 && /sin permiso|no autorizado|permiso/i.te
   const delActa = (acta.match(/array\[([^\]]+)\]/) || [])[1].split(',').map((x) => x.trim().replace(/'/g, '')).sort();
   const us = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-usuarios.js'), 'utf8');
   const validos = vm.runInNewContext(us.match(/const ROLES_VALIDOS = (\[[^\]]+\])/)[1]).sort();
-  af(JSON.stringify(delActa) === JSON.stringify(validos), () => 'CHECK del acta = ROLES_VALIDOS: ' + delActa.join(','));
+  // [DIRECTOR-1 · 7-nov] El acta de YAJIROBE-1 es la FOTO de los 7 roles de su
+  // día; el CHECK vivo lo reescribió DIRECTOR-1 con 8. Lo que sigue siendo cierto
+  // y se vigila: los 7 de esta acta SIGUEN en ROLES_VALIDOS (nadie los quitó) y
+  // el acta MÁS RECIENTE que toca usuarios_rol_check es igual a ROLES_VALIDOS.
+  af(delActa.every((r) => validos.includes(r)), () => 'los 7 roles del acta YAJIROBE-1 siguen en ROLES_VALIDOS: ' + delActa.join(','));
+  const actaDir = fs.readFileSync(path.join(RAIZ, 'migraciones/DIRECTOR-1.sql'), 'utf8');
+  const delActaDir = ((actaDir.match(/usuarios_rol_check\s*\n?\s*check \(rol = any \(array\[([^\]]+)\]/) || [])[1] || '').split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort();
+  af(JSON.stringify(delActaDir) === JSON.stringify(validos), () => 'el CHECK vigente (acta DIRECTOR-1) = ROLES_VALIDOS: ' + delActaDir.join(','));
   const mt = fs.readFileSync(path.join(RAIZ, 'kamehouse-montana.js'), 'utf8');
   const opts = vm.runInNewContext(mt.match(/const rolOpts = (\[[^\]]+\])/)[1]).sort();
   af(JSON.stringify(opts) === JSON.stringify(validos), () => 'Montaña Pai ofrece los mismos roles (si falta uno, editar a esa persona la cambia de rol): ' + opts.join(','));

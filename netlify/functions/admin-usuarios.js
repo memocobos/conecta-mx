@@ -39,14 +39,14 @@ const crypto = require('crypto');
 
 const BCRYPT_COST = 10;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'milk', 'yajirobe']; // [YAJIROBE-1]
+const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'milk', 'yajirobe', 'director']; // [YAJIROBE-1] [DIRECTOR-1]
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 // Roles de alto privilegio cuya CREACIÓN (invitación) queda reservada a
 // maestro_roshi (anti escalación). Incluye `milk` aunque NO sea ROLES_ADMIN:
 // milk vive justo debajo de bulma y un bulma no debe poder crear ni un bulma ni
 // un milk. Ojo: se usa SOLO para gatear 'crear' — NO cambia la semántica de
 // ROLES_ADMIN (editar/borrar a terceros), que milk sigue sin tener.
-const ROLES_INVITA_SOLO_ROSHI = ['maestro_roshi', 'bulma', 'milk', 'yajirobe']; // [YAJIROBE-1] solo roshi lo crea
+const ROLES_INVITA_SOLO_ROSHI = ['maestro_roshi', 'bulma', 'milk', 'yajirobe', 'director']; // [YAJIROBE-1] solo roshi lo crea · [DIRECTOR-1] ve TODO el dinero: solo roshi lo invita
 
 // Whitelist de columnas que SÍ pueden viajar al navegador. password_hash,
 // invite_token, invite_usado e invite_expires_at quedan EXCLUIDOS a propósito.
@@ -54,7 +54,7 @@ const COLS_ADMIN_ARR = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
   'num_emergencia', 'nombre_emergencia', 'parentesco_emergencia', 'template_sugerido', 'tema_acento',
-  'tema_plantilla', 'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
+  'tema_plantilla', 'nombres_pro', 'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
 ];
 const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la query)
 
@@ -70,7 +70,7 @@ const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la 
 //   · cualquier otro rol → solo lo mínimo para pintar nombres y vistas de
 //     equipo… salvo SU PROPIA fila, que llega completa (cada quien ve lo suyo).
 const COLS_BASICO_ARR = [
-  'id', 'nombre', 'username', 'rol', 'activo', 'foto_url', 'tema_acento', 'tema_plantilla',
+  'id', 'nombre', 'username', 'rol', 'activo', 'foto_url', 'tema_acento', 'tema_plantilla', 'nombres_pro',
   'perfil_completo', 'template_sugerido',
 ];
 const COLS_BASICO = new Set(COLS_BASICO_ARR);
@@ -130,7 +130,8 @@ const SELF_FIELDS = [
   'tema_acento', 'tema_plantilla', 'foto_url', 'perfil_completo',
 ];
 // Campos extra que SOLO un admin (maestro_roshi/bulma) puede tocar de otros.
-const ADMIN_FIELDS = ['rol', 'activo', 'strikes', 'correo'];
+// [DIRECTOR-1] `nombres_pro` lo decide un admin por usuario (es forma, no permiso).
+const ADMIN_FIELDS = ['rol', 'activo', 'strikes', 'correo', 'nombres_pro'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -384,6 +385,9 @@ exports.handler = async (event) => {
       }
       if (Object.prototype.hasOwnProperty.call(update, 'activo')) {
         update.activo = !!update.activo;
+      }
+      if (Object.prototype.hasOwnProperty.call(update, 'nombres_pro')) {
+        update.nombres_pro = update.nombres_pro === true || update.nombres_pro === 'true'; // [DIRECTOR-1]
       }
 
       // username: normaliza y verifica unicidad server-side.

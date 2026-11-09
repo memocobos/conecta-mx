@@ -52,6 +52,28 @@ function folioDeReferencia(ref) {
 // guarda en su fila. `req` trae folio, id, separo_sistema, evento_nombre,
 // evento_id, paquete, zona, num_personas, nombre, correo.
 // Devuelve { ok:true, url, preference_id, total_pesos, comision_pesos, neto_pesos }
+// [MP-RIESGO-1 · 9-nov-2026] Mercado Pago rechazó 2 de 3 pagos con tarjeta el
+// primer día (cc_rejected_high_risk): su antifraude califica con lo que la
+// preferencia le cuenta del comprador y de lo que compra. Mandábamos solo correo
+// y un nombre en un solo campo. Hoy viajan nombre y apellido separados, el
+// celular (10 dígitos MX), y la categoría del artículo (viajes). No cambia el
+// monto ni el flujo: solo le da a MP los datos que su antifraude pide.
+function _payerDe(p) {
+  if (!p) return undefined;
+  const correo = String(p.correo || '').trim();
+  if (!correo) return undefined;
+  const partes = String(p.nombre || '').trim().split(/\s+/).filter(Boolean);
+  const payer = { email: correo };
+  if (partes.length) {
+    payer.name = partes.length > 2 ? partes.slice(0, partes.length - 2).join(' ') : partes[0];
+    const ap = partes.length > 2 ? partes.slice(-2).join(' ') : partes.slice(1).join(' ');
+    if (ap) payer.surname = ap;
+  }
+  const d = String(p.celular || '').replace(/\D/g, '').slice(-10);
+  if (d.length === 10) payer.phone = { area_code: '52', number: d };
+  return payer;
+}
+
 // o { ok:false, motivo } — JAMÁS lanza.
 async function crearLinkRequisicion({ req, SB_URL, sbH, fetchImpl }) {
   const _fetch = fetchImpl || fetch;
@@ -72,9 +94,10 @@ async function crearLinkRequisicion({ req, SB_URL, sbH, fetchImpl }) {
         quantity: 1,
         currency_id: 'MXN',
         unit_price: t.total_pesos,            // ⚠️ EN PESOS
+        category_id: 'travels',               // [MP-RIESGO-1]
       }],
       external_reference: referenciaDe(folio),
-      payer: req.correo ? { email: String(req.correo), name: req.nombre || undefined } : undefined,
+      payer: _payerDe(req),
       back_urls: {
         success: `${SITE()}/?pago=ok&folio=${encodeURIComponent(folio)}`,
         failure: `${SITE()}/?pago=error&folio=${encodeURIComponent(folio)}`,
@@ -167,9 +190,10 @@ async function crearLinkCuota({ cuota, fetchImpl }) {
         title: `${cuota.etiqueta || 'Abono'} · ${cuota.evento_nombre || vj.evento_id || 'tu viaje'}`,
         description: `${vj.nombre || 'Viajero'} · incluye comisión de Mercado Pago`,
         quantity: 1, currency_id: 'MXN', unit_price: t.total_pesos,
+        category_id: 'travels',               // [MP-RIESGO-1]
       }],
       external_reference: referenciaCambio(cid),
-      payer: vj.correo ? { email: String(vj.correo), name: vj.nombre || undefined } : undefined,
+      payer: _payerDe(vj),
       back_urls: {
         success: `${SITE()}/portal.html?pago=ok`,
         failure: `${SITE()}/portal.html?pago=error`,
@@ -195,4 +219,5 @@ async function crearLinkCuota({ cuota, fetchImpl }) {
   }
 }
 
-module.exports = { PREFIJO_REQ, PREFIJO_CV, disponible, referenciaDe, folioDeReferencia, referenciaCambio, cambioDeReferencia, crearLinkRequisicion, crearLinkCuota };
+module.exports = {
+  _payerDe, PREFIJO_REQ, PREFIJO_CV, disponible, referenciaDe, folioDeReferencia, referenciaCambio, cambioDeReferencia, crearLinkRequisicion, crearLinkCuota };

@@ -188,6 +188,15 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳⏳ **MP-RIESGO-1 (9-nov-2026, en main local, cero SQL): Mercado Pago rechazaba tarjetas por «alto riesgo».**
+  Reporte de Memo («otra persona me indicó lo mismo, algo anda mal con Mercado Pago»). Medido en `mp_pagos`: del primer
+  día, 2 de 3 tarjetas `rejected / cc_rejected_high_risk` (R-223EE crédito $633 · R-EDU5F débito $319), 1 aprobada (la
+  prueba de Memo) y 1 SPEI pendiente. No es un defecto del webhook ni del link: es el antifraude de MP, que califica con
+  lo que la preferencia cuenta, y mandábamos solo correo + nombre en un campo. Hoy `_payerDe` (dueño en `_lib/mp-link`)
+  manda nombre y apellido separados + celular (52 + 10 dígitos) y el artículo lleva `category_id:'travels'`, en las DOS
+  preferencias (requisición y cuota del Portal). Monto y flujo intactos. Vecinos verdes: mp-link-1 60 · portal-pago-2
+  78 · req-b1 52. ⚠️ No garantiza la aprobación: cuenta/app recién estrenadas también pesan y lo decide el banco. ⏳ Push.
+
 - 🔎⏳ **CC-BUSCA-GLOBAL-1 (9-nov-2026, en main local, cero SQL): el buscador principal de Capsule encuentra CLIENTES en todos
   los eventos.** Palabra de Memo: *«entrar evento por evento a buscar un cliente, sobre todo en los multifechas, es cansado»*.
   Con 3+ letras, además de filtrar eventos, `admin-coordi-asignaciones · viajero_buscar` (SOLO LEE; roshi/bulma/milk/yajirobe

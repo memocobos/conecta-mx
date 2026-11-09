@@ -188,6 +188,25 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🎤⏳ **FEID-VENTA-1 (9-nov-2026, ficha YA ESCRITA + index a mano): Feid sale a
+  la venta con 15 zonas nuevas.** Palabra de Memo: «urge cambiar las zonas y
+  costos de feid y salir a la venta». Ficha `feid` (valor esperado md5 + status
+  'agotado' en el WHERE, 1 fila): status '' y zonas [{n,p,pc}] — Cancha VIP
+  7400/5700 · Platino, Mc Cormick, Coke Studio, Doritos 7800/6100 · Oro,
+  Megacable, Plus Ultra, Banco Azteca 7300/5600 · Super Palco 5600/3900 ·
+  Barrera 7000/5300 · Butaca 6500/4800 · Preferente 5400/3700 · Luneta
+  4800/3100 · Balcón 4400/2700 (PLUS/CHEAP). Medido antes: 0 viajeros · 0
+  requisiciones · 0 compras · 0 ajustes (cero huérfanos). El index se editó con
+  los MISMOS números (el push lo lleva sin esperar publish) y feid entró a
+  `REQUISICION_EVENTOS` + `RESERVA_2027` (MTY 2027, regla de PITBULL-REQ-1).
+  Careado por el dueño (`_parseEV` + `_calcularPrecio`): PLUS Cancha VIP 7400 ·
+  CHEAP 5700 · STAY Oro 6800 · RIDE 2700 · separo 300; «Platino B» vieja
+  rebota. `mide:req-2027-2` **34** (su lista literal ganó feid) ·
+  `mide:req-2027-1` **24** (su control positivo leía `HEAD` y caducó con
+  c6eb121: hoy ancla al commit ANTERIOR a CORREO-ABONO-2027, buscado por
+  mensaje). ⚠️ **El MAPA sigue siendo el de Arena (Beyond/Platino/Perfil)**:
+  hay que subir el mapa nuevo en Esferas antes de/tras publicar. ⚠️ Sin pedido
+  cargado: vende a ciegas hasta Kamisama. ⏳ Push de Memo → mapa → publish.
 - 📜⏳ **LEGAL-1 + OAUTH-GOOGLE (9-nov-2026, en main local, cero SQL): aviso de
   privacidad y términos públicos — la llave para publicar el login con Google.**
   Medido con Memo en Chrome: el cliente OAuth del Portal vive en el proyecto

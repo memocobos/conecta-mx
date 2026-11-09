@@ -59,8 +59,8 @@ global.fetch = async (url) => {
   // 2027»). La excepción «con nombre» de vivelatino se volvió la regla para
   // todos los CDMX 2027 a la venta; el que queda fuera (ozzfest) es próximamente.
   const CDMX_ABIERTOS = ['vivelatino', 'warning', 'hilary', 'edc27', 'u2', 'louist', 'niall'];
-  af(C.RESERVA_2027.length === 17 && C.RESERVA_2027.includes('pitbull') && CDMX_ABIERTOS.every((id) => C.RESERVA_2027.includes(id)),
-     'son los 9 que firmó Memo + pitbull (MTY 2027, caso María) + los 7 CDMX 2027 (vivelatino 7-nov · 6 más el 9-nov)');
+  af(C.RESERVA_2027.length === 18 && C.RESERVA_2027.includes('pitbull') && C.RESERVA_2027.includes('feid') && CDMX_ABIERTOS.every((id) => C.RESERVA_2027.includes(id)),
+     'son los 9 que firmó Memo + pitbull (MTY 2027, caso María) + los 7 CDMX 2027 (vivelatino 7-nov · 6 más el 9-nov) + feid (FEID-VENTA-1, 9-nov)');
   af(new Set(lista).size === lista.length, 'sin repetidos');
 
   console.log('\n[B] cada evento abierto, contra el catálogo real');

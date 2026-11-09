@@ -64,6 +64,7 @@ const CORREO_RESERVA_DESDE = '2027-01-01';
 // mide:req-2027-2 las carea para que no diverjan.
 const RESERVA_2027 = ['fuerzaregida', 'juniorh', 'anagabriel', 'emmanuel', 'madero',
   'interpol', 'anuelaa', 'oreja', 'scorpions', 'pitbull',
+  'feid',          // [FEID-VENTA-1] MTY 2027 (palabra de Memo, 9-nov-2026)
   'vivelatino',    // [VIVELATINO-VENTA-1] el primer CDMX 2027 (palabra de Memo, 7-nov-2026)
   'warning', 'hilary', 'edc27', 'u2', 'louist', 'niall'];  // [SEP-300-1] los 6 CDMX 2027 restantes (palabra de Memo, 9-nov-2026: «abre cdmx 2027»)
 

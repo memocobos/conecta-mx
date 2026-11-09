@@ -114,7 +114,7 @@ const ev = (body) => ({ httpMethod: 'POST', headers: { origin: 'https://conectar
   try {
     const { execSync } = require('child_process');
     const tmp = path.join(RAIZ, 'netlify/functions/_lib', '.mide-req-2027-1-base.js');
-    fs.writeFileSync(tmp, execSync('git show HEAD:netlify/functions/_lib/correo-confirmacion.js', { cwd: RAIZ, encoding: 'utf8' }));
+    fs.writeFileSync(tmp, execSync('git show ' + execSync('git log --format=%H -1 --grep="CORREO-ABONO-2027"', { cwd: RAIZ, encoding: 'utf8' }).trim() + '~1:netlify/functions/_lib/correo-confirmacion.js', { cwd: RAIZ, encoding: 'utf8' }));
     try {
       const B = require(tmp);
       const baseNo = !(await B.correoDebeSalir('juniorh', 'abono'));

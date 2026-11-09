@@ -8,7 +8,7 @@
  *   [A] las dos listas son la MISMA (index = preventas + RESERVA_2027)
  *   [B] cada evento abierto, contra el catálogo REAL: existe, 2027+, NO CDMX,
  *       a la venta (no agotado/próximamente/pasado)
- *   [C] ningún CDMX 2027 quedó abierto, por construcción
+ *   [C] ningún CDMX 2027 fuera de los abiertos POR NOMBRE quedó abierto
  *   [D] el correo: abierto → sale al aprobar; CDMX 2027 → NO (aunque la fecha
  *       califique); captura manual → NO
  * ⚠️ SIN ANCLA a propósito (árbol de trabajo, como mide:req-2027-1).
@@ -55,10 +55,14 @@ global.fetch = async (url) => {
   // [VIVELATINO-VENTA-1 · 7-nov] + vivelatino: el PRIMER CDMX que abre (palabra de
   // Memo: «con formulario»). Su total nace SIN transporte y el vuelo se suma en
   // Capsule (✈️ Vuelo). Es una excepción CON NOMBRE: los demás CDMX siguen fuera.
-  af(C.RESERVA_2027.length === 11 && C.RESERVA_2027.includes('pitbull') && C.RESERVA_2027.includes('vivelatino'), 'son los 9 que firmó Memo + pitbull (MTY 2027, caso María) + vivelatino (CDMX, 7-nov)');
+  // [SEP-300-1 · 9-nov] + los 6 CDMX 2027 restantes (palabra de Memo: «abre cdmx
+  // 2027»). La excepción «con nombre» de vivelatino se volvió la regla para
+  // todos los CDMX 2027 a la venta; el que queda fuera (ozzfest) es próximamente.
+  const CDMX_ABIERTOS = ['vivelatino', 'warning', 'hilary', 'edc27', 'u2', 'louist', 'niall'];
+  af(C.RESERVA_2027.length === 17 && C.RESERVA_2027.includes('pitbull') && CDMX_ABIERTOS.every((id) => C.RESERVA_2027.includes(id)),
+     'son los 9 que firmó Memo + pitbull (MTY 2027, caso María) + los 7 CDMX 2027 (vivelatino 7-nov · 6 más el 9-nov)');
   af(new Set(lista).size === lista.length, 'sin repetidos');
 
-  const CDMX_ABIERTOS = ['vivelatino'];
   console.log('\n[B] cada evento abierto, contra el catálogo real');
   CDMX_ABIERTOS.forEach((id) => {
     const e = by(id);
@@ -76,14 +80,16 @@ global.fetch = async (url) => {
   const cdmx27 = EV.filter((e) => e && String(e.ds || '') >= '2027-01-01' && esCDMX(e) && !CDMX_ABIERTOS.includes(e.id));
   af(cdmx27.length > 0, 'control: el catálogo SÍ trae CDMX 2027 (' + cdmx27.map((e) => e.id).join(', ') + ')');
   af(cdmx27.every((e) => !lista.includes(e.id)), 'ninguno (fuera de los abiertos por nombre) está en la lista del index');
-  af(CDMX_ABIERTOS.every((id) => lista.includes(id) && C.RESERVA_2027.includes(id)), 'vivelatino SÍ está en las dos listas');
+  af(CDMX_ABIERTOS.every((id) => lista.includes(id) && C.RESERVA_2027.includes(id)), 'los 7 CDMX abiertos SÍ están en las dos listas');
 
   console.log('\n[D] el correo único');
   af(await C.correoDebeSalir('juniorh', 'reserva'), 'juniorh al aprobar → SÍ sale');
   af(await C.correoDebeSalir('fuerzaregida#1', 'reserva'), 'fuerzaregida#1 (multifecha) al aprobar → SÍ sale');
   af(!(await C.correoDebeSalir('juniorh', 'pago')), 'juniorh captura manual → NO sale');
   const h = cdmx27[0];
-  af(h && !(await C.correoDebeSalir(h.id, 'reserva')), '🔒 CDMX 2027 (' + (h && h.id) + ') al aprobar → NO sale aunque su fecha califique');
+  af(h && !(await C.correoDebeSalir(h.id, 'reserva')), '🔒 CDMX 2027 NO abierto (' + (h && h.id) + ') al aprobar → NO sale aunque su fecha califique');
+  af(await C.correoDebeSalir('u2#1', 'reserva'), 'u2#1 (CDMX multifecha, abierto 9-nov) al aprobar → SÍ sale');
+  af(await C.correoDebeSalir('louist', 'reserva'), 'louist (CDMX, abierto 9-nov) al aprobar → SÍ sale');
   af(await C.correoDebeSalir('vivelatino#2', 'reserva'), 'vivelatino#2 (2 días) al aprobar → SÍ sale');
   af(await C.correoDebeSalir('palnorte', 'pago'), 'regresión: palnorte sigue saliendo en todo');
 

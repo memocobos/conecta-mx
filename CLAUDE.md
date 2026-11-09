@@ -188,6 +188,59 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💲⏳ **SEP-300-1 (9-nov-2026, en main local; la BASE ya escrita): EL SEPARO ES
+  $300 EN TODOS LOS TOURS VIVOS, Y LOS 6 CDMX 2027 ABREN A REQUISICIÓN.**
+  Palabra de Memo, citada: *«todos los tours baja su separo a $300 no importa
+  cual sea 2026 o 2027 y abre cdmx 2027»*. Cierra las dos preguntas que NUBE-6b
+  dejó (louist $1,000 · edc27/niall una sola zona): van a $300 y salen así.
+  - **La base** (acta `migraciones/SEP-300-1.sql`, YA CORRIDA, 34 filas, careo
+    de salida 0·0·0): `esferas_eventos.sep=300` en los 56 VIVOS (no archivados,
+    fecha hoy o después, o sin fecha); `sep_cheap=300` solo donde ya tenía valor
+    (coronacapital y badbunny siguen NULL: sin cheapZonas el compilador no lo
+    emite); `sep_ride=300` en los 2 que lo traían distinto (caifanes · scorpions;
+    tecatecomuna ya estaba). **Los pasados NO se tocan.** Medido antes: multifecha
+    sin `sep` propio, ninguna zona viva con `sepEspecial`, ningún vivo con
+    `sepZonas` — el separo vive en esas tres columnas y nada más.
+  - ⚠️ **SEIS SUBEN en vez de bajar** (estaban abajo de $300): mariajose,
+    prevail, anagabriel, nortex, dialibre (200) y el CHEAP de brunomars (100).
+    «No importa cuál sea» → 300 igual; dicho a Memo con nombre por si alguno
+    era a propósito.
+  - **El index se editó A MANO en la misma tuerca** (32 líneas de EV, los mismos
+    eventos y números que la base; badbunny no emitía `sep` y lo ganará en el
+    próximo publish) para que el push lo lleve sin esperar publish — y el
+    próximo publish de Esferas lo reproduce desde la ficha. 🔒 Cero regla
+    nueva: `_calcularPrecio` sigue leyendo `ev.sep/sepCheap/sepRide`; la regla
+    del **50 % a ≤15 días** sigue viva y es otra (siddharta 12-nov cotiza
+    $2,050, careado como control).
+  - **CDMX 2027:** `REQUISICION_EVENTOS` (index) y `RESERVA_2027`
+    (`_lib/correo-confirmacion`) ganaron **warning · hilary · edc27 · u2 ·
+    louist · niall**. La «excepción con nombre» de vivelatino se volvió la
+    regla de los CDMX 2027 a la venta: el total nace SIN transporte
+    (`requiere_transporte`), el bus/vuelo lo pone la Nube (NUBE-6b) o ✈️ Vuelo
+    en Capsule. Fuera queda ozzfest (próximamente). `mide:req-2027-2`
+    actualizado con su razón (**33**: `CDMX_ABIERTOS` 7, `RESERVA_2027` 17,
+    u2#1 y louist mandan el correo único, ozzfest no).
+  - `mide:sep-300-1` **31** ([A] los 56 vivos en el index del árbol por lista
+    FIJA —no por reloj, para que no caduque— con sep/sepCheap/sepRide=300 y sin
+    separo escondido por zona · [B] control positivo: BASE (NUBE-6b, buscado por
+    mensaje) traía 51 raros, louist 1000 y brunomars cheap 100 · [C] el dueño
+    cotiza $300×personas en PLUS/CHEAP/RIDE de 9 casos que antes traían
+    1000/800/500/200/100 + control del 50 % · [D] los 6 en las dos listas, PLUS
+    de cada uno con separo 300 y `transportCost 0`, correo único sale al
+    aprobar y no en captura manual; sabotaje louist→1000 con sha1 careado → 3
+    rojos con nombre → restaurado byte a byte). Vecinos verdes: confirma-1 28 ·
+    req-b1 52 · nube-6 90 · ride-callejon-1 11 · pago-ux-1 44 · mp-link-1 60.
+    req-2027-1 (soylunadic 2026), preventa-pn27 (red fuera del guion) y
+    cotiza-vend-1 («el CDMX ofrece PLUS o RIDE») traen su rojo PREEXISTENTE,
+    idéntico con `git stash` en HEAD.
+  - ⚠️ **No verificado en navegador.** ⏳ Push de Memo → `/louist`, `/edc27`,
+    `/niall` abren el formulario de reservación con separo $300; una
+    requisición de prueba y rechazarla. ⚠️ edc27 y niall venden con UNA sola
+    zona (lo que su ficha trae); las demás zonas se cargan en Esferas cuando
+    Memo las tenga. ⚠️ Los 6 CDMX siguen **sin pedido cargado** (venden a
+    ciegas hasta Kamisama) y sin tarifa de avión propia en la Nube (su botón
+    de avión manda al WhatsApp de vuelos hasta que Milk la capture).
+
 - ☁️⏳ **NUBE-6 + NUBE-6b (9-nov-2026, en main local, cero SQL): LA NUBE
   VOLADORA SE SIMPLIFICA — el BUS tiene una tarifa GENERAL a 30 días; el AVIÓN
   es SIEMPRE POR EVENTO a 15 días y JAMÁS hereda; renovar a un clic; panorama de
@@ -285,8 +338,9 @@ está caduco antes de escribirse.
     ese evento manda al WhatsApp de vuelos.** Desde ahí el ciclo es: el Radar
     avisa ≤5 días antes → «↻ Sigue igual» o «✏️ Cambiar precio». **Después de esto se
     abren los 6 CDMX 2027** (warning · hilary · edc27 · u2 · louist · niall:
-    `REQUISICION_EVENTOS` + `RESERVA_2027`, o la regla REQ-2027-3) — ⚠️ louist
-    trae sep $1,000 y edc27/niall una sola zona: palabra de Memo antes.
+    `REQUISICION_EVENTOS` + `RESERVA_2027`, o la regla REQ-2027-3) — ✅ HECHO
+    el mismo 9-nov en SEP-300-1 (arriba): louist bajó a $300 como todos, y
+    edc27/niall salen con su única zona por palabra de Memo.
 
 - ✉️⏳ **REQ-EXITO-1 (9-nov-2026, en main local, cero SQL): la pantalla de éxito
   de la reservación ya NO manda a WhatsApp.** Palabra de Memo: *«cuando reservan

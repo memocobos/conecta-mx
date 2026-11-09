@@ -3015,6 +3015,11 @@ ${entregables}
         abonos: abonos.map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha || null, tiene_foto: !!a.foto_path })),
         plan, plan_error: null, sugerido, fecha_separo: v.fecha_separo || null,
         banco,
+        // [COB-WA-1] Lo que le TOCA hoy (atrasado + próxima, topado a la resta),
+        // del MISMO dueño que el Portal (PF.tocaHoy): el 💬 de cobro de Capsule
+        // dice el mismo número que el cliente ve en su «¿Cómo quieres pagar?».
+        // null = sin rol fijo en calendario; la pantalla cae a la resta y lo dice.
+        toca: PF.tocaHoy(plan, s ? s.resta : 0),
       });
     }
 

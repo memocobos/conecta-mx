@@ -158,6 +158,30 @@ function estadoPlan(plan, o) {
   }, base);
 }
 
+// ── LO QUE LE TOCA HOY ───────────────────────────────────────────────────────
+// [COB-WA-1] «¿Cuánto le toca pagar hoy?» = lo ATRASADO + la PRÓXIMA cuota,
+// topado a lo que resta. Vivía escrito DOS veces (portal-viajero._saldoPortal y
+// portal-mi-plan-migrado) y el 💬 de cobro de Capsule iba a ser la tercera: hoy
+// las tres le preguntan aquí. Solo aplica al rol fijo en `calendario`; en
+// cualquier otro estado devuelve null y quien pregunta decide su respaldo (el
+// Portal ofrece la resta entera). Pesos ENTEROS, como lo que se cobra.
+function tocaHoy(plan, resta) {
+  const r = Math.max(0, Math.round(Number(resta) || 0));
+  if (!plan || plan.estado !== 'calendario' || r <= 0) return null;
+  const atrasado = Math.round(Number(plan.atrasado) || 0);
+  const prox = plan.proxima ? Math.round(Number(plan.proxima.monto) || 0) : 0;
+  const monto = Math.min(r, atrasado + prox);
+  if (monto <= 0) return null;
+  let etiqueta = null;
+  if (plan.proxima) etiqueta = (atrasado > 0 ? 'Atrasado + ' : '') + (plan.proxima.lbl || 'Pago ' + plan.proxima.n);
+  else if (atrasado > 0) etiqueta = 'Pagos atrasados';
+  return {
+    monto, atrasado, etiqueta,
+    proxima_lbl: plan.proxima ? (plan.proxima.lbl || null) : null,
+    hasta: plan.proxima ? (plan.proxima.hasta || null) : null,
+  };
+}
+
 // ── RE-REPARTIR cuando cambia el total (espejo JS del trigger de la base) ────
 // Las cuotas cuya ventana YA EMPEZÓ conservan su monto; las que no han empezado
 // se re-reparten con lo que falte. Sin ventanas futuras, lo que falte va a una
@@ -225,4 +249,4 @@ async function fijarEnBase(o) {
   }
 }
 
-module.exports = { VERSION, armarPlanFijo, estadoPlan, rerepartir, maxPagos, diaReynosa, fijarEnBase, _repartir };
+module.exports = { VERSION, armarPlanFijo, estadoPlan, tocaHoy, rerepartir, maxPagos, diaReynosa, fijarEnBase, _repartir };

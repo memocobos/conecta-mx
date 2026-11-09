@@ -354,7 +354,9 @@ exports.handler = async (event) => {
             let prox = null;
             if (c.plan_pagos && sc && sc.resta > 0) {
               const pc = PF.estadoPlan(c.plan_pagos, { total: sc.total, abonado: sc.abonado, ahora });
-              if (pc && pc.estado === 'calendario') prox = Math.min(sc.resta, Math.round((Number(pc.atrasado) || 0) + (pc.proxima ? Number(pc.proxima.monto) || 0 : 0)));
+              // [COB-WA-1] el mismo dueño que el `sugerido` del titular
+              const tc = PF.tocaHoy(pc, sc.resta);
+              if (tc) prox = tc.monto;
             }
             return { viajero_id: c.id, nombre: c.nombre || null, resta: sc ? Math.max(0, Math.round(sc.resta)) : null, proximo: prox };
           }) : [],
@@ -365,9 +367,8 @@ exports.handler = async (event) => {
         mp_disponible: mpDisponible,
         // Y lo que le toca pagar HOY según su rol fijo (atrasado + próxima),
         // topado a lo que resta. null sin plan fijo: el Portal ofrece la resta.
-        sugerido: (plan && plan.estado === 'calendario')
-          ? Math.min(Math.max(0, Math.round(s.resta)), Math.round((Number(plan.atrasado) || 0) + (plan.proxima ? Number(plan.proxima.monto) || 0 : 0))) || null
-          : null,
+        // [COB-WA-1] UN dueño para «qué le toca hoy»: tocaHoy de plan-fijo.
+        sugerido: (() => { const t = PF.tocaHoy(plan, s.resta); return t ? t.monto : null; })(),
         // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
         evento_ds: dsEv,
         // [PORTAL-RECUERDO-1] Viaje ya realizado: el Portal lo pinta como

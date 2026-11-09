@@ -188,6 +188,56 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🚀⏳ **PORTAL-CARGA-1 + COB-WA-1 (9-nov-2026, en main local, cero SQL): el día
+  del estreno — el Portal carga UNA vez y Capsule gana el 💬 de cobro.** Palabra
+  de Memo: *«arranca … lo mejor sería mandar un mensaje de "estamos estrenando
+  sistema para los tours 2027" para que vayan al Portal a hacer sus cuentas y
+  toda la semana entre todos meter bien a la gente»*. Medido antes (con
+  PORTAL-PAGO-2 ya `ready` en Netlify, deploy `6af20c25`, 12:09 Reynosa): en los
+  tours MTY 2027 hay **221 correos con saldo · 122 publicados · 97 publicados y
+  registrados**; Junior H **58 de 63 sin publicar** y **26 con saldo sin correo**
+  (y CERO celulares en sus 88 filas). Lista nominal por evento en
+  `LISTA-SIN-PUBLICAR-9NOV.md` (raíz, privado, NO se commitea). ⚠️ Los 147
+  viajes sin publicar tampoco tienen rol fijo: al publicarlos ven «estamos
+  preparando tu calendario» (la opción de pagar SÍ les sale, con la resta).
+  - **PORTAL-CARGA-1:** en los logs de Netlify cada entrada al Portal disparaba
+    `portal-mi-plan-migrado` **3 veces en el mismo segundo** (0.3–3.8 s cada
+    una): `cargarClienteYRutear` corre dos veces (arranque + onAuthStateChange)
+    y cada una llama `renderToursList → renderPlanMigrado`. Hoy
+    `renderPlanMigrado` es la PUERTA que comparte el pedido en vuelo
+    (`_migPlanEnVuelo`, la forma de `_psEventosPromesa`) y el cuerpo vive en
+    `_migPlanPintar`; al terminar (éxito o fallo) se suelta, así los refrescos
+    tras guardar/firmar/subir pago siguen pidiendo. `mide:portal-carga-1` **13**
+    (3 concurrentes → 1 fetch y la misma promesa · se suelta · fallo suelta ·
+    nadie llama al cuerpo directo · control positivo: la forma vieja hace 3).
+    `mide:portal-vivo-1` rebana el cuerpo nuevo (45). ⚠️ Lección del instrumento:
+    un `let` de nivel superior no es propiedad del contexto en vm (NUBE-6) y
+    `sinComentarios` sobre portal.html ENTERO se come ~180 KB (PAGOS-PORTAL-2).
+  - **COB-WA-1:** «¿cuánto le toca hoy?» (atrasado + próxima, topado a la resta)
+    vivía escrito **TRES veces** (portal-viajero `_saldoPortal`,
+    portal-mi-plan-migrado ×2 — titular y compañeros del grupo) y el 💬 iba a
+    ser la cuarta: hoy **`PF.tocaHoy(plan, resta)` en `_lib/plan-fijo` es el
+    dueño** y los tres le preguntan; `plan_viajero` manda `toca`. En el panel
+    **🗓 Plan** de Capsule: botón **«💬 Cobrar $X por WhatsApp»** (wa.me/52 + 10
+    dígitos por `_waDigits10`; sin celular MX → «Copiar cobro») con el mensaje
+    corto: monto que toca, fecha límite, «incluye $A de un pago anterior» si
+    hay atrasado, el Portal con sus dos caminos, «si ya lo hiciste ignóralo».
+    Sin `toca` (sin rol fijo) cae a la RESTA y lo DICE; liquidado/sin total → no
+    se pinta. El «📋 Copiar para WhatsApp» del plan también manda al Portal.
+    `mide:cob-wa-1` **33** (dueño con tope y enteros · los 3 bebedores sin suma
+    propia — la tercera copia la cazó el careo, no la lectura · pantalla real en
+    vm · sabotaje al tope con sha1 → rojo → restaurado). Vecinos verdes:
+    plan-vj-1 35 · portal-pago-2 78 · plan-pagos-1 81 · pagos-portal-2 38 ·
+    plan-fijo-1 25 · capsule-ux-1 83 · capsule-ux-2 46 · rol-avisos-1 28 ·
+    portal-solo-1 89 · acomp-2 43 · mp-link-1 60 · req-b1 52 · **vuelo-1 40**
+    (su ancla «plan_pagos,vuelo&limit» leía una POSICIÓN del select que
+    PORTAL-PAGO-2 movió al agregar `grupo_viaje`; hoy pregunta si `vuelo` es un
+    campo pedido — arnés podrido por mi propia tuerca anterior, actualizado).
+  - ⏳ Push de Memo. Mensaje «estamos estrenando sistema» a los grupos MTY 2027
+    (FR · NSQK · Pitbull · Madero listos; Junior H / Anuel / Ana Gabriel tras
+    publicar). ⚠️ El pago por link de MP desde el Portal (`cv:`) sigue SIN
+    estrenarse con dinero real: prueba de Memo con un monto chico como invitado.
+
 - 💳👥⏳ **PORTAL-PAGO-2 (9-nov-2026, en main local; la BASE ya escrita): PAGAR
   DESDE EL PORTAL — el DESGLOSE del comprobante y el LINK DE MERCADO PAGO por
   cuota.** Palabra de Memo (primer día de la ventana 9-16 nov): *«construye lo

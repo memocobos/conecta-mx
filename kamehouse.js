@@ -7012,6 +7012,17 @@ async function _vjPlanVer(id, nombre) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       <button class="btn btn-primary btn-sm" onclick="_vjPlanPng('${_attrJs(id)}')">⬇️ Descargar imagen (PNG)</button>
       <button class="btn btn-ghost btn-sm" onclick="_vjPlanCopiar('${_attrJs(id)}')">📋 Copiar para WhatsApp</button>
+      ${(() => {
+        // [COB-WA-1] El 💬 de cobro: con celular a 10 dígitos abre WhatsApp con
+        // el mensaje puesto; sin él, se copia. Sin nada que cobrar, no se pinta.
+        const txt = _vjCobroTexto(d);
+        if (!txt) return '';
+        const href = _vjCobroHref(d);
+        const toca = d.toca && Number(d.toca.monto) > 0 ? _spFmtMxn(Math.round(Number(d.toca.monto))) : _spFmtMxn(Math.max(0, Math.round(Number(d.resta) || 0)));
+        return href
+          ? `<a class="btn btn-sm vj-cobro-wa" href="${href}" target="_blank" rel="noopener" style="background:var(--green);color:#000;font-weight:800" title="Abre WhatsApp con el recordatorio de ${toca} y el link al Portal">💬 Cobrar ${toca} por WhatsApp</a>`
+          : `<button class="btn btn-ghost btn-sm vj-cobro-wa" onclick="_vjCobroCopiar('${_attrJs(id)}')" title="Sin celular a 10 dígitos: se copia el mensaje para pegarlo donde lo tengas">💬 Copiar cobro de ${toca}</button>`;
+      })()}
     </div>
   </div>`;
 }
@@ -7112,8 +7123,56 @@ function _vjPlanTexto(d) {
   if (cuotas.length) { l.push('', '*Tus pagos pendientes*'); cuotas.forEach((q) => l.push(`• ${q.lbl} (${q.cuando}): ${_spFmtMxn(q.monto)}`)); }
   const n = d.plan ? _VJPLAN_ESTADO[d.plan.estado] : ''; if (n && d.plan.estado !== 'calendario') l.push('', n);
   if (d.banco) l.push('', `Cuenta ${d.banco.nombre}`, `CLABE ${d.banco.clabe}`, `Tarjeta ${d.banco.tarjeta}`, `A nombre de ${d.banco.titular}`);
-  l.push('', 'Mándanos tu comprobante por aquí. Conecta Reynosa');
+  // [COB-WA-1] Desde PORTAL-PAGO-2 el comprobante se sube en el Portal (o se
+  // paga ahí en línea): el texto del plan manda a esa puerta, con WhatsApp de
+  // respaldo — antes decía solo «mándanos tu comprobante por aquí».
+  l.push('', 'Sube tu comprobante o paga en línea desde tu Portal: ' + _COB_PORTAL_URL, 'Si prefieres, mándanos el comprobante por aquí. Conecta Reynosa');
   return l.join('\n');
+}
+
+// ═══ [COB-WA-1 · 9-nov-2026] EL 💬 DE COBRO ═════════════════════════════════
+// Palabra de Memo (día del estreno del pago desde el Portal): los recordatorios
+// de pago salen por WhatsApp a mano, uno por uno, tecleando el monto. Este 💬
+// arma el mensaje CORTO de cobro con lo que le TOCA hoy — el número lo manda el
+// servidor (`toca`, de PF.tocaHoy: el MISMO dueño que el Portal) — y manda al
+// Portal a pagar. 🔒 La pantalla no suma un peso: si el servidor no trae `toca`
+// (sin rol fijo), cae a la RESTA entera y lo dice («lo que te falta»).
+// El saludo de CAPSULE-WA-1 (neutro) sigue en la celda del celular: éste es
+// OTRO mensaje, con otro motivo, y vive en el panel 🗓 Plan donde ya están los
+// números enfrente de quien lo manda.
+const _COB_PORTAL_URL = 'www.conectareynosa.mx/portal';
+function _vjCobroTexto(d) {
+  if (!d) return null;
+  const v = d.viajero || {}, t = _vjPlanTitulo(d), pl = d.plan || null;
+  const primer = String(v.nombre || '').trim().split(/\s+/)[0] || '';
+  const resta = Math.max(0, Math.round(Number(d.resta) || 0));
+  if (!pl || pl.estado === 'liquidado' || pl.estado === 'sin_total' || pl.estado === 'evento_pasado' || resta <= 0) return null;
+  const toca = d.toca && Number(d.toca.monto) > 0 ? d.toca : null;
+  const monto = toca ? Math.round(Number(toca.monto)) : resta;
+  const l = ['Hola' + (primer ? ' ' + primer : '') + ' 👋, te recordamos tu pago de *' + _spFmtMxn(monto) + '* para *' + t.evento + '*'
+    + (toca && toca.hasta ? ' (hasta el ' + _vjPlanFecha(toca.hasta) + ')' : toca ? '' : ' (lo que te falta por liquidar)') + '.'];
+  if (toca && toca.atrasado > 0) l.push('Incluye ' + _spFmtMxn(toca.atrasado) + ' de un pago anterior que quedó pendiente.');
+  l.push('', 'Puedes pagarlo desde tu Portal: ' + _COB_PORTAL_URL,
+    '• transferencia o depósito y subes ahí tu comprobante',
+    '• o en línea con tarjeta, OXXO o SPEI (Mercado Pago)',
+    '', 'Si ya lo hiciste, ¡ignora este mensaje! 🙌 Conecta Reynosa');
+  return l.join('\n');
+}
+// El link: wa.me con el celular a 10 dígitos (el dueño _waDigits10, como la
+// cobranza y CAPSULE-WA-1); sin 10 dígitos MX no hay link — se ofrece copiar.
+function _vjCobroHref(d) {
+  const txt = _vjCobroTexto(d);
+  if (!txt) return null;
+  const dig = _waDigits10(d.viajero && d.viajero.celular);
+  if (!dig) return null;
+  return 'https://wa.me/52' + dig + '?text=' + encodeURIComponent(txt);
+}
+async function _vjCobroCopiar(id) {
+  const d = (window.__vjPlan || {})[id]; if (!d) return;
+  const txt = _vjCobroTexto(d);
+  if (!txt) { showToast('No hay nada que cobrar en este viaje', 'error'); return; }
+  try { await navigator.clipboard.writeText(txt); showToast('Mensaje de cobro copiado', 'success'); }
+  catch (_) { showToast('No se pudo copiar — selecciona el texto a mano', 'error'); }
 }
 async function _vjPlanCopiar(id) {
   const d = (window.__vjPlan || {})[id]; if (!d) return;

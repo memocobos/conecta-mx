@@ -473,12 +473,9 @@ async function _saldoPortal(KH_URL, hKH, v) {
     if (v.plan_pagos && resta > 0) {
       const plan = PF.estadoPlan(v.plan_pagos, { total: s.total, abonado: s.abonado, ahora: new Date() });
       if (plan && plan.estado === 'calendario') {
-        const atr = Math.round(Number(plan.atrasado) || 0);
-        const prox = plan.proxima ? Math.round(Number(plan.proxima.monto) || 0) : 0;
-        const sug = Math.min(resta, atr + prox);
-        if (sug > 0) sugerido = sug;
-        if (plan.proxima) etiqueta = (atr > 0 ? 'Atrasado + ' : '') + (plan.proxima.lbl || 'Pago ' + plan.proxima.n);
-        else if (atr > 0) etiqueta = 'Pagos atrasados';
+        // [COB-WA-1] «qué le toca hoy» tiene UN dueño: tocaHoy de plan-fijo.
+        const t = PF.tocaHoy(plan, resta);
+        if (t) { sugerido = t.monto; if (t.etiqueta) etiqueta = t.etiqueta; }
       } else if (plan && plan.estado === 'liquidado') {
         return { ok: true, total: s.total, abonado: s.abonado, resta: 0, sugerido: 0, etiqueta: null, evento_nombre: null };
       }

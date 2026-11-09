@@ -3327,7 +3327,21 @@ async function _migFotosUpgrade(tours) {
   }
 }
 
-async function renderPlanMigrado(){
+// [PORTAL-CARGA-1] Medido en los logs de Netlify (9-nov, el día del estreno):
+// cada entrada al Portal disparaba `portal-mi-plan-migrado` TRES veces en el
+// mismo segundo (cargarClienteYRutear corre dos veces —arranque y
+// onAuthStateChange— y cada una llama renderToursList → renderPlanMigrado), a
+// 0.3–3.8 s cada una. La card tardaba y se repintaba. El pedido EN VUELO se
+// comparte (la forma de _psEventosPromesa): quien llame mientras hay uno
+// corriendo recibe ESA promesa; al terminar se suelta, así que un refresco
+// posterior (tras guardar, firmar, subir un pago) sí vuelve a pedir.
+let _migPlanEnVuelo = null;
+function renderPlanMigrado(){
+  if (_migPlanEnVuelo) return _migPlanEnVuelo;
+  _migPlanEnVuelo = _migPlanPintar().catch(() => {}).then(() => { _migPlanEnVuelo = null; });
+  return _migPlanEnVuelo;
+}
+async function _migPlanPintar(){
   _migGrupoVisto = new Set();
   const cont = document.getElementById('tours-migrados');
   if (!cont) return;

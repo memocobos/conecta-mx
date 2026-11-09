@@ -225,8 +225,10 @@ async function bloqueD() {
 // ═══ [E] el cableado, por el hecho ═════════════════════════════════════════
 function bloqueE() {
   console.log('\n[E] el cableado: el pintor y el dispatcher de verdad');
-  const pintor = sinComentarios(rebana(PORTAL, 'async function renderPlanMigrado(){'));
-  af(pintor.indexOf('_migHeroHtml(t, titulo)') !== -1, 'renderPlanMigrado arma la card CON el hero');
+  // [PORTAL-CARGA-1] El cuerpo del pintor se MUDÓ a _migPlanPintar; renderPlanMigrado
+  // quedó como la puerta que comparte el pedido en vuelo. Se mide el cuerpo real.
+  const pintor = sinComentarios(rebana(PORTAL, 'async function _migPlanPintar(){'));
+  af(pintor.indexOf('_migHeroHtml(t, titulo)') !== -1, 'renderPlanMigrado (_migPlanPintar) arma la card CON el hero');
   af(pintor.indexOf('_migMediaHtml(t)') !== -1, 'y con la fila de media');
   af(pintor.indexOf('_migFotosUpgrade(j.tours)') !== -1, 'y dispara el upgrade de fotos tras pintar');
   af(pintor.indexOf('"tour-card" style="padding') === -1, 'el padding inline viejo se mudó a .mig-body (el hero corre de borde a borde)');

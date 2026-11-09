@@ -209,7 +209,11 @@ const llamar = async (b) => {
   console.log('[E] Portal');
   const pm = fs.readFileSync(path.join(RAIZ, 'netlify/functions/portal-mi-plan-migrado.js'), 'utf8');
   const blk = pm.slice(pm.indexOf('vuelo: (v.vuelo'), pm.indexOf('} : null,', pm.indexOf('vuelo: (v.vuelo')));
-  af(/plan_pagos,vuelo&limit/.test(pm) && /aerolinea/.test(blk) && /clave/.test(blk) && !/costo/.test(blk), 'el Portal recibe aerolínea/horarios/clave y NO el costo');
+  // [PORTAL-PAGO-2] el select ganó `grupo_viaje` después de `vuelo`: el ancla
+  // «plan_pagos,vuelo&limit» leía una POSICIÓN; lo que importa es que `vuelo`
+  // sea un campo pedido (coma o fin de lista a los lados).
+  const pideVuelo = /&select=[^']*(^|,)vuelo(,|&)/.test(pm.replace(/'\s*\+\s*'/g, ''));
+  af(pideVuelo && /aerolinea/.test(blk) && /clave/.test(blk) && !/costo/.test(blk), 'el Portal recibe aerolínea/horarios/clave y NO el costo');
   const ph = fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8');
   const i0 = ph.indexOf('function _migVueloHtml(t){'), i1 = ph.indexOf('function _migGrupoHtml(t){');
   const ctx = { escapeHtml: (s) => String(s == null ? '' : s).replace(/</g, '&lt;') };

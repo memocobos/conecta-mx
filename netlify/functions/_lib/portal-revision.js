@@ -110,9 +110,18 @@ async function pedirRevision({ correo, filas, KH_URL, KH_KEY }) {
 }
 
 // Nombre y fecha de un evento (o de una fecha `slug#N`) desde el catálogo servido.
+// [PASADO-FUERA-1 · 9-nov] Eventos YA REALIZADOS que salieron del catálogo pero
+// todavía tienen viajeros: sin esto su fecha no se lee, el viaje no cuenta como
+// pasado y la bandeja pide «total de contrato» (caso Melany · palnorte2026). Es
+// la ÚNICA lista; la piden la bandeja y el Portal. Los CANCELADOS (natanael,
+// titodoble) NO van aquí: no son un recuerdo, tienen reembolso.
+const FUERA_CATALOGO = {
+  palnorte2026: { nombre: "Tecate Pa'l Norte 2026", fecha: 'marzo 2026', ds: '2026-03-27' },
+};
 function nombreEvento(EV, eventoId) {
   const [slug, idx] = String(eventoId || '').split('#');
   const ev = Array.isArray(EV) ? EV.find((e) => e && e.id === slug) : null;
+  if (!ev && FUERA_CATALOGO[slug]) { const f = FUERA_CATALOGO[slug]; return { nombre: f.nombre, fecha: f.fecha, ds: f.ds }; }
   if (!ev) return { nombre: eventoId, fecha: '' };
   const mf = (idx != null && Array.isArray(ev.multifecha)) ? ev.multifecha[Number(idx)] : null;
   return { nombre: ev.a || slug, fecha: (mf && (mf.lbl || mf.f)) || ev.f || '', ds: (mf && mf.ds) || ev.ds || '' };
@@ -175,4 +184,4 @@ async function avisarRevision({ rev, viajes, nombre, noProceden }) {
   }
 }
 
-module.exports = { VSEL, TABLA, EQUIPO_TIPOS, esDelEquipo, revisada, normCorreo, filasDeCorreo, abonosDe, foto, pedirRevision, nombreEvento, renderRevision, avisarRevision };
+module.exports = { FUERA_CATALOGO, VSEL, TABLA, EQUIPO_TIPOS, esDelEquipo, revisada, normCorreo, filasDeCorreo, abonosDe, foto, pedirRevision, nombreEvento, renderRevision, avisarRevision };

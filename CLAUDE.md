@@ -188,6 +188,17 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📸⏳ **PASADO-FUERA-1 (9-nov-2026, en main local, cero SQL): Pa'l Norte 2026 se publica como RECUERDO.**
+  Captura de Memo: Melany (palnorte2026, $9,700 pagados) salía en la bandeja con «⚠️ Sin total de contrato».
+  Causa: `palnorte2026` NO está en el catálogo (la ficha viva `palnorte` es el 2027), así que su fecha no se
+  leía y PORTAL-RECUERDO-1 no lo reconocía como pasado. Hoy `FUERA_CATALOGO` en `_lib/portal-revision` (ÚNICA
+  lista: hoy solo palnorte2026, ds 2026-03-27) alimenta `nombreEvento` (bandeja → «📸 Publicar como recuerdo»)
+  y `portal-mi-plan-migrado` (`pasado`). 🔒 Los CANCELADOS (natanael, titodoble) NO van ahí: tienen reembolso,
+  no son recuerdo. Medido: de 112 slugs con viajeros, solo esos 3 faltan del catálogo. `mide:portal-hotfix-1`
+  **29** (bloque [F]; su control positivo leía `HEAD` y caducó con su propio merge: hoy ancla al commit
+  anterior a PORTAL-HOTFIX-1 por mensaje). Vecinos verdes: portal-solo-1 89 · plan-pagos-1 81 · portal-pago-2
+  78 · portal-vivo-1 45 · portal-carga-1 13 · cob-wa-1 33. ⏳ Push de Memo → la bandeja recarga.
+
 - 🚪⏳ **REQ-2027-3 (9-nov-2026, en main local, cero SQL): TODO evento 2027 abre la requisición (Mercado
   Pago / transferencia) y manda el correo único SOLO, por su FECHA.** Palabra de Memo: *«eso ya siempre debe
   de salir para evento 2027 por favor»*. `_requisicionActiva` (index) abre si `cur.ds >= 2027-01-01`;

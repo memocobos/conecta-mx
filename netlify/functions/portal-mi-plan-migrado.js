@@ -289,7 +289,8 @@ exports.handler = async (event) => {
     const tours = viajeros.map((v) => {
       const s = saldoMigrado(v, porViajero[v.id]);   // LA MISMA función del Palacio
       const evCat = evPorSlug[String(v.evento_id).split('#')[0]] || null;
-      const dsEv = evCat ? PP.dsDeEvento(evCat, v.evento_id) : null;
+      const dsEv = evCat ? PP.dsDeEvento(evCat, v.evento_id)
+        : ((require('./_lib/portal-revision').FUERA_CATALOGO[String(v.evento_id).split('#')[0]] || {}).ds || null);   // [PASADO-FUERA-1]
       // [PLAN-FIJO-1] El rol es FIJO desde la fecha de separo (palabra de
       // Memo, 4-nov): se arma UNA vez y aquí solo se LEE — lo pagado se aplica
       // a las cuotas en orden y lo no pagado sale vencido. ⚰️ El plan ya NO se

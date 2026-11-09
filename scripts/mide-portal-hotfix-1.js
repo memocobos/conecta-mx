@@ -20,6 +20,10 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { execSync } = require('child_process');
+// [PASADO-FUERA-1 · 9-nov] El control positivo leía `HEAD`, y HEAD ya TRAE el
+// arreglo (caducó el día de su propio merge). Hoy ancla al commit ANTERIOR a
+// PORTAL-HOTFIX-1, buscado por su mensaje.
+const BASE_HF = require('child_process').execSync('git log --format=%H -1 --grep="PORTAL-HOTFIX-1"', { cwd: require('path').join(__dirname, '..'), encoding: 'utf8' }).trim() + '~1';
 const RAIZ = path.join(__dirname, '..');
 process.env.PORTAL_SUPABASE_URL = 'https://pt.falso.test';
 process.env.PORTAL_SUPABASE_ANON_KEY = 'anon';
@@ -125,7 +129,7 @@ async function correr(archivo) {
   // cae, este careo no está reproduciendo el defecto.
   const tmp = path.join(RAIZ, 'netlify/functions', '.mide-portal-hotfix-1-base.js');
   try {
-    const src = execSync('git show HEAD:netlify/functions/portal-mi-plan-migrado.js', { cwd: RAIZ, encoding: 'utf8' });
+    const src = execSync('git show ' + BASE_HF + ':netlify/functions/portal-mi-plan-migrado.js', { cwd: RAIZ, encoding: 'utf8' });
     af(() => /PF\.tocaHoy\(plan,\s*s\.resta\)/.test(src), 'HEAD lee `s.resta` a secas (es el defecto, no otra cosa)');
     fs.writeFileSync(tmp, src);
     DB = semilla();
@@ -209,9 +213,16 @@ async function correr(archivo) {
   const sc = sinComentarios(bloqueSubmit);
   af(() => sc.indexOf("showView('dashboard')") < sc.indexOf('renderToursList()') && sc.indexOf('renderToursList()') < sc.indexOf('_procesarInvitacionPendiente()'), 'y en orden: tras showView(dashboard), antes de las invitaciones pendientes');
   // Control por commit: HEAD no los corría ahí.
-  const submitHead = (() => { const h = execSync('git show HEAD:portal.html', { cwd: RAIZ, encoding: 'utf8' }); const i = h.indexOf("$('#form-profile').addEventListener('submit'"); return sinComentarios(h.slice(i, h.indexOf('\n});', i) + 4)); })();
+  const submitHead = (() => { const h = execSync('git show ' + BASE_HF + ':portal.html', { cwd: RAIZ, encoding: 'utf8' }); const i = h.indexOf("$('#form-profile').addEventListener('submit'"); return sinComentarios(h.slice(i, h.indexOf('\n});', i) + 4)); })();
   af(() => !/renderToursList\(\)/.test(submitHead), 'CONTROL POSITIVO: en HEAD el submit del perfil NO pedía los viajes');
 
+  console.log('\n[F] PASADO-FUERA-1 · un evento realizado que salió del catálogo');
+  { const PR = require('../netlify/functions/_lib/portal-revision');
+    const n = PR.nombreEvento([], 'palnorte2026');
+    af(() => n.ds === '2026-03-27' && /Pa'l Norte 2026/.test(n.nombre), 'palnorte2026 fuera del catálogo trae su fecha y nombre (la bandeja lo ve PASADO)');
+    af(() => !PR.nombreEvento([], 'natanael').ds, 'control: un CANCELADO (natanael) NO es recuerdo — sigue sin fecha');
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../netlify/functions/portal-mi-plan-migrado.js'), 'utf8');
+    af(() => /FUERA_CATALOGO\[/.test(src), 'el Portal pregunta a la MISMA lista (FUERA_CATALOGO) para marcar `pasado`'); }
   console.log('\n' + (R ? '🔴' : '✅') + ' mide:portal-hotfix-1 · ' + V + ' en verde · ' + R + ' en rojo');
   process.exit(R ? 1 : 0);
 })().catch((e) => { console.error('ARNÉS CAÍDO:', e); process.exit(2); });

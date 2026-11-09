@@ -6,6 +6,13 @@
 //   'cotizar' → inserta UNA fila. { modo, precio_pp, vigente_hasta, vigente_desde?, nota? }
 //   'historial' → ¿qué regía el día X? { dia } → los dos modos con su estado
 //                 ROTULADO y quién la capturó. [NUBE-3]
+//   'eventos'   → la lista de CDMX vivos que usan el paso del transporte. [NUBE-4]
+//   'cobertura' → cuántos eventos vivos quedan sin precio, el DETALLE por evento
+//                 (sin · heredado · propio) y la GENERAL de cada modo. [NUBE-5/6]
+//   'renovar'   → { modo, evento_id?, dias? (1-90, default 30) } re-captura la
+//                 cotización que rige (o la última vencida) de ESA llave, con el
+//                 MISMO precio y horarios, desde ahora por N días. Sin ninguna →
+//                 404. Es un INSERT por el mismo camino que `cotizar`. [NUBE-6]
 //
 // 🔒 INSERT-ONLY, Y NO SOLO POR EL TRIGGER. Aquí no existe ninguna acción que
 // actualice ni borre: para cambiar un precio se captura una fila nueva. El
@@ -69,7 +76,17 @@ async function eventosCdmx() {
     .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
 }
 
-const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos', 'cobertura'];
+// [NUBE-6] 'renovar' → la cotización que rige (o la última vencida) se vuelve a
+// capturar TAL CUAL por N días más. Es un INSERT como cualquier otro —el
+// historial lo registra como fila nueva con la nota «renovada sin cambio»— y
+// existe porque el dato medido el 9-nov-2026 fue que en toda la vida de la nube
+// hubo 5 capturas, con vigencias de 2-5 días, y el equipo no re-capturaba
+// semana a semana. «Sigue igual» tiene que costar UN clic.
+const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos', 'cobertura', 'renovar'];
+// Tope de una renovación: 90 días. Un «renovar» de un año sería apagar la
+// pregunta en vez de contestarla cada mes.
+const RENOVAR_DIAS_DEFAULT = 30;
+const RENOVAR_DIAS_MAX = 90;
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -133,15 +150,32 @@ exports.handler = async (event) => {
       const ahora = Date.now();
       const sin = {}, propios = {};
       for (const modo of MODOS) { sin[modo] = []; propios[modo] = 0; }
+      // [NUBE-6] El DETALLE por evento, para el panorama de la pantalla: con
+      // UNA mirada se ve quién hereda la general, quién tiene precio propio y
+      // quién está sin nada. Sale de las MISMAS llamadas al dueño que los
+      // conteos — no es una segunda opinión, es la misma respuesta sin agregar.
+      const detalle = [];
       for (const ev of lista) {
+        const fila = { id: ev.id, nombre: ev.nombre, ds: ev.ds };
         for (const modo of MODOS) {
           const r = await resolver(pedirMemo, modo, ev.id, ahora);
-          if (!r) sin[modo].push({ id: ev.id, nombre: ev.nombre, ds: ev.ds });
-          else if (r.heredado === false) propios[modo]++;
+          if (!r) { sin[modo].push({ id: ev.id, nombre: ev.nombre, ds: ev.ds }); fila[modo] = { estado: 'sin' }; }
+          else {
+            if (r.heredado === false) propios[modo]++;
+            fila[modo] = { estado: r.heredado ? 'heredado' : 'propio', precio: r.precio, vigente_hasta: r.vigente_hasta };
+          }
         }
+        detalle.push(fila);
+      }
+      // Y la GENERAL en sí, por modo, con su vencimiento: es el dato que el
+      // panorama pone arriba, porque es el que cubre a los demás.
+      const general = {};
+      for (const modo of MODOS) {
+        const g = await resolver(pedirMemo, modo, null, ahora);
+        general[modo] = g ? { precio: g.precio, vigente_hasta: g.vigente_hasta, horarios: g.horarios || null } : null;
       }
       return { statusCode: 200, headers, body: JSON.stringify({
-        ok: true, total: lista.length, sin, propios, consultas: memo.size, ahora,
+        ok: true, total: lista.length, sin, propios, detalle, general, consultas: memo.size, ahora,
       }) };
     }
 
@@ -213,10 +247,63 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia: new Date(dia).toISOString(), evento_id: eventoId, modos }) };
     }
 
-    // ── cotizar ────────────────────────────────────────────────────────────
+    // ── cotizar / renovar ─────────────────────────────────────────────────
     const modo = typeof body.modo === 'string' ? body.modo.trim().toLowerCase() : '';
     if (!MODOS.includes(modo)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El modo tiene que ser «bus» o «avion»' }) };
+    }
+
+    // ── renovar · «SIGUE IGUAL» EN UN CLIC ────────────────────────────────
+    // [NUBE-6] Toma la fila MÁS RECIENTE de ESTA llave (evento o general) —la
+    // vigente si la hay, o la última vencida— y la vuelve a capturar tal cual
+    // (precio y horarios) desde AHORA por N días. 🔒 Es un INSERT por el mismo
+    // camino que `cotizar`: el historial gana una fila con su nota, la vieja no
+    // se toca (la tabla es insert-only y el trigger lo garantiza). Y la fila
+    // que se renueva es la de la MISMA llave: renovar un evento jamás copia la
+    // general a su nombre — eso sería inventarle una cotización propia.
+    // 🔒 El PRECIO no viaja en el body a propósito: renovar es «sigue igual».
+    // Para cambiar el precio existe `cotizar`.
+    if (accion === 'renovar') {
+      const dias = body.dias == null ? RENOVAR_DIAS_DEFAULT : Number(body.dias);
+      if (!Number.isFinite(dias) || dias < 1 || dias > RENOVAR_DIAS_MAX) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Los días de la renovación van de 1 a ' + RENOVAR_DIAS_MAX }) };
+      }
+      const previas = await filasDe(pedir, modo, eventoId, 20);
+      const ahora = Date.now();
+      // La vigente manda; sin vigente, la más reciente (filasDe ya ordena por
+      // vigente_desde desc). Sin ninguna, no hay qué renovar — se DICE, no se
+      // inventa un precio.
+      const base = _cualCubre(previas, ahora) || previas[0] || null;
+      if (!base) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'No hay ninguna cotización de ' + (modo === 'bus' ? 'autobús' : 'avión') + ' para ' + (eventoId || 'la general') + ' que renovar. Captura una primero.' }) };
+      }
+      const quienR = (auth.user && (auth.user.correo || auth.user.id)) || 'desconocido';
+      const hastaR = ahora + dias * 86400000;
+      const notaR = ('renovada sin cambio el ' + new Date(ahora).toISOString().slice(0, 10)
+        + ' (+' + dias + ' días)' + (base.nota ? (' · ' + String(base.nota)) : '')).slice(0, 400);
+      const insR = await fetch(SB_URL + '/rest/v1/nube_cotizaciones', {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({
+          modo,
+          evento_id: eventoId,
+          precio_pp: Number(base.precio_pp),
+          vigente_desde: new Date(ahora).toISOString(),
+          vigente_hasta: new Date(hastaR).toISOString(),
+          horarios: (typeof base.horarios === 'string' && base.horarios.trim()) ? base.horarios.trim() : null,
+          nota: notaR,
+          capturado_por: String(quienR).slice(0, 120),
+        }),
+      });
+      if (!insR.ok) {
+        const detalle = (await insR.text()).slice(0, 300);
+        console.error('[admin-nube] renovar', insR.status, detalle);
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo renovar la cotización', detail: detalle }) };
+      }
+      const filasR = await insR.json().catch(() => []);
+      const nuevaR = interna(Array.isArray(filasR) ? filasR[0] : filasR);
+      const vR = await vigentes(pedir, Date.now(), eventoId);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, fila: nuevaR, renovada_de: interna(base), dias, vigentes: vR }) };
     }
     // 🔒 EL PRECIO NO SE INVENTA NI SE REDONDEA A LA BUENA: se exige un número
     // mayor que cero. Un 0 aquí sería un transporte gratis publicado al sitio.

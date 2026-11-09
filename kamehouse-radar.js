@@ -1273,9 +1273,20 @@ async function _radarNubeAviso() {
   if (!d) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
   const ahora = Number(d.ahora) || Date.now();
   const flojos = [];
+  // [NUBE-6] Y los POR VENCER: la general que muere en ≤5 días se avisa ANTES,
+  // para que renovarla sea un clic a tiempo y no un WhatsApp después. Con la
+  // vigencia en 30 días, el aviso cae una vez al mes y no se vuelve mueble.
+  const porVencer = [];
+  const RAD_NUBE_AVISO_DIAS = 5;
   for (const m of [{ k: 'bus', n: 'autobús' }, { k: 'avion', n: 'avión' }]) {
     const info = (d.modos && d.modos[m.k]) || {};
-    if (info.vigente) continue;
+    if (info.vigente) {
+      const hastaMs = Date.parse(info.vigente.vigente_hasta);
+      if (Number.isFinite(hastaMs) && (hastaMs - ahora) <= RAD_NUBE_AVISO_DIAS * 86400000) {
+        porVencer.push({ nombre: m.n, hasta: info.vigente.vigente_hasta });
+      }
+      continue;
+    }
     const ultima = (info.ultimas || [])[0];
     flojos.push({ nombre: m.n, venció: ultima ? ultima.vigente_hasta : null });
   }
@@ -1297,7 +1308,7 @@ async function _radarNubeAviso() {
   const descubiertos = cob
     ? [...new Set([].concat(...Object.values(cob.sin || {}).map((a) => a.map((e) => e.id))))]
     : [];
-  if (!flojos.length && !descubiertos.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  if (!flojos.length && !descubiertos.length && !porVencer.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
   const enRey = (iso) => {
     const t = Date.parse(iso);
     if (!Number.isFinite(t)) return '—';
@@ -1320,16 +1331,24 @@ async function _radarNubeAviso() {
   // `loadPage` y por la puerta vieja la pantalla salía VACÍA — un «Ir a
   // resolver» que lleva a una pantalla en blanco. Es la ley de «quitar del
   // menú no es quitar un botón»: lo que cuelga del `nav-*` se barre entero.
-  caja.innerHTML = '<div class="rdr-alert sev-alta no-vista" style="cursor:pointer" onclick="showPage(\'nube\')">'
+  // [NUBE-6] Solo «por vencer» (nada vencido ni descubierto) es severidad
+  // MEDIA: es un aviso a tiempo, no un hueco en el sitio.
+  const soloPorVencer = !flojos.length && !descubiertos.length && porVencer.length > 0;
+  const listaPV = porVencer.map((p) => '<b>' + p.nombre + '</b> (hasta el ' + enRey(p.hasta) + ')').join(' y ');
+  caja.innerHTML = '<div class="rdr-alert ' + (soloPorVencer ? 'sev-media' : 'sev-alta') + ' no-vista" style="cursor:pointer" onclick="showPage(\'nube\')">'
     + '<div class="dot"></div>'
     + '<div class="body">'
     + '<div class="titulo">'
     + (flojos.length ? ('La cotización GENERAL de la nube está vencida: ' + lista)
-                     : 'Hay eventos de CDMX vivos sin precio de transporte')
-    + (cob ? (' · <b>' + descubiertos.length + '</b> de <b>' + cob.total + '</b> eventos vivos sin precio') : '')
+       : descubiertos.length ? 'Hay eventos de CDMX vivos sin precio de transporte'
+       : ('La tarifa GENERAL de la nube vence pronto: ' + listaPV))
+    + (cob && !soloPorVencer ? (' · <b>' + descubiertos.length + '</b> de <b>' + cob.total + '</b> eventos vivos sin precio') : '')
     + '</div>'
-    + '<div class="mensaje">Mientras no haya cotización vigente, ese modo NO se vende en el sitio: '
-    + 'el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).'
+    + '<div class="mensaje">'
+    + (soloPorVencer
+        ? 'Si el precio sigue igual, en <b>Nube voladora</b> está «↻ Sigue igual · renovar 30 días»: un clic y los eventos de CDMX siguen vendiendo. Si cambió, captura el nuevo.'
+        : 'Mientras no haya cotización vigente, ese modo NO se vende en el sitio: el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).')
+    + (!soloPorVencer && porVencer.length ? ('<br>Y además vence pronto: ' + listaPV + '.') : '')
     + (porModo ? ('<br>' + porModo + '.') : '')
     + (cob && cob.total && !descubiertos.length ? '<br>Los ' + cob.total + ' eventos vivos SÍ tienen precio (propio o heredado de la general).' : '')
     + '</div>'

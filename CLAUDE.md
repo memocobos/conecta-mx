@@ -188,6 +188,74 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ☁️⏳ **NUBE-6 (9-nov-2026, en main local, cero SQL): LA NUBE VOLADORA SE
+  SIMPLIFICA — la GENERAL es el camino normal, 30 días de vigencia, renovar a un
+  clic, panorama de cobertura, avión general «desde», el Radar avisa ANTES de
+  vencer.** Palabra de Memo: *«hacerlo manual se está volviendo complicado ¿hay
+  forma de optimizarlo y automatizarlo?»* → *«ps dale, primero arreglemos eso
+  antes de salir a venta con los eventos 2027 de cdmx»*. Eligió la opción A
+  (simplificar lo manual); la B (un cron que PROPONGA precios de vuelo REX→MEX)
+  queda nombrada para después — Viva/Volaris no tienen API pública.
+  - 🔴 **LO MEDIDO ANTES, y es la razón entera:** `nube_cotizaciones` trae **5
+    filas en toda su historia**, TODAS por evento (ninguna general), vigencias
+    de **2-5 días**, todas de Milk. Con 18 eventos de CDMX vivos × 2 modos y la
+    cadencia «cada lunes» que NUBE-1 pedía, nadie la sostuvo: el sitio vivía en
+    «cotiza por WhatsApp» y el card «Cómo llegar» casi nunca se pintaba. La
+    nube es una REFERENCIA de venta (el precio real lo pone el equipo al comprar
+    el vuelo, ✈️ Vuelo en Capsule), así que un mes es la cadencia honesta.
+  - **Servidor (`admin-nube`):** acción **`renovar`** `{modo, evento_id?, dias?
+    (1-90, default 30)}` → re-captura la que rige (o la última vencida) de ESA
+    llave con el MISMO precio y horarios, desde ahora por N días, nota «renovada
+    sin cambio el YYYY-MM-DD (+N días) · <nota vieja>», `capturado_por` del
+    token. 🔒 Es un INSERT por el camino de `cotizar` (la tabla sigue
+    insert-only); **un evento sin propia NO copia la general a su nombre →
+    404 «Captura una primero»** (sería inventarle una cotización); el
+    `precio_pp` del body se IGNORA (renovar es «sigue igual»; cambiar precio es
+    `cotizar`). `cobertura` gana `detalle` por evento (`sin · heredado ·
+    propio`, con precio y vencimiento) y `general` por modo — de las MISMAS
+    llamadas al dueño `resolver`, cero segunda opinión. `_lib/nube.js` NO se
+    tocó (careado: nube-4 74 verde).
+  - **Pantalla (`kamehouse-nube.js` + `kamehouse.html`):** `NUBE_DIAS_DEFAULT =
+    30` → la vigencia nace en hoy-Reynosa+30 (FORMA anunciada en la etiqueta,
+    DEFAULTS-1 b; ⚰️ `_nubeProximoDomingoISO` queda de alias). Sin evento
+    elegido se pinta el **PANORAMA**: la general de cada modo con precio,
+    «rige hasta · quedan N días» (⚠️ naranja a ≤5), horarios, botones **«↻
+    Sigue igual · renovar 30 días»** y «✏️ Cambiar precio»; sin general: «SIN
+    TARIFA GENERAL … captura UNA y los cubre a todos» + Revivir + Capturar; y
+    la **cobertura** de los 18 CDMX vivos con chips por evento (propio · general
+    · sin precio), clic → abre el evento. El botón «↻ Sigue igual» también vive
+    en la card vigente de cualquier llave y «↻ Revivir la última ($X)» en la
+    vencida. El texto de la página dice el método: una general, renovar al mes,
+    propia solo como excepción.
+  - **Index:** `nubeAproxLabel(modo, v)` es el DUEÑO de «¿se presenta como
+    “desde”?»: **SOLO el avión que HEREDA la general** (es una referencia para
+    18 fechas distintas; el vuelo real se compra después). Bus general y avión
+    propio van EXACTOS. Lo preguntan el card «Cómo llegar» («desde $4,800 · por
+    persona · se confirma al reservar») y `_tBoton` del cotizador (`data-aprox`,
+    «desde $X», y el nombre que viaja al resumen dice «Avión (desde)» para que
+    la línea de Transporte no prometa un precio cerrado). El total de la
+    requisición CDMX NO cambia (sigue sin transporte, `requiere_transporte`).
+  - **Radar (`_radarNubeAviso`):** `RAD_NUBE_AVISO_DIAS = 5` — una general
+    vigente que muere en ≤5 días sale en **sev-media** «vence pronto … renovar
+    es un clic»; vencida sigue sev-alta (+ «Y además vence pronto» si aplica);
+    todo vigente y lejos → se calla. Con 30 días el aviso cae una vez al mes.
+  - `mide:nube-6` **78** (handler REAL con red falsa que respeta filtros,
+    guarda estado y TRUENA ante PATCH/DELETE · pantalla e index REALES en vm ·
+    radar en vm · control positivo contra BASE `3af80d1` · sabotaje «renovar
+    obedece el precio del body» → rojo → restaurado sha1). ⚠️ Sin ancla de HEAD
+    a propósito (árbol de trabajo, forma de req-b1); BASE = `git rev-parse
+    HEAD`. Un rojo de la primera corrida era del instrumento: un `const` de
+    nivel superior no es propiedad del contexto en vm. Vecinos: nube-4 74 ·
+    nube-1 60 · nube-3 21 (sus bloques Playwright caen en el sandbox, Mac).
+  - ⏳ **Push de Memo → UNA vez, Milk (o Bulma) en la Nube: capturar la GENERAL
+    de autobús y la GENERAL de avión con la vigencia de 30 días que ya viene
+    puesta.** Desde ahí el ciclo es: el Radar avisa ≤5 días antes → «↻ Sigue
+    igual» o «✏️ Cambiar precio». Las propias por evento siguen existiendo para
+    la excepción (un vuelo ya negociado para esa fecha). **Después de esto se
+    abren los 6 CDMX 2027** (warning · hilary · edc27 · u2 · louist · niall:
+    `REQUISICION_EVENTOS` + `RESERVA_2027`, o la regla REQ-2027-3) — ⚠️ louist
+    trae sep $1,000 y edc27/niall una sola zona: palabra de Memo antes.
+
 - ✉️⏳ **REQ-EXITO-1 (9-nov-2026, en main local, cero SQL): la pantalla de éxito
   de la reservación ya NO manda a WhatsApp.** Palabra de Memo: *«cuando reservan
   no pongas nada del whatsapp, pon algo como tu requisición ha sido enviada,

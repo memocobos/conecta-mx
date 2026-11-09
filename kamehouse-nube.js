@@ -50,16 +50,24 @@ function _nubeInstante(fechaISO, hhmm) {
   // humano decide.
   return Date.parse(fechaISO + 'T' + hhmm + ':00-05:00');
 }
-// El domingo que viene, en Reynosa. Si HOY es domingo, es el de dentro de 7
-// días: la cotización del lunes tiene que cubrir la semana entera.
-function _nubeProximoDomingoISO() {
+// [NUBE-6] LA VIGENCIA POR DEFAULT ES DE 30 DÍAS, ya no «el domingo que viene».
+// Medido el 9-nov-2026: en toda la vida de la nube hubo 5 capturas con
+// vigencias de 2-5 días, y la cadencia semanal × 18 eventos × 2 modos no la
+// sostuvo nadie — el sitio pasaba casi siempre en «cotiza por WhatsApp». La
+// nube es una REFERENCIA de venta (el precio real lo pone el equipo al comprar,
+// con ✈️ Vuelo en Capsule), así que un mes es la cadencia honesta. Sigue siendo
+// una FORMA con default ANUNCIADO en la etiqueta (DEFAULTS-1 caso b).
+const NUBE_DIAS_DEFAULT = 30;
+function _nubeDefaultHastaISO() {
   const hoyR = new Date().toLocaleString('sv-SE', { timeZone: NUBE_TZ }).slice(0, 10);
   const [a, m, d] = hoyR.split('-').map(Number);
   const base = new Date(Date.UTC(a, m - 1, d));
-  const dow = base.getUTCDay();                 // 0 = domingo
-  base.setUTCDate(base.getUTCDate() + (dow === 0 ? 7 : (7 - dow)));
+  base.setUTCDate(base.getUTCDate() + NUBE_DIAS_DEFAULT);
   return base.toISOString().slice(0, 10);
 }
+// ⚰️ `_nubeProximoDomingoISO` murió con la cadencia semanal; el nombre se
+// conserva como alias por si algún llamador viejo lo pide.
+function _nubeProximoDomingoISO() { return _nubeDefaultHastaISO(); }
 function _nubeEnReynosa(iso) {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '—';
@@ -151,10 +159,118 @@ function nubeEventoCambio() {
   const q = document.getElementById('nube-q-res');
   if (q) q.innerHTML = '';
   if (elegido) loadNube();
-  else {
-    const cont = document.getElementById('nube-cuerpo');
-    if (cont) cont.innerHTML = '<div class="card" style="padding:18px;text-align:center;font-size:13px;color:var(--ts)">'
-      + 'Elige arriba <b style="color:var(--tp)">de qué se habla</b> para ver las cotizaciones.</div>';
+  else _nubePanorama();
+}
+
+// ═══ [NUBE-6] EL PANORAMA: lo que se ve al entrar, sin elegir nada ═════════
+// Antes la pantalla decía «elige arriba de qué se habla» y la general era una
+// opción más del selector — se capturaba por evento, 2-5 días cada una, y nadie
+// aguantó el ritmo. Hoy, sin elegir nada, se ve LA GENERAL (bus y avión, con su
+// vencimiento y «↻ Renovar») y debajo la lista de los eventos de CDMX vivos con
+// su estado por modo: hereda · propio · sin precio. Una captura de la general
+// cubre a todos; por evento solo se captura la excepción, y se ve cuál es.
+// 🔒 Nada se calcula aquí: la cobertura la contesta `admin-nube · cobertura`,
+// que a su vez le pregunta al dueño (`resolver`) evento por evento.
+async function _nubePanorama() {
+  const cont = document.getElementById('nube-cuerpo');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state">Leyendo la cobertura…</div>';
+  _nubeFormReset();
+  let d = null;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'cobertura' }),
+    });
+    d = await r.json().catch(() => ({}));
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
+  } catch (e) {
+    khErrorCarga(cont, 'la cobertura de la nube', '_nubePanorama', e);
+    return;
+  }
+  cont.innerHTML = _nubePanoramaHtml(d);
+}
+// Puro: recibe la respuesta de `cobertura` y arma el HTML. Separado para que
+// el careo lo corra con una respuesta sembrada.
+function _nubePanoramaHtml(d) {
+  const ahora = Number(d.ahora) || Date.now();
+  const general = d.general || {};
+  const detalle = Array.isArray(d.detalle) ? d.detalle : [];
+  const tarjetasGen = NUBE_MODOS.map((m) => {
+    const g = general[m.k];
+    let cuerpo;
+    if (g) {
+      const diasQuedan = Math.ceil((Date.parse(g.vigente_hasta) - ahora) / 86400000);
+      const porVencer = Number.isFinite(diasQuedan) && diasQuedan <= 5;
+      cuerpo = '<b style="color:var(--tp);font-size:22px">' + _nubeMxn(g.precio) + '</b>'
+        + ' <span style="font-size:11px;color:var(--ts)">por persona</span>'
+        + '<div style="font-size:11px;color:' + (porVencer ? 'var(--orange)' : 'var(--ts)') + ';margin-top:4px">'
+        + (porVencer ? '⚠️ ' : '') + 'rige hasta <b>' + _nubeEnReynosa(g.vigente_hasta) + '</b>'
+        + (Number.isFinite(diasQuedan) ? (' · ' + (diasQuedan <= 0 ? 'vence hoy' : ('quedan ' + diasQuedan + ' día' + (diasQuedan === 1 ? '' : 's')))) : '') + '</div>'
+        + (g.horarios ? ('<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(g.horarios) + '</div>') : '')
+        + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
+        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Sigue igual · renovar ' + NUBE_DIAS_DEFAULT + ' días</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="nubeIrA(\'' + NUBE_GENERAL + '\',\'' + m.k + '\')">✏️ Cambiar precio</button>'
+        + '</div>';
+    } else {
+      cuerpo = '<div style="font-size:12px;color:var(--orange)"><b>SIN TARIFA GENERAL</b></div>'
+        + '<div style="font-size:11px;color:var(--ts);margin-top:4px">Los eventos sin cotización propia caen al WhatsApp en este modo. '
+        + 'Captura UNA general y los cubre a todos.</div>'
+        + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
+        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Revivir la última ' + NUBE_DIAS_DEFAULT + ' días</button>'
+        + '<button class="btn btn-primary btn-sm" onclick="nubeIrA(\'' + NUBE_GENERAL + '\',\'' + m.k + '\')">➕ Capturar general</button>'
+        + '</div>';
+    }
+    return '<div class="card" style="padding:14px"><div class="card-lbl">' + m.emoji + ' ' + m.nombre + ' · TARIFA GENERAL CDMX</div>' + cuerpo + '</div>';
+  }).join('');
+
+  const chip = (x) => {
+    if (!x || x.estado === 'sin') return '<span style="color:var(--orange)">— sin precio</span>';
+    if (x.estado === 'propio') return '<span style="color:var(--green)">' + _nubeMxn(x.precio) + ' <span style="font-size:10px">propio</span></span>';
+    return '<span style="color:var(--ts)">' + _nubeMxn(x.precio) + ' <span style="font-size:10px">general</span></span>';
+  };
+  const filas = detalle.map((e) => '<div style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" onclick="nubeIrA(\'' + _nubeEsc(e.id) + '\',\'\')" title="Abrir ' + _nubeEsc(e.nombre) + '">'
+    + '<span><b style="color:var(--tp)">' + _nubeEsc(e.nombre) + '</b>' + (e.ds ? (' <span style="color:var(--ts)">· ' + _nubeEsc(e.ds) + '</span>') : '') + '</span>'
+    + '<span style="white-space:nowrap">🚌 ' + chip(e.bus) + '</span>'
+    + '<span style="white-space:nowrap">✈️ ' + chip(e.avion) + '</span>'
+    + '</div>').join('');
+  const sinBus = ((d.sin && d.sin.bus) || []).length, sinAvion = ((d.sin && d.sin.avion) || []).length;
+  const propiosBus = (d.propios && d.propios.bus) || 0, propiosAvion = (d.propios && d.propios.avion) || 0;
+  return '<div style="font-size:11px;color:var(--ts);margin-bottom:8px;text-transform:uppercase;letter-spacing:.1em">la tarifa general cubre a todos los eventos sin una propia</div>'
+    + '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + tarjetasGen + '</div>'
+    + '<div class="card" style="padding:14px;margin-top:12px">'
+    + '<div class="card-lbl">📡 Cobertura · ' + Number(d.total || 0) + ' eventos de CDMX vivos</div>'
+    + '<div style="font-size:11px;color:var(--ts);margin-bottom:8px">'
+    + '🚌 ' + propiosBus + ' con precio propio · ' + (Number(d.total || 0) - propiosBus - sinBus) + ' heredan la general · <b style="color:' + (sinBus ? 'var(--orange)' : 'var(--green)') + '">' + sinBus + ' sin precio</b>'
+    + ' &nbsp;·&nbsp; ✈️ ' + propiosAvion + ' propio · ' + (Number(d.total || 0) - propiosAvion - sinAvion) + ' general · <b style="color:' + (sinAvion ? 'var(--orange)' : 'var(--green)') + '">' + sinAvion + ' sin precio</b>'
+    + '<br>Toca un evento para ver sus cotizaciones o capturarle una propia (la excepción, no la regla).</div>'
+    + (filas || '<div style="font-size:12px;color:var(--ts)">No hay eventos de CDMX vivos en el catálogo.</div>')
+    + '</div>';
+}
+// Lleva el selector a un evento (o a la general) y, si se pide, deja el modo
+// elegido en el formulario para que capturar sea un paso menos.
+function nubeIrA(valor, modo) {
+  const sel = document.getElementById('nube-evento');
+  if (sel) sel.value = valor;
+  nubeEventoCambio();
+  if (modo) { const m = document.getElementById('nube-modo'); if (m) m.value = modo; }
+}
+// [NUBE-6] «Sigue igual»: renueva la cotización de ESTA llave (la elegida, o la
+// general con `eventoId === null`) por NUBE_DIAS_DEFAULT días. El servidor
+// inserta la fila nueva con la nota «renovada sin cambio» — el historial queda.
+async function nubeRenovar(modo, eventoId) {
+  const quien = eventoId === undefined ? _nubeSel().eventoId : eventoId;
+  const etiqueta = _nubeNombre(quien);
+  if (!confirm('¿Renovar la cotización de ' + (modo === 'bus' ? 'autobús' : 'avión') + ' de «' + etiqueta + '» por ' + NUBE_DIAS_DEFAULT + ' días más, con el MISMO precio?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-nube', {
+      method: 'POST', body: JSON.stringify({ accion: 'renovar', modo, evento_id: quien || undefined, dias: NUBE_DIAS_DEFAULT }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
+    showToast('Renovada · ' + _nubeMxn(d.fila && d.fila.precio) + ' hasta ' + _nubeEnReynosa(d.fila && d.fila.vigente_hasta), 'success');
+    if (_nubeSel().elegido) await loadNube(); else await _nubePanorama();
+  } catch (e) {
+    showToast(e.message, 'error');
   }
 }
 
@@ -163,13 +279,10 @@ async function loadNube() {
   if (!cont) return;
   // La lista de eventos se pide UNA vez por carga de pantalla.
   if (_nubeEventos == null) await _nubeCargarEventos();
-  const { elegido, eventoId } = _nubeSel();
-  if (!elegido) {
-    cont.innerHTML = '<div class="card" style="padding:18px;text-align:center;font-size:13px;color:var(--ts)">'
-      + 'Elige arriba <b style="color:var(--tp)">de qué se habla</b> para ver las cotizaciones.</div>';
-    _nubeFormReset();
-    return;
-  }
+  const { elegido } = _nubeSel();
+  // [NUBE-6] Sin elección, el PANORAMA — no un letrero que manda a elegir.
+  if (!elegido) { await _nubePanorama(); return; }
+  const { eventoId } = _nubeSel();
   cont.innerHTML = '<div class="loading-state">Leyendo la nube…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-nube', {
@@ -206,7 +319,9 @@ function _nubePintar(d) {
         + '<div style="font-size:11px;color:var(--ts);margin-top:4px">rige hasta <b>' + _nubeEnReynosa(v.vigente_hasta) + '</b>'
         + ' (hora de Reynosa) · la subió ' + _nubeEsc(v.capturado_por || '—') + '</div>'
         + (v.horarios ? '<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(v.horarios) + '</div>' : '')
-        + (v.nota ? '<div style="font-size:11px;color:var(--ts);margin-top:2px">' + _nubeEsc(v.nota) + '</div>' : '');
+        + (v.nota ? '<div style="font-size:11px;color:var(--ts);margin-top:2px">' + _nubeEsc(v.nota) + '</div>' : '')
+        // [NUBE-6] «Sigue igual» a un clic: renueva ESTA llave con el mismo precio.
+        + '<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Sigue igual · renovar ' + NUBE_DIAS_DEFAULT + ' días</button></div>';
     } else if (res && res.heredado) {
       // 🔒 CUATRO ESTADOS AHORA, Y EL NUEVO SE ROTULA: «este evento no tiene
       // cotización propia, y rige la GENERAL». Sin este renglón la pantalla
@@ -229,7 +344,9 @@ function _nubePintar(d) {
             : 'Este modo nunca se ha cotizado.')
         + (_nubeSel().eventoId != null ? ' <b>Y la general tampoco rige hoy.</b>' : '')
         + ' <b style="color:var(--tp)">En el sitio, este modo manda al WhatsApp</b> — no se pinta ningún precio.'
-        + '</div>';
+        + '</div>'
+        // [NUBE-6] Si hubo una, revivirla con el mismo precio es un clic.
+        + (ultima ? ('<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Revivir la última (' + _nubeMxn(ultima.precio) + ') por ' + NUBE_DIAS_DEFAULT + ' días</button></div>') : '');
     }
     const filas = (info.ultimas || []).slice(0, 6).map((f) => {
       const viva = Date.parse(f.vigente_desde) <= ahora && ahora < Date.parse(f.vigente_hasta);
@@ -277,7 +394,7 @@ function _nubeFormReset() {
   // los lunes: bus y avión, uno tras otro.
   // La vigencia SÍ trae default, y va anunciada en su etiqueta.
   const f = document.getElementById('nube-hasta-fecha');
-  if (f && !f.value) f.value = _nubeProximoDomingoISO();
+  if (f && !f.value) f.value = _nubeDefaultHastaISO();
   const h = document.getElementById('nube-hasta-hora');
   if (h && !h.value) h.value = '23:59';
   _nubePreviaVigencia();

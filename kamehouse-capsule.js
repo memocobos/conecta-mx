@@ -497,6 +497,74 @@ function filtrarCapsule() {
       })
     : _ccEventosCache;
   renderCCEventos(lista, _ccFiltroFecha);
+  if (typeof ccBuscaClientes === 'function') ccBuscaClientes(q);   // [CC-BUSCA-GLOBAL-1]
+}
+// ── [CC-BUSCA-GLOBAL-1 · 9-nov-2026] el buscador principal encuentra CLIENTES ──
+// Palabra de Memo: «el buscador principal también debería dejarme buscar por
+// cliente o número de contrato… entrar evento por evento, sobre todo en los
+// multifechas, es cansado». Con 3+ letras se le pregunta al servidor
+// (`viajero_buscar`, todos los eventos); clic → abre su evento en Viajeros con
+// su nombre ya buscado. Los eventos se siguen filtrando igual, abajo.
+let _ccBuscaT = null, _ccBuscaSeq = 0;
+function ccBuscaClientes(q) {
+  const box = document.getElementById('cc-busca-clientes');
+  if (!box) return;
+  clearTimeout(_ccBuscaT);
+  const limpio = String(q || '').trim();
+  if (limpio.replace(/[^a-z0-9áéíóúñü]/gi, '').length < 3) { box.style.display = 'none'; box.innerHTML = ''; _ccBuscaSeq++; return; }
+  _ccBuscaT = setTimeout(() => _ccBuscaClientesPedir(limpio), 300);
+}
+async function _ccBuscaClientesPedir(q) {
+  const box = document.getElementById('cc-busca-clientes');
+  if (!box) return;
+  const seq = ++_ccBuscaSeq;
+  box.style.display = '';
+  box.innerHTML = '<div style="font-size:12px;color:var(--ts)">Buscando clientes en todos los eventos…</div>';
+  let j;
+  try { j = await khViajeros._call({ accion: 'viajero_buscar', q }); }
+  catch (e) {
+    if (seq !== _ccBuscaSeq) return;
+    box.innerHTML = `<div class="alert alert-error">No se pudo buscar clientes: ${_esfEsc(e.message || 'error')}</div>`;
+    return;
+  }
+  if (seq !== _ccBuscaSeq) return;   // llegó tarde: el buscador ya dice otra cosa
+  box.innerHTML = _ccBuscaClientesHtml(j || {}, _ccEventosCache || []);
+}
+// Tarjeta de la llave del viajero: exacta, o el slug base si el evento es de
+// una sola fecha (la forma de vjAltaIr). Sin tarjeta → evento fuera del
+// catálogo de Capsule (pasado viejo): se dice, no se abre a ciegas.
+function _ccTarjetaDe(evId, cache) {
+  const id = String(evId || '');
+  if (cache.some(e => e.id === id)) return id;
+  const base = id.split('#')[0];
+  return cache.some(e => e.id === base) ? base : null;
+}
+function _ccBuscaClientesHtml(j, cache) {
+  const rs = Array.isArray(j.resultados) ? j.resultados : [];
+  const tit = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:6px">👤 CLIENTES · ${j.total || 0} encontrado${(j.total || 0) === 1 ? '' : 's'}${j.recortado ? ' · se enseñan los primeros ' + rs.length + ', afina la búsqueda' : ''}</div>`;
+  if (!rs.length) return tit + '<div style="font-size:12px;color:var(--ts)">Ningún cliente con eso. Los eventos de abajo sí se filtran.</div>';
+  const filas = rs.map(v => {
+    const card = _ccTarjetaDe(v.evento_id, cache);
+    const ev = card ? cache.find(e => e.id === card) : null;
+    const evTxt = ev ? ev.nombre : (v.evento_id + ' · fuera del catálogo');
+    const pq = v.tipo_paquete ? `<span style="color:var(--orange);font-family:'JetBrains Mono',monospace">${_esfEsc(v.tipo_paquete)}</span>` : '';
+    const extra = [v.zona_boleto, v.folio, v.celular, v.correo].filter(Boolean).map(_esfEsc).join(' · ');
+    const chips = (v.baja ? ' <span style="color:var(--red)">⛔ baja</span>' : '') + (v.staff ? ' <span style="color:var(--ts)">· equipo</span>' : '');
+    const click = card ? ` onclick="ccBuscaClienteAbrir('${_esfEsc(card)}', ${_esfEsc(JSON.stringify(v.nombre || ''))})" style="cursor:pointer"` : ' style="opacity:.6"';
+    return `<div class="cc-busca-fila"${click.replace(' style="', ' style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px;')}>
+      <b>${_esfEsc(v.nombre || '—')}</b>${chips} ${pq}
+      <span style="color:var(--ink)">${_esfEsc(evTxt)}</span>
+      <span style="color:var(--ts);margin-left:auto">${extra}</span>
+    </div>`;
+  }).join('');
+  return tit + `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg2);max-height:320px;overflow:auto">${filas}</div>`;
+}
+async function ccBuscaClienteAbrir(cardId, nombre) {
+  await abrirDetalleEvento(cardId);
+  if (typeof showCCSubTab === 'function') showCCSubTab('viajeros', document.getElementById('cc-sub-btn-viajeros'), true);
+  const bq = document.getElementById('cc-vj-buscar');
+  if (bq) bq.value = nombre || '';
+  if (typeof vjBuscar === 'function') vjBuscar(nombre || '');
 }
 // ── Crear / Editar evento ────────────────────────────────────
 function abrirModalCrearEvento() { abrirModalEvento(null); }

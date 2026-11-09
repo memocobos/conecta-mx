@@ -73,7 +73,7 @@ const LECTURAS_DIRECTOR = {
   'admin-coordi-asignaciones': ['listar', 'viajero_listar', 'capsule_resumen', 'alarmas_operacion',
     'deudores_migrados', 'contrato_cliente_estado', 'contrato_cliente_lista', 'abonos_listar',
     'plan_viajero', 'plan_pendientes', 'fechas_de_evento', 'perfiles_portal', 'grupo_wa_ver',
-    'precio_sugerido', 'vuelo_prellenar'],
+    'precio_sugerido', 'vuelo_prellenar', 'viajero_buscar'],
   'admin-viajeros-evento': '*',
   'admin-rooming': ['listar'],
   'admin-rooming-grupos': ['listar'],

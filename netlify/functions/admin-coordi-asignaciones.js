@@ -104,6 +104,7 @@ const ACCIONES = {
   responder: null,
   viajero_upsert_staff: null,
   viajero_listar: null,
+  viajero_buscar: ROLES_EDITA_VIAJERO,           // [CC-BUSCA-GLOBAL-1] buscar cliente en TODOS los eventos — solo LEE
   viajero_eliminar: ROLES_ELIMINA_VIAJERO,
   viajero_editar: ROLES_EDITA_VIAJERO,
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
@@ -1271,6 +1272,73 @@ ${entregables}
       if (!selloR.ok) return upstream(headers, await selloR.text(), 'update');
 
       return ok(headers, { viajero, acompanante: acompViajero, stock: stockFinal, cortesia, creada: !existente });
+    }
+
+    // ── [CC-BUSCA-GLOBAL-1 · 9-nov-2026] buscar un cliente en TODOS los eventos ──
+    // Palabra de Memo: «entrar evento por evento a buscar un cliente, sobre todo
+    // en los multifechas, es cansado». Busca por nombre (palabras en cualquier
+    // orden, sin acentos), correo, celular (dígitos) o FOLIO de requisición
+    // (R-XXXXX, vive en la nota del viajero que nació de ella). SOLO LEE.
+    // 🔒 Sobre-pesca y filtra aquí: el ilike de PostgREST distingue acentos, así
+    // que cada vocal/ñ va como comodín `_` (casa «sofia» con «Sofía») y la
+    // AUTORIDAD es la comparación normalizada de abajo — un comodín solo puede
+    // pescar DE MÁS, nunca de menos (la ley de PLAN-CASE-1).
+    if (accion === 'viajero_buscar') {
+      const q = String(body.q || '').trim().slice(0, 80);
+      const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const qn = norm(q);
+      if (qn.replace(/[^a-z0-9]/g, '').length < 3) return bad(headers, 'Escribe al menos 3 letras o números');
+      const COLS = 'id,nombre,evento_id,tipo_paquete,tipo_viajero,zona_boleto,boletos,correo,celular,notas';
+      const digitos = q.replace(/\D/g, '');
+      // Un folio es «R-XXXXX»; sin guion solo si trae un dígito (si no, «Rafael»
+      // se leería como el folio R-AFAEL).
+      const folio = (q.match(/\bR-[A-Z0-9]{5}\b/i) || q.match(/\bR(?=[A-Z0-9]{0,4}\d)[A-Z0-9]{5}\b/i) || [])[0];
+      const limpio = (t) => t.replace(/[*,()"\\]/g, '');
+      const comodin = (t) => limpio(t).replace(/[aeiounáéíóúñü]/gi, '_');
+      const or = [];
+      let tokens = qn.split(/\s+/).map((t) => t.replace(/[^a-z0-9@._\-]/g, '')).filter((t) => t.length >= 2);
+      if (folio) {
+        const f = folio.toUpperCase().replace(/^R-?/, 'R-');
+        or.push(`notas.ilike.*${f}*`);
+      } else if (q.includes('@')) {
+        or.push(`correo.ilike.*${limpio(q.toLowerCase())}*`);
+      } else if (digitos.length >= 4 && digitos.length === q.replace(/[\s\-()+]/g, '').length) {
+        or.push(`celular.ilike.*${digitos.slice(-10)}*`);
+      } else if (tokens.length) {
+        // La palabra MÁS larga estrecha la consulta; las demás las exige el filtro.
+        const larga = tokens.slice().sort((x, y) => y.length - x.length)[0];
+        or.push(`nombre.ilike.*${comodin(larga)}*`, `correo.ilike.*${limpio(larga)}*`);
+      }
+      if (!or.length) return bad(headers, 'Búsqueda vacía');
+      const sp = new URLSearchParams();
+      sp.set('select', COLS);
+      sp.set('or', `(${or.join(',')})`);
+      sp.set('order', 'nombre.asc');
+      sp.set('limit', '500');
+      const r = await fetch(`${baseVE}?${sp.toString()}`, { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const filas = await r.json();
+      const casa = (v) => {
+        if (folio) return true;
+        if (q.includes('@')) return norm(v.correo).includes(qn);
+        if (or[0].startsWith('celular.')) return String(v.celular || '').replace(/\D/g, '').includes(digitos.slice(-10));
+        const nom = norm(v.nombre), cor = norm(v.correo);
+        return tokens.every((t) => nom.includes(t)) || (tokens.length === 1 && cor.includes(tokens[0]));
+      };
+      const hallados = filas.filter(casa);
+      const resultados = hallados.slice(0, 60).map((v) => {
+        const f = String(v.notas || '').match(/\bR-[A-Z0-9]{5}\b/);
+        return {
+          id: v.id, nombre: v.nombre, evento_id: v.evento_id,
+          tipo_paquete: v.tipo_paquete ? String(v.tipo_paquete).toUpperCase() : null,
+          zona_boleto: v.zona_boleto || null, boletos: v.boletos,
+          staff: !esCliente(v.tipo_viajero),
+          baja: Number(v.boletos) === 0 && !v.zona_boleto,
+          correo: v.correo || null, celular: v.celular || null,
+          folio: f ? f[0] : null,
+        };
+      });
+      return ok(headers, { resultados, total: hallados.length, recortado: hallados.length > resultados.length });
     }
 
     // ── viajeros_evento: listar (descarga) — admin o coordi del evento ────

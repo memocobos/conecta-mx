@@ -188,6 +188,18 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔎⏳ **CC-BUSCA-GLOBAL-1 (9-nov-2026, en main local, cero SQL): el buscador principal de Capsule encuentra CLIENTES en todos
+  los eventos.** Palabra de Memo: *«entrar evento por evento a buscar un cliente, sobre todo en los multifechas, es cansado»*.
+  Con 3+ letras, además de filtrar eventos, `admin-coordi-asignaciones · viajero_buscar` (SOLO LEE; roshi/bulma/milk/yajirobe
+  + director por LECTURAS_DIRECTOR; coordi 403) busca por nombre (palabras en cualquier orden, sin acentos), correo, celular o
+  FOLIO de requisición (R-XXXXX, vive en la nota: 258 viajeros lo traen). 🔒 Sobre-pesca con `_` por vocal (el ilike distingue
+  acentos) y la comparación normalizada del handler es la autoridad. «Rafael» no se lee como folio (sin guion exige dígito).
+  Clic → abre la tarjeta de ESA fecha en Viajeros con el nombre ya buscado; evento fuera del catálogo (palnorte2026) se dice y no
+  se abre. La nota no viaja. `mide:cc-busca-global-1` **29** (red falsa que distingue acentos como la base + control del
+  comodín; sabotaje quitando el comodín → 7 rojos → restaurado sha1 `25c10b63`). Vecinos verdes: capsule-ux-1 83 (su sandbox
+  corre `filtrarCapsule` sola: la llamada va con `typeof`) · capsule-ux-2 46 · vj-contacto-1 21 · director-1 79 · yajirobe-1 53
+  · plan-vj-1 35. ⏳ Push de Memo.
+
 - 📸⏳ **PASADO-FUERA-1 (9-nov-2026, en main local, cero SQL): Pa'l Norte 2026 se publica como RECUERDO.**
   Captura de Memo: Melany (palnorte2026, $9,700 pagados) salía en la bandeja con «⚠️ Sin total de contrato».
   Causa: `palnorte2026` NO está en el catálogo (la ficha viva `palnorte` es el 2027), así que su fecha no se

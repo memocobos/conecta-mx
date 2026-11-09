@@ -6947,6 +6947,9 @@ function _requisicionActiva(){
   // Por evento: `cur` es el evento abierto (puesto por showDetail antes de que
   // el modal de pago exista). typeof-guard por la ley del orden de parseo.
   try{ if(typeof cur!=='undefined'&&cur&&REQUISICION_EVENTOS.indexOf(cur.id)>-1)return true; }catch(e){}
+  // [REQ-2027-3 · 9-nov] Palabra de Memo: «eso ya siempre debe de salir para evento 2027». Todo evento con
+  // fecha 2027+ abre la requisición SOLO (sin agregarlo a mano a la lista). La lista sigue para preventas sin fecha.
+  try{ if(typeof cur!=='undefined'&&cur&&String(cur.ds||'').slice(0,10)>='2027-01-01')return true; }catch(e){}
   try{ return sessionStorage.getItem('conecta_req_preview')==='1'; }catch(e){ return false; }
 }
 var _reqEstado={forma:null,archivo:null,enviando:false};

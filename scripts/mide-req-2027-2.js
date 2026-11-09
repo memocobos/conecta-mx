@@ -87,7 +87,15 @@ global.fetch = async (url) => {
   af(await C.correoDebeSalir('fuerzaregida#1', 'reserva'), 'fuerzaregida#1 (multifecha) al aprobar → SÍ sale');
   af(await C.correoDebeSalir('juniorh', 'abono'), 'juniorh captura manual → SÍ sale [CORREO-ABONO-2027, palabra de Memo 9-nov: «si manual tmb»]');
   const h = cdmx27[0];
-  af(h && !(await C.correoDebeSalir(h.id, 'reserva')), '🔒 CDMX 2027 NO abierto (' + (h && h.id) + ') al aprobar → NO sale aunque su fecha califique');
+  // [REQ-2027-3 · 9-nov] Verdad nueva (palabra de Memo: «eso ya siempre debe de salir para evento 2027»):
+  // la FECHA 2027+ decide sola — un 2027 fuera de la lista también sale. El candado que queda es la fecha.
+  af(h && (await C.correoDebeSalir(h.id, 'reserva')), 'REQ-2027-3: un 2027 FUERA de la lista (' + (h && h.id) + ') al aprobar → SÍ sale por su fecha');
+  const v26 = EV.find((e) => e && /^2026-1[12]/.test(String(e.ds || '')) && !C.EVENTOS_CORREO.includes(e.id));
+  af(v26 && !(await C.correoDebeSalir(v26.id, 'reserva')), '🔒 un evento 2026 fuera de la lista (' + (v26 && v26.id) + ') → NO sale');
+  const fn = INDEX_HTML.slice(INDEX_HTML.indexOf('function _requisicionActiva(){'), INDEX_HTML.indexOf('var _reqEstado'));
+  const corre = (ev) => { const ctx = { REQUISICION_VIVA: false, REQUISICION_EVENTOS: lista, cur: ev, sessionStorage: { getItem: () => null } }; require('vm').createContext(ctx); require('vm').runInContext(fn + ';this.r=_requisicionActiva();', ctx); return ctx.r; };
+  af(corre({ id: 'nuevo2027', ds: '2027-06-01' }) === true, 'index: un evento 2027 que NO está en la lista abre la requisición solo');
+  af(corre({ id: 'viejo2026', ds: '2026-12-20' }) === false, 'index: control — un 2026 fuera de la lista NO abre');
   af(await C.correoDebeSalir('u2#1', 'reserva'), 'u2#1 (CDMX multifecha, abierto 9-nov) al aprobar → SÍ sale');
   af(await C.correoDebeSalir('louist', 'reserva'), 'louist (CDMX, abierto 9-nov) al aprobar → SÍ sale');
   af(await C.correoDebeSalir('vivelatino#2', 'reserva'), 'vivelatino#2 (2 días) al aprobar → SÍ sale');

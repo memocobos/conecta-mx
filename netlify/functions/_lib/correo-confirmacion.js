@@ -78,7 +78,8 @@ function reservaPorFecha(ev) { return !!(ev && ev.ds && String(ev.ds).slice(0, 1
 // Portal, que escribe.
 async function correoDebeSalir(evento_id, tipo) {   // eslint-disable-line no-unused-vars
   if (correoActivo(evento_id)) return true;
-  if (!RESERVA_2027.includes(baseSlug(evento_id))) return false;
+  // [REQ-2027-3 · 9-nov] Ya no hace falta estar en RESERVA_2027: la FECHA 2027+ del catálogo
+  // servido decide sola (palabra de Memo). La lista queda como registro; el candado es la fecha.
   try {
     const { fetchEventosRaw } = require('./catalogo-index');
     const EV = await fetchEventosRaw();

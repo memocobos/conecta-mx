@@ -188,6 +188,16 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🚪⏳ **REQ-2027-3 (9-nov-2026, en main local, cero SQL): TODO evento 2027 abre la requisición (Mercado
+  Pago / transferencia) y manda el correo único SOLO, por su FECHA.** Palabra de Memo: *«eso ya siempre debe
+  de salir para evento 2027 por favor»*. `_requisicionActiva` (index) abre si `cur.ds >= 2027-01-01`;
+  `correoDebeSalir` ya no exige `RESERVA_2027` (la fecha del catálogo servido es el candado; un 2026 fuera de
+  `EVENTOS_CORREO` sigue sin correo). Las listas quedan como registro y para preventas sin fecha (donomar).
+  ⚰️ Supera la regla de PITBULL-REQ-1 («cada MTY 2027 nuevo se agrega a mano»). `mide:req-2027-2` **37**
+  (la aserción «ozzfest NO sale» se actualizó a la verdad nueva; control: un 2026 no abre ni manda).
+  Vecinos verdes: req-2027-1 24 · confirma-1 28 · req-b1 52 · sep-300-1 31 · acomp-1 76 · mp-link-1 60.
+  ⚠️ Feid YA estaba bien en producción (verificado en Chrome: «¡Estás a un paso!» → pagar). ⏳ Push de Memo.
+
 - 🎤⏳ **FEID-VENTA-1 (9-nov-2026, ficha YA ESCRITA + index a mano): Feid sale a
   la venta con 15 zonas nuevas.** Palabra de Memo: «urge cambiar las zonas y
   costos de feid y salir a la venta». Ficha `feid` (valor esperado md5 + status

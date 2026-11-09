@@ -134,6 +134,15 @@ function _mermaPasado(ev) {
 // boletos que valen ≈$40,100).
 function _audUtilidadPintar(utilidad, cta, util) {
   const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // [UTIL-SOLO-ROSHI] Si el servidor NO mandó la utilidad (bulma/milk), la card
+  // grande entera —número, «en mano», bodega— se ESCONDE. No se pinta «Sin
+  // dato»: eso dice «no se pudo saber», y aquí sí se sabe, solo que no es para
+  // este rol. El hueco se cierra solo: `.res-tres` es auto-fit.
+  const oculta = !!(util && (util.utilidad_oculta || (util.cuenta && util.cuenta.utilidad_oculta)))
+    || !!(currentUser && !KH_UTILIDAD_ROLES.includes(currentUser.rol));
+  const big = document.getElementById('resumen-utilidad');
+  if (big) big.style.display = oculta ? 'none' : '';
+  if (oculta) return;
   // [UTIL-C-2] `null` = NO SE PUEDE SABER, y se dice. Antes esta función no
   // distinguía el desconocido del cero: `Number(null) || 0` pinta $0 en verde
   // con el rótulo "Utilidad", que es una afirmación —"este evento no gana ni
@@ -694,6 +703,14 @@ async function _renderResumenUtilidad(ev) {
   const cont = document.getElementById('resumen-utilidad-tabla');
   if (!cont) return;
   const util = await _utilCargar();  // usa la cache que loadResumen ya cargó (sin doble fetch)
+  // [UTIL-SOLO-ROSHI] La tabla «Ganancia por evento» es UTILIDAD: para quien no
+  // la ve, la card completa se esconde (no «No se pudo cargar», que es otra
+  // afirmación — se pudo, y no es para él).
+  const card = document.getElementById('resumen-utilidad-card');
+  const oculta = !!(util && (util.utilidad_oculta || (util.cuenta && util.cuenta.utilidad_oculta)))
+    || !!(currentUser && !KH_UTILIDAD_ROLES.includes(currentUser.rol));
+  if (card) card.style.display = oculta ? 'none' : '';
+  if (oculta) { cont.innerHTML = ''; return; }
   if (!util) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--ts)">No se pudo cargar la utilidad por evento.</div>';
     return;

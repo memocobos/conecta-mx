@@ -95,14 +95,37 @@ const ev = (body) => ({ httpMethod: 'POST', headers: { origin: 'https://conectar
   r = await H.crear(ev(Object.assign({}, base, { evento_id: 'palnorte', paquete: 'cheap', zona: 'Preventa a ciegas' })));
   af(r.statusCode === 200, 'regresión: la preventa de palnorte (CHEAP) sigue naciendo');
 
-  console.log('\n[C] el correo único: lista para todo, fecha 2027+ solo para reservas');
+  console.log('\n[C] el correo único: lista para todo; los 2027 por lista + fecha, reserva Y abono');
   H = fresco();
   const C = H.correo;
   af(await C.correoDebeSalir('palnorte', 'pago') && await C.correoDebeSalir('nsqkmty', 'reserva'), 'palnorte/nsqkmty: sale en reserva Y en captura manual (como siempre)');
   af(await C.correoDebeSalir('juniorh', 'reserva'), 'juniorh (2027) al APROBAR una requisición → SÍ sale');
   af(await C.correoDebeSalir('fuerzaregida#1', 'reserva'), 'fuerzaregida#1 (multifecha 2027) al aprobar → SÍ sale (se lee el slug base)');
-  af(!(await C.correoDebeSalir('juniorh', 'pago')), '🔒 juniorh con pago capturado A MANO → NO sale («solo requisiciones»: los del Excel no reciben nada nuevo)');
-  const e2026 = EV.find((e) => e && e.ds && e.ds < '2027-01-01' && e.ds >= '2026-10-27' && !['palnorte', 'nsqkmty'].includes(e.id));
+  // ⚰️ [CORREO-ABONO-2027, 9-nov-2026] Esta aserción exigía que la captura MANUAL
+  // en un 2027 NO mandara («solo requisiciones», 26-oct). Palabra nueva de Memo
+  // («si manual tmb»): hoy SÍ sale — el cliente que transfiere y sube su
+  // comprobante tiene que saber que su pago entró. El candado que sigue vivo es
+  // la LISTA + la fecha, no el tipo.
+  af(await C.correoDebeSalir('juniorh', 'abono'), 'juniorh con pago capturado A MANO → SÍ sale «Recibimos tu pago» [CORREO-ABONO-2027]');
+  af(!(await C.correoDebeSalir('soad', 'abono')), '…pero un evento FUERA de la lista sigue sin mandar en captura manual (la lista es el candado)');
+  // 🔒 Control positivo POR COMMIT: el lib de HEAD (el servido hasta el push)
+  // tiene que contestar NO a la misma pregunta — si contestara SÍ, este careo
+  // no estaría midiendo el cambio.
+  try {
+    const { execSync } = require('child_process');
+    const tmp = path.join(RAIZ, 'netlify/functions/_lib', '.mide-req-2027-1-base.js');
+    fs.writeFileSync(tmp, execSync('git show HEAD:netlify/functions/_lib/correo-confirmacion.js', { cwd: RAIZ, encoding: 'utf8' }));
+    try {
+      const B = require(tmp);
+      const baseNo = !(await B.correoDebeSalir('juniorh', 'abono'));
+      const baseSi = await B.correoDebeSalir('juniorh', 'reserva');
+      af(baseNo && baseSi, 'CONTROL POSITIVO: el lib de HEAD aún contestaba NO al abono manual de juniorh (y SÍ a la reserva)');
+    } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
+  } catch (e) { af(false, 'control positivo por HEAD no se pudo correr: ' + e.message); }
+  // El ejemplar de 2026 se elige FUERA de EVENTOS_CORREO (la lista del dueño,
+  // no una copia a mano: la copia ['palnorte','nsqkmty'] se quedó corta en
+  // cuanto SOYLUNA-DIC-1 metió a soylunadic y este careo se puso rojo solo).
+  const e2026 = EV.find((e) => e && e.ds && e.ds < '2027-01-01' && e.ds >= '2026-10-27' && !C.EVENTOS_CORREO.includes(e.id));
   af(e2026 && !(await C.correoDebeSalir(e2026.id, 'reserva')), 'evento de 2026 (' + (e2026 && e2026.id) + ') al aprobar → NO sale');
   indexCaido = true; H = fresco();
   af(!(await H.correo.correoDebeSalir('juniorh', 'reserva')), '🔒 catálogo caído → NO sale (no se escribe al Portal a ciegas)');

@@ -45,6 +45,14 @@ const EVENTOS_CORREO = ['palnorte', 'nsqkmty', 'donomar', 'soylunadic'];   // [N
 // clientes que vienen del Excel no reciben nada nuevo; a ellos se les invita
 // evento por evento con el botón. La fecha se le PREGUNTA al catálogo servido
 // (su `ds`), no se teclea evento por evento.
+// ⚰️ [CORREO-ABONO-2027, 9-nov-2026] «solo requisiciones» quedó SUPERADO por
+// palabra de Memo («si manual tmb»): hoy el flujo real de cobranza es
+// transferencia → comprobante → Bulma/Milk capturan, y el cliente no se
+// enteraba de que su pago entró. La captura manual (tipo 'abono') en los
+// eventos de RESERVA_2027 SÍ manda «Recibimos tu pago». Lo que NO cambia: la
+// lista y la fecha siguen siendo candado, `avisar:false` sigue apagándolo
+// (alta manual con comprobante, revisión del Portal), y el careo del Excel
+// jamás ha llamado a este correo — un abono del careo no manda nada.
 const CORREO_RESERVA_DESDE = '2027-01-01';
 
 // [REQ-2027-2] Palabra de Memo (26-oct-2026, «haremos solo los de Monterrey» →
@@ -62,12 +70,13 @@ const RESERVA_2027 = ['fuerzaregida', 'juniorh', 'anagabriel', 'emmanuel', 'made
 function baseSlug(id) { return String(id || '').split('#')[0]; }
 function correoActivo(evento_id) { return EVENTOS_CORREO.includes(baseSlug(evento_id)); }
 function reservaPorFecha(ev) { return !!(ev && ev.ds && String(ev.ds).slice(0, 10) >= CORREO_RESERVA_DESDE); }
-// ¿Sale el correo? La lista manda para todo; la reserva 2027 exige estar en
-// RESERVA_2027 Y fecha 2027+. Async porque la fecha vive en el catálogo — y se
-// pregunta ANTES del puente al Portal, que escribe.
-async function correoDebeSalir(evento_id, tipo) {
+// ¿Sale el correo? La lista manda para todo; los 2027 exigen estar en
+// RESERVA_2027 Y fecha 2027+, para CUALQUIER tipo (reserva y abono — el
+// `tipo` lo decide el TEXTO del correo, no si sale: CORREO-ABONO-2027). Async
+// porque la fecha vive en el catálogo — y se pregunta ANTES del puente al
+// Portal, que escribe.
+async function correoDebeSalir(evento_id, tipo) {   // eslint-disable-line no-unused-vars
   if (correoActivo(evento_id)) return true;
-  if (tipo !== 'reserva') return false;
   if (!RESERVA_2027.includes(baseSlug(evento_id))) return false;
   try {
     const { fetchEventosRaw } = require('./catalogo-index');

@@ -85,7 +85,7 @@ global.fetch = async (url) => {
   console.log('\n[D] el correo único');
   af(await C.correoDebeSalir('juniorh', 'reserva'), 'juniorh al aprobar → SÍ sale');
   af(await C.correoDebeSalir('fuerzaregida#1', 'reserva'), 'fuerzaregida#1 (multifecha) al aprobar → SÍ sale');
-  af(!(await C.correoDebeSalir('juniorh', 'pago')), 'juniorh captura manual → NO sale');
+  af(await C.correoDebeSalir('juniorh', 'abono'), 'juniorh captura manual → SÍ sale [CORREO-ABONO-2027, palabra de Memo 9-nov: «si manual tmb»]');
   const h = cdmx27[0];
   af(h && !(await C.correoDebeSalir(h.id, 'reserva')), '🔒 CDMX 2027 NO abierto (' + (h && h.id) + ') al aprobar → NO sale aunque su fecha califique');
   af(await C.correoDebeSalir('u2#1', 'reserva'), 'u2#1 (CDMX multifecha, abierto 9-nov) al aprobar → SÍ sale');

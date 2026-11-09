@@ -28,8 +28,18 @@
 //     sin_evento:{...mismos campos...},
 //     totales:{ caja_total_empresa, proyectado_total, falta_total } }
 //
-// Seguridad: verifyAdminAuth(['maestro_roshi','bulma']) + corsCheck. service_role
-// SOLO aquí. Reusa PORTAL_SUPABASE_* — sin env vars nuevas, sin SQL nuevo.
+// Seguridad: verifyAdminAuth(['maestro_roshi','bulma','milk']) + corsCheck.
+// service_role SOLO aquí. Reusa PORTAL_SUPABASE_* — sin env vars nuevas, sin SQL.
+//
+// [UTIL-SOLO-ROSHI, 9-nov-2026] Palabra de Memo: «ni milk ni bulma ven
+// utilidad». La UTILIDAD y sus piezas (ganancia, inversión, bodega, en mano,
+// deuda a proveedores) se PROYECTAN en el servidor por rol: bulma y milk
+// reciben la cuenta operativa (cobrado · facturado · pendiente · viajeros ·
+// gastos) SIN esos campos y con `utilidad_oculta:true`, y la pantalla no pinta
+// el hueco. Esconder la card en el navegador no basta (COB-MIG-1): el dato no
+// viaja. Milk ENTRA a la puerta (antes recibía 403 y su Resumen caía al
+// cálculo Portal-puro, que hoy son puros ceros — un cero es una afirmación).
+// El director (DIRECTOR-1, solo lectura de todo) sí la ve, por LECTURAS_DIRECTOR.
 //
 // El read+stitch vive en `_lib/utilidad-evento` (fuente única, también usado por
 // admin-liquidacion y admin-ventas-resumen); aquí solo se envuelve con auth y la
@@ -44,6 +54,43 @@ const { cuentasDeTodos } = require('./_lib/cuenta-evento');
 // de Memo 12-oct: «solo deja la info de calle 24 en adelante»). El contador
 // público NO lo pide — ese presume la historia completa a propósito.
 const { EPOCA_INICIO } = require('./_lib/epoca');
+
+// [UTIL-SOLO-ROSHI] Quién VE la utilidad. El director pasa por LECTURAS_DIRECTOR
+// (verify-admin) y es solo-lectura de todo el dinero, así que la ve.
+const ROLES_UTILIDAD = ['maestro_roshi', 'director'];
+// La DEUDA a proveedores NO es utilidad (es «lo que debo», va al lado y jamás
+// resta — E5-2) y la orden de Memo no la tocó: la siguen viendo los mismos de
+// antes (roshi · bulma) más el director. Milk entra a la puerta pero no la ve,
+// igual que antes, cuando ni siquiera entraba.
+const ROLES_DEUDA = ['maestro_roshi', 'bulma', 'director'];
+// Las piezas de la fórmula UTIL-C y lo que las acompaña. Son los NOMBRES que
+// `_lib/cuenta-evento` publica (leídos de su `return`, no recordados): se quitan
+// del total Y de cada evento. Lo operativo (ventas · facturado · pendiente ·
+// gastos · viajeros · por_cobrar · a_favor · sin_contrato) se queda.
+const CAMPOS_UTILIDAD = [
+  'ganancia', 'ganancia_empresa',
+  'inversion_boletos', 'inversion_parcial', 'inversion_zonas_sin_costo',
+  'en_mano', 'bodega', 'bodega_boletos', 'bodega_valor', 'bodega_costo',
+  'merma_boletos', 'merma_costo',
+];
+// Y las dos del bloque Portal-puro que también son «cuánto queda»: caja y
+// proyectado (por evento y de empresa).
+const CAMPOS_CAJA_PURA = ['caja', 'proyectado', 'caja_total_empresa', 'proyectado_total'];
+
+function proyectarSinUtilidad(cuenta, r, veDeuda) {
+  const quitar = (obj, campos) => { if (obj && typeof obj === 'object') campos.forEach((k) => { delete obj[k]; }); return obj; };
+  if (cuenta && typeof cuenta === 'object') {
+    const campos = veDeuda ? CAMPOS_UTILIDAD : CAMPOS_UTILIDAD.concat(['deuda_proveedores']);
+    quitar(cuenta.totales, campos);
+    Object.keys(cuenta.eventos || {}).forEach((s) => quitar(cuenta.eventos[s], campos));
+    cuenta.utilidad_oculta = true;
+  }
+  if (r && typeof r === 'object') {
+    quitar(r.totales, CAMPOS_CAJA_PURA);
+    quitar(r.sin_evento, CAMPOS_CAJA_PURA);
+    Object.keys(r.eventos || {}).forEach((s) => quitar(r.eventos[s], CAMPOS_CAJA_PURA));
+  }
+}
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -61,8 +108,9 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma', 'milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
+  const veUtilidad = ROLES_UTILIDAD.includes(String((auth.user || {}).rol || ''));
 
   const env = readEnv();
   if (env.error) return { statusCode: 500, headers, body: JSON.stringify({ error: env.error }) };
@@ -107,6 +155,12 @@ exports.handler = async (event) => {
       }
     } catch (e) { cuentaError = e.message; }
 
+    // [UTIL-SOLO-ROSHI] La proyección por rol va AL FINAL, sobre la respuesta
+    // armada: quitar antes dejaría a `cuentasDeTodos` sumando sobre campos
+    // ausentes. Y se quita DESPUÉS de calcular, no se deja de calcular — así
+    // la cuenta operativa que sí viaja es exactamente la misma que ve roshi.
+    if (!veUtilidad) proyectarSinUtilidad(cuenta, r, ROLES_DEUDA.includes(String((auth.user || {}).rol || '')));
+
     return {
       statusCode: 200,
       headers,
@@ -118,6 +172,7 @@ exports.handler = async (event) => {
         totales: r.totales,
         cuenta,
         cuenta_error: cuentaError,
+        utilidad_oculta: !veUtilidad,
       }),
     };
   } catch (e) {
@@ -174,3 +229,11 @@ function readEnv() {
   }
   return { PORTAL_SB_URL, PORTAL_SB_SERVICE };
 }
+
+// [UTIL-SOLO-ROSHI] Para el careo: la lista de roles y los campos que se
+// proyectan, leídos de aquí y no recordados.
+exports.ROLES_UTILIDAD = ROLES_UTILIDAD;
+exports.ROLES_DEUDA = ROLES_DEUDA;
+exports.CAMPOS_UTILIDAD = CAMPOS_UTILIDAD;
+exports.CAMPOS_CAJA_PURA = CAMPOS_CAJA_PURA;
+exports.proyectarSinUtilidad = proyectarSinUtilidad;

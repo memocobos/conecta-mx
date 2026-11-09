@@ -3092,11 +3092,17 @@ let _resumenSaldosCache = null;  // respuesta de admin-saldos | null
 // El total lo hace el SERVIDOR (`totales.deuda_proveedores`): aquí no se suma
 // nada. Si un día hay un evento más, esta función no se entera — y así debe ser.
 //
-// QUIÉN LO VE: los mismos roles que el endpoint deja pasar
-// (`admin-utilidad-evento` → ['maestro_roshi','bulma'], leído de ahí). A milk el
-// bloque NI SE LE OFRECE: no se pinta el hueco ni un aviso de permiso, porque
-// anunciar un dato que no va a llegar es peor que no anunciarlo.
-const RESUMEN_DEUDA_ROLES = ['maestro_roshi', 'bulma'];
+// QUIÉN LO VE: [UTIL-SOLO-ROSHI, 9-nov-2026] palabra de Memo: «ni milk ni
+// bulma ven utilidad». Es el ESPEJO con nombre de `ROLES_UTILIDAD` del
+// servidor (`admin-utilidad-evento`): la utilidad ya no VIAJA a bulma/milk
+// (`cuenta.utilidad_oculta`), y esta lista solo decide que la pantalla no
+// pinte el hueco ni un aviso de permiso — anunciar un dato que no va a llegar
+// es peor que no anunciarlo. El careo carea las dos listas.
+// La DEUDA no es utilidad y no cambió de dueños: espejo de ROLES_DEUDA.
+const RESUMEN_DEUDA_ROLES = ['maestro_roshi', 'bulma', 'director'];
+// [UTIL-SOLO-ROSHI] La utilidad (card grande, bodega, en mano y la tabla
+// «Ganancia por evento»): espejo de ROLES_UTILIDAD del servidor.
+const KH_UTILIDAD_ROLES = ['maestro_roshi', 'director'];
 
 
 // ── Franja 2 del dashboard: tabla "Utilidad por evento" (web) ────────────────

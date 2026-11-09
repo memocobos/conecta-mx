@@ -142,7 +142,7 @@ function separosRaros(EV) {
        id + ' PLUS cotiza separo 300, SIN transporte en el total (requiere_transporte) · total ' + (r && r.total) + (r && !r.ok ? ' · ' + r.motivo : ''));
   }
   af(await C.correoDebeSalir('edc27#0', 'reserva'), 'edc27#0 al aprobar → el correo único SÍ sale');
-  af(!(await C.correoDebeSalir('edc27', 'pago')), 'edc27 captura manual → NO sale');
+  af(await C.correoDebeSalir('edc27', 'abono'), 'edc27 captura manual → SÍ sale [CORREO-ABONO-2027: la lista y la fecha mandan, no el tipo]');
 
   console.log('\n══ RESULTADO ══');
   if (V === 0) { console.log('⚠️ NADA MEDIDO · esto NO es un verde'); process.exit(1); }

@@ -188,6 +188,39 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔒⏳ **CORREO-ABONO-2027 + UTIL-SOLO-ROSHI (9-nov-2026, en main local, cero
+  SQL): dos palabras de Memo al análisis profundo.**
+  - **CORREO-ABONO-2027 · «si manual tmb».** ⚰️ «Solo requisiciones» (REQ-2027-1,
+    26-oct) queda SUPERADO: el flujo real de cobranza es transferencia →
+    comprobante → captura, y el cliente no se enteraba de que su pago entró.
+    `correoDebeSalir` ya no mira el `tipo`: en `RESERVA_2027` (lista + fecha
+    2027+) sale «Recibimos tu pago» también al capturar a mano. Siguen los
+    candados: la lista, la fecha, `avisar:false` (alta con comprobante, revisión
+    del Portal) y el careo del Excel, que jamás llamó a este correo.
+    `mide:req-2027-1` **24** (su aserción vieja se retiró con razón escrita +
+    control positivo por `git show HEAD` + su ejemplar de 2026 hoy se elige
+    fuera de `EVENTOS_CORREO` del DUEÑO — la copia a mano se había quedado corta
+    con soylunadic y el careo estaba rojo solo) · req-2027-2 33 · sep-300-1 31 ·
+    confirma-1 28 · acomp-1 76 · req-b1 52 · pagos-portal-2 38 · portal-pago-2 78.
+  - **UTIL-SOLO-ROSHI · «ni milk ni bulma ven utilidad».** La proyección vive en
+    el SERVIDOR (`admin-utilidad-evento`): `ROLES_UTILIDAD = [maestro_roshi,
+    director]`; a bulma y milk se les quitan TODAS las piezas de UTIL-C
+    (`CAMPOS_UTILIDAD`: ganancia/empresa, inversión, en mano, bodega, merma) del
+    total y de cada evento, más caja/proyectado del bloque Portal-puro, y viaja
+    `utilidad_oculta:true`. 🔒 **La DEUDA a proveedores no es utilidad** y
+    conserva sus dueños de antes (`ROLES_DEUDA` = roshi · bulma · director).
+    **Milk ahora ENTRA** (antes 403 → su Resumen caía al cálculo Portal-puro,
+    puros ceros) y recibe la cuenta operativa sin utilidad ni deuda. Pantalla:
+    la card grande y la tabla «Ganancia por evento» se ESCONDEN (no «sin dato»:
+    se sabe, no es para ese rol); espejos con nombre `KH_UTILIDAD_ROLES` /
+    `RESUMEN_DEUDA_ROLES`. Kamisama ya era solo roshi/director.
+    `mide:util-solo-roshi` **27** (handler real por rol; control positivo por
+    HEAD: bulma recibía la utilidad y milk rebotaba; pantalla real en vm;
+    sabotaje quitando la proyección → 7 rojos → restaurado sha1 `edb253bd`).
+    Vecinos verdes: director-1 79 · epoca-1 12 · yajirobe-1 53 · saldos-caja-1
+    33 · concilia-1 83 · capsule-ux-1 83.
+  - ⏳ Push de Memo. El OAuth de Google se revisa con Memo en Chrome.
+
 - 🔴🚑⏳ **PORTAL-HOTFIX-1 (9-nov-2026, en main local, cero SQL): TRES defectos
   del Portal cazados por la auditoría profunda del mismo día — el primero una
   REGRESIÓN MÍA que estaba EN PRODUCCIÓN.** Los cazaron los auditores que corrí

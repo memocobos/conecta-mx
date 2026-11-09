@@ -166,6 +166,96 @@ async function marcarRequisicion({ pago, paymentId, folioReq, notifId, tipo, acc
   return res(200, { ok: true, req: folioReq, anotado: true, marcado: true, payment_id: paymentId, monto: fila.monto_cobrado, estado_req: req.estado });
 }
 
+// ── [PORTAL-PAGO-2] El pago de una CUOTA desde el Portal (`cv:<cambio_id>`) ──
+// La MISMA forma que la requisición: bitácora en `mp_pagos` (idempotencia por
+// payment_id, 23505 del índice = ya anotado → UPDATE de estado) y la MARCA en
+// `cambios_viajero` solo con `approved` y valor esperado `mp_pago_id=is.null`.
+// El cambio se queda PENDIENTE: la bandeja lo pinta «💳 Pagado en Mercado Pago»
+// y Bulma/Milk capturan el abono con eso enfrente. Nada automático decide dinero.
+// Un cambio que ya no existe (o que ya se atendió) se anota IGUAL: el dinero
+// llegó y alguien tiene que verlo.
+async function marcarCambioPortal({ pago, paymentId, cambioId }) {
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  if (!KH_URL || !KH_KEY) return res(500, { error: 'Faltan env vars de KameHouse' });
+  const kh = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY, 'Content-Type': 'application/json' };
+  const crudo = pago.crudo || {};
+
+  let cv = null;
+  try {
+    const r = await fetch(`${KH_URL}/rest/v1/cambios_viajero?id=eq.${encodeURIComponent(cambioId)}&select=id,viajero_id,estado,tipo,mp_monto_cobrar,mp_neto,mp_pago_id`, { headers: kh });
+    const arr = r.ok ? await r.json() : [];
+    cv = Array.isArray(arr) ? arr[0] || null : null;
+  } catch (e) { console.error('[mp-webhook] KH: no pude leer el cambio', cambioId, e.message); }
+
+  const esperado = cv ? Number(cv.mp_monto_cobrar) : null;
+  const cobrado = Number(pago.monto);
+  const fila = {
+    mp_payment_id: paymentId,
+    preference_id: crudo.preference_id || (crudo.order && crudo.order.id) || null,
+    external_reference: String(pago.referencia),
+    cambio_id: cv ? cv.id : null,
+    viajero_id: cv ? cv.viajero_id : null,
+    monto_esperado: Number.isFinite(esperado) ? esperado : 0,
+    monto_cobrado: Number.isFinite(cobrado) ? cobrado : 0,
+    comision: Math.max(0, Math.round(((crudo.transaction_amount || 0) - (crudo.transaction_details && crudo.transaction_details.net_received_amount != null ? crudo.transaction_details.net_received_amount : (crudo.transaction_amount || 0))) * 100) / 100),
+    neto: crudo.transaction_details && crudo.transaction_details.net_received_amount != null ? crudo.transaction_details.net_received_amount : null,
+    metodo: crudo.payment_type_id || pago.metodo || null,
+    estado: pago.estado,
+    status_detail: pago.detalle || null,
+    payload: crudo,
+    actualizado_en: new Date().toISOString(),
+  };
+  let yaEstaba = false;
+  try {
+    const ins = await fetch(`${KH_URL}/rest/v1/mp_pagos`, { method: 'POST', headers: { ...kh, Prefer: 'return=minimal' }, body: JSON.stringify(fila) });
+    if (!ins.ok) {
+      const txt = await ins.text();
+      if (/23505/.test(txt) && txt.includes(INDICE_MP_PAGOS)) {
+        yaEstaba = true;
+        const up = await fetch(`${KH_URL}/rest/v1/mp_pagos?mp_payment_id=eq.${encodeURIComponent(paymentId)}&estado=neq.${encodeURIComponent(pago.estado)}`, {
+          method: 'PATCH', headers: { ...kh, Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: fila.estado, status_detail: fila.status_detail, neto: fila.neto, comision: fila.comision, metodo: fila.metodo, payload: crudo, actualizado_en: fila.actualizado_en }),
+        });
+        if (!up.ok) console.error('[mp-webhook] KH: no se actualizó mp_pagos (cuota)', paymentId, up.status);
+      } else {
+        console.error('[mp-webhook] KH: no se anotó el pago (cuota)', paymentId, txt.slice(0, 300));
+        return res(500, { error: 'No se pudo anotar el pago; MP reintenta' });
+      }
+    }
+  } catch (e) {
+    console.error('[mp-webhook] KH: insert mp_pagos falló (cuota)', e.message);
+    return res(500, { error: 'No se pudo anotar el pago; MP reintenta' });
+  }
+  if (pago.estado !== 'approved') return res(200, { ok: true, cambio: cambioId, anotado: true, estado: pago.estado, ya_estaba: yaEstaba });
+  if (!cv) {
+    console.error('[mp-webhook] pago APROBADO de una cuota que no existe:', cambioId, paymentId);
+    return res(200, { ok: true, cambio: cambioId, sin_cambio: true, payment_id: paymentId });
+  }
+  try {
+    const up = await fetch(`${KH_URL}/rest/v1/cambios_viajero?id=eq.${encodeURIComponent(cv.id)}&mp_pago_id=is.null`, {
+      method: 'PATCH', headers: { ...kh, Prefer: 'return=representation' },
+      body: JSON.stringify({ mp_pago_id: paymentId, mp_monto: fila.monto_cobrado, mp_pagado_at: new Date().toISOString() }),
+    });
+    const filas = up.ok ? await up.json().catch(() => null) : null;
+    if (!up.ok) {
+      console.error('[mp-webhook] KH: no se marcó el cambio', cambioId, up.status);
+      return res(200, { ok: true, cambio: cambioId, anotado: true, marcado: false, payment_id: paymentId });
+    }
+    if (!Array.isArray(filas) || !filas.length) {
+      if (cv.mp_pago_id && cv.mp_pago_id !== paymentId) console.error('[mp-webhook] SEGUNDO PAGO aprobado de la misma cuota — revisar duplicado:', cambioId, cv.mp_pago_id, paymentId);
+      return res(200, { ok: true, cambio: cambioId, anotado: true, ya_marcada: true, payment_id: paymentId });
+    }
+  } catch (e) {
+    console.error('[mp-webhook] KH: PATCH cambio falló', cambioId, e.message);
+    return res(200, { ok: true, cambio: cambioId, anotado: true, marcado: false, payment_id: paymentId });
+  }
+  if (Number.isFinite(esperado) && Math.abs(esperado - fila.monto_cobrado) >= 1) {
+    console.error('[mp-webhook] monto distinto al del link (cuota):', cambioId, 'esperado', esperado, 'cobrado', fila.monto_cobrado);
+  }
+  return res(200, { ok: true, cambio: cambioId, anotado: true, marcado: true, payment_id: paymentId, monto: fila.monto_cobrado, estado_cambio: cv.estado });
+}
+
 exports.handler = async (event) => {
   // ── 1. INTERRUPTOR ─────────────────────────────────────────────────────────
   // 404 y no 403: con el cobro apagado este endpoint no existe para nadie.
@@ -247,6 +337,13 @@ exports.handler = async (event) => {
   // dinero. El uuid pelado de abajo es el flujo viejo del Portal y no se toca.
   const folioReq = mpLink.folioDeReferencia(solicitudId);
   if (folioReq) return await marcarRequisicion({ pago, paymentId, folioReq, notifId, tipo, accion });
+
+  // ── [PORTAL-PAGO-2] LA CUOTA DEL PORTAL (`cv:<cambio_id>`) ─────────────────
+  // Misma ley: se ANOTA en `mp_pagos` y se MARCA el cambio; el abono lo
+  // captura Bulma/Milk desde la bandeja. Va ANTES del uuid pelado del Portal
+  // viejo: el prefijo es lo que los distingue.
+  const cambioId = mpLink.cambioDeReferencia(solicitudId);
+  if (cambioId) return await marcarCambioPortal({ pago, paymentId, cambioId });
 
   const SB_URL = process.env.PORTAL_SUPABASE_URL;
   const SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;

@@ -3644,11 +3644,14 @@ function _migPagosHtml(t){
   // Memo): cae a la bandeja de KameHouse y el equipo captura el abono viendo la
   // foto — nada automático mueve dinero. El WhatsApp queda como camino alterno.
   const vjId = String(t.viajero_id || '');
-  const mandaComp = '<div style="margin-top:10px">'
-    + (vjId ? '<button type="button" class="btn btn-secondary" style="width:auto;padding:9px 14px;font-size:13px" data-mig-act="pago-subir" data-mig-id="' + escapeHtml(vjId) + '">📤 Ya pagué — subir mi comprobante</button>'
-      + '<input type="file" id="mig-pago-file-' + escapeHtml(vjId) + '" accept="image/*,.pdf" style="display:none">'
-      + '<div class="mig-pago-msg" id="mig-pago-msg-' + escapeHtml(vjId) + '" style="font-size:12px;margin-top:6px;min-height:14px"></div>' : '')
-    + '<div style="font-size:12px;opacity:.7;margin-top:6px;line-height:1.5">También puedes mandarlo por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a>. En cuanto el equipo lo capture, tu saldo se actualiza aquí.</div></div>';
+  // [PORTAL-PAGO-2] «¿Cómo quieres pagar?» — DOS caminos (palabra de Memo, 9-nov:
+  // «da opción de pagar desde el portal con mercado pago y transferencia»):
+  // 🏦 transferencia/depósito/OXXO (la cuenta + subir comprobante, con DESGLOSE
+  // si viaja en grupo) y 💳 Mercado Pago (link por cuota, solo si el servidor
+  // dice que está disponible). El monto nace con lo que le toca HOY (su rol
+  // fijo) y lo puede cambiar dentro de lo que debe. `comoPago` vive dentro del
+  // camino 🏦; `mandaComp` ahora es ese bloque completo.
+  const mandaComp = _migPagarHtml(t, p, vjId, comoPago, money);
 
   if (p.estado === 'liquidado') {
     return caja(barra + '<div style="font-size:14px;font-weight:800;color:#88ea4e">✓ ¡Ya está liquidado!</div>'
@@ -3658,7 +3661,7 @@ function _migPagosHtml(t){
     return caja('<div style="font-size:13px;opacity:.85">Todavía no tenemos cargado el total de tu viaje, así que no podemos armarte el calendario.</div>' + mandaComp + hist);
   }
   if (p.estado === 'sin_fecha') {
-    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. En cuanto confirmemos la fecha del evento, aquí aparece tu calendario de pagos.</div>' + comoPago + mandaComp + hist);
+    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. En cuanto confirmemos la fecha del evento, aquí aparece tu calendario de pagos.</div>' + mandaComp + hist);
   }
   if (p.estado === 'evento_pasado') {
     return caja(barra + '<div style="font-size:13px;opacity:.85">Este viaje ya pasó'
@@ -3668,7 +3671,7 @@ function _migPagosHtml(t){
   // [PLAN-FIJO-1] Sin plan fijo (migrado del Excel sin fecha de separo): NO se
   // inventa un calendario — el equipo captura su fecha y entonces aparece, fijo.
   if (p.estado === 'sin_plan_fijo') {
-    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. Estamos preparando tu calendario de pagos: en cuanto quede listo aparece aquí con tus fechas fijas. Si tienes dudas, escríbenos por WhatsApp.</div>' + comoPago + mandaComp + hist);
+    return caja(barra + '<div style="font-size:13px;opacity:.85">Te faltan <b>' + money(p.resta) + '</b>. Estamos preparando tu calendario de pagos: en cuanto quede listo aparece aquí con tus fechas fijas. Si tienes dudas, escríbenos por WhatsApp.</div>' + mandaComp + hist);
   }
 
   // [PLAN-FIJO-1] El calendario es FIJO desde tu separo: las fechas y montos no
@@ -3701,7 +3704,121 @@ function _migPagosHtml(t){
 
   return caja(barra + avisoAtr + destacado
     + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;margin-bottom:2px">Tu rol de pagos · te faltan ' + money(p.resta) + '</div>'
-    + lista + nota + comoPago + mandaComp + hist);
+    + lista + nota + mandaComp + hist);
+}
+
+// [PORTAL-PAGO-2] El bloque «¿Cómo quieres pagar?». PURA: recibe el tour (t),
+// su plan (p), el id y el link de la cuenta; devuelve HTML. La pantalla NO
+// decide un peso: el sugerido viene del servidor (t.sugerido) o es la resta.
+// `money` entra por parámetro: es local de _migPagosHtml (no hay una global) —
+// lo cazó mide:plan-pagos-1 al rebanar: en el navegador habría sido ReferenceError.
+function _migPagarHtml(t, p, vjId, comoPago, money){
+  if (!vjId) return '';
+  money = money || ((n) => '$' + Number(n || 0).toLocaleString('es-MX'));
+  const id = escapeHtml(vjId);
+  const resta = (p && Number(p.resta) > 0) ? Math.round(Number(p.resta)) : null;
+  const sug = (t.sugerido != null && Number(t.sugerido) > 0) ? Math.round(Number(t.sugerido)) : resta;
+  const grupo = Array.isArray(t.grupo) ? t.grupo : [];
+  const pend = Array.isArray(t.pagos_pendientes) ? t.pagos_pendientes : [];
+  const linkVivo = pend.find((x) => x.tipo === 'mp_link' && x.url);
+
+  // Lo que ya está en camino: se DICE para que nadie pague dos veces.
+  let enCamino = '';
+  pend.forEach((x) => {
+    if (x.tipo === 'comprobante') enCamino += '<div style="font-size:12px;padding:7px 10px;border-radius:8px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.3);margin-top:8px">⏳ Tu comprobante' + (x.reparto ? ' (con reparto)' : '') + ' está en revisión: el equipo lo captura y tu saldo se actualiza aquí.</div>';
+    else if (x.tipo === 'mp_pagado') enCamino += '<div style="font-size:12px;padding:7px 10px;border-radius:8px;background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.4);margin-top:8px">✓ Recibimos tu pago en Mercado Pago' + (x.monto ? ' de <b>' + money(x.monto) + '</b>' : '') + '. El equipo lo está registrando en tu plan.</div>';
+  });
+
+  const montoCaja = '<label style="display:block;font-size:12px;opacity:.8;margin-top:10px">¿Cuánto vas a pagar?'
+    + '<input type="number" inputmode="numeric" min="1" step="1" id="mig-pago-monto-' + id + '" value="' + (sug != null ? sug : '') + '" ' + (resta != null ? 'max="' + resta + '"' : '') + ' style="display:block;width:100%;margin-top:4px;padding:9px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:16px;font-weight:800">'
+    + (sug != null && resta != null && sug < resta ? '<span style="font-size:11px;opacity:.65">Te toca ' + money(sug) + ' · te faltan ' + money(resta) + ' en total</span>' : '') + '</label>';
+
+  // Camino 🏦: la cuenta + el desglose (si viaja en grupo) + subir comprobante.
+  let desg = '';
+  if (grupo.length) {
+    desg = '<div style="margin-top:10px;padding:9px 10px;border-radius:8px;border:1px dashed rgba(255,255,255,.25)">'
+      + '<label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="mig-desg-on-' + id + '" data-mig-act="pago-desg" data-mig-id="' + id + '"> Este pago es por varias personas (repartir)</label>'
+      + '<div id="mig-desg-' + id + '" style="display:none;margin-top:8px">'
+      + '<div style="font-size:12px;opacity:.75;margin-bottom:6px">Di cuánto va a cada quien. El equipo lo captura así.</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;font-size:13px"><span style="flex:1">' + escapeHtml(t.nombre || 'Tú') + ' <span style="opacity:.6">(tú)</span></span><input type="number" inputmode="numeric" min="0" step="1" class="mig-desg-m-' + id + '" data-vid="' + id + '" value="' + (sug != null ? sug : '') + '" style="width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff"></div>'
+      + grupo.map((g) => '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;font-size:13px"><span style="flex:1">' + escapeHtml(g.nombre || 'Acompañante') + (g.resta != null ? ' <span style="opacity:.6">(le faltan ' + money(g.resta) + ')</span>' : '') + '</span><input type="number" inputmode="numeric" min="0" step="1" class="mig-desg-m-' + id + '" data-vid="' + escapeHtml(g.viajero_id) + '" value="' + (g.proximo != null ? g.proximo : '') + '" style="width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff"></div>').join('')
+      + '<div style="font-size:12px;margin-top:6px">Suma del comprobante: <b id="mig-desg-suma-' + id + '">—</b></div>'
+      + '</div></div>';
+  }
+  const transfer = '<div id="mig-cam-transfer-' + id + '" style="display:none;margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)">'
+    + '<div style="font-size:13px;line-height:1.5">1) Transfiere o deposita a la cuenta. 2) Sube aquí tu comprobante.</div>'
+    + comoPago.replace('margin-top:12px', 'margin-top:6px')
+    + desg
+    + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary" style="width:auto;padding:9px 14px;font-size:13px" data-mig-act="pago-subir" data-mig-id="' + id + '">📤 Ya pagué — subir mi comprobante</button>'
+    + '<input type="file" id="mig-pago-file-' + id + '" accept="image/*,.pdf" style="display:none">'
+    + '<div class="mig-pago-msg" id="mig-pago-msg-' + id + '" style="font-size:12px;margin-top:6px;min-height:14px"></div></div>'
+    + '<div style="font-size:12px;opacity:.7;margin-top:6px;line-height:1.5">También puedes mandarlo por WhatsApp al <a href="https://wa.me/528119771072" target="_blank" rel="noopener" style="color:#e8ff4c;text-decoration:none">81 1977 1072</a>.</div>'
+    + '</div>';
+
+  // Camino 💳: el link de Mercado Pago (tarjeta, OXXO o SPEI en su página; la
+  // comisión se le dice ANTES de salir). Solo si el servidor lo ofrece.
+  const mp = t.mp_disponible
+    ? '<div id="mig-cam-mp-' + id + '" style="display:none;margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)">'
+      + '<div style="font-size:13px;line-height:1.5">Pagas con tarjeta, OXXO o SPEI en la página de Mercado Pago. La comisión de Mercado Pago se suma a tu pago y se te dice antes de pagar.</div>'
+      + (linkVivo ? '<div style="font-size:12px;opacity:.8;margin-top:6px">Ya tienes un link por ' + money(linkVivo.monto) + ' (cobra ' + money(linkVivo.cobra) + '). Si pagas otro monto, se genera uno nuevo.</div>' : '')
+      + '<button type="button" class="btn" style="width:auto;padding:10px 16px;font-size:14px;margin-top:10px;background:#009ee3;color:#fff;border:0" data-mig-act="pago-mp" data-mig-id="' + id + '">💳 Pagar en Mercado Pago →</button>'
+      + '<div id="mig-mp-msg-' + id + '" style="font-size:12px;margin-top:6px;min-height:14px"></div>'
+      + '</div>'
+    : '';
+
+  const tarjetas = '<div style="display:grid;grid-template-columns:1fr' + (t.mp_disponible ? ' 1fr' : '') + ';gap:8px;margin-top:8px">'
+    + '<button type="button" class="mig-cam-btn" data-mig-act="pago-cam" data-mig-id="' + id + '" data-cam="transfer" style="text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer"><div style="font-weight:800;font-size:14px">🏦 Transferencia, depósito u OXXO</div><div style="font-size:12px;opacity:.7;margin-top:2px">Pagas a la cuenta y subes tu comprobante</div></button>'
+    + (t.mp_disponible ? '<button type="button" class="mig-cam-btn" data-mig-act="pago-cam" data-mig-id="' + id + '" data-cam="mp" style="text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer"><div style="font-weight:800;font-size:14px">💳 Pagar en línea ahora</div><div style="font-size:12px;opacity:.7;margin-top:2px">Tarjeta, OXXO o SPEI por Mercado Pago</div></button>' : '')
+    + '</div>';
+
+  return '<div style="margin-top:14px" id="mig-pagar-' + id + '">'
+    + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6">¿Cómo quieres pagar' + (sug != null ? ' tu pago de ' + money(sug) : '') + '?</div>'
+    + enCamino + montoCaja + tarjetas + transfer + mp + '</div>';
+}
+// Abre un camino y cierra el otro (la forma de PAGO-UX-1 en el index).
+function _migPagoCamino(id, cam){
+  ['transfer', 'mp'].forEach((c) => { const el = document.getElementById('mig-cam-' + c + '-' + id); if (el) el.style.display = c === cam ? '' : 'none'; });
+  document.querySelectorAll('#mig-pagar-' + CSS.escape(id) + ' .mig-cam-btn').forEach((b) => { b.style.borderColor = b.getAttribute('data-cam') === cam ? '#e8ff4c' : 'rgba(255,255,255,.2)'; });
+}
+// Lee el monto tecleado (entero, > 0) o null.
+function _migPagoMonto(id){
+  const el = document.getElementById('mig-pago-monto-' + id);
+  const n = el ? Math.round(Number(el.value)) : NaN;
+  return (Number.isFinite(n) && n > 0) ? n : null;
+}
+// El desglose: [{viajero_id, monto}] con monto > 0, o null si la casilla está apagada.
+function _migPagoDesglose(id){
+  const on = document.getElementById('mig-desg-on-' + id);
+  if (!on || !on.checked) return null;
+  return Array.from(document.querySelectorAll('.mig-desg-m-' + CSS.escape(id)))
+    .map((i) => ({ viajero_id: i.getAttribute('data-vid'), monto: Math.round(Number(i.value)) }))
+    .filter((d) => d.viajero_id && Number.isFinite(d.monto) && d.monto > 0);
+}
+function _migPagoDesgToggle(id){
+  const on = document.getElementById('mig-desg-on-' + id);
+  const box = document.getElementById('mig-desg-' + id);
+  if (!on || !box) return;
+  box.style.display = on.checked ? '' : 'none';
+  const suma = () => { const s = (_migPagoDesglose(id) || []).reduce((a, d) => a + d.monto, 0); const el = document.getElementById('mig-desg-suma-' + id); if (el) el.textContent = money(s); const m = document.getElementById('mig-pago-monto-' + id); if (m && on.checked && s > 0) m.value = s; };
+  if (!box.dataset.listo) { box.querySelectorAll('.mig-desg-m-' + CSS.escape(id)).forEach((i) => i.addEventListener('input', suma)); box.dataset.listo = '1'; }
+  suma();
+}
+// 💳 El link de Mercado Pago: el servidor lo genera (o reusa el vivo por el
+// mismo monto) y se abre en la misma pestaña — es la página de MP.
+async function _migPagoMp(id, btn){
+  const msg = document.getElementById('mig-mp-msg-' + id);
+  const say = (t, ok) => { if (msg) { msg.textContent = t; msg.style.color = ok ? '#88ea4e' : '#ff283b'; } };
+  const monto = _migPagoMonto(id);
+  if (!monto) return say('Teclea cuánto vas a pagar.');
+  if (btn) btn.disabled = true;
+  say('Generando tu link…', true);
+  try {
+    const j = await _migPost({ accion: 'pago_link', viajero_id: id, monto });
+    if (j && j.ok && j.url) {
+      say('Te cobra ' + money(j.total) + ' (tu abono ' + money(j.neto) + ' + ' + money(j.comision) + ' de comisión). Abriendo Mercado Pago…', true);
+      setTimeout(() => { window.location.href = j.url; }, 600);
+    } else { say((j && j.error) || 'No se pudo generar tu link. Prueba con transferencia.'); if (btn) btn.disabled = false; }
+  } catch (_) { say('No se pudo generar tu link. Revisa tu conexión.'); if (btn) btn.disabled = false; }
 }
 
 // [VUELO-1] Los datos de su vuelo. Sin costo a propósito (palabra de Memo:
@@ -4068,6 +4185,10 @@ document.addEventListener('click', (ev) => {
   else if (act === 'radio') { const p = document.getElementById('rcp-play'); if (p) p.click(); }
   // [PAGOS-PORTAL-2] Subir el comprobante de un pago.
   else if (act === 'pago-subir') _migPagoSubir(id, b);
+  // [PORTAL-PAGO-2] Los dos caminos, el reparto y el link de Mercado Pago.
+  else if (act === 'pago-cam') _migPagoCamino(id, b.getAttribute('data-cam'));
+  else if (act === 'pago-desg') _migPagoDesgToggle(id);
+  else if (act === 'pago-mp') _migPagoMp(id, b);
   // [PORTAL-TICKET-1] Ver el comprobante de un pago ya registrado.
   else if (act === 'abono-foto') _migAbonoFoto(id, b.getAttribute('data-mig-abono'), b);
 });
@@ -4143,8 +4264,15 @@ async function _migPagoSubir(id, btn){
   } catch (e) { say((e && e.message) || 'No se pudo leer tu archivo. Inténtalo otra vez.'); if (btn) btn.disabled = false; inp.value = ''; return; }
   say('Subiendo…', true);
   try {
-    const j = await _migPost({ accion: 'subir_pago', viajero_id: id, comprobante_base64: b64 });
-    if (j && j.ok) { say('✓ Recibimos tu comprobante. El equipo lo captura y tu saldo se actualiza aquí mismo.', true); inp.value = ''; }
+    // [PORTAL-PAGO-2] El monto que declara y, si viaja en grupo y lo marcó, el
+    // DESGLOSE («$650 a Jose, $650 a Jonathan»). Son TEXTO para la bandeja: el
+    // abono lo captura el equipo con el comprobante enfrente.
+    const cuerpo = { accion: 'subir_pago', viajero_id: id, comprobante_base64: b64 };
+    const desg = _migPagoDesglose(id);
+    if (desg && desg.length) cuerpo.desglose = desg;
+    else { const m = _migPagoMonto(id); if (m) cuerpo.monto = m; }
+    const j = await _migPost(cuerpo);
+    if (j && j.ok) { say('✓ Recibimos tu comprobante' + (desg && desg.length > 1 ? ' con el reparto entre ' + desg.length + ' personas' : '') + '. El equipo lo captura y tu saldo se actualiza aquí mismo.', true); inp.value = ''; }
     else { say((j && j.error) || 'No se pudo subir. Inténtalo otra vez.'); if (btn) btn.disabled = false; }
   } catch (e) { say('No se pudo subir. Revisa tu conexión e inténtalo otra vez.'); if (btn) btn.disabled = false; }
 }
@@ -5251,10 +5379,12 @@ function _c24Vuelta() {
   // Por eso el texto dice "estamos confirmándolo": es la verdad en los dos casos.
   if (estado === 'ok' || estado === 'pendiente') {
     div.className = 'pay-vuelta pend';
-    div.textContent = '⏳ Ya recibimos tu pago y estamos confirmándolo. Si pagaste en OXXO, te avisamos en cuanto la tienda nos confirme — puede tardar unas horas. Tu lugar está guardado mientras tanto.';
+    // [PORTAL-PAGO-2] El mismo letrero sirve para una CUOTA pagada desde el
+    // Portal: el webhook marca, el equipo registra y el plan se actualiza aquí.
+    div.textContent = '⏳ Ya recibimos tu pago y estamos confirmándolo. Si pagaste en OXXO, te avisamos en cuanto la tienda nos confirme — puede tardar unas horas. En cuanto se confirme, el equipo lo registra y tu plan se actualiza aquí.';
   } else if (estado === 'cancelado' || estado === 'error') {
     div.className = 'pay-vuelta cancel';
-    div.textContent = 'No se completó el pago y no se te cobró nada. Tu lugar sigue apartado el tiempo que te queda: puedes intentar de nuevo o pagar por transferencia.';
+    div.textContent = 'No se completó el pago y no se te cobró nada. Puedes intentar de nuevo o pagar por transferencia y subir tu comprobante.';
   } else { return null; }
   try { window.history.replaceState({}, '', window.location.pathname); } catch (e) {}
   return div;

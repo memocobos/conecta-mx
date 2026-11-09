@@ -69,6 +69,11 @@ const ACCIONES = {
 const { enviarCorreoPago } = require('./_lib/correo-confirmacion');
 const SIGN_EXPIRA = 60 * 60; // 1 hora, como admin-solicitud-comprobante
 const BUCKET = 'abonos-viajeros';
+// [PORTAL-PAGO-2] Qué cambio del Portal es un PENDIENTE del equipo: todo lo que
+// no sea tipo pago, y un pago que traiga comprobante O que MP ya marcó pagado.
+// Un link de MP sin pagar vive en la tabla (para el Portal) pero no es
+// trabajo de nadie todavía.
+const FILTRO_PAGO_VIVO = '&or=(tipo.neq.pago,foto_path.not.is.null,mp_pago_id.not.is.null)';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // [REQ-CORRIGE-1 · 31-oct-2026] CORREGIR Y APROBAR
@@ -311,7 +316,10 @@ exports.handler = async (event) => {
   if (accion === 'cambios_listar') {
     const cb = `${SB_URL}/rest/v1/cambios_viajero`;
     const estado = String(body.estado || 'pendiente');
-    let q = `${cb}?select=*&order=creado_en.desc&limit=200`;
+    // [PORTAL-PAGO-2] Un pago tipo link de MP que NADIE ha pagado no es un
+    // pendiente del equipo: no se enseña ni se cuenta. En cuanto el webhook lo
+    // marca (mp_pago_id) o trae comprobante, entra a la bandeja.
+    let q = `${cb}?select=*&order=creado_en.desc&limit=200${FILTRO_PAGO_VIVO}`;
     if (estado !== 'todas') q += `&estado=eq.${encodeURIComponent(estado)}`;
     const r = await fetch(q, { headers: sbH });
     if (!r.ok) return j(502, headers, { error: 'No se pudieron leer las solicitudes de cambio', detail: (await r.text()).slice(0, 300) });
@@ -323,7 +331,7 @@ exports.handler = async (event) => {
       const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto`, { headers: sbH });
       if (rv.ok) (await rv.json()).forEach((v) => { vmap[v.id] = v; });
     }
-    const pc = await fetch(`${cb}?select=id&estado=eq.pendiente&limit=500`, { headers: sbH });
+    const pc = await fetch(`${cb}?select=id&estado=eq.pendiente&limit=500${FILTRO_PAGO_VIVO}`, { headers: sbH });
     const pendientes = pc.ok ? (await pc.json()).length : null;
     return j(200, headers, { ok: true, cambios: rows.map((x) => Object.assign({}, x, { viajero: vmap[x.viajero_id] || null })), pendientes });
   }
@@ -422,23 +430,74 @@ exports.handler = async (event) => {
   // una carrera de dos clics podría crear DOS abonos del mismo comprobante,
   // que es dinero inventado y no se deshace solo. Equivocarse hacia «falta
   // capturar» se ve y se corrige; hacia «capturado dos veces» es lo invisible.
+  // [PORTAL-PAGO-2] Y el REPARTO: un comprobante (o un pago de MP) puede cubrir
+  // a varios del mismo grupo — «de estos $1,300: $650 a Jose y $650 a Jonathan».
+  // El cliente lo DECLARA en `desglose` y aquí el humano lo CONFIRMA (o lo
+  // corrige) en `reparto: [{viajero_id, monto}]`. Nace UN abono por persona,
+  // todos con el mismo comprobante y el mismo mp_pago_id. Sin `reparto`, la
+  // forma de siempre: `monto` al viajero de la solicitud.
+  // 🔒 Solo puede nombrar al viajero de la solicitud, a quien el cliente nombró
+  //    en su desglose y a su `grupo_viaje` del mismo evento. A nadie más.
+  // 🔒 Con pago en MP el dinero YA es un hecho: la suma del reparto tiene que
+  //    ser el NETO (bruto − comisión cargada al cliente), ±$1 de redondeo.
   if (accion === 'cambio_pago_capturar') {
     const cid = String(body.id || '');
     if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });
-    // Las MISMAS validaciones de monto que abono_crear (admin-coordi-
-    // asignaciones) — copiadas, no inventadas; si divergen, el careo las carea.
-    const monto = Number(body.monto);
-    if (!Number.isFinite(monto) || monto <= 0) return j(400, headers, { error: 'El monto tiene que ser mayor que cero' });
-    if (monto > 1000000) return j(400, headers, { error: 'Monto fuera de rango' });
 
-    const rc = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=id,viajero_id,evento_id,tipo,estado,foto_path,detalle,nombre`, { headers: sbH });
+    const rc = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=id,viajero_id,evento_id,tipo,estado,foto_path,detalle,nombre,desglose,mp_pago_id,mp_monto,mp_monto_cobrar,mp_neto,mp_preference_id`, { headers: sbH });
     if (!rc.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
     const c = (await rc.json())[0];
     if (!c) return j(404, headers, { error: 'Esa solicitud no existe' });
     if (c.tipo !== 'pago') return j(409, headers, { error: 'Esa solicitud no es un pago — se atiende con los botones de siempre' });
+    if (!c.foto_path && !c.mp_pago_id) return j(409, headers, { error: 'Este pago no trae comprobante ni pago en Mercado Pago: no hay nada que capturar todavía' });
+
+    // El NETO que MP ya cobró, si lo hay: bruto − (cobrar − neto) = lo que el
+    // cliente quiso abonar. Si cobró distinto a lo esperado, el neto sigue la
+    // diferencia (la comisión es la del link).
+    const mpNeto = c.mp_pago_id
+      ? Math.round((Number(c.mp_monto) || 0) - Math.max(0, (Number(c.mp_monto_cobrar) || 0) - (Number(c.mp_neto) || 0)))
+      : null;
+
+    // Las MISMAS validaciones de monto que abono_crear (admin-coordi-
+    // asignaciones) — copiadas, no inventadas; si divergen, el careo las carea.
+    let reparto;
+    if (Array.isArray(body.reparto)) {
+      if (!body.reparto.length || body.reparto.length > 10) return j(400, headers, { error: 'El reparto tiene que traer de 1 a 10 personas' });
+      const permitidos = new Set([c.viajero_id].concat((Array.isArray(c.desglose) ? c.desglose : []).map((d) => d && d.viajero_id).filter(Boolean)));
+      try {
+        const rv0 = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${c.viajero_id}&select=grupo_viaje,evento_id&limit=1`, { headers: sbH });
+        const v0 = rv0.ok ? (await rv0.json())[0] : null;
+        if (v0 && v0.grupo_viaje) {
+          const rg = await fetch(`${SB_URL}/rest/v1/viajeros_evento?grupo_viaje=eq.${encodeURIComponent(v0.grupo_viaje)}&evento_id=eq.${encodeURIComponent(v0.evento_id)}&select=id&limit=20`, { headers: sbH });
+          if (rg.ok) (await rg.json()).forEach((m) => permitidos.add(m.id));
+        }
+      } catch (_) { /* sin grupo legible: solo el titular y su desglose */ }
+      const vistos = new Set();
+      reparto = [];
+      for (const r of body.reparto) {
+        const vid = String(r && r.viajero_id || '');
+        const m = Number(r && r.monto);
+        if (!/^[0-9a-f-]{36}$/.test(vid) || !permitidos.has(vid)) return j(400, headers, { error: 'El reparto nombra a alguien que no viaja con esta persona' });
+        if (vistos.has(vid)) return j(400, headers, { error: 'Una persona aparece dos veces en el reparto' });
+        if (!Number.isFinite(m) || m <= 0) return j(400, headers, { error: 'Cada monto del reparto tiene que ser mayor que cero' });
+        if (m > 1000000) return j(400, headers, { error: 'Monto fuera de rango' });
+        vistos.add(vid);
+        reparto.push({ viajero_id: vid, monto: m });
+      }
+    } else {
+      const monto = Number(body.monto);
+      if (!Number.isFinite(monto) || monto <= 0) return j(400, headers, { error: 'El monto tiene que ser mayor que cero' });
+      if (monto > 1000000) return j(400, headers, { error: 'Monto fuera de rango' });
+      reparto = [{ viajero_id: c.viajero_id, monto }];
+    }
+    const montoTotal = Math.round(reparto.reduce((s, r) => s + r.monto, 0) * 100) / 100;
+    if (montoTotal > 1000000) return j(400, headers, { error: 'Monto fuera de rango' });
+    if (mpNeto != null && Math.abs(montoTotal - mpNeto) > 1) {
+      return j(400, headers, { error: `Mercado Pago cobró $${Number(c.mp_monto).toLocaleString('es-MX')} (neto $${mpNeto.toLocaleString('es-MX')}): el reparto tiene que sumar $${mpNeto.toLocaleString('es-MX')}, no $${montoTotal.toLocaleString('es-MX')}` });
+    }
 
     // 1 · Cerrar con valor esperado: el reclamo. 0 filas = alguien ganó el clic.
-    const respuesta = `Abono capturado: $${Math.round(monto).toLocaleString('es-MX')} · ${quien}`;
+    const respuesta = `Abono capturado: $${Math.round(montoTotal).toLocaleString('es-MX')}${reparto.length > 1 ? ' repartido entre ' + reparto.length : ''} · ${quien}`;
     const rz = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&estado=eq.pendiente`, {
       method: 'PATCH',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
@@ -447,36 +506,47 @@ exports.handler = async (event) => {
     if (!rz.ok) return j(502, headers, { error: 'No se pudo reclamar la solicitud', detail: (await rz.text()).slice(0, 300) });
     if (!(await rz.json()).length) return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la atendió' });
 
-    // 2 · El abono — capturado_por del JWT (anti-spoofing, como abono_crear),
-    // foto_path heredado del comprobante.
-    const filaAbono = { viajero_id: c.viajero_id, monto, foto_path: c.foto_path || null,
-      nota: ('Pago subido desde el Portal · ' + String(c.detalle || '').slice(0, 300)).slice(0, 500),
-      capturado_por: quien };
+    // 2 · Los abonos — capturado_por del JWT (anti-spoofing, como abono_crear),
+    // foto_path heredado del comprobante, mp_pago_id heredado del webhook.
+    // UN solo POST: o nacen todos o ninguno.
+    const origen = c.mp_pago_id
+      ? `Pagado en Mercado Pago #${c.mp_pago_id} desde el Portal (cobró $${Number(c.mp_monto).toLocaleString('es-MX')}, comisión al cliente $${Math.max(0, Math.round((Number(c.mp_monto) || 0) - montoTotal)).toLocaleString('es-MX')})`
+      : 'Pago subido desde el Portal';
+    const titularTxt = reparto.length > 1 ? ` · reparto de ${c.nombre || 'titular'} (${reparto.length} personas)` : '';
+    const filasAbono = reparto.map((r) => ({
+      viajero_id: r.viajero_id, monto: r.monto, foto_path: c.foto_path || null,
+      mp_pago_id: c.mp_pago_id || null,
+      nota: (origen + titularTxt + ' · ' + String(c.detalle || '').slice(0, 220)).slice(0, 500),
+      capturado_por: quien,
+    }));
     const ra = await fetch(`${SB_URL}/rest/v1/abonos_viajero`, {
       method: 'POST',
       headers: Object.assign({}, sbH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify(filaAbono),
+      body: JSON.stringify(filasAbono),
     });
     if (!ra.ok) {
       // La solicitud YA quedó atendida; el dinero NO entró. Se DICE con el
       // monto para capturarlo por ➕ Abono — nada se borra ni se reintenta solo.
-      return j(207, headers, { error: 'La solicitud se cerró pero el ABONO NO SE GUARDÓ: captúralo por ➕ Abono con $' + monto, detail: (await ra.text()).slice(0, 300) });
+      return j(207, headers, { error: 'La solicitud se cerró pero el ABONO NO SE GUARDÓ: captúralo por ➕ Abono con $' + montoTotal + (reparto.length > 1 ? ' (repartido)' : ''), detail: (await ra.text()).slice(0, 300) });
     }
-    const abono = (await ra.json())[0] || null;
+    const abonos = await ra.json();
+    const abono = abonos[0] || null;
 
     // 3 · «Recibimos tu pago» — el MISMO correo de la captura manual, con la
     // FIRMA del dueño (leída de abono_crear, no adivinada). EVENTOS_CORREO
     // decide; fuera de la lista no sale nada. Jamás tumba el abono.
     let correo = null;
     try {
+      const recibido = {};
+      reparto.forEach((r) => { recibido[r.viajero_id] = r.monto; });
       correo = await enviarCorreoPago({
-        tipo: 'abono', evento_id: c.evento_id, viajeroIds: [c.viajero_id],
-        recibidoPorViajero: { [c.viajero_id]: monto },
+        tipo: 'abono', evento_id: c.evento_id, viajeroIds: reparto.map((r) => r.viajero_id),
+        recibidoPorViajero: recibido,
         enviado_por: (auth.user && auth.user.correo) || null,
         KH_URL: SB_URL, KH_KEY: SB_KEY,
       });
     } catch (e) { correo = { error: e.message }; }
-    return j(200, headers, { ok: true, abono, correo });
+    return j(200, headers, { ok: true, abono, abonos, reparto, correo });
   }
 
   // Las tres restantes piden el id.

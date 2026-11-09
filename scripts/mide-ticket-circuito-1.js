@@ -318,6 +318,8 @@ function reqBase(extra) {
     // La función real es grande; el sujeto es el forEach del historial — se
     // rebana la función completa y se corre con un plan mínimo liquidado.
     vm.runInContext(rebana(PORTAL_HTML, 'function _migPagosHtml'), ctx);
+    // [PORTAL-PAGO-2] la pantalla delega el bloque de pago en _migPagarHtml: va la real.
+    vm.runInContext(rebana(PORTAL_HTML, 'function _migPagarHtml'), ctx);
     const t = {
       viajero_id: UUID(10), total: 300, abonado: 300, resta: 0, banco: 'bbva',
       plan: { estado: 'liquidado', resta: 0, cuotas: [] }, abonado_previo: 0,

@@ -264,6 +264,9 @@ async function correr() {
   };
   vm.createContext(ctx);
   vm.runInContext(rebana(PORTAL, 'function _migPagosHtml(t){') + ';', ctx);
+  // [PORTAL-PAGO-2] el bloque «¿Cómo quieres pagar?» se separó en su propia
+  // función (la pantalla la llama): va la REAL, rebanada igual, no un doble.
+  vm.runInContext(rebana(PORTAL, 'function _migPagarHtml(t, p, vjId, comoPago, money){') + ';', ctx);
   af(() => typeof ctx._migPagosHtml === 'function', 'la pantalla se rebanó de portal.html y corre (es la de verdad, no un doble)');
   const pinta = (t) => ctx._migPagosHtml(t);
   const fuentePagos = rebana(PORTAL, 'function _migPagosHtml(t){');

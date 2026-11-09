@@ -188,6 +188,80 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳👥⏳ **PORTAL-PAGO-2 (9-nov-2026, en main local; la BASE ya escrita): PAGAR
+  DESDE EL PORTAL — el DESGLOSE del comprobante y el LINK DE MERCADO PAGO por
+  cuota.** Palabra de Memo (primer día de la ventana 9-16 nov): *«construye lo
+  del desglose … y también da opción de pagar desde el portal con mercado pago
+  y transferencia, etc»*. La card del viaje gana **«¿Cómo quieres pagar tu pago
+  de $X?»** con DOS caminos (la forma de PAGO-UX-1 en el index): **🏦
+  Transferencia, depósito u OXXO** (la cuenta + subir comprobante, y si viaja
+  en grupo la casilla «este pago es por varias personas» con una caja por
+  persona) y **💳 Pagar en línea ahora** (link de MP; solo si el servidor dice
+  `mp_disponible`). El monto nace en lo que le TOCA hoy por su rol fijo
+  (atrasado + próxima cuota, `t.sugerido`) y lo puede cambiar dentro de lo que
+  debe. 🔒 **Nada automático decide dinero**: las dos cosas caen a
+  `cambios_viajero` tipo `pago` y Bulma/Milk capturan.
+  - **La base** (acta `migraciones/PORTAL-PAGO-2.sql`, YA CORRIDA, candados
+    mordidos 3/3): `cambios_viajero` gana `desglose jsonb` (CHECK arreglo) y
+    las 8 `mp_*` (preference/init_point/monto_cobrar/neto · pago_id/monto/
+    pagado_at); el CHECK `cambios_viajero_pago_foto` se RE-CREÓ: **un pago
+    existe con foto O con link de MP**; `mp_pagos.cambio_id` + índice parcial.
+  - **El desglose** (`subir_pago` con `desglose:[{viajero_id,monto}]`): solo
+    puede nombrar a quien viaja CON la persona (ella + su `grupo_viaje` del
+    mismo evento, los acompañantes de ACOMP-1/2); otro id → 400 **antes de
+    subir la foto** (cero huérfanos); el total declarado ES la suma. Es TEXTO
+    estructurado que la bandeja PRELLENA (una caja por persona) y el humano
+    corrige; `cambio_pago_capturar` gana `reparto` → **un abono por persona**
+    con el MISMO `foto_path` (y `mp_pago_id`), en UN POST (o nacen todos o
+    ninguno), nota con el reparto; el correo «Recibimos tu pago» sale a todos.
+    `portal-mi-plan-migrado` manda `grupo` (nombre + resta + próximo de cada
+    compañero — ni correo ni celular), `pagos_pendientes` (comprobante en
+    revisión · MP acreditado en revisión · link sin pagar con su url) y
+    `mp_disponible`.
+  - **El link de cuota** (`pago_link`, `_lib/mp-link.crearLinkCuota`,
+    `external_reference=cv:<uuid del cambio>` — el id nace ANTES de pedirle a
+    MP): neto = lo que toca o `monto` ≤ resta (pesos enteros); comisión al
+    cliente por `calcularLink` (la tarifa de MP-LINK-1); nace la fila SIN foto
+    y CON el link; el mismo monto REUSA el link vivo (dos links por la misma
+    cuota son dos cobros). MP apagado → 409 (fail-soft a la transferencia); MP
+    rechaza → 502 sin fila huérfana. `mp-webhook` gana la rama `cv:`
+    (`marcarCambioPortal`, misma ley que `req:`: `mp_pagos` con `cambio_id`,
+    23505 → update; `approved` → PATCH del cambio con valor esperado
+    `mp_pago_id=is.null`; 2º pago aprobado NO pisa y se grita; cuota
+    inexistente se anota igual). 🔒 **Un link SIN PAGAR no es pendiente del
+    equipo**: `FILTRO_PAGO_VIVO` (`or=(tipo.neq.pago,foto_path.not.is.null,
+    mp_pago_id.not.is.null)`) en la lista Y el conteo de la bandeja, en el
+    inicio MB y en el tope del cliente; al marcarse entra con chip verde
+    «💳 Pagado en Mercado Pago · cobró $X → abono $neto» y el monto va FIJO al
+    neto (con reparto, la suma TIENE que dar el neto, ±$1). El regreso
+    `?pago=ok|error` del Portal reusa el letrero de MP-1e (texto neutro).
+  - 🔴 **Cazado por un careo VECINO, no por el mío:** `money` es LOCAL de
+    `_migPagosHtml` y mi `_migPagarHtml` la usaba suelta — en el navegador
+    habría sido `ReferenceError` en TODA card con saldo. `mide:plan-pagos-1`
+    la rebanó y tronó; mi careo pasaba porque mi sandbox definía `money`
+    global (*el arnés hereda las creencias del autor*). Hoy entra por
+    parámetro y el careo lo exige ([U6b]).
+  - `mide:portal-pago-2` **78** (cuatro handlers reales + red falsa con
+    `or=`, el CHECK re-creado y el índice único; cero dinero desde el Portal
+    por el HECHO con control positivo; la pantalla EJECUTADA en vm; tres
+    sabotajes con sha1 careado: webhook sin valor esperado → 5 rojos ·
+    desglose sin candado de grupo → 2 · reparto que ignora el neto de MP → 7;
+    restaurados byte a byte). Vecinos actualizados a la verdad nueva con su
+    razón: pagos-portal-2 **38** (su red falsa aprendió el POST en arreglo y
+    el CHECK nuevo), plan-pagos-1 **81** y ticket-circuito-1 **32** (rebanan
+    también `_migPagarHtml`). Verdes sin tocar: mp-link-1 60 ·
+    comprobante-dup-1 17 · acomp-2 43 · cambio-rechazo-1 36 ·
+    preventa-portal-1 35 · portal-solo-1 89 · req-b1 52 · portal-edit-1 31 ·
+    rechazo-1 71 · confirma-1 28 · capsule-ux-1 83 · portal-vivo-1 45 ·
+    contrato-cliente-2 19 · sep-300-1 31.
+  - ⚠️ **No verificado en navegador** (careado en vm y por handlers). ⏳ Push
+    de Memo → prueba humana con su cuenta: (1) subir un comprobante con
+    reparto a su acompañante y capturarlo desde la bandeja con las dos cajas;
+    (2) «Pagar en línea» con un monto chico → pagar en MP (como invitado: su
+    cuenta no puede pagarle a su app) → ver el chip verde en la bandeja →
+    capturar. ⚠️ Migrar `/checkout/preferences` a Orders sigue siendo
+    MP-ORDERS-1.
+
 - 💲⏳ **SEP-300-1 (9-nov-2026, en main local; la BASE ya escrita): EL SEPARO ES
   $300 EN TODOS LOS TOURS VIVOS, Y LOS 6 CDMX 2027 ABREN A REQUISICIÓN.**
   Palabra de Memo, citada: *«todos los tours baja su separo a $300 no importa

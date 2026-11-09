@@ -121,4 +121,78 @@ async function crearLinkRequisicion({ req, SB_URL, sbH, fetchImpl }) {
   }
 }
 
-module.exports = { PREFIJO_REQ, disponible, referenciaDe, folioDeReferencia, crearLinkRequisicion };
+// ═══ [PORTAL-PAGO-2] EL LINK DE UNA CUOTA DESDE EL PORTAL ═══════════════════
+// Palabra de Memo (9-nov-2026): «da opción de pagar desde el portal con mercado
+// pago». La forma es la MISMA que la requisición, con otro dueño de la fila:
+// `cambios_viajero` tipo 'pago' (la bandeja), nacida SIN foto y CON el link.
+// external_reference = `cv:<uuid del cambio>` — el webhook lo lee del GET del
+// pago y por ese prefijo sabe que es una cuota del Portal (no una requisición
+// `req:` ni el uuid pelado del Portal viejo).
+// 🔒 El NETO lo decide el servidor (portal-viajero `pago_link`: la cuota que
+//    toca, o un monto que el cliente eligió DENTRO de lo que debe); la comisión
+//    se le carga al cliente igual que en MP-LINK-1 (calcularLink). Aquí no se
+//    escribe dinero: nace un link. El abono lo captura un humano con la marca
+//    del webhook enfrente.
+const PREFIJO_CV = 'cv:';
+const UUID_RE_CV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function referenciaCambio(cambioId) { return PREFIJO_CV + String(cambioId || '').trim(); }
+function cambioDeReferencia(ref) {
+  const s = String(ref == null ? '' : ref).trim();
+  if (!s.startsWith(PREFIJO_CV)) return null;
+  const id = s.slice(PREFIJO_CV.length).trim();
+  return UUID_RE_CV.test(id) ? id.toLowerCase() : null;
+}
+
+// Crea la preferencia de UNA cuota. `cuota` trae cambio_id (uuid YA elegido —
+// el cambio se inserta DESPUÉS con ese id, porque el CHECK de la base exige
+// foto o link al nacer), viajero {id, nombre, correo, evento_id}, evento_nombre,
+// neto_pesos, etiqueta ('Pago 2 · 24 al 1 de diciembre'). Devuelve
+// { ok:true, url, preference_id, total_pesos, comision_pesos, neto_pesos } o
+// { ok:false, motivo } — JAMÁS lanza.
+async function crearLinkCuota({ cuota, fetchImpl }) {
+  const _fetch = fetchImpl || fetch;
+  try {
+    const d = disponible();
+    if (!d.ok) return { ok: false, motivo: d.motivo };
+    const cid = String(cuota && cuota.cambio_id || '');
+    if (!UUID_RE_CV.test(cid)) return { ok: false, motivo: 'cambio_id inválido' };
+    const neto = Math.round(Number(cuota.neto_pesos));
+    if (!(neto > 0)) return { ok: false, motivo: 'la cuota no trae monto' };
+    const t = tarifas.calcularLink(neto);
+    if (t.error) return { ok: false, motivo: t.error };
+    const vj = cuota.viajero || {};
+    const pref = {
+      items: [{
+        id: cid,
+        title: `${cuota.etiqueta || 'Abono'} · ${cuota.evento_nombre || vj.evento_id || 'tu viaje'}`,
+        description: `${vj.nombre || 'Viajero'} · incluye comisión de Mercado Pago`,
+        quantity: 1, currency_id: 'MXN', unit_price: t.total_pesos,
+      }],
+      external_reference: referenciaCambio(cid),
+      payer: vj.correo ? { email: String(vj.correo), name: vj.nombre || undefined } : undefined,
+      back_urls: {
+        success: `${SITE()}/portal.html?pago=ok`,
+        failure: `${SITE()}/portal.html?pago=error`,
+        pending: `${SITE()}/portal.html?pago=pendiente`,
+      },
+      notification_url: `${SITE()}/.netlify/functions/mp-webhook`,
+      statement_descriptor: 'CONECTA REYNOSA',
+      binary_mode: false,
+      payment_methods: { installments: 1 },
+    };
+    const r = await mp.apiPost('/checkout/preferences', pref, { idempotencia: `cv_${cid}_${t.total_pesos}`, fetchImpl: _fetch });
+    if (!r.ok) {
+      console.error('[mp-link] MP rechazó la preferencia de cuota', cid, r.status, r.error);
+      return { ok: false, motivo: 'Mercado Pago rechazó la preferencia: ' + (r.error || r.status) };
+    }
+    const p = r.json || {};
+    const url = mp.modo() === 'live' ? p.init_point : (p.sandbox_init_point || p.init_point);
+    if (!url) return { ok: false, motivo: 'Mercado Pago no devolvió una URL' };
+    return { ok: true, url, preference_id: p.id || null, total_pesos: t.total_pesos, comision_pesos: t.comision_pesos, neto_pesos: t.neto_pesos };
+  } catch (e) {
+    console.error('[mp-link] excepción (cuota)', e && e.message);
+    return { ok: false, motivo: e && e.message };
+  }
+}
+
+module.exports = { PREFIJO_REQ, PREFIJO_CV, disponible, referenciaDe, folioDeReferencia, referenciaCambio, cambioDeReferencia, crearLinkRequisicion, crearLinkCuota };

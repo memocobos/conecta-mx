@@ -19,6 +19,13 @@
 //                         el mismo grupo de viaje, y con su correo propio
 //                         recibe su invitación al Portal. El TOTAL del dinero
 //                         no se mueve: solo se reparte entre las filas.
+//   · `subir_pago`      → [PAGOS-PORTAL-2] el comprobante, a la bandeja. Con
+//                         [PORTAL-PAGO-2] admite `desglose` (a quién va cada
+//                         parte, solo gente de su grupo) como TEXTO estructurado.
+//   · `pago_link`       → [PORTAL-PAGO-2] un link de Mercado Pago por la cuota
+//                         que le toca (o un monto dentro de lo que debe). Nace
+//                         una fila de pago SIN foto y CON el link; el webhook la
+//                         marca al pagar. Aquí no se escribe dinero.
 //
 // 🔒 Lo que JAMÁS se toca desde aquí: correo (es la llave de la cuenta), evento,
 // paquete, zona, boletos, contrato, abonos. Cualquier otro campo del cuerpo se
@@ -59,7 +66,7 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (_) { return json(400, headers, { ok: false, error: 'Cuerpo inválido' }); }
   const accion = String(body.accion || '');
-  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete', 'subir_pago', 'abono_foto'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
+  if (!['editar', 'solicitar_cambio', 'repartir', 'opciones_paquete', 'pedir_paquete', 'subir_pago', 'abono_foto', 'pago_link'].includes(accion)) return json(400, headers, { ok: false, error: 'Acción desconocida' });
   const viajero_id = String(body.viajero_id || '');
   if (!UUID_RE.test(viajero_id)) return json(400, headers, { ok: false, error: 'Viajero inválido' });
 
@@ -77,7 +84,7 @@ exports.handler = async (event) => {
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   let v;
   try {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at,usuario_id,tipo_viajero&limit=1`, { headers: hKH });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at,usuario_id,tipo_viajero,grupo_viaje,total_contrato,abonado_previo,plan_pagos&limit=1`, { headers: hKH });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu viaje' });
     v = (await r.json())[0];
   } catch (e) { return json(502, headers, { ok: false, error: 'No pude leer tu viaje' }); }
@@ -249,6 +256,72 @@ exports.handler = async (event) => {
     } catch (_) { return json(502, headers, { ok: false, error: 'No pude abrir tu comprobante, inténtalo otra vez' }); }
   }
 
+  // ── 3l · [PORTAL-PAGO-2] LINK DE MERCADO PAGO PARA UNA CUOTA ─────────────
+  // Palabra de Memo (9-nov): «da opción de pagar desde el portal con mercado
+  // pago». Nace una fila `cambios_viajero` tipo 'pago' SIN foto y CON el link
+  // (el CHECK de la base lo admite desde PORTAL-PAGO-2). El webhook la MARCA al
+  // caer el pago; Bulma/Milk capturan el abono desde la bandeja. 🔒 El NETO lo
+  // decide el servidor: lo que le toca pagar (atrasado + próxima cuota) o un
+  // monto que el cliente eligió DENTRO de lo que debe. La comisión se le carga
+  // al cliente (calcularLink), como en el index. Aquí no se escribe dinero.
+  if (accion === 'pago_link') {
+    const mpLink = require('./_lib/mp-link');
+    const disp = mpLink.disponible();
+    if (!disp.ok) return json(409, headers, { ok: false, error: 'El pago en línea no está disponible ahora. Puedes pagar por transferencia y subir tu comprobante.' });
+    const saldo = await _saldoPortal(KH_URL, hKH, v);
+    if (!saldo || !saldo.ok) return json(502, headers, { ok: false, error: 'No pude leer tu saldo. Inténtalo otra vez.' });
+    if (!(saldo.resta > 0)) return json(409, headers, { ok: false, error: 'Tu viaje ya está liquidado: no hay nada que pagar.' });
+    let neto = saldo.sugerido;
+    if (body.monto != null && body.monto !== '') {
+      const m = Number(body.monto);
+      if (!Number.isFinite(m) || m <= 0 || Math.round(m) !== m) return json(400, headers, { ok: false, error: 'El monto tiene que ser un número entero de pesos' });
+      if (m > saldo.resta) return json(400, headers, { ok: false, error: `Te faltan $${saldo.resta.toLocaleString('es-MX')}: no puedes pagar más que eso` });
+      neto = m;
+    }
+    if (!(neto > 0)) return json(409, headers, { ok: false, error: 'No hay una cuota pendiente que pagar' });
+
+    // ¿Ya hay un link vivo por ESTE mismo monto, sin pagar? Se REUSA: dos links
+    // por la misma cuota son dos cobros esperando a que alguien pague los dos.
+    let vivos = [];
+    try {
+      const p = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.pago&estado=eq.pendiente&select=id,foto_path,mp_preference_id,mp_init_point,mp_neto,mp_monto_cobrar,mp_pago_id&limit=20`, { headers: hKH });
+      if (!p.ok) return json(502, headers, { ok: false, error: 'No pude revisar tus pagos. Inténtalo otra vez.' });
+      vivos = await p.json();
+    } catch (_) { return json(502, headers, { ok: false, error: 'No pude revisar tus pagos. Inténtalo otra vez.' }); }
+    const reusable = vivos.find((c) => c.mp_preference_id && !c.mp_pago_id && Number(c.mp_neto) === neto && c.mp_init_point);
+    if (reusable) {
+      return json(200, headers, { ok: true, url: reusable.mp_init_point, total: Number(reusable.mp_monto_cobrar), neto, comision: Math.round((Number(reusable.mp_monto_cobrar) - neto) * 100) / 100, reusado: true });
+    }
+    // Los pendientes CON evidencia (foto o pago en MP) sí cuentan para el tope;
+    // un link sin pagar no es un pendiente del equipo.
+    if (vivos.filter((c) => c.foto_path || c.mp_pago_id).length >= MAX_PENDIENTES) {
+      return json(429, headers, { ok: false, error: 'Ya tienes pagos en revisión: el equipo los está capturando. Si urge, escríbenos por WhatsApp.' });
+    }
+
+    const cambio_id = require('crypto').randomUUID();
+    const etiqueta = saldo.etiqueta || 'Abono a tu viaje';
+    const link = await mpLink.crearLinkCuota({ cuota: { cambio_id, viajero: { id: v.id, nombre: v.nombre, correo, evento_id: v.evento_id }, evento_nombre: saldo.evento_nombre, neto_pesos: neto, etiqueta } });
+    if (!link.ok) {
+      console.error('[portal-viajero] link de cuota falló', viajero_id, link.motivo);
+      return json(502, headers, { ok: false, error: 'No se pudo generar tu link de pago. Puedes pagar por transferencia y subir tu comprobante.' });
+    }
+    const fLink = {
+      id: cambio_id, viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'pago',
+      detalle: `Link de Mercado Pago desde el Portal · ${etiqueta} · abono $${neto.toLocaleString('es-MX')} (cobra $${link.total_pesos.toLocaleString('es-MX')}, comisión al cliente $${link.comision_pesos.toLocaleString('es-MX')})`.slice(0, 600),
+      mp_preference_id: link.preference_id, mp_init_point: link.url, mp_monto_cobrar: link.total_pesos, mp_neto: neto,
+    };
+    const rI = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
+      method: 'POST',
+      headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(fLink),
+    });
+    if (!rI.ok) {
+      console.error('[portal-viajero] no se guardó el link de cuota', viajero_id, rI.status, await rI.text().catch(() => ''));
+      return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' });
+    }
+    return json(200, headers, { ok: true, url: link.url, total: link.total_pesos, neto, comision: link.comision_pesos });
+  }
+
   if (accion === 'subir_pago') {
     // El comprobante — la MISMA forma que requisicion-crear: base64 → bytes →
     // magia (jpg/png/webp + PDF: los bancos dan PDF) → bucket PRIVADO
@@ -266,16 +339,54 @@ exports.handler = async (event) => {
 
     // Monto DECLARADO, opcional. Solo viaja en el texto del detalle: la cifra
     // que vale es la que Bulma teclee viendo el comprobante.
-    const montoDec = Number(body.monto);
+    let montoDec = Number(body.monto);
+    const notaCliente = String(body.nota || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+
+    // [PORTAL-PAGO-2] EL DESGLOSE: «de este comprobante, $X son de Fulano y $Y
+    // de Mengano». Palabra de Memo (9-nov): «construye lo del desglose». Es
+    // TEXTO ESTRUCTURADO que la bandeja PRELLENA — el humano lo corrige y
+    // captura; aquí no nace un abono. Solo puede nombrar a quien viaja CON esta
+    // persona: ella misma y su `grupo_viaje` del mismo evento (los acompañantes
+    // de ACOMP-1/2). Un id de otra persona se rechaza, no se tolera.
+    let desglose = null;
+    if (body.desglose != null) {
+      if (!Array.isArray(body.desglose) || !body.desglose.length) return json(400, headers, { ok: false, error: 'El desglose tiene que decir a quién va cada parte' });
+      if (body.desglose.length > 10) return json(400, headers, { ok: false, error: 'Máximo 10 personas en un desglose' });
+      const permitidos = new Map([[v.id, v.nombre || null]]);
+      if (v.grupo_viaje) {
+        try {
+          const g = await fetch(`${KH_URL}/rest/v1/viajeros_evento?grupo_viaje=eq.${encodeURIComponent(v.grupo_viaje)}&evento_id=eq.${encodeURIComponent(v.evento_id)}&select=id,nombre&limit=20`, { headers: hKH });
+          if (!g.ok) return json(502, headers, { ok: false, error: 'No pude leer tu grupo. Inténtalo otra vez.' });
+          for (const m of await g.json()) permitidos.set(m.id, m.nombre || null);
+        } catch (_) { return json(502, headers, { ok: false, error: 'No pude leer tu grupo. Inténtalo otra vez.' }); }
+      }
+      const vistos = new Set();
+      desglose = [];
+      for (const d of body.desglose) {
+        const id = String(d && d.viajero_id || '');
+        const m = Number(d && d.monto);
+        if (!UUID_RE.test(id) || !permitidos.has(id)) return json(400, headers, { ok: false, error: 'El desglose nombra a alguien que no viaja contigo' });
+        if (vistos.has(id)) return json(400, headers, { ok: false, error: 'Una persona aparece dos veces en el desglose' });
+        if (!Number.isFinite(m) || m <= 0 || m > 1000000) return json(400, headers, { ok: false, error: 'Cada parte del desglose tiene que ser un monto mayor a cero' });
+        vistos.add(id);
+        desglose.push({ viajero_id: id, nombre: permitidos.get(id), monto: Math.round(m) });
+      }
+      // El total declarado ES la suma del desglose: una suma que no cuadra con
+      // el «declara» sería dos verdades sobre el mismo comprobante.
+      montoDec = desglose.reduce((s, d) => s + d.monto, 0);
+    }
     const montoTxt = (Number.isFinite(montoDec) && montoDec > 0 && montoDec <= 1000000)
       ? ` · el cliente declara $${Math.round(montoDec).toLocaleString('es-MX')}` : '';
-    const notaCliente = String(body.nota || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+    const desgloseTxt = desglose && desglose.length > 1
+      ? ' · reparto: ' + desglose.map((d) => `${d.nombre || d.viajero_id.slice(0, 8)} $${d.monto.toLocaleString('es-MX')}`).join(', ')
+      : '';
 
     // Tope de pendientes tipo pago (el MISMO número que las solicitudes de
     // cambio: un buzón, no un chat). Dos comprobantes legítimos seguidos caben;
-    // el cuarto espera a que el equipo capture.
+    // el cuarto espera a que el equipo capture. [PORTAL-PAGO-2] Un link de MP
+    // sin pagar NO cuenta: no es un pendiente del equipo.
     try {
-      const p = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.pago&estado=eq.pendiente&select=id&limit=${MAX_PENDIENTES + 1}`, { headers: hKH });
+      const p = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.pago&estado=eq.pendiente&or=(foto_path.not.is.null,mp_pago_id.not.is.null)&select=id&limit=${MAX_PENDIENTES + 1}`, { headers: hKH });
       if (!p.ok) return json(502, headers, { ok: false, error: 'No pude registrar tu pago. Inténtalo otra vez.' });
       if ((await p.json()).length >= MAX_PENDIENTES) {
         return json(429, headers, { ok: false, error: 'Ya tienes comprobantes en revisión: el equipo los está capturando. Si urge, escríbenos por WhatsApp.' });
@@ -306,8 +417,9 @@ exports.handler = async (event) => {
     } catch (e) { return json(502, headers, { ok: false, error: 'No se pudo subir tu comprobante. Revisa tu señal e inténtalo otra vez.' }); }
     if (!up.ok) return json(502, headers, { ok: false, error: 'No se pudo guardar tu comprobante. Inténtalo otra vez.' });
 
-    const detallePago = ('Comprobante subido desde el Portal' + montoTxt + (notaCliente ? ' · «' + notaCliente + '»' : '')).slice(0, 600);
+    const detallePago = ('Comprobante subido desde el Portal' + montoTxt + desgloseTxt + (notaCliente ? ' · «' + notaCliente + '»' : '')).slice(0, 600);
     const fPago = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'pago', detalle: detallePago, foto_path, foto_md5 };
+    if (desglose) fPago.desglose = desglose;
     const rI = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
       method: 'POST',
       headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
@@ -338,6 +450,52 @@ exports.handler = async (event) => {
   if (!r.ok) return json(502, headers, { ok: false, error: 'No pude registrar tu solicitud' });
   return json(200, headers, { ok: true, solicitud: 'pendiente' });
 };
+
+// =============================================================================
+// [PORTAL-PAGO-2] _saldoPortal — cuánto debe ESTE viajero y qué le toca pagar.
+// =============================================================================
+// 🔒 CERO aritmética propia: el saldo es `saldoMigrado` (el dueño del Palacio)
+// y «qué le toca» es `estadoPlan` del rol fijo (PLAN-FIJO-1): lo atrasado + la
+// próxima cuota, topado a lo que resta. Sin plan fijo (migrados del Excel) el
+// sugerido es lo que resta entero — el cliente puede teclear menos. El nombre
+// del evento sale del catálogo servido y es solo para el TÍTULO del link.
+async function _saldoPortal(KH_URL, hKH, v) {
+  try {
+    const { saldoMigrado } = require('./_lib/cuenta-evento');
+    const PF = require('./_lib/plan-fijo');
+    const r = await fetch(`${KH_URL}/rest/v1/abonos_viajero?viajero_id=eq.${encodeURIComponent(v.id)}&select=monto&limit=2000`, { headers: hKH });
+    if (!r.ok) return { ok: false };
+    const abonos = await r.json();
+    const s = saldoMigrado(v, Array.isArray(abonos) ? abonos : []);
+    if (!s) return { ok: true, total: null, abonado: null, resta: 0, sugerido: 0, etiqueta: null, evento_nombre: null };
+    const resta = Math.max(0, Math.round(s.resta));
+    let sugerido = resta, etiqueta = 'Abono a tu viaje';
+    if (v.plan_pagos && resta > 0) {
+      const plan = PF.estadoPlan(v.plan_pagos, { total: s.total, abonado: s.abonado, ahora: new Date() });
+      if (plan && plan.estado === 'calendario') {
+        const atr = Math.round(Number(plan.atrasado) || 0);
+        const prox = plan.proxima ? Math.round(Number(plan.proxima.monto) || 0) : 0;
+        const sug = Math.min(resta, atr + prox);
+        if (sug > 0) sugerido = sug;
+        if (plan.proxima) etiqueta = (atr > 0 ? 'Atrasado + ' : '') + (plan.proxima.lbl || 'Pago ' + plan.proxima.n);
+        else if (atr > 0) etiqueta = 'Pagos atrasados';
+      } else if (plan && plan.estado === 'liquidado') {
+        return { ok: true, total: s.total, abonado: s.abonado, resta: 0, sugerido: 0, etiqueta: null, evento_nombre: null };
+      }
+    }
+    let evento_nombre = null;
+    try {
+      const evRaw = await require('./_lib/catalogo-index').fetchEventosRaw();
+      const base = String(v.evento_id || '').split('#')[0];
+      const ev = (Array.isArray(evRaw) ? evRaw : []).find((e) => e && String(e.id) === base);
+      if (ev) evento_nombre = ev.a || ev.n || null;
+    } catch (_) { /* el nombre es cosmético: sin él, el link dice el slug */ }
+    return { ok: true, total: s.total, abonado: s.abonado, resta, sugerido, etiqueta, evento_nombre };
+  } catch (e) {
+    console.error('[portal-viajero] _saldoPortal', e && e.message);
+    return { ok: false };
+  }
+}
 
 // =============================================================================
 // [ACOMP-2] repartir — el titular le da su ficha a cada acompañante.

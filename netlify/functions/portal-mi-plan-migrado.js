@@ -141,7 +141,7 @@ exports.handler = async (event) => {
     // PostgREST haría SUB-pescar, que es el defecto que vinimos a arreglar. Se
     // prefiere sobre-pescar y filtrar aquí, donde la regla se puede leer.
     const vR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?correo=ilike.${encodeURIComponent(correo)}`
-      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero,fecha_separo,plan_pagos,vuelo&limit=200', { headers: hKH });
+      + '&select=id,evento_id,nombre,correo,celular,talla_playera,genero,num_emergencia,emergencia_nombre,emergencia_parentesco,tipo_paquete,zona_boleto,total_contrato,abonado_previo,boletos,portal_revisado_at,usuario_id,tipo_viajero,fecha_separo,plan_pagos,vuelo,grupo_viaje&limit=200', { headers: hKH });
     if (!vR.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No pude leer tus tours', detail: await vR.text() }) };
     const crudos = await vR.json();
     // 🔒 LA IGUALDAD EXACTA, EN MINÚSCULAS Y DE LOS DOS LADOS. Es el filtro que
@@ -189,8 +189,26 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tours: [], en_revision, solicitudes, revision_error: revisionError }) };
     }
 
-    // Los abonos de ESOS viajeros. Se filtra en el servidor por sus ids.
-    const ids = viajeros.map((v) => '"' + v.id + '"').join(',');
+    // ═══ [PORTAL-PAGO-2] QUIÉN VIAJA CON QUIÉN (para el desglose) ═══════════
+    // Palabra de Memo (9-nov): «si alguien paga por todos, el portal lo deja
+    // desglosar». Las filas del MISMO `grupo_viaje` (ACOMP-1/2) viajan con
+    // nombre y cuánto le falta a cada quien, para que el titular reparta su
+    // comprobante. 🔒 Solo nombre + dinero del grupo: ni correo ni celular de
+    // los otros. Sin grupo, lista vacía (y el Portal no ofrece desglose).
+    const grupos = [...new Set(viajeros.map((v) => v.grupo_viaje).filter(Boolean))];
+    let companeros = [];
+    if (grupos.length) {
+      try {
+        const gR = await fetch(`${KH_URL}/rest/v1/viajeros_evento?grupo_viaje=in.(${encodeURIComponent(grupos.map((g) => '"' + g + '"').join(','))})`
+          + '&select=id,evento_id,nombre,grupo_viaje,total_contrato,abonado_previo,plan_pagos,tipo_viajero,usuario_id,boletos,zona_boleto&limit=300', { headers: hKH });
+        if (gR.ok) companeros = (await gR.json()).filter((c) => !(Number(c.boletos) === 0 && c.zona_boleto == null));
+      } catch (_) { companeros = []; }
+    }
+    const propios = new Set(viajeros.map((v) => v.id));
+    const extraCompaneros = companeros.filter((c) => !propios.has(c.id));
+
+    // Los abonos de ESOS viajeros (y de sus compañeros de grupo, para su saldo).
+    const ids = viajeros.concat(extraCompaneros).map((v) => '"' + v.id + '"').join(',');
     // [PORTAL-TICKET-1] `id` y `foto_path` viajan hasta aquí para derivar
     // `tiene_foto`; el PATH jamás sale al navegador (la URL se firma al clic
     // en portal-viajero `abono_foto`, con los filtros de siempre).
@@ -205,6 +223,31 @@ exports.handler = async (event) => {
     // al dueño VERIFICADO de la fila (nunca al index público). Sin link → null.
     const { gruposDe } = require('./_lib/grupo-whatsapp');
     const linksWA = await gruposDe(viajeros.map((v) => v.evento_id), { KH_URL, KH_KEY });
+
+    // [PORTAL-PAGO-2] Lo que el cliente ya mandó y el equipo no ha capturado:
+    // comprobantes en revisión, pagos de MP ya acreditados (en revisión) y links
+    // de MP sin pagar (se le vuelve a ofrecer el mismo). El Portal lo DICE para
+    // que nadie pague dos veces ni suba el mismo comprobante otra vez.
+    const idsPropios = viajeros.map((v) => '"' + v.id + '"').join(',');
+    const pagosPend = {};
+    try {
+      const cR = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=in.(${encodeURIComponent(idsPropios)})&tipo=eq.pago&estado=eq.pendiente`
+        + '&select=viajero_id,foto_path,mp_preference_id,mp_init_point,mp_neto,mp_monto_cobrar,mp_pago_id,mp_monto,creado_en,desglose&order=creado_en.asc&limit=200', { headers: hKH });
+      if (cR.ok) (await cR.json()).forEach((c) => {
+        const tipo = c.mp_pago_id ? 'mp_pagado' : c.foto_path ? 'comprobante' : c.mp_preference_id ? 'mp_link' : null;
+        if (!tipo) return;
+        (pagosPend[c.viajero_id] = pagosPend[c.viajero_id] || []).push({
+          tipo,
+          monto: tipo === 'mp_pagado' ? Number(c.mp_neto) || null : tipo === 'mp_link' ? Number(c.mp_neto) || null : null,
+          cobra: tipo === 'mp_link' ? Number(c.mp_monto_cobrar) || null : null,
+          url: tipo === 'mp_link' ? c.mp_init_point : null,
+          fecha: c.creado_en || null,
+          reparto: Array.isArray(c.desglose) && c.desglose.length > 1,
+        });
+      });
+    } catch (_) { /* sin la lista el Portal no promete nada */ }
+    let mpDisponible = false;
+    try { mpDisponible = !!require('./_lib/mp-link').disponible().ok; } catch (_) { mpDisponible = false; }
 
     // ═══ [PLAN-PAGOS-1b] EL CALENDARIO DE PAGOS ════════════════════════════
     // Palabra de Memo (28-oct): «el cliente debe de poder ver su rol de pagos
@@ -301,6 +344,30 @@ exports.handler = async (event) => {
         // [PLAN-PAGOS-1d] A qué cuenta manda ESTE viajero, con la excepción de
         // la preventa ya aplicada. La pantalla pinta, no decide.
         banco: bancoDeViajero(v),
+        // [PORTAL-PAGO-2] Con quién viaja (mismo grupo, mismo evento), con lo que
+        // le falta a cada uno y su próximo pago — para el desglose del
+        // comprobante. La propia fila NO va aquí (el Portal la agrega arriba).
+        grupo: v.grupo_viaje ? companeros
+          .filter((c) => c.grupo_viaje === v.grupo_viaje && c.evento_id === v.evento_id && c.id !== v.id)
+          .map((c) => {
+            const sc = saldoMigrado(c, porViajero[c.id]);
+            let prox = null;
+            if (c.plan_pagos && sc && sc.resta > 0) {
+              const pc = PF.estadoPlan(c.plan_pagos, { total: sc.total, abonado: sc.abonado, ahora });
+              if (pc && pc.estado === 'calendario') prox = Math.min(sc.resta, Math.round((Number(pc.atrasado) || 0) + (pc.proxima ? Number(pc.proxima.monto) || 0 : 0)));
+            }
+            return { viajero_id: c.id, nombre: c.nombre || null, resta: sc ? Math.max(0, Math.round(sc.resta)) : null, proximo: prox };
+          }) : [],
+        // [PORTAL-PAGO-2] Lo que ya está en camino (comprobante en revisión ·
+        // pago en MP acreditado en revisión · link de MP sin pagar).
+        pagos_pendientes: pagosPend[v.id] || [],
+        // [PORTAL-PAGO-2] ¿Se puede ofrecer «Pagar en línea» ahora mismo?
+        mp_disponible: mpDisponible,
+        // Y lo que le toca pagar HOY según su rol fijo (atrasado + próxima),
+        // topado a lo que resta. null sin plan fijo: el Portal ofrece la resta.
+        sugerido: (plan && plan.estado === 'calendario')
+          ? Math.min(Math.max(0, Math.round(s.resta)), Math.round((Number(plan.atrasado) || 0) + (plan.proxima ? Number(plan.proxima.monto) || 0 : 0))) || null
+          : null,
         // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
         evento_ds: dsEv,
         // [PORTAL-RECUERDO-1] Viaje ya realizado: el Portal lo pinta como

@@ -81,11 +81,15 @@ function red() {
     if (m === 'GET') return resp(200, T.filter((r) => casa(r, fl)).map((r) => Object.assign({}, r)));
     if (m === 'PATCH') { const c = JSON.parse(init.body); const rows = T.filter((r) => casa(r, fl)); rows.forEach((r) => Object.assign(r, c)); return resp(200, rows.map((r) => Object.assign({}, r))); }
     if (m === 'POST') {
-      const row = Object.assign({ id: 'cccccccc-0000-4000-8000-' + String(seq++).padStart(12, '0') }, tabla === 'cambios' ? { estado: 'pendiente' } : {}, JSON.parse(init.body));
-      // La base de verdad muerde: un 'pago' sin foto_path rebota (CHECK
-      // cambios_viajero_pago_foto del acta) — el fake lo modela o pasa en vacío.
-      if (tabla === 'cambios' && row.tipo === 'pago' && !row.foto_path) return resp(400, { code: '23514', message: 'violates check constraint "cambios_viajero_pago_foto"' });
-      T.push(row); return resp(201, [row]);
+      // [PORTAL-PAGO-2] PostgREST acepta un ARREGLO de filas en un POST (el
+      // reparto inserta varios abonos de un golpe): el fake lo modela igual.
+      const cuerpo = JSON.parse(init.body);
+      const rows = (Array.isArray(cuerpo) ? cuerpo : [cuerpo]).map((x) => Object.assign({ id: 'cccccccc-0000-4000-8000-' + String(seq++).padStart(12, '0') }, tabla === 'cambios' ? { estado: 'pendiente' } : {}, x));
+      // La base de verdad muerde: un 'pago' sin foto_path NI link de MP rebota
+      // (CHECK cambios_viajero_pago_foto, re-creado por PORTAL-PAGO-2) — el fake
+      // lo modela o pasa en vacío.
+      for (const row of rows) if (tabla === 'cambios' && row.tipo === 'pago' && !row.foto_path && !row.mp_preference_id) return resp(400, { code: '23514', message: 'violates check constraint "cambios_viajero_pago_foto"' });
+      rows.forEach((r) => T.push(r)); return resp(201, rows);
     }
     throw new Error('método ' + m);
   };

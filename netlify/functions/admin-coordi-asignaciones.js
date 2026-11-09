@@ -508,7 +508,8 @@ exports.handler = async (event) => {
           leer(`${baseContratos}?select=id,creador_nombre,creador_email,plantilla,estado,evento_nombre,evento_fecha,datos&limit=2000`),
           leer(`${baseVE}?tipo_viajero=not.is.null&tipo_viajero=neq.cliente&select=id,evento_id,usuario_id,nombre,zona_boleto,talla_playera,tipo_viajero,sin_boleto&limit=5000`),
           leer(`${env.KH_SB_URL}/rest/v1/requisiciones?estado=eq.pendiente&select=id&limit=1000`),
-          leer(`${env.KH_SB_URL}/rest/v1/cambios_viajero?estado=eq.pendiente&select=id&limit=1000`),
+          // [PORTAL-PAGO-2] un link de MP sin pagar no es pendiente del equipo
+          leer(`${env.KH_SB_URL}/rest/v1/cambios_viajero?estado=eq.pendiente&or=(tipo.neq.pago,foto_path.not.is.null,mp_pago_id.not.is.null)&select=id&limit=1000`),
           leer(`${env.KH_SB_URL}/rest/v1/salidas_bodega?estado=eq.solicitada&select=id,evento_id,solicitante_id&limit=500`),
         ]);
       } catch (e) { return upstream(headers, e.message, 'consulta'); }

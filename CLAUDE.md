@@ -306,9 +306,25 @@ está caduco antes de escribirse.
     **188607140172**, `approved/accredited`, bruto $319, **comisión real de MP
     $17.56, neto $301.44** — sobra $1.44 porque la tarifa va en 3.79 % por si
     pagan en OXXO y en tarjeta MP cobra 3.49 %, decisión de Memo) → la
-    requisición marcada `mp_pago_id/mp_monto/mp_pagado_at`. ⏳ Se archiva con
-    «🗑 Era prueba» (NO se aprueba); los $319 viven en el saldo de MP de Memo
-    (reembolsables desde su app).
+    requisición marcada `mp_pago_id/mp_monto/mp_pagado_at`. ✅ **Archivadas
+    con «🗑 Era prueba» (9-nov, desde la sesión de Memo): R-69B6B y su gemela
+    sin pagar R-YDQA2**; `mp_pagos` 188607140172 se QUEDA (bitácora del dinero
+    real); los $319 viven en el saldo de MP de Memo (reembolsables desde su
+    app).
+  - 🔴 **PRUEBA-ARCHIVO-2 (9-nov, cazado al archivar): el botón «🗑 Era
+    prueba» llevaba ~12 días MUERTO para cualquier requisición.**
+    `archivar_prueba` copia la fila ENTERA (`select=*`) a `pruebas_archivo_*`
+    antes de borrar, y las tablas de archivo (nacidas el 13-oct copiando
+    columnas) se quedaron atrás de las vivas: **12 en requisiciones** (desde
+    `motivo_clave` de RECHAZO-AVISO-1, 28-oct, hasta las 6 `mp_*`), **11 en
+    viajeros**, **1 en abonos** → «No se pudo copiar al archivo — no se quitó
+    nada» (fail-safe correcto; último archivo que funcionó: 14-oct). Acta
+    `migraciones/PRUEBA-ARCHIVO-2.sql` (YA CORRIDA): las columnas se DERIVAN
+    de `pg_attribute` en un `do $$` idempotente, sin CHECKs ni NOT NULL (el
+    archivo es foto, no valida). Careo de salida 0·0·0. ⚠️ Lo que NO cierra:
+    la próxima columna nueva en una viva lo vuelve a romper hasta re-correr el
+    bloque (el careo `mide:prueba-archivo-1` usa red falsa y no lo ve) —
+    tuerca propia: proyectar en `archivar_prueba` o un vigilante de catálogos.
   - 🔴 **MP-IPN-1 (mismo 9-nov, cazado en los logs del primer pago): MP manda
     DOS avisos por pago y el viejo rebotaba.** Además del webhook firmado,
     MP manda el **IPN heredado** (`?id=…&topic=payment` y

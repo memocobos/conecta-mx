@@ -6925,7 +6925,7 @@ var REQUISICION_EVENTOS=['palnorte','nsqkmty','fuerzaregida','juniorh','anagabri
     var qs=new URLSearchParams(location.search);
     var p=qs.get('pago'); if(!p)return;
     var folio=String(qs.get('folio')||'').replace(/[^A-Za-z0-9-]/g,'').slice(0,20);
-    var txt=p==='ok'?'✅ ¡Gracias! Recibimos tu pago'+(folio?' de la reservación '+folio:'')+'. El equipo lo confirma y te escribe por WhatsApp.'
+    var txt=p==='ok'?'✅ ¡Gracias! Recibimos tu pago'+(folio?' de la reservación '+folio:'')+'. En menos de 24 horas recibirás en tu correo tu confirmación y tu acceso al Portal.'
       :p==='pendiente'?'⏳ Tu pago quedó pendiente'+(folio?' (reservación '+folio+')':'')+'. Si pagaste en OXXO, se confirma cuando la tienda lo reporte (hasta 1 día hábil).'
       :'⚠️ El pago no se completó'+(folio?' (reservación '+folio+')':'')+'. Tu reservación sigue registrada: escríbenos por WhatsApp y te ayudamos.';
     var pintar=function(){
@@ -6961,7 +6961,7 @@ function _reqPintar(){
   cont.innerHTML=
     '<div style="border-top:1px solid rgba(255,255,255,.14);margin:14px 0 12px"></div>'+
     '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#e8ff4c;margin:0 0 2px">Aparta tu lugar aquí mismo</div>'+
-    '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 10px">Sube tu comprobante y el equipo te confirma por WhatsApp. Sin cuentas ni contraseñas.</div>'+
+    '<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 10px">Reserva aquí y en menos de 24 horas recibirás en tu correo tu confirmación y tu acceso al Portal. Sin cuentas ni contraseñas.</div>'+
     '<input type="text" id="req-nombre" placeholder="Tu nombre completo *" maxlength="80" style="'+inp+'">'+
     '<input type="tel" id="req-celular" placeholder="Tu WhatsApp (10 dígitos) *" maxlength="14" inputmode="numeric" style="'+inp+'">'+
     '<input type="email" id="req-correo" placeholder="Tu correo * (ahí te llega tu acceso)" maxlength="120" style="'+inp+'">'+
@@ -7318,15 +7318,20 @@ function _reqEnviar(){
         // [PAGO-UX-1] Con link de MP el lugar TODAVÍA NO está pagado: el titular
         // lo dice («falta tu pago»), no «recibimos tu reservación» a secas.
         '<div style="font-size:26px;margin-bottom:4px">'+(r.j.pago&&r.j.pago.url?'💳':'✅')+'</div>'+
-        '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">'+(r.j.pago&&r.j.pago.url?'¡Ya casi! Solo falta tu pago':'¡Recibimos tu reservación!')+'</div>'+
+        // [REQ-EXITO-1 · 9-nov-2026, palabra de Memo] Nada de WhatsApp aquí: la
+        // reservación queda PENDIENTE y la confirmación + el acceso al Portal
+        // llegan por CORREO en menos de 24 h (es lo que hace el correo único al
+        // aprobar). El WhatsApp dejaba al cliente esperando un mensaje que
+        // nadie le iba a mandar.
+        '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">'+(r.j.pago&&r.j.pago.url?'¡Ya casi! Solo falta tu pago':'¡Tu reservación fue enviada!')+'</div>'+
         '<div style="font-family:Montserrat,sans-serif;font-size:12px;color:#fff;margin-bottom:6px">Tu folio: <b style="color:#e8ff4c;letter-spacing:.06em">'+r.j.folio+'</b></div>'+
         // [MP-LINK-1] Si el servidor generó el link de Mercado Pago, se enseña
         // AQUÍ MISMO con su monto (separo + comisión, dicho con todas sus letras).
         // Sin link (MP apagado / sin tarifa) sale la frase de siempre.
         (r.j.pago&&r.j.pago.url
           ?'<a href="'+String(r.j.pago.url).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" id="req-mp-btn" style="display:block;margin:10px 0 8px;padding:16px 12px;background:#009ee3;color:#fff;border-radius:10px;font-family:Montserrat,sans-serif;font-weight:900;font-size:15px;text-decoration:none;letter-spacing:.03em;box-shadow:0 8px 24px rgba(0,158,227,.35)">💳 Pagar $'+Number(r.j.pago.total).toLocaleString('es-MX')+' en Mercado Pago →</a>'+
-           '<div style="font-family:Montserrat,sans-serif;font-size:10.5px;color:rgba(255,255,255,.7);line-height:1.45;margin-bottom:6px">Separo $'+Number(r.j.pago.neto).toLocaleString('es-MX')+(Number(r.j.pago.comision)>0?' + $'+Number(r.j.pago.comision).toLocaleString('es-MX')+' de comisión de Mercado Pago':'')+'. Pagas con tarjeta, OXXO o transferencia en su página segura; en cuanto cae el pago, el equipo confirma tu lugar. Si prefieres transferencia directa, mándanos el comprobante por WhatsApp con tu folio.</div>'
-          :'<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">El equipo revisa tu '+(_reqEstado.forma==='link_pago'?'solicitud y te manda tu link de pago':'comprobante')+' y te confirma por WhatsApp. Guarda tu folio.</div>')+
+           '<div style="font-family:Montserrat,sans-serif;font-size:10.5px;color:rgba(255,255,255,.7);line-height:1.45;margin-bottom:6px">Separo $'+Number(r.j.pago.neto).toLocaleString('es-MX')+(Number(r.j.pago.comision)>0?' + $'+Number(r.j.pago.comision).toLocaleString('es-MX')+' de comisión de Mercado Pago':'')+'. Pagas con tarjeta, OXXO o transferencia en su página segura. En cuanto cae tu pago, en menos de 24 horas recibirás en tu correo tu confirmación y tu acceso al Portal.</div>'
+          :'<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">Tu reservación está <b style="color:#fff">pendiente de revisión</b>. En menos de <b style="color:#fff">24 horas</b> recibirás en tu correo tu confirmación y tu acceso al Portal. Guarda tu folio.</div>')+
         '</div>';
     }else{
       try{trackMainEvent('main_requisicion_error',{st:r.st});}catch(e){}

@@ -154,7 +154,24 @@ console.log('\n[D] los textos del camino MP dicen lo que pasa');
   af(/Al enviar tus datos te aparece aquí mismo el botón/.test(pintar), 'el aviso dice que el botón de pagar aparece al enviar — el link nace solo');
   af(/\['link_pago','Pagar en línea \(Mercado Pago\)'\]/.test(pintar), 'el chip (respaldo sin pasos) dice «Pagar en línea (Mercado Pago)»');
   const enviar = sinComentarios(funcionDe(HTML, '_reqEnviar') || '');
-  af(/¡Ya casi! Solo falta tu pago/.test(enviar) && /¡Recibimos tu reservación!/.test(enviar), 'la pantalla de éxito distingue: con link «¡Ya casi! Solo falta tu pago», sin link «¡Recibimos tu reservación!»');
+  // [REQ-EXITO-1 · 9-nov] ACTUALIZADA a la verdad nueva, con su razón: la
+  // pantalla sin link decía «¡Recibimos tu reservación!» y hoy dice «¡Tu
+  // reservación fue enviada!» (palabra de Memo: pendiente, correo <24 h,
+  // acceso al Portal — nada de WhatsApp). La aserción vieja habría exigido
+  // revertir su decisión.
+  af(/¡Ya casi! Solo falta tu pago/.test(enviar) && /¡Tu reservación fue enviada!/.test(enviar), 'la pantalla de éxito distingue: con link «¡Ya casi! Solo falta tu pago», sin link «¡Tu reservación fue enviada!»');
+  // El éxito se rebana por su marcador (req-seccion → innerHTML) y se mide
+  // SOBRE ESE TROZO, no sobre toda la función: _reqEnviar también arma el
+  // mensaje de error de red, que legítimamente manda a Messenger.
+  const iEx = enviar.indexOf("getElementById('req-seccion')");
+  const exito = iEx >= 0 ? enviar.slice(iEx, enviar.indexOf("'</div>';", iEx) + 9) : '';
+  af(exito.length > 200, 'la pantalla de éxito se rebana (' + exito.length + ' chars)');
+  af(!/WhatsApp/.test(exito), 'la pantalla de éxito NO menciona WhatsApp en ninguno de los dos caminos (nadie va a escribir por ahí)');
+  af(/pendiente de revisión/.test(exito), 'sin link dice que la reservación está «pendiente de revisión»');
+  af((exito.match(/en menos de (<b[^>]*>)?24 horas/gi) || []).length === 2, 'los DOS caminos prometen «en menos de 24 horas» (con y sin link)');
+  af((exito.match(/recibirás en tu correo tu confirmación y tu acceso al Portal/g) || []).length === 2, 'los DOS caminos dicen que la confirmación y el acceso al Portal llegan por CORREO');
+  // Control por construcción: el trozo SÍ sabe ver un WhatsApp si lo hubiera.
+  af(/WhatsApp/.test(exito.replace('Guarda tu folio', 'WhatsApp')), 'control: el detector de WhatsApp ve uno sembrado');
   af(/r\.j\.pago&&r\.j\.pago\.url\?'¡Ya casi!/.test(enviar), 'y la elige por el HECHO de que vino el link (pago.url), no por la forma elegida');
   af(/id="req-mp-btn" style="[^"]*font-size:15px/.test(enviar), 'el botón «Pagar en Mercado Pago» creció (15px)');
 }

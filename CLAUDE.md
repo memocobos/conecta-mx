@@ -188,6 +188,32 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✉️⏳ **REQ-EXITO-1 (9-nov-2026, en main local, cero SQL): la pantalla de éxito
+  de la reservación ya NO manda a WhatsApp.** Palabra de Memo: *«cuando reservan
+  no pongas nada del whatsapp, pon algo como tu requisición ha sido enviada,
+  pendiente… de tu correo en menos de 24 horas recibirás tu confirmación y tu
+  acceso al portal»*. Sin link: **«¡Tu reservación fue enviada!» · «pendiente de
+  revisión» · «en menos de 24 horas recibirás en tu correo tu confirmación y tu
+  acceso al Portal»**. Con link de MP: sigue «¡Ya casi! Solo falta tu pago» y el
+  pie dice lo mismo tras «en cuanto cae tu pago» (murió la frase «mándanos el
+  comprobante por WhatsApp con tu folio»). También el subtítulo del formulario
+  (oculto por WEB-UX-3, pero es el respaldo sin pasos) y el letrero de regreso
+  `?pago=ok` de MP. 🔒 La promesa es verdad por construcción: es lo que hace el
+  correo único al aprobar (confirmación + invitación al Portal). El «escríbenos
+  por WhatsApp» del `?pago=error` se QUEDA: ahí sí hace falta un humano.
+  `mide:pago-ux-1` **44** (la aserción del título viejo se actualizó con su
+  razón; el éxito se rebana por `req-seccion` y se exige CERO «WhatsApp» en los
+  dos caminos, «pendiente de revisión», 2× «24 horas», 2× «correo… Portal», con
+  control sembrado; sabotaje → 1 rojo, restaurado). Vecinos verdes: req-b1 52 ·
+  mp-link-1 60 · ticket-circuito-1 32. ⏳ Push de Memo.
+  ⚠️ **Lección del 9-nov, de deploy:** el push de PAGO-UX-1 (`b122ee7`) llegó a
+  GitHub y **Netlify nunca lo construyó** (el webhook se perdió; la lista de
+  deploys no tenía ninguno de ese commit). Se disparó a mano desde el panel de
+  Netlify («Trigger deploy → Deploy project», sesión de Memo en Chrome) → deploy
+  `6af175c3` ready, verificado en producción. **Si tras un push el sitio no
+  cambia en ~2 min, se mira la lista de deploys de Netlify ANTES de tocar
+  código.**
+
 - 💳⏳ **PAGO-UX-1 (9-nov-2026, en main local, cero SQL): el paso de pago en DOS
   CAMINOS — y el cotizador sin la cuenta repetida.** Palabra de Memo (con
   capturas del flujo de Madero): *«el botón de reservar lugar debería ser más

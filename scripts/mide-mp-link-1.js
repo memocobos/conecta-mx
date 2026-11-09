@@ -243,6 +243,18 @@ const pagoMP = (id, ref, monto, estado, extra) => Object.assign({ id: Number(id)
   const mala = notif(H, '1001'); mala.headers['x-signature'] = mala.headers['x-signature'].replace(/v1=.*/, 'v1=deadbeef');
   r = await H.webhook(mala);
   af(r.statusCode === 400 && red.mp_pagos.length === 0 && red.log.every((l) => !/mercadopago/.test(l)), '[W11] 🔒 firma inválida → 400, ni se consulta MP ni se escribe nada');
+  // [MP-IPN-1] el IPN heredado (topic= en el querystring, SIN firma) — medido
+  // en el primer pago real (9-nov): MP lo manda además del webhook firmado y
+  // lo reintentaba porque aquí era 400. Hoy: 200 ignorado, cero escrituras,
+  // cero lecturas a MP. Y la forma MODERNA sin firma SIGUE siendo 400.
+  red = redNueva({ requisiciones: [Object.assign({}, REQ)], pagosMP: { 1001: pagoMP(1001, 'req:R-WEBHK', 313) } }); global.fetch = red.fetch; H = frescos();
+  for (const topic of ['payment', 'merchant_order']) {
+    r = await H.webhook({ httpMethod: 'POST', headers: {}, queryStringParameters: { id: topic === 'payment' ? '1001' : '45986443962', topic }, body: JSON.stringify({ resource: '/x', topic }) });
+    j = JSON.parse(r.body);
+    af(r.statusCode === 200 && j.ignorado === true && red.mp_pagos.length === 0 && red.log.every((l) => !/mercadopago/.test(l)), `[W11b] 🔒 IPN heredado topic=${topic} SIN firma → 200 ignorado, cero escrituras y cero lecturas a MP`);
+  }
+  r = await H.webhook({ httpMethod: 'POST', headers: {}, queryStringParameters: { 'data.id': '1001', type: 'payment' }, body: JSON.stringify({ type: 'payment', data: { id: '1001' } }) });
+  af(r.statusCode === 400 && red.mp_pagos.length === 0, '[W11c] 🔒 la forma MODERNA (data.id+type) SIN firma sigue siendo 400: ésa sí debe traerla');
   MP_OFF(); H = frescos();
   r = await H.webhook(notif(Object.assign({}, H, { mp: require(path.join(RAIZ, 'netlify/functions/_lib/mercadopago.js')) }), '1001'));
   af(r.statusCode === 404, '[W12] 🔒 MP apagado → el webhook contesta 404 (no existe para nadie)');

@@ -292,6 +292,33 @@ está caduco antes de escribirse.
     («mp-webhok»): se verificó leyendo el `value` y se corrigió — **toda URL
     tecleada en un panel ajeno se relee antes de guardar**. La app del Club
     (3527539171126093) sigue con producción SIN activar: Memo decide si va hoy.
+  - 🏆 **ENCENDIDO Y ESTRENADO CON DINERO REAL (9-nov-2026, 00:34 Reynosa).**
+    Memo pegó las dos secretas, pusheó (`bf6aca6`, deploy `ready` 06:05Z) y la
+    prueba de punta a punta salió a la primera: requisición **R-69B6B**
+    (fuerzaregida#0 · CHEAP · Cancha VIP · `link_pago`) → `requisicion-crear`
+    devolvió `pago{total:319, comision:19, neto:300}` con preferencia REAL →
+    Memo pagó $319 con tarjeta ajena en la página de MP (su propia cuenta de MP
+    NO puede pagarle a su propia app: el botón «Pagar» sale gris — para
+    probar hay que entrar como invitado o con otra cuenta) → **el webhook
+    FIRMADO (`?data.id=…&type=payment`) llegó 2 s después del `approved`,
+    la firma del manifest se VERIFICÓ a la primera** (la duda que el lib
+    traía desde agosto queda cerrada) → fila en `mp_pagos` (op.
+    **188607140172**, `approved/accredited`, bruto $319, **comisión real de MP
+    $17.56, neto $301.44** — sobra $1.44 porque la tarifa va en 3.79 % por si
+    pagan en OXXO y en tarjeta MP cobra 3.49 %, decisión de Memo) → la
+    requisición marcada `mp_pago_id/mp_monto/mp_pagado_at`. ⏳ Se archiva con
+    «🗑 Era prueba» (NO se aprueba); los $319 viven en el saldo de MP de Memo
+    (reembolsables desde su app).
+  - 🔴 **MP-IPN-1 (mismo 9-nov, cazado en los logs del primer pago): MP manda
+    DOS avisos por pago y el viejo rebotaba.** Además del webhook firmado,
+    MP manda el **IPN heredado** (`?id=…&topic=payment` y
+    `?id=…&topic=merchant_order`) **SIN `x-signature`, por diseño de MP**; como
+    aquí todo lo sin firma era 400, MP lo tomó por fallo y lo **reintentó 7
+    veces en 60 s**. Hoy `mp-webhook` contesta **200 ignorado** a la forma IPN
+    (`topic` en el querystring Y sin cabecera de firma) sin leer MP ni escribir
+    nada — el dinero entra SOLO por el aviso firmado; la forma moderna sin
+    firma **sigue siendo 400**. `mide:mp-link-1` **60** ([W11b]×2 + [W11c];
+    control positivo: el código de HEAD da 2 rojos exactos).
 
 - 🚑⏳ **REP-MULTIFECHA-1 + YAJIROBE-1b (8-nov-2026, en main local, cero SQL):
   «el kamehouse no les funciona» — eran DOS huecos viejos que estrenó el fin de

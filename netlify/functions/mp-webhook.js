@@ -187,6 +187,23 @@ exports.handler = async (event) => {
   // mismo id, pero usar el del cuerpo permitiría firmar una cosa y mandar otra.
   const dataId = qs['data.id'] || qs['data_id'] || qs.id || null;
 
+  // ── [MP-IPN-1] EL AVISO VIEJO (IPN) SE IGNORA CON 200, NO CON 400 ─────────
+  // Medido en el primer pago REAL (9-nov-2026, op. 188607140172): por cada
+  // pago MP manda DOS formas de aviso. El webhook firmado
+  // (`?data.id=…&type=payment` + x-signature) llegó, se verificó y escribió el
+  // pago en 2 s. Pero ADEMÁS manda el IPN heredado (`?id=…&topic=payment` y
+  // `?id=…&topic=merchant_order`) que viene SIN x-signature por diseño de MP —
+  // y como aquí todo lo sin firma era 400, MP lo tomó por fallo y lo reintentó
+  // 7 veces en 60 s. Un IPN sin firma no se puede verificar, así que NO se
+  // procesa (cero escrituras: el dinero entra SOLO por el aviso firmado); se le
+  // contesta 200 para que MP deje de insistir. 🔒 Solo se ignora la forma IPN
+  // (`topic` en el querystring y SIN cabecera de firma): un webhook moderno
+  // con firma rota sigue siendo 400, porque ése sí debería traerla.
+  const esIPN = !!qs.topic && !(h['x-signature'] || h['X-Signature']);
+  if (esIPN) {
+    return res(200, { ok: true, ignorado: true, motivo: 'IPN sin firma: el pago entra por el webhook firmado', topic: qs.topic });
+  }
+
   const firma = mp.verificarFirma({
     xSignature: h['x-signature'] || h['X-Signature'] || '',
     xRequestId: h['x-request-id'] || h['X-Request-Id'] || '',

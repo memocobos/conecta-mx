@@ -188,6 +188,29 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 📜⏳ **LEGAL-1 + OAUTH-GOOGLE (9-nov-2026, en main local, cero SQL): aviso de
+  privacidad y términos públicos — la llave para publicar el login con Google.**
+  Medido con Memo en Chrome: el cliente OAuth del Portal vive en el proyecto
+  **«Conecta Portal» (`conecta-portal`, nº 425861856151) de hcgcobos@gmail.com**
+  — NO en admin@conectareynosa.mx (esa cuenta tiene una organización vacía; se
+  le activó la verificación en 2 pasos porque Google Cloud la bloqueaba). Estado:
+  **«Prueba»**, 1 usuario de prueba, scopes `email profile`. Aun así entran
+  clientes reales (93 identidades Google, 50 nuevas en 7 días, 20 distintas en
+  48 h) — funciona HOY, pero es apostar a que Google no aplique el tope de prueba.
+  Publicar pide completar «Información de la marca»: faltaban **Política de
+  Privacidad y Condiciones del Servicio** (y la LFPDPPP pide el aviso igual).
+  `privacidad.html` (responsable, datos reales que guarda el sistema —INE,
+  emergencia, comprobantes, IP de firma—, encargados: Netlify/Supabase/Resend/
+  Mercado Pago/Google/GA, ARCO a reynosa@conectamexico.mx) y `terminos.html`
+  (paquetes, pagos, y las POLITICAS del index **palabra por palabra**; posposición
+  como dice el contrato del cliente) + `_redirects` /privacidad y /terminos.
+  Estáticas, sin `<script>`. `mide:legal-1` **24** (rutas antes del catchall ·
+  cada renglón de `var POLITICAS` aparece igual en términos — el careo cazó mi
+  paráfrasis del cargo de tarjeta · sabotaje 6→7 días → rojo → restaurado sha1
+  `deb622f8`). ⚠️ No soy abogado: Memo las lee (y alguien de confianza el aviso).
+  ⏳ Push de Memo → en la consola de `conecta-portal`: Información de la marca →
+  página principal `https://conectareynosa.mx`, privacidad y términos → Guardar →
+  Público → **Publicar app** (con email/profile no pide verificación).
 - 🔒⏳ **CORREO-ABONO-2027 + UTIL-SOLO-ROSHI (9-nov-2026, en main local, cero
   SQL): dos palabras de Memo al análisis profundo.**
   - **CORREO-ABONO-2027 · «si manual tmb».** ⚰️ «Solo requisiciones» (REQ-2027-1,

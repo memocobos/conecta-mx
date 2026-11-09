@@ -15,6 +15,9 @@
 /demo        /demo.html        200
 /demo-full   /demo-full.html   200
 /contrato    /contrato.html    200
+# LEGAL-1: las dos ligas que Google Auth Platform pide para publicar el login.
+/privacidad  /privacidad.html  200
+/terminos    /terminos.html    200
 
 # Portal de clientes (Fase 2.1 — Supabase Auth)
 /portal      /portal.html      200

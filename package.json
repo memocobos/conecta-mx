@@ -159,6 +159,7 @@
     "mide:cob-wa-1": "node scripts/mide-cob-wa-1.js",
     "mide:grupo-wa-2": "node scripts/mide-grupo-wa-2.js",
     "mide:portal-hotfix-1": "node scripts/mide-portal-hotfix-1.js",
-    "mide:util-solo-roshi": "node scripts/mide-util-solo-roshi.js"
+    "mide:util-solo-roshi": "node scripts/mide-util-solo-roshi.js",
+    "mide:legal-1": "node scripts/mide-legal-1.js"
   }
 }

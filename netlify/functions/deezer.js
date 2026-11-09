@@ -139,9 +139,17 @@ exports.handler = async function(event) {
       : data;
     return {
       statusCode: 200,
+      // 🔴 DEEZER-CACHE-1 (9-nov-2026): esta rama NO traía Cache-Control, así que
+      // CADA tarjeta sin foto estática de CADA visita invocaba la function — medido:
+      // 46,789 invocaciones en 24 h (~1,000 por visitante), y la cuenta de Netlify
+      // se quedó sin uso («usage_exceeded»: sitio y KameHouse caídos). La foto del
+      // ARTISTA no está firmada (a diferencia del `preview` de las otras ramas, que
+      // caduca y por eso sigue privado): se puede guardar en el CDN días.
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=86400',
+        'Netlify-CDN-Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=86400'
       },
       body: JSON.stringify(salida)
     };

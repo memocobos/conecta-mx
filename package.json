@@ -150,6 +150,7 @@
     "mide:wl-dup-1": "node scripts/mide-wl-dup-1.js",
     "mide:yajirobe-1": "node scripts/mide-yajirobe-1.js",
     "mide:mp-link-1": "node scripts/mide-mp-link-1.js",
-    "mide:director-1": "node scripts/mide-director-1.js"
+    "mide:director-1": "node scripts/mide-director-1.js",
+    "mide:pago-ux-1": "node scripts/mide-pago-ux-1.js"
   }
 }

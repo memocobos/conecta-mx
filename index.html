@@ -964,6 +964,11 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .bp-amount{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:56px;letter-spacing:-.02em;line-height:.9;font-weight:900;color:var(--c-amarillo)}
 .wa-btn{background:#25D366;color:#fff;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:900;padding:18px;letter-spacing:.1em;text-transform:uppercase}
 .wa-btn:hover{background:#1fba57}
+/* [PAGO-UX-1 9-nov] Palabra de Memo: «el botón de reservar lugar debería ser más
+   grande». Es EL botón del cotizador — el único que mueve dinero — y la tarjeta
+   de cuenta que vivía debajo se fue (la cuenta se enseña DENTRO de la ventana,
+   solo a quien paga por transferencia). Solo #r-wa: el .wa-btn genérico sigue. */
+#r-wa.wa-btn{padding:24px 18px;font-size:18px;letter-spacing:.08em;border-radius:12px;margin-top:10px;box-shadow:0 10px 30px rgba(37,211,102,.28)}
 
 /* Preview music button on event cards */
 .ev-play{
@@ -5227,7 +5232,12 @@ function actualizarBankInfo(){
     '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+' <span class="bank-copy" onclick="copiarDato(this,\''+b.clabe+'\')">Copiar</span></span></div>'+
     '<div class="bank-row"><span class="bank-lbl">Titular</span><span class="bank-val s">'+b.titular+'</span></div>';
   $$('d-bank').innerHTML=bH;
-  $$('d-bank-card').style.display='block';
+  // [PAGO-UX-1 9-nov] La tarjeta «Datos de pago» del cotizador YA NO se enseña
+  // (palabra de Memo: «quitar la cuenta porque en el siguiente paso la vas a
+  // poner de nuevo»). La cuenta vive en la ventana de pago, en el camino de
+  // transferencia. El contenido se sigue pintando por si algo lo lee; la
+  // tarjeta queda display:none (su valor de nacimiento en el HTML).
+  $$('d-bank-card').style.display='none';
 }
 function getCiudad(ev){
   if(!ev||!ev.v)return 'Destino';
@@ -6973,12 +6983,16 @@ function _reqPintar(){
       '<label for="req-file" id="req-file-lbl" style="display:block;text-align:center;padding:12px;border:1.5px dashed rgba(232,255,76,.5);border-radius:8px;color:#e8ff4c;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin:0 0 8px">📎 Subir foto de tu comprobante *</label>'+
       '<input type="file" id="req-file" accept="image/*,application/pdf" style="display:none">'+
     '</div>'+
-    '<div id="req-link-msg" style="display:none;font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 8px">Al enviar tu reservación te damos tu link de pago (o te lo mandamos por WhatsApp) — pagas con tarjeta, OXXO o transferencia en la página segura de Mercado Pago. El link incluye la comisión de Mercado Pago.</div>'+
+    // [PAGO-UX-1] El link NO lo manda nadie: nace solo al enviar (lleva el folio
+    // adentro). El texto viejo decía «te damos tu link (o te lo mandamos por
+    // WhatsApp)» y Memo lo leyó como una solicitud a una persona. Hoy dice lo
+    // que pasa: al enviar sale el botón de pagar.
+    '<div id="req-link-msg" style="display:none;font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.45;margin:0 0 8px">Al enviar tus datos te aparece aquí mismo el botón <b style="color:#fff">«Pagar en Mercado Pago»</b> con el total (tu separo + la comisión de Mercado Pago, dicha antes de pagar). Pagas ahí con tarjeta, OXXO o SPEI y, en cuanto cae el pago, el equipo confirma tu lugar.</div>'+
     '<input type="text" id="req-web" name="web" value="" style="display:none" tabindex="-1" autocomplete="off">'+
     '<button type="button" id="req-enviar" onclick="_reqEnviar()" style="width:100%;padding:13px;background:#e8ff4c;color:#000;border:none;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer">Enviar mi reservación</button>'+
     '<div id="req-msg" style="font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.45;margin:8px 0 0;min-height:1px"></div>'+
     '<div style="font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.45);text-align:center;margin:10px 0 2px">¿Prefieres mandarlo por chat? Abajo está el botón de siempre ↓</div>';
-  var formas=[['transferencia','Transferencia'],['deposito','Depósito'],['oxxo','Pagué en OXXO'],['link_pago','Quiero link de pago']];
+  var formas=[['transferencia','Transferencia'],['deposito','Depósito'],['oxxo','Pagué en OXXO'],['link_pago','Pagar en línea (Mercado Pago)']];  // [PAGO-UX-1] en la ventana por pasos este chip se esconde: lo elige el camino «Pagar en línea»
   var fw=document.getElementById('req-formas');
   formas.forEach(function(f){
     var b=document.createElement('button');
@@ -7301,14 +7315,16 @@ function _reqEnviar(){
       if(cont)cont.innerHTML=
         '<div style="border-top:1px solid rgba(255,255,255,.14);margin:14px 0 12px"></div>'+
         '<div style="text-align:center;padding:14px 10px;background:rgba(136,234,78,.1);border:1px solid rgba(136,234,78,.4);border-radius:10px">'+
-        '<div style="font-size:26px;margin-bottom:4px">✅</div>'+
-        '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">¡Recibimos tu reservación!</div>'+
+        // [PAGO-UX-1] Con link de MP el lugar TODAVÍA NO está pagado: el titular
+        // lo dice («falta tu pago»), no «recibimos tu reservación» a secas.
+        '<div style="font-size:26px;margin-bottom:4px">'+(r.j.pago&&r.j.pago.url?'💳':'✅')+'</div>'+
+        '<div style="font-family:Montserrat,sans-serif;font-weight:900;font-size:14px;color:#88ea4e;margin-bottom:4px">'+(r.j.pago&&r.j.pago.url?'¡Ya casi! Solo falta tu pago':'¡Recibimos tu reservación!')+'</div>'+
         '<div style="font-family:Montserrat,sans-serif;font-size:12px;color:#fff;margin-bottom:6px">Tu folio: <b style="color:#e8ff4c;letter-spacing:.06em">'+r.j.folio+'</b></div>'+
         // [MP-LINK-1] Si el servidor generó el link de Mercado Pago, se enseña
         // AQUÍ MISMO con su monto (separo + comisión, dicho con todas sus letras).
         // Sin link (MP apagado / sin tarifa) sale la frase de siempre.
         (r.j.pago&&r.j.pago.url
-          ?'<a href="'+String(r.j.pago.url).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" id="req-mp-btn" style="display:block;margin:8px 0 6px;padding:12px;background:#009ee3;color:#fff;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:900;font-size:13px;text-decoration:none;letter-spacing:.03em">💳 Pagar $'+Number(r.j.pago.total).toLocaleString('es-MX')+' en Mercado Pago →</a>'+
+          ?'<a href="'+String(r.j.pago.url).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" id="req-mp-btn" style="display:block;margin:10px 0 8px;padding:16px 12px;background:#009ee3;color:#fff;border-radius:10px;font-family:Montserrat,sans-serif;font-weight:900;font-size:15px;text-decoration:none;letter-spacing:.03em;box-shadow:0 8px 24px rgba(0,158,227,.35)">💳 Pagar $'+Number(r.j.pago.total).toLocaleString('es-MX')+' en Mercado Pago →</a>'+
            '<div style="font-family:Montserrat,sans-serif;font-size:10.5px;color:rgba(255,255,255,.7);line-height:1.45;margin-bottom:6px">Separo $'+Number(r.j.pago.neto).toLocaleString('es-MX')+(Number(r.j.pago.comision)>0?' + $'+Number(r.j.pago.comision).toLocaleString('es-MX')+' de comisión de Mercado Pago':'')+'. Pagas con tarjeta, OXXO o transferencia en su página segura; en cuanto cae el pago, el equipo confirma tu lugar. Si prefieres transferencia directa, mándanos el comprobante por WhatsApp con tu folio.</div>'
           :'<div style="font-family:Montserrat,sans-serif;font-size:11px;color:rgba(255,255,255,.75);line-height:1.5">El equipo revisa tu '+(_reqEstado.forma==='link_pago'?'solicitud y te manda tu link de pago':'comprobante')+' y te confirma por WhatsApp. Guarda tu folio.</div>')+
         '</div>';
@@ -9543,6 +9559,19 @@ function skipOnboarding(){
 .wx3-err{font:600 11.5px/1.4 'Montserrat',sans-serif;color:#ff6b6b;min-height:1px;margin:6px 0 0}
 .wx3-alt{margin:16px 0 0;padding:14px 0 0;border-top:1px solid rgba(255,255,255,.1)}
 .wx3-alt-lbl{font:800 10px/1.3 'Montserrat',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);text-align:center;margin:0 0 10px}
+/* [PAGO-UX-1 9-nov] El paso 2 son DOS caminos grandes, no cuatro chips: el
+   cliente elige CÓMO va a pagar y solo entonces ve lo suyo (la cuenta para
+   transferir, o la explicación de Mercado Pago). Transferencia primero,
+   palabra de Memo. */
+.wx3-cam{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;padding:14px;margin:0 0 10px;border-radius:12px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:#fff;cursor:pointer;font-family:'Montserrat',sans-serif}
+.wx3-cam:hover{border-color:rgba(232,255,76,.5)}
+.wx3-cam.on{border-color:#e8ff4c;background:rgba(232,255,76,.08)}
+.wx3-cam-ic{font-size:22px;line-height:1;padding-top:2px}
+.wx3-cam-t{display:flex;flex-direction:column;gap:3px}
+.wx3-cam-t b{font:900 13.5px/1.25 'Montserrat',sans-serif}
+.wx3-cam-t small{font:500 11px/1.4 'Montserrat',sans-serif;color:rgba(255,255,255,.65)}
+.wx3-cam.on .wx3-cam-t small{color:rgba(255,255,255,.85)}
+.wx3-sub-cam{margin:-4px 0 12px;padding:12px 12px 4px;border-left:2px solid rgba(232,255,76,.35);animation:wx3in .22s ease-out both}
 .wx3-on .pago-actions .pago-btn-primary{background:transparent !important;border:1px solid rgba(255,255,255,.25) !important;color:#fff !important;font-size:11px !important;padding:12px !important;box-shadow:none !important}
 </style>
 <script id="web-ux-3-js">
@@ -9567,12 +9596,37 @@ function skipOnboarding(){
   window._wx3Ir=irA;
 
   // Lo mismo que _reqEnviar exige de la forma de pago, dicho ANTES de pedir datos.
+  // [PAGO-UX-1] Primero el CAMINO (transferencia / en línea), luego lo suyo.
+  var camino=null;
   function validaPago(){
     var e=$('wx3-err-2'); var est=window._reqEstado||{};
-    if(!est.forma){e.textContent='Elige cómo pagaste';return false;}
+    if(!camino){e.textContent='Elige cómo quieres pagar';return false;}
+    if(!est.forma){e.textContent='Dinos cómo pagaste: transferencia, depósito u OXXO';return false;}
     if(est.forma!=='link_pago'&&!est.archivo){e.textContent='Sube la foto de tu comprobante';return false;}
     e.textContent='';return true;
   }
+  // [PAGO-UX-1] Elegir camino. 'b' = ya transferí/deposité/OXXO (cuenta + chips
+  // + comprobante); 'a' = pagar en línea (Mercado Pago): la forma es link_pago,
+  // la elige ESTO y el chip queda escondido. El link NO lo manda nadie: nace al
+  // enviar los datos (lleva el folio adentro) y sale como botón en la pantalla
+  // de éxito — eso es lo que el subtítulo del camino dice con todas sus letras.
+  function elegirCamino(c){
+    camino=c;
+    var a=$('wx3-cam-a'), b=$('wx3-cam-b'), sa=$('wx3-sub-a'), sb=$('wx3-sub-b'), e=$('wx3-err-2');
+    if(a)a.classList.toggle('on',c==='a'); if(b)b.classList.toggle('on',c==='b');
+    if(sa)sa.style.display=c==='a'?'block':'none'; if(sb)sb.style.display=c==='b'?'block':'none';
+    if(e)e.textContent='';
+    var est=window._reqEstado||{};
+    if(c==='a'){ if(typeof window._reqForma==='function')window._reqForma('link_pago'); }
+    else{
+      if(est.forma==='link_pago'&&typeof window._reqForma==='function')window._reqForma(null);
+      // El cuadro del comprobante se enseña desde que eliges transferir (no
+      // solo tras tocar un chip): el cliente ve de entrada qué le van a pedir.
+      var fw=$('req-file-wrap'); if(fw)fw.style.display='block';
+    }
+    try{trackMainEvent('main_pago_camino',{camino:c});}catch(_){}
+  }
+  window._wx3Camino=elegirCamino;
 
   window._reqPintar=function(){
     var body=document.querySelector('#pago-modal-bg .pago-modal-body');
@@ -9601,6 +9655,10 @@ function skipOnboarding(){
   function armar(body,modal,sec,formas){
     var separo=body.querySelector('.pago-separo'), bank=$('pago-bank-info'), acciones=body.querySelector('.pago-actions');
     var lblForma=formas.previousElementSibling, fileWrap=$('req-file-wrap'), linkMsg=$('req-link-msg');
+    // [PAGO-UX-1] El separo se lee AQUÍ, antes de mover `.pago-separo` a p1:
+    // p1 no está en el documento todavía y getElementById ya no lo encuentra
+    // (medido en navegador: el título salía sin el monto).
+    var sepTxt=txt('pago-monto');
     // Encabezado decorativo de la sección (raya + título + subtítulo) y la nota
     // final «¿Prefieres por chat?»: los pasos los reemplazan.
     var kids=[].slice.call(sec.children);
@@ -9628,10 +9686,26 @@ function skipOnboarding(){
     if(separo)p1.appendChild(separo);
     p1.insertAdjacentHTML('beforeend','<div class="wx3-nav"><button type="button" class="wx3-btn" onclick="_wx3Ir(2)">Continuar a pagar →</button></div>');
 
+    // [PAGO-UX-1] Paso 2 = DOS caminos (transferencia primero, palabra de Memo).
+    // La cuenta bancaria solo se enseña dentro del camino de transferencia; el
+    // de Mercado Pago explica que el botón de pagar sale al enviar los datos.
+    camino=null;
     var p2=document.createElement('div');p2.className='wx3-paso';p2.dataset.paso='2';
-    p2.innerHTML='<div class="wx3-tit">Paga tu separo</div><div class="wx3-sub">Haz tu transferencia, depósito u OXXO a esta cuenta y sube la foto del comprobante. Si prefieres pagar con tarjeta, pide tu link de pago.</div>';
-    if(bank)p2.appendChild(bank);
-    [lblForma,formas,fileWrap,linkMsg].forEach(function(n){if(n)p2.appendChild(n);});
+    p2.innerHTML='<div class="wx3-tit">¿Cómo quieres pagar tu separo'+(sepTxt?' de '+sepTxt:'')+'?</div><div class="wx3-sub">Elige una opción. En las dos, el equipo confirma tu lugar en cuanto ve el pago.</div>'+
+      '<button type="button" class="wx3-cam" id="wx3-cam-b" onclick="_wx3Camino(\'b\')"><span class="wx3-cam-ic">🏦</span><span class="wx3-cam-t"><b>Transferencia, depósito u OXXO</b><small>Pagas a la cuenta de Conecta y subes la foto de tu comprobante.</small></span></button>'+
+      '<div class="wx3-sub-cam" id="wx3-sub-b" style="display:none"></div>'+
+      '<button type="button" class="wx3-cam" id="wx3-cam-a" onclick="_wx3Camino(\'a\')"><span class="wx3-cam-ic">💳</span><span class="wx3-cam-t"><b>Pagar en línea ahora</b><small>Tarjeta, OXXO o SPEI en la página segura de Mercado Pago. Al enviar tus datos te sale el botón para pagar.</small></span></button>'+
+      '<div class="wx3-sub-cam" id="wx3-sub-a" style="display:none"></div>';
+    var subB=p2.querySelector('#wx3-sub-b'), subA=p2.querySelector('#wx3-sub-a');
+    if(bank)subB.appendChild(bank);
+    if(lblForma){lblForma.textContent='¿Cómo pagaste? *';subB.appendChild(lblForma);}
+    if(formas){
+      subB.appendChild(formas);
+      // El chip de link_pago lo elige el camino «Pagar en línea»: aquí se esconde.
+      var chipLink=formas.querySelector('[data-forma="link_pago"]'); if(chipLink)chipLink.style.display='none';
+    }
+    if(fileWrap)subB.appendChild(fileWrap);
+    if(linkMsg)subA.appendChild(linkMsg);
     p2.insertAdjacentHTML('beforeend','<div class="wx3-err" id="wx3-err-2"></div><div class="wx3-nav"><button type="button" class="wx3-btn atras" onclick="_wx3Ir(1)">←</button><button type="button" class="wx3-btn" id="wx3-a3">Continuar →</button></div>');
 
     var p3=document.createElement('div');p3.className='wx3-paso';p3.dataset.paso='3';

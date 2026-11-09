@@ -188,6 +188,46 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💳⏳ **PAGO-UX-1 (9-nov-2026, en main local, cero SQL): el paso de pago en DOS
+  CAMINOS — y el cotizador sin la cuenta repetida.** Palabra de Memo (con
+  capturas del flujo de Madero): *«el botón de reservar lugar debería ser más
+  grande y quitar la cuenta porque en el siguiente paso la vas a poner de
+  nuevo · no entiendo lo del link ¿no debería salir automático? · no entiendo
+  bien el proceso de pago con mercado pago»*. Sus respuestas: quitar la cuenta
+  del cotizador y agrandar el botón · paso 2 en dos caminos, **transferencia
+  primero**.
+  - 🔒 **El link SIEMPRE fue automático** — nace en `requisicion-crear` al
+    enviar (lleva el folio adentro: sin folio no hay link) y sale como botón
+    en la pantalla de éxito. Lo que confundía eran las PALABRAS: el paso 2
+    preguntaba «¿Cómo PAGASTE?» con la cuenta BBVA arriba para todos, y el
+    chip decía «Quiero link de pago» con un aviso de «te lo mandamos por
+    WhatsApp» — se leía como solicitud a una persona.
+  - **Cotizador:** `#d-bank-card` ya no se enseña (`actualizarBankInfo` deja
+    `display:none`; el contenido se sigue pintando) y `#r-wa` creció (regla
+    propia `#r-wa.wa-btn` 18px/24px; el `.wa-btn` genérico no se tocó).
+  - **Ventana paso 2 (WEB-UX-3):** «¿Cómo quieres pagar tu separo de $300?» con
+    dos tarjetas: **🏦 Transferencia, depósito u OXXO** (al elegirla se abre la
+    cuenta + los 3 chips + el cuadro del comprobante) y **💳 Pagar en línea
+    ahora** (al elegirla `_reqForma('link_pago')` por el dueño, el chip de
+    link queda escondido, y el aviso dice que el botón de Mercado Pago
+    aparece al enviar los datos). Volver de A a B desmarca `link_pago`.
+    `validaPago` pide primero el camino, luego lo suyo.
+  - **Pantalla de éxito:** con `pago.url` el titular dice **«¡Ya casi! Solo
+    falta tu pago»** (antes «¡Recibimos tu reservación!» — el lugar aún no
+    estaba pagado) y el botón azul de MP creció.
+  - 🔴 **Lección del instrumento, cazada en navegador:** el título salía SIN el
+    monto porque `txt('pago-monto')` se leía DESPUÉS de `p1.appendChild(separo)`
+    — p1 aún no está en el documento y `getElementById` no lo encuentra. Se
+    lee antes; el careo lo clava por posición y el sabotaje lo tumba.
+  - `mide:pago-ux-1` **38** (`actualizarBankInfo` real con `$$` falso +
+    control positivo del 'block' viejo · `validaPago`/`elegirCamino` REALES
+    en vm con DOM por id · orden de lectura del separo · textos). Vecinos
+    verdes: req-b1 52 · ticket-circuito-1 32 · mp-link-1 60 ·
+    ride-callejon-1 11. ✅ **Verificado en Chrome real por inyección sobre
+    producción (madero):** cotizador sin cuenta y botón de 70 px; paso 2 con
+    las dos tarjetas, transferencia abre cuenta+chips+comprobante, MP abre su
+    aviso; validaciones por camino. ⏳ Push de Memo.
+
 - 💳⏳ **MP-LINK-1 (8-nov-2026, en main local; la BASE ya escrita): LOS LINKS DE
   PAGO DE MERCADO PAGO EN LA REQUISICIÓN — el rumbo del 12-oct hecho botón.**
   Palabra de Memo (domingo, «vamos uno por uno»): links **en el index al

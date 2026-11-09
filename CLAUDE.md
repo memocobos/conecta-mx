@@ -264,6 +264,34 @@ está caduco antes de escribirse.
     con un pago chico real → ver el chip verde → aprobar. ⚠️ El manifest de la
     firma sigue sin ver una notificación REAL (lo dice el lib desde agosto): el
     primer webhook de verdad lo confirma o se corrige ahí, en un solo archivo.
+  - 🔥 **ENCENDIDO EN CURSO (8-nov, noche, con Memo en Chrome):** decisión de
+    Memo: **UNA cuenta de MP (la personal) para Conecta Y el Club**, cada negocio
+    con su APLICACIÓN. En Netlify YA están (puestas por mí vía MCP, sin llave):
+    `PAGOS_MP_MODO=live` · `MP_PCT_LINK=0.0379` · `MP_FIJA_LINK=4`. Faltan las
+    dos secretas que pega Memo: `MP_ACCESS_TOKEN` y `MP_WEBHOOK_SECRET`. La
+    aplicación **«Conecta Reynosa»** se creó como **Checkout Pro · API de
+    Orders** — ⚠️ al crearla, MP marca «API de Preferences» como *«será
+    descontinuada pronto»*. El código de MP-LINK-1 usa `/checkout/preferences`
+    (sigue funcionando con el token de la app; el tipo de API es un rótulo de la
+    app, no una llave distinta) — **migrar a `POST /v1/orders` es tuerca propia
+    (MP-ORDERS-1), con su careo, antes de que MP apague Preferences.** El dinero
+    cae al saldo de MP y de ahí al BBVA de Memo por **retiro automático** (lo
+    configura él en la app de MP); no hay forma de que caiga directo al banco.
+    **Datos de la app (no son llaves):** id **2470910542082370** · panel
+    `developers/panel/app/2470910542082370` · credenciales de PRODUCCIÓN
+    activadas por Memo (sector Turismo, sitio conectareynosa.mx) en
+    `/credentials?env=production` · webhook en `/webhooks?env=production` con
+    URL `https://conectareynosa.mx/.netlify/functions/mp-webhook` y el evento
+    **«Pagos (legacy)»** — es el topic `payment`, el ÚNICO que `mp-webhook`
+    atiende (`tipo !== 'payment'` → se ignora); «Order (Mercado Pago)» es el
+    topic de la API de Orders y entra con MP-ORDERS-1, no antes. ⚠️ Guardar el
+    webhook y activar credenciales piden **verificación de identidad de MP**
+    (código al celular): es paso de Memo, yo no lo meto. La «Firma secreta» que
+    pinta esa pantalla es `MP_WEBHOOK_SECRET` (la copia él con el 👁, directo a
+    Netlify). ⚠️ El teclado del navegador se COMIÓ una letra al escribir la URL
+    («mp-webhok»): se verificó leyendo el `value` y se corrigió — **toda URL
+    tecleada en un panel ajeno se relee antes de guardar**. La app del Club
+    (3527539171126093) sigue con producción SIN activar: Memo decide si va hoy.
 
 - 🚑⏳ **REP-MULTIFECHA-1 + YAJIROBE-1b (8-nov-2026, en main local, cero SQL):
   «el kamehouse no les funciona» — eran DOS huecos viejos que estrenó el fin de

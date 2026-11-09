@@ -2554,6 +2554,13 @@ $('#form-profile').addEventListener('submit', async (e) => {
   }
   renderDashboard(perfilExistente);
   showView('dashboard');
+  // 🔴 [PORTAL-HOTFIX-1] El perfil RECIÉN guardado (el «Paso final» de todo
+  // cliente nuevo) caía al dashboard sin pedir sus viajes: contadores 0·0·0 y el
+  // spinner de #tours-list girando hasta recargar — la primera impresión del
+  // estreno. Los tres mismos lectores que corre cargarClienteYRutear.
+  renderToursList();
+  renderMisViajesAcomp();
+  loadContratosEstado();
   _procesarInvitacionPendiente(); // [invitacion] acepta si el nuevo usuario llegó por un link
   _procesarReservaPendiente();    // [puente A1] precarga el wizard si llegó por deep-link de reserva
 });
@@ -3796,6 +3803,15 @@ function _migPagoCamino(id, cam){
   ['transfer', 'mp'].forEach((c) => { const el = document.getElementById('mig-cam-' + c + '-' + id); if (el) el.style.display = c === cam ? '' : 'none'; });
   document.querySelectorAll('#mig-pagar-' + CSS.escape(id) + ' .mig-cam-btn').forEach((b) => { b.style.borderColor = b.getAttribute('data-cam') === cam ? '#e8ff4c' : 'rgba(255,255,255,.2)'; });
 }
+// 🔴 [PORTAL-HOTFIX-1] `money` vivía SOLO como variable local de _migPlanPintar
+// y _migPagosHtml (y _migPagarHtml la recibe por parámetro, U6b). Las DOS
+// funciones de abajo (_migPagoDesgToggle · _migPagoMp) la usaban SUELTA, y
+// este script es un módulo estricto: ReferenceError. Consecuencia: el pago en
+// línea NUNCA llegaba a abrir Mercado Pago — el servidor creaba el link y la
+// fila, el `catch` se tragaba el error y el cliente leía «No se pudo generar tu
+// link». Medido: 0 links `cv:` pagados desde el Portal. Hoy hay UN dueño de
+// módulo con el mismo formato que las copias locales (que lo sombrean, inocuo).
+function money(n){ return '$' + Number(n || 0).toLocaleString('es-MX'); }
 // Lee el monto tecleado (entero, > 0) o null.
 function _migPagoMonto(id){
   const el = document.getElementById('mig-pago-monto-' + id);

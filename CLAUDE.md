@@ -188,6 +188,69 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔴🚑⏳ **PORTAL-HOTFIX-1 (9-nov-2026, en main local, cero SQL): TRES defectos
+  del Portal cazados por la auditoría profunda del mismo día — el primero una
+  REGRESIÓN MÍA que estaba EN PRODUCCIÓN.** Los cazaron los auditores que corrí
+  por el encargo de Memo (*«analiza bien el sistema del portal y capsule corps
+  y kamehouse… clávate»*), no una lectura mía: el arnés de COB-WA-1 heredó mi
+  creencia de que `s` siempre existe (*el arnés hereda las creencias del autor*).
+  - 🔴 **(A) `s.resta` sobre un saldo NULL tumbaba `portal-mi-plan-migrado`
+    ENTERO.** COB-WA-1 (`01d6d67`, 9-nov) escribió `PF.tocaHoy(plan, s.resta)`;
+    `saldoMigrado` contesta **null cuando la fila no trae `total_contrato`**, y
+    un solo null en el `.map` mandaba el handler al `catch` → **502** → el
+    Portal (que calla ante `!r.ok`) **no pintaba NADA** a esa persona: ni sus
+    viajes, ni «estamos revisando», ni el botón de pagar. **Medido en la base:
+    23 filas selladas sin total · 13 correos** — justo los migrados del Excel
+    que Bulma/Milk publican y a los que nadie les ha capturado el total; con el
+    código servido (`d532103`) esas 13 personas abrían un Portal vacío el día
+    del «estamos estrenando». Hoy `s ? s.resta : 0` (sin saldo no hay resta →
+    `tocaHoy` devuelve null, como diseña COB-WA-1). Logs: 0 × 502 en las últimas
+    6 h — la ventana fue corta porque el deploy llevaba horas, no porque no
+    mordiera.
+  - 🔴 **(B) `money` fuera de alcance: el pago en línea del Portal NUNCA abría
+    Mercado Pago.** `money` vivía SOLO como variable local de `_migPlanPintar` y
+    `_migPagosHtml` (y `_migPagarHtml` la recibe por parámetro, U6b); PORTAL-
+    PAGO-2 la usó SUELTA en `_migPagoMp` y `_migPagoDesgToggle` — el script es
+    módulo estricto → `ReferenceError`, que el `catch` se tragaba: el servidor
+    SÍ creaba la fila y el link en MP, y el cliente leía «No se pudo generar tu
+    link. Revisa tu conexión» con el botón re-habilitado. **Medido: 0 links
+    `cv:` pagados desde el Portal.** `mide:plan-pagos-1` solo rebanaba
+    `_migPagarHtml` — el careo de PORTAL-PAGO-2 pasaba porque su sandbox definía
+    `money` global (la lección de U6b, incompleta). Hoy hay UN dueño de módulo
+    `function money(n)` con el MISMO formato que las copias locales (que lo
+    sombrean, inocuo porque dicen lo mismo).
+  - 🔴 **(C) El perfil RECIÉN guardado caía al dashboard sin pedir sus
+    viajes:** contadores 0·0·0 y el spinner de `#tours-list` girando hasta
+    recargar — la primera impresión de TODO cliente nuevo. El submit de
+    `#form-profile` corre hoy los MISMOS tres lectores que
+    `cargarClienteYRutear` (`renderToursList · renderMisViajesAcomp ·
+    loadContratosEstado`), tras `showView('dashboard')` y antes de las
+    invitaciones pendientes. Preexistente (desde PP-1), no de esta semana.
+  - `mide:portal-hotfix-1` **26** ([A] handler REAL con fila sellada sin total +
+    fila sana al lado → 200, `sugerido` null/number; **control positivo POR
+    COMMIT**: el handler de HEAD vía `git show` con la misma semilla → 502
+    «reading 'resta'», también con la fila sin total SOLA · [B] `_migPagoMp` y
+    `_migPagoDesgToggle` REALES ejecutados en vm con y sin el dueño: con él abre
+    MP y dice «Te cobra $519…»; sin él reproduce byte a byte el texto que leía
+    el cliente · [C] los lectores se DERIVAN de `cargarClienteYRutear`, no de
+    una lista; HEAD no los corría). Vecinos verdes: portal-pago-2 78 ·
+    plan-pagos-1 81 · portal-vivo-1 45 · portal-carga-1 13 · portal-solo-1 89 ·
+    cob-wa-1 33 · grupo-wa-2 44 · pagos-portal-2 38 · fecha3-1 33 ·
+    portal-edit-1 31.
+  - 🔒 **Lección que vale más que la tuerca:** una función que devuelve null
+    por diseño (`saldoMigrado` sin total) es un null que TODO bebedor nuevo
+    tiene que contemplar, y el careo del bebedor tiene que sembrar ESA fila —
+    la semilla de `mide:cob-wa-1` solo traía filas con total. Y un sandbox que
+    define globales «para que corra» esconde justo el ReferenceError que
+    producción sí lanza: **el vm se arma con lo que el módulo declara, nada
+    más.**
+  - ⏳ **PUSH DE MEMO — URGENTE:** mientras no esté `ready`, 13 personas ven el
+    Portal vacío y nadie puede pagar en línea desde el Portal. Tras el deploy:
+    la prueba de Memo del pago `cv:` con monto chico (como invitado) por fin
+    tiene sentido; y la lista de 13 correos sin total se le pasa a Bulma/Milk
+    para capturar el contrato (hasta entonces ven «estamos preparando tu plan»,
+    que es la verdad).
+
 - 💬⏳ **GRUPO-WA-2 + GRUPO-LINK-VIVO-1 (9-nov-2026, en main local; la BASE ya
   escrita): DOS grupos de WhatsApp por evento (CHEAP · viaje) y el link que «se
   borraba».** Palabra de Memo, tras mandar el «estamos estrenando» a todos:

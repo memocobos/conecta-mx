@@ -157,6 +157,7 @@
     "mide:portal-pago-2": "node scripts/mide-portal-pago-2.js",
     "mide:portal-carga-1": "node scripts/mide-portal-carga-1.js",
     "mide:cob-wa-1": "node scripts/mide-cob-wa-1.js",
-    "mide:grupo-wa-2": "node scripts/mide-grupo-wa-2.js"
+    "mide:grupo-wa-2": "node scripts/mide-grupo-wa-2.js",
+    "mide:portal-hotfix-1": "node scripts/mide-portal-hotfix-1.js"
   }
 }

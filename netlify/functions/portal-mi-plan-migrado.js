@@ -370,7 +370,12 @@ exports.handler = async (event) => {
         // Y lo que le toca pagar HOY según su rol fijo (atrasado + próxima),
         // topado a lo que resta. null sin plan fijo: el Portal ofrece la resta.
         // [COB-WA-1] UN dueño para «qué le toca hoy»: tocaHoy de plan-fijo.
-        sugerido: (() => { const t = PF.tocaHoy(plan, s.resta); return t ? t.monto : null; })(),
+        // 🔴 [PORTAL-HOTFIX-1] `s` es NULL cuando la fila no trae total (saldoMigrado
+        // contesta null): COB-WA-1 leyó `s.resta` a secas y el handler ENTERO
+        // contestaba 502 — el Portal (que calla ante !r.ok) no pintaba NADA a esa
+        // persona, ni «estamos revisando». Medido: 23 filas selladas sin total,
+        // 13 correos. Sin saldo no hay resta → tocaHoy devuelve null.
+        sugerido: (() => { const t = PF.tocaHoy(plan, s ? s.resta : 0); return t ? t.monto : null; })(),
         // La fecha del evento, derivada del catálogo para ESA fecha del `slug#N`.
         evento_ds: dsEv,
         // [PORTAL-RECUERDO-1] Viaje ya realizado: el Portal lo pinta como

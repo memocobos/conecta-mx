@@ -9,10 +9,11 @@
 //   'eventos'   → la lista de CDMX vivos que usan el paso del transporte. [NUBE-4]
 //   'cobertura' → cuántos eventos vivos quedan sin precio, el DETALLE por evento
 //                 (sin · heredado · propio) y la GENERAL de cada modo. [NUBE-5/6]
-//   'renovar'   → { modo, evento_id?, dias? (1-90, default 30) } re-captura la
+//   'renovar'   → { modo, evento_id?, dias? (1-90; default bus 30 · avión 15) } re-captura la
 //                 cotización que rige (o la última vencida) de ESA llave, con el
 //                 MISMO precio y horarios, desde ahora por N días. Sin ninguna →
 //                 404. Es un INSERT por el mismo camino que `cotizar`. [NUBE-6]
+//   🔒 [NUBE-6b] El AVIÓN es POR EVENTO: cotizar/renovar avión sin evento → 400.
 //
 // 🔒 INSERT-ONLY, Y NO SOLO POR EL TRIGGER. Aquí no existe ninguna acción que
 // actualice ni borre: para cambiar un precio se captura una fila nueva. El
@@ -33,7 +34,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { MODOS, vigentes, regiaEl, resolver, filasDe, interna, _cualCubre } = require('./_lib/nube');
+const { MODOS, admiteGeneral, VIGENCIA_DIAS, vigentes, regiaEl, resolver, filasDe, interna, _cualCubre } = require('./_lib/nube');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -85,7 +86,8 @@ async function eventosCdmx() {
 const ACCIONES = ['listar', 'cotizar', 'historial', 'eventos', 'cobertura', 'renovar'];
 // Tope de una renovación: 90 días. Un «renovar» de un año sería apagar la
 // pregunta en vez de contestarla cada mes.
-const RENOVAR_DIAS_DEFAULT = 30;
+// [NUBE-6b] El default es POR MODO y lo dice el dueño (`VIGENCIA_DIAS`: bus 30 ·
+// avión 15, palabra de Memo). Aquí solo vive el TOPE.
 const RENOVAR_DIAS_MAX = 90;
 
 exports.handler = async (event) => {
@@ -252,6 +254,13 @@ exports.handler = async (event) => {
     if (!MODOS.includes(modo)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El modo tiene que ser «bus» o «avion»' }) };
     }
+    // [NUBE-6b] 🔒 EL AVIÓN NO TIENE GENERAL — ni al cotizar ni al renovar. Una
+    // fila de avión con evento_id NULL no regiría para nadie (el dueño ya no la
+    // lee) y la pantalla diría «ya capturé»: el éxito vacío. Se rebota en la
+    // PUERTA, con palabras, aunque la pantalla ya no lo ofrezca.
+    if (eventoId == null && !admiteGeneral(modo)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'El avión se cotiza POR EVENTO (cambia con cada fecha): elige el evento. La tarifa general solo existe para el autobús.' }) };
+    }
 
     // ── renovar · «SIGUE IGUAL» EN UN CLIC ────────────────────────────────
     // [NUBE-6] Toma la fila MÁS RECIENTE de ESTA llave (evento o general) —la
@@ -264,7 +273,7 @@ exports.handler = async (event) => {
     // 🔒 El PRECIO no viaja en el body a propósito: renovar es «sigue igual».
     // Para cambiar el precio existe `cotizar`.
     if (accion === 'renovar') {
-      const dias = body.dias == null ? RENOVAR_DIAS_DEFAULT : Number(body.dias);
+      const dias = body.dias == null ? VIGENCIA_DIAS[modo] : Number(body.dias);
       if (!Number.isFinite(dias) || dias < 1 || dias > RENOVAR_DIAS_MAX) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Los días de la renovación van de 1 a ' + RENOVAR_DIAS_MAX }) };
       }

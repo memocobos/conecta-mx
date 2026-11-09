@@ -1278,7 +1278,13 @@ async function _radarNubeAviso() {
   // vigencia en 30 días, el aviso cae una vez al mes y no se vuelve mueble.
   const porVencer = [];
   const RAD_NUBE_AVISO_DIAS = 5;
+  // [NUBE-6b] El AVIÓN NO TIENE GENERAL (palabra de Memo: cambia con cada
+  // fecha): su general NUNCA existe, así que aquí no se la puede extrañar ni
+  // declarar vencida — eso sería un aviso permanente sobre algo que no debe
+  // existir. El avión se vigila POR EVENTO, abajo, con la cobertura.
+  const RAD_NUBE_SIN_GENERAL = ['avion'];
   for (const m of [{ k: 'bus', n: 'autobús' }, { k: 'avion', n: 'avión' }]) {
+    if (RAD_NUBE_SIN_GENERAL.includes(m.k)) continue;
     const info = (d.modos && d.modos[m.k]) || {};
     if (info.vigente) {
       const hastaMs = Date.parse(info.vigente.vigente_hasta);
@@ -1308,6 +1314,21 @@ async function _radarNubeAviso() {
   const descubiertos = cob
     ? [...new Set([].concat(...Object.values(cob.sin || {}).map((a) => a.map((e) => e.id))))]
     : [];
+  // [NUBE-6b] Los AVIONES propios por vencer (≤ RAD_NUBE_AVISO_DIAS), evento por
+  // evento, salen del detalle de la cobertura — es la misma respuesta del dueño,
+  // sin segunda opinión. Con 15 días de vigencia, el aviso cae cada quincena.
+  if (cob && Array.isArray(cob.detalle)) {
+    for (const e of cob.detalle) {
+      for (const k of RAD_NUBE_SIN_GENERAL) {
+        const x = e[k];
+        if (!x || x.estado !== 'propio' || !x.vigente_hasta) continue;
+        const hastaMs = Date.parse(x.vigente_hasta);
+        if (Number.isFinite(hastaMs) && (hastaMs - ahora) <= RAD_NUBE_AVISO_DIAS * 86400000) {
+          porVencer.push({ nombre: (k === 'avion' ? 'avión' : k) + ' de ' + (e.nombre || e.id), hasta: x.vigente_hasta });
+        }
+      }
+    }
+  }
   if (!flojos.length && !descubiertos.length && !porVencer.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
   const enRey = (iso) => {
     const t = Date.parse(iso);
@@ -1341,16 +1362,16 @@ async function _radarNubeAviso() {
     + '<div class="titulo">'
     + (flojos.length ? ('La cotización GENERAL de la nube está vencida: ' + lista)
        : descubiertos.length ? 'Hay eventos de CDMX vivos sin precio de transporte'
-       : ('La tarifa GENERAL de la nube vence pronto: ' + listaPV))
+       : ('Una tarifa de la nube vence pronto: ' + listaPV))
     + (cob && !soloPorVencer ? (' · <b>' + descubiertos.length + '</b> de <b>' + cob.total + '</b> eventos vivos sin precio') : '')
     + '</div>'
     + '<div class="mensaje">'
     + (soloPorVencer
-        ? 'Si el precio sigue igual, en <b>Nube voladora</b> está «↻ Sigue igual · renovar 30 días»: un clic y los eventos de CDMX siguen vendiendo. Si cambió, captura el nuevo.'
+        ? 'Si el precio sigue igual, en <b>Nube voladora</b> está «↻ Sigue igual · renovar» (bus 30 días · avión 15): un clic y sigue vendiendo. Si cambió, captura el nuevo.'
         : 'Mientras no haya cotización vigente, ese modo NO se vende en el sitio: el cliente cae al WhatsApp. Súbela desde <b>Nube voladora</b>, en el menú (ya no está en Herramientas).')
     + (!soloPorVencer && porVencer.length ? ('<br>Y además vence pronto: ' + listaPV + '.') : '')
     + (porModo ? ('<br>' + porModo + '.') : '')
-    + (cob && cob.total && !descubiertos.length ? '<br>Los ' + cob.total + ' eventos vivos SÍ tienen precio (propio o heredado de la general).' : '')
+    + (cob && cob.total && !descubiertos.length ? '<br>Los ' + cob.total + ' eventos vivos SÍ tienen precio (bus propio o general · avión propio).' : '')
     + '</div>'
     + '</div>'
     + '<div class="meta">' + enRey(new Date(ahora).toISOString()) + '<br><span class="tipo">nube_vencida</span>'

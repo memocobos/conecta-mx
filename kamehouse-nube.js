@@ -50,24 +50,47 @@ function _nubeInstante(fechaISO, hhmm) {
   // humano decide.
   return Date.parse(fechaISO + 'T' + hhmm + ':00-05:00');
 }
-// [NUBE-6] LA VIGENCIA POR DEFAULT ES DE 30 DÍAS, ya no «el domingo que viene».
+// [NUBE-6] LA VIGENCIA POR DEFAULT YA NO ES «el domingo que viene».
 // Medido el 9-nov-2026: en toda la vida de la nube hubo 5 capturas con
 // vigencias de 2-5 días, y la cadencia semanal × 18 eventos × 2 modos no la
-// sostuvo nadie — el sitio pasaba casi siempre en «cotiza por WhatsApp». La
-// nube es una REFERENCIA de venta (el precio real lo pone el equipo al comprar,
-// con ✈️ Vuelo en Capsule), así que un mes es la cadencia honesta. Sigue siendo
-// una FORMA con default ANUNCIADO en la etiqueta (DEFAULTS-1 caso b).
-const NUBE_DIAS_DEFAULT = 30;
-function _nubeDefaultHastaISO() {
+// sostuvo nadie — el sitio pasaba casi siempre en «cotiza por WhatsApp».
+// [NUBE-6b] Y ES POR MODO — palabra de Memo: «renovación cada 15 días el del
+// vuelo, el bus cada 30 porque sí cambia». ESPEJO con nombre de `VIGENCIA_DIAS`
+// de `_lib/nube` (el navegador no puede hacer require); el careo los carea.
+// Sigue siendo una FORMA con default ANUNCIADO en la etiqueta (DEFAULTS-1 b).
+const NUBE_DIAS = { bus: 30, avion: 15 };
+// [NUBE-6b] EL AVIÓN NO TIENE GENERAL (espejo de `MODOS_SIN_GENERAL` del dueño):
+// cambia con cada fecha. La pantalla no ofrece capturarlo ni renovarlo como
+// general; el servidor lo rebota igual si alguien lo intenta por otra puerta.
+const NUBE_SIN_GENERAL = ['avion'];
+function _nubeAdmiteGeneral(modo) { return !NUBE_SIN_GENERAL.includes(String(modo)); }
+function _nubeDias(modo) { return NUBE_DIAS[modo] || NUBE_DIAS.bus; }
+function _nubeDefaultHastaISO(modo) {
   const hoyR = new Date().toLocaleString('sv-SE', { timeZone: NUBE_TZ }).slice(0, 10);
   const [a, m, d] = hoyR.split('-').map(Number);
   const base = new Date(Date.UTC(a, m - 1, d));
-  base.setUTCDate(base.getUTCDate() + NUBE_DIAS_DEFAULT);
+  base.setUTCDate(base.getUTCDate() + _nubeDias(modo));
   return base.toISOString().slice(0, 10);
 }
 // ⚰️ `_nubeProximoDomingoISO` murió con la cadencia semanal; el nombre se
 // conserva como alias por si algún llamador viejo lo pide.
-function _nubeProximoDomingoISO() { return _nubeDefaultHastaISO(); }
+function _nubeProximoDomingoISO() { return _nubeDefaultHastaISO('bus'); }
+// [NUBE-6b] Al elegir el modo, la vigencia por default se acomoda a SU cadencia
+// (bus 30 · avión 15) y la etiqueta lo dice. Si la persona ya tecleó una fecha
+// a mano, no se le pisa.
+function nubeModoCambio() {
+  const modo = (document.getElementById('nube-modo')?.value || '').trim();
+  const f = document.getElementById('nube-hasta-fecha');
+  if (f && (!f.value || f.dataset.auto === '1')) { f.value = _nubeDefaultHastaISO(modo || 'bus'); f.dataset.auto = '1'; }
+  const lbl = document.getElementById('nube-hasta-default');
+  if (lbl) lbl.textContent = modo ? ('(por default, ' + _nubeDias(modo) + ' días)') : '(por default, 30 días bus · 15 avión)';
+  const av = document.getElementById('nube-aviso-general');
+  if (av) {
+    const sel = _nubeSel();
+    av.style.display = (modo && !_nubeAdmiteGeneral(modo) && sel.elegido && sel.eventoId == null) ? '' : 'none';
+  }
+  _nubePreviaVigencia();
+}
 function _nubeEnReynosa(iso) {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '—';
@@ -150,14 +173,16 @@ function nubeEventoCambio() {
     ayuda.innerHTML = elegido
       ? ('Hablando de <b style="color:var(--tp)">' + _nubeEsc(_nubeNombre(eventoId)) + '</b>. '
          + (eventoId == null
-            ? 'Esta cotización rige para <b>todos</b> los eventos de CDMX que no tengan una propia.'
-            : 'Su cotización propia le <b>gana</b> a la general, aunque la general sea más nueva.'))
+            ? 'La general rige para <b>todos</b> los eventos de CDMX que no tengan una propia — <b>solo autobús</b>: el avión se captura por evento.'
+            : 'Su cotización propia de autobús le <b>gana</b> a la general; el avión solo existe aquí, por evento.'))
       : 'Manda sobre las tres cosas de esta pantalla: lo que se lista, lo que se guarda y lo que se consulta.';
   }
   // El historial de la consulta anterior era de OTRO evento: se borra en vez de
   // quedarse ahí pareciendo de éste.
   const q = document.getElementById('nube-q-res');
   if (q) q.innerHTML = '';
+  // [NUBE-6b] El aviso «el avión no tiene general» depende del evento Y del modo.
+  try { nubeModoCambio(); } catch (_) {}
   if (elegido) loadNube();
   else _nubePanorama();
 }
@@ -198,6 +223,17 @@ function _nubePanoramaHtml(d) {
   const tarjetasGen = NUBE_MODOS.map((m) => {
     const g = general[m.k];
     let cuerpo;
+    if (!_nubeAdmiteGeneral(m.k)) {
+      // [NUBE-6b] El avión no tiene general: la tarjeta dice el método y cuenta.
+      const conPropio = detalle.filter((e) => e[m.k] && e[m.k].estado === 'propio').length;
+      const sinNada = detalle.filter((e) => !e[m.k] || e[m.k].estado === 'sin').length;
+      cuerpo = '<div style="font-size:12px;color:var(--tp)"><b>SIEMPRE POR EVENTO</b> · vigencia ' + _nubeDias(m.k) + ' días</div>'
+        + '<div style="font-size:11px;color:var(--ts);margin-top:4px">El vuelo cambia con cada fecha, así que no hay tarifa general: '
+        + 'se captura en cada evento y se renueva con «↻ Sigue igual». Sin cotización propia, ese evento manda al WhatsApp de vuelos.</div>'
+        + '<div style="font-size:12px;margin-top:8px"><b style="color:var(--green)">' + conPropio + '</b> con avión propio · '
+        + '<b style="color:' + (sinNada ? 'var(--orange)' : 'var(--green)') + '">' + sinNada + '</b> sin avión</div>';
+      return '<div class="card" style="padding:14px"><div class="card-lbl">' + m.emoji + ' ' + m.nombre + ' · POR EVENTO</div>' + cuerpo + '</div>';
+    }
     if (g) {
       const diasQuedan = Math.ceil((Date.parse(g.vigente_hasta) - ahora) / 86400000);
       const porVencer = Number.isFinite(diasQuedan) && diasQuedan <= 5;
@@ -208,7 +244,7 @@ function _nubePanoramaHtml(d) {
         + (Number.isFinite(diasQuedan) ? (' · ' + (diasQuedan <= 0 ? 'vence hoy' : ('quedan ' + diasQuedan + ' día' + (diasQuedan === 1 ? '' : 's')))) : '') + '</div>'
         + (g.horarios ? ('<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(g.horarios) + '</div>') : '')
         + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
-        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Sigue igual · renovar ' + NUBE_DIAS_DEFAULT + ' días</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Sigue igual · renovar ' + _nubeDias(m.k) + ' días</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="nubeIrA(\'' + NUBE_GENERAL + '\',\'' + m.k + '\')">✏️ Cambiar precio</button>'
         + '</div>';
     } else {
@@ -216,7 +252,7 @@ function _nubePanoramaHtml(d) {
         + '<div style="font-size:11px;color:var(--ts);margin-top:4px">Los eventos sin cotización propia caen al WhatsApp en este modo. '
         + 'Captura UNA general y los cubre a todos.</div>'
         + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
-        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Revivir la última ' + NUBE_DIAS_DEFAULT + ' días</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\',null)">↻ Revivir la última ' + _nubeDias(m.k) + ' días</button>'
         + '<button class="btn btn-primary btn-sm" onclick="nubeIrA(\'' + NUBE_GENERAL + '\',\'' + m.k + '\')">➕ Capturar general</button>'
         + '</div>';
     }
@@ -255,15 +291,19 @@ function nubeIrA(valor, modo) {
   if (modo) { const m = document.getElementById('nube-modo'); if (m) m.value = modo; }
 }
 // [NUBE-6] «Sigue igual»: renueva la cotización de ESTA llave (la elegida, o la
-// general con `eventoId === null`) por NUBE_DIAS_DEFAULT días. El servidor
-// inserta la fila nueva con la nota «renovada sin cambio» — el historial queda.
+// general con `eventoId === null`) por los días de SU modo (bus 30 · avión 15).
+// El servidor inserta la fila nueva con la nota «renovada sin cambio» — el
+// historial queda.
 async function nubeRenovar(modo, eventoId) {
   const quien = eventoId === undefined ? _nubeSel().eventoId : eventoId;
+  // [NUBE-6b] El avión no tiene general: no hay nada que renovar ahí.
+  if (quien == null && !_nubeAdmiteGeneral(modo)) { showToast('El avión se cotiza por evento: elige el evento.', 'error'); return; }
   const etiqueta = _nubeNombre(quien);
-  if (!confirm('¿Renovar la cotización de ' + (modo === 'bus' ? 'autobús' : 'avión') + ' de «' + etiqueta + '» por ' + NUBE_DIAS_DEFAULT + ' días más, con el MISMO precio?')) return;
+  const dias = _nubeDias(modo);
+  if (!confirm('¿Renovar la cotización de ' + (modo === 'bus' ? 'autobús' : 'avión') + ' de «' + etiqueta + '» por ' + dias + ' días más, con el MISMO precio?')) return;
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-nube', {
-      method: 'POST', body: JSON.stringify({ accion: 'renovar', modo, evento_id: quien || undefined, dias: NUBE_DIAS_DEFAULT }),
+      method: 'POST', body: JSON.stringify({ accion: 'renovar', modo, evento_id: quien || undefined, dias }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.ok === false) throw new Error(d.error || ('Error ' + r.status));
@@ -321,7 +361,7 @@ function _nubePintar(d) {
         + (v.horarios ? '<div style="font-size:11px;color:var(--tp);margin-top:2px">🕓 ' + _nubeEsc(v.horarios) + '</div>' : '')
         + (v.nota ? '<div style="font-size:11px;color:var(--ts);margin-top:2px">' + _nubeEsc(v.nota) + '</div>' : '')
         // [NUBE-6] «Sigue igual» a un clic: renueva ESTA llave con el mismo precio.
-        + '<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Sigue igual · renovar ' + NUBE_DIAS_DEFAULT + ' días</button></div>';
+        + '<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Sigue igual · renovar ' + _nubeDias(m.k) + ' días</button></div>';
     } else if (res && res.heredado) {
       // 🔒 CUATRO ESTADOS AHORA, Y EL NUEVO SE ROTULA: «este evento no tiene
       // cotización propia, y rige la GENERAL». Sin este renglón la pantalla
@@ -342,11 +382,11 @@ function _nubePintar(d) {
             ? ('La última venció el <b>' + _nubeEnReynosa(ultima.vigente_hasta) + '</b> ('
                + _nubeMxn(ultima.precio) + ', la subió ' + _nubeEsc(ultima.capturado_por || '—') + ').')
             : 'Este modo nunca se ha cotizado.')
-        + (_nubeSel().eventoId != null ? ' <b>Y la general tampoco rige hoy.</b>' : '')
+        + (_nubeSel().eventoId != null ? (_nubeAdmiteGeneral(m.k) ? ' <b>Y la general tampoco rige hoy.</b>' : ' <b>El avión no tiene general: solo rige lo que se capture aquí, para este evento.</b>') : '')
         + ' <b style="color:var(--tp)">En el sitio, este modo manda al WhatsApp</b> — no se pinta ningún precio.'
         + '</div>'
         // [NUBE-6] Si hubo una, revivirla con el mismo precio es un clic.
-        + (ultima ? ('<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Revivir la última (' + _nubeMxn(ultima.precio) + ') por ' + NUBE_DIAS_DEFAULT + ' días</button></div>') : '');
+        + (ultima ? ('<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="nubeRenovar(\'' + m.k + '\')">↻ Revivir la última (' + _nubeMxn(ultima.precio) + ') por ' + _nubeDias(m.k) + ' días</button></div>') : '');
     }
     const filas = (info.ultimas || []).slice(0, 6).map((f) => {
       const viva = Date.parse(f.vigente_desde) <= ahora && ahora < Date.parse(f.vigente_hasta);
@@ -394,10 +434,10 @@ function _nubeFormReset() {
   // los lunes: bus y avión, uno tras otro.
   // La vigencia SÍ trae default, y va anunciada en su etiqueta.
   const f = document.getElementById('nube-hasta-fecha');
-  if (f && !f.value) f.value = _nubeDefaultHastaISO();
+  if (f && (!f.value || f.dataset.auto === '1')) { f.value = _nubeDefaultHastaISO('bus'); f.dataset.auto = '1'; }
   const h = document.getElementById('nube-hasta-hora');
   if (h && !h.value) h.value = '23:59';
-  _nubePreviaVigencia();
+  nubeModoCambio();
 }
 // El letrero de «esto vence el…» se DERIVA de lo capturado y dice el instante
 // en hora de Reynosa: el que teclea ve exactamente lo que va a guardar.
@@ -429,6 +469,9 @@ async function nubeGuardar() {
   // es el precio, y «General CDMX» tiene su propia opción para poder elegirse.
   if (!elegido) return showToast('Elige arriba de qué se habla: un evento o «General CDMX»', 'error');
   if (!modo) return showToast('Elige el modo: autobús o avión', 'error');
+  // [NUBE-6b] El avión no tiene general: se rebota ANTES de pedir (el servidor
+  // también lo rebota — el candado vive allá; esto es la palabra a tiempo).
+  if (eventoId == null && !_nubeAdmiteGeneral(modo)) return showToast('El avión se cotiza POR EVENTO (cambia con cada fecha): elige el evento arriba. La general solo existe para el autobús.', 'error');
   if (!precio || !(Number(precio) > 0)) return showToast('Escribe el precio por persona', 'error');
   if (!f) return showToast('Escribe hasta cuándo rige', 'error');
   const hasta = _nubeInstante(f, h);

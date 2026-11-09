@@ -28,6 +28,24 @@
 
 const MODOS = ['bus', 'avion'];
 
+// [NUBE-6b] EL AVIÓN NO HEREDA UNA GENERAL — palabra de Memo (9-nov-2026):
+// «el avión cambia bastante en cada evento, no puede ser general el costo». La
+// ruta del autobús Reynosa–CDMX cuesta lo mismo sea cual sea el concierto; el
+// vuelo depende de la fecha y de la temporada de CADA evento, así que una
+// tarifa general de avión le enseñaría al cliente un número que no es el suyo.
+// 🔒 La regla vive AQUÍ, en el dueño de la herencia, y no en cada bebedor: así
+// el cotizador de vendedor, el prellenado de ✈️ Vuelo, la pluma y el endpoint
+// público obedecen a la vez. Un modo que no admite general: `resolver` jamás
+// cae a la general y `regiaEl` jamás la consulta.
+const MODOS_SIN_GENERAL = ['avion'];
+function admiteGeneral(modo) { return !MODOS_SIN_GENERAL.includes(String(modo)); }
+
+// [NUBE-6b] La vigencia por DEFAULT de una captura/renovación, POR MODO —
+// palabra de Memo: «renovación cada 15 días el del vuelo, el bus cada 30
+// porque sí cambia». Es una FORMA con default anunciado (DEFAULTS-1 b); la
+// pantalla lo pinta en la etiqueta y lo espeja con el mismo nombre.
+const VIGENCIA_DIAS = { bus: 30, avion: 15 };
+
 // La forma que sale a la calle. Se arma campo por campo —nunca con un spread—
 // para que `capturado_por` y la `nota` interna no se escapen al público por
 // accidente: quien las necesita es el admin, y las pide por su endpoint.
@@ -101,6 +119,10 @@ async function resolver(pedir, modo, eventoId, ahoraMs) {
     const suya = cualCubre(propias, t);
     if (suya) return Object.assign(publica(suya), { heredado: false, evento_id: String(eventoId) });
   }
+  // [NUBE-6b] Un modo sin general NO cae a la general: ni como herencia de un
+  // evento ni como respuesta a la consulta general. Null es la verdad: «este
+  // evento no tiene cotización de avión» — el sitio manda al WhatsApp de vuelos.
+  if (!admiteGeneral(modo)) return null;
   const generales = await filasDe(pedir, modo, null, 20);
   const g = cualCubre(generales, t);
   if (!g) return null;
@@ -200,10 +222,13 @@ async function regiaEl(pedir, modo, diaMs, eventoId) {
   }
   const propio = await _regiaEnLlave(pedir, modo, diaMs, String(eventoId));
   if (propio.estado === 'vigente') return Object.assign(propio, { heredado: false });
+  // [NUBE-6b] El historial de un modo sin general tampoco hereda: lo que dijo
+  // el evento es la respuesta, y `general:'no_aplica'` dice por qué no se miró.
+  if (!admiteGeneral(modo)) return Object.assign(propio, { heredado: false, general: 'no_aplica' });
   const general = await _regiaEnLlave(pedir, modo, diaMs, null);
   if (general.estado === 'vigente') return Object.assign(general, { heredado: true });
   return Object.assign(propio, { heredado: false, general: general.estado });
 }
 
-module.exports = { MODOS, vigentes, regiaEl, resolver, filasDe, publica, interna,
+module.exports = { MODOS, MODOS_SIN_GENERAL, admiteGeneral, VIGENCIA_DIAS, vigentes, regiaEl, resolver, filasDe, publica, interna,
   _cualCubre: cualCubre, _regiaEnLlave };

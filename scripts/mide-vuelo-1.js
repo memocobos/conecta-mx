@@ -137,7 +137,15 @@ const llamar = async (b) => {
   af(a.j.nube && a.j.nube.horarios === 'Viva · sale 7:05 AM', 'y sus horarios');
   DB.nube = DB.nube.filter((f) => f.evento_id == null);
   const a2 = await llamar({ accion: 'vuelo_prellenar', viajero_id: U(1) });
-  af(a2.j.nube && a2.j.nube.precio === 3800 && /general/.test(a2.j.nube.fuente), 'sin cotización del evento → la general, ROTULADA');
+  // ⚰️ [NUBE-6b · 9-nov-2026] Aquí se exigía «sin cotización del evento → la
+  // general de avión, ROTULADA». Palabra de Memo: «el avión cambia bastante en
+  // cada evento, no puede ser general el costo» — el dueño (`_lib/nube`) ya NO
+  // deja heredar el avión, así que sin cotización del evento la respuesta
+  // correcta es NULL (se captura a mano), aunque exista una general de avión en
+  // la tabla. La fila general sigue sembrada A PROPÓSITO: es el control de que
+  // no se hereda. Esta aserción se actualizó a la verdad nueva, no se silenció.
+  af(DB.nube.some((f) => f.evento_id == null && f.modo === 'avion'), 'premisa: sigue habiendo una general de avión sembrada (el control tiene dientes)');
+  af(a2.s === 200 && a2.j.nube === null, () => 'sin cotización del evento → NULL aunque haya general de avión (el avión no hereda, NUBE-6b): ' + JSON.stringify(a2.j.nube));
   DB.nube = [];
   const a3 = await llamar({ accion: 'vuelo_prellenar', viajero_id: U(1) });
   af(a3.s === 200 && a3.j.nube === null, 'sin Nube vigente → null (se captura a mano), no un precio inventado');

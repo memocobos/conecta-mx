@@ -3363,8 +3363,9 @@
      </select>
      <div style="font-size:11px;color:var(--ts);margin-top:4px" id="nube-evento-ayuda">
        <!-- [NUBE-6] Sin elegir nada se ve el PANORAMA: la general y la cobertura de todos los eventos. -->
-       Sin elegir nada ves el <b style="color:var(--tp)">panorama</b>: la tarifa general y qué evento la hereda, cuál tiene precio propio y cuál está sin precio.
-       Elige <b>General CDMX</b> para capturar la que cubre a todos; elige un evento solo para la excepción.
+       Sin elegir nada ves el <b style="color:var(--tp)">panorama</b>: la tarifa general del autobús y, evento por evento, quién la hereda, quién tiene precio propio y quién está sin precio.
+       <!-- [NUBE-6b] Bus general a 30 días · avión POR EVENTO a 15 días (palabra de Memo). -->
+       <b>🚌 Autobús:</b> elige <b>General CDMX</b> y captura una (rige 30 días, cubre a todos). <b>✈️ Avión:</b> siempre por evento (rige 15 días) — cambia con cada fecha, no hay general.
      </div>
     </div>
    </div>
@@ -3382,21 +3383,23 @@
     <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
      <div class="form-group">
       <label>Modo</label>
-      <select class="cot-input" id="nube-modo" style="width:100%">
+      <select class="cot-input" id="nube-modo" style="width:100%" onchange="nubeModoCambio()">
        <option value="">— elige —</option>
        <option value="bus">🚌 Autobús</option>
        <option value="avion">✈️ Avión</option>
       </select>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Nace vacío a propósito: elegir solo pondría el precio en el modo equivocado.</div>
+      <!-- [NUBE-6b] El avión no tiene general: cambia con cada fecha. -->
+      <div id="nube-aviso-general" style="display:none;font-size:11px;color:var(--orange);margin-top:4px">✈️ El avión se cotiza <b>por evento</b>: elige el evento arriba. La general solo existe para el autobús.</div>
      </div>
      <div class="form-group">
       <label>Precio por persona</label>
       <input class="cot-input" id="nube-precio" type="number" min="1" step="1" placeholder="ej. 2500" style="width:100%">
      </div>
      <div class="form-group">
-      <label>Rige hasta <span style="color:var(--ts);font-weight:400">(por default, 30 días)</span></label>
+      <label>Rige hasta <span style="color:var(--ts);font-weight:400" id="nube-hasta-default">(por default, 30 días bus · 15 avión)</span></label>
       <div style="display:flex;gap:6px">
-       <input class="cot-input" id="nube-hasta-fecha" type="date" style="flex:1" oninput="_nubePreviaVigencia()">
+       <input class="cot-input" id="nube-hasta-fecha" type="date" style="flex:1" oninput="this.dataset.auto='';_nubePreviaVigencia()">
        <input class="cot-input" id="nube-hasta-hora" type="time" value="23:59" style="width:100px" oninput="_nubePreviaVigencia()">
       </div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px" id="nube-previa"></div>

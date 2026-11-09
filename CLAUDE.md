@@ -188,6 +188,64 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 💬⏳ **GRUPO-WA-2 + GRUPO-LINK-VIVO-1 (9-nov-2026, en main local; la BASE ya
+  escrita): DOS grupos de WhatsApp por evento (CHEAP · viaje) y el link que «se
+  borraba».** Palabra de Memo, tras mandar el «estamos estrenando» a todos:
+  *«los links de whatsapp algo está pasando que luego se borran, varios de Pal
+  Norte y Fuerza Regida me dijeron»* · *«los cheap en un grupo y PLUS, Stay y
+  Ride en otro: opción en Capsule para poner los dos links y que cada quien se
+  vaya a su grupo»*.
+  - 🔴 **GRUPO-LINK-VIVO-1 · la causa del «se borra», medida en el código:**
+    `_migGrupoVisto` (el Set que evita pintar el botón dos veces por evento) se
+    RESETEABA al ARRANCAR `renderPlanMigrado`, y antes de PORTAL-CARGA-1 cada
+    entrada al Portal corría TRES pintadas a la vez: A resetea · B resetea · A
+    pinta y anota el link · B pinta → «ya visto» → SIN botón — y B es la que
+    queda en pantalla. El cliente veía el botón ~1 s y desaparecía. Pal Norte y
+    FR son justo los eventos con link capturado y más gente entrando hoy.
+    PORTAL-CARGA-1 (una sola pintada) lo tapaba por accidente; hoy el reset vive
+    PEGADO al `.map` (sin un `await` en medio) y el dedupe es por LINK, no por
+    evento. 🔒 Familia de PS-EVENTOS-1: **una bandera de «ya hice X» que cruza un
+    await es una promesa sobre otra pintada.** El careo lo reproduce con la
+    función REAL: la forma vieja con dos pintadas concurrentes deja la segunda
+    sin botón ([E5], control positivo); la nueva pinta las dos.
+  - **La base** (acta `migraciones/GRUPO-WA-2.sql`, YA CORRIDA, candados mordidos
+    2/2): `grupos_whatsapp.link_cheap` (mismo CHECK), `link` deja de ser NOT
+    NULL, CHECK `grupos_whatsapp_algun_link` (una fila sin ningún link no
+    existe), GRANT repetido. Las 12 filas vivas quedaron con `link_cheap` NULL —
+    **nada cambia hasta que Bulma/Milk peguen el segundo link.**
+  - 🔒 **`linkPara(fila, paquete)` en `_lib/grupo-whatsapp` es el ÚNICO dueño de
+    «a quién le toca cuál»**: CHEAP → `link_cheap`, PLUS/STAY/RIDE → `link`; con
+    UNO solo capturado, ese es el grupo de todos (exactamente lo de antes).
+    `gruposDe` devuelve `{link, link_cheap}` con herencia CAMPO por CAMPO (la
+    fecha `slug#N` gana; el campo que no trae cae al evento base). Los tres
+    bebedores le preguntan: `portal-mi-plan-migrado` (por `tipo_paquete` de la
+    fila), el correo único (el `select` ganó `tipo_paquete`; un buzón con un
+    CHEAP y un PLUS del mismo evento —aprobar con acompañantes, reparto— trae
+    los DOS botones rotulados; con uno solo el render es **byte a byte el de
+    HEAD**, careado contra `git show`) y `gz-panel` (manda `grupo_whatsapp` +
+    `grupo_whatsapp_cheap`; la pestaña Tours del GZ pinta los dos).
+  - **Capsule:** la caja «💬 Grupos de WhatsApp del evento» tiene DOS renglones
+    —🚌 Viaje (PLUS · STAY · RIDE) y 🎫 Solo boleto (CHEAP)— con su estado
+    (activo · usa el del evento · sin link). `grupo_wa_guardar` recibe `link` y
+    `link_cheap`: ausente → no se toca · '' → se quita · texto → se normaliza o
+    400; las dos vacías → 400 sin escribir (la casa no borra filas); el candado
+    del CHECK se dice con palabras ANTES del PATCH. `grupo_wa_ver` devuelve
+    `propio_cheap/link_cheap/heredado_cheap` junto a los de siempre.
+  - `mide:grupo-wa-2` **44** (dueño · herencia · handler real con red falsa que
+    modela el CHECK · correo por `enviarCorreoPago` real · `_migGrupoHtml` real
+    en vm con el control del «se borra» · sabotaje al respaldo con sha1 → 2
+    rojos → restaurado). Vecinos verdes: confirma-1 28 · gz-plataforma-1 33 ·
+    portal-pago-2 78 · plan-pagos-1 81 · vuelo-1 40 · plan-fijo-1 25 ·
+    portal-vivo-1 45 · portal-carga-1 13 · portal-solo-1 89 · capsule-ux-1 83 ·
+    capsule-ux-2 46 · cob-wa-1 33 · acomp-1 76 · acomp-2 43 (req-corrige-1 trae
+    su rojo PREEXISTENTE, idéntico con `git stash`).
+  - ⏳ Push de Memo → Bulma/Milk recargan y pegan el 2º link en los eventos que
+    ya tienen dos grupos (Pal Norte · FR); el Portal deja de «borrar» el botón
+    en cuanto el deploy esté `ready`. ⚠️ Lo que NO es de aquí: si WhatsApp
+    RESTABLECE el link de un grupo (un admin toca «Restablecer enlace»), el link
+    guardado deja de abrir y hay que pegar el nuevo en Capsule — no hay forma de
+    detectarlo desde el sistema.
+
 - 🚀⏳ **PORTAL-CARGA-1 + COB-WA-1 (9-nov-2026, en main local, cero SQL): el día
   del estreno — el Portal carga UNA vez y Capsule gana el 💬 de cobro.** Palabra
   de Memo: *«arranca … lo mejor sería mandar un mensaje de "estamos estrenando

@@ -221,8 +221,10 @@ exports.handler = async (event) => {
 
     // [GRUPO-WA-1] El link del grupo de WhatsApp de cada evento. Solo viaja aquí,
     // al dueño VERIFICADO de la fila (nunca al index público). Sin link → null.
-    const { gruposDe } = require('./_lib/grupo-whatsapp');
-    const linksWA = await gruposDe(viajeros.map((v) => v.evento_id), { KH_URL, KH_KEY });
+    // [GRUPO-WA-2] Cuál de los dos grupos (CHEAP · viaje) le toca lo decide el
+    // dueño `linkPara` por el paquete de SU fila.
+    const { gruposDe, linkPara } = require('./_lib/grupo-whatsapp');
+    const gruposWA = await gruposDe(viajeros.map((v) => v.evento_id), { KH_URL, KH_KEY });
 
     // [PORTAL-PAGO-2] Lo que el cliente ya mandó y el equipo no ha capturado:
     // comprobantes en revisión, pagos de MP ya acreditados (en revisión) y links
@@ -316,7 +318,7 @@ exports.handler = async (event) => {
         // [ACOMP-2] cuántos lugares trae la fila: con 2+ el Portal le ofrece
         // al titular darle su ficha a cada acompañante.
         boletos: Number(v.boletos) || 1,
-        grupo_whatsapp: linksWA[v.evento_id] || null,
+        grupo_whatsapp: linkPara(gruposWA[v.evento_id], v.tipo_paquete),
         // [VUELO-1] Los datos de su vuelo (aerolínea, horarios, clave). 🔒 El
         // COSTO no viaja: palabra de Memo, «un solo total» — ya va dentro del
         // total de arriba y el cliente no ve el desglose.

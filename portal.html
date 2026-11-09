@@ -3342,7 +3342,6 @@ function renderPlanMigrado(){
   return _migPlanEnVuelo;
 }
 async function _migPlanPintar(){
-  _migGrupoVisto = new Set();
   const cont = document.getElementById('tours-migrados');
   if (!cont) return;
   try {
@@ -3380,6 +3379,9 @@ async function _migPlanPintar(){
     } catch (_) { /* sin contratos visibles: no tumba el plan */ }
 
     const money = (n) => '$' + Number(n || 0).toLocaleString('es-MX');
+    // [GRUPO-LINK-VIVO-1] El reset va PEGADO al .map (síncrono): ningún await
+    // entre el reset y el uso, así que otra pintada no puede vaciarlo a medias.
+    _migGrupoVisto = new Set();
     const filas = j.tours.map((t) => {
       const ev = (typeof EV !== 'undefined' && Array.isArray(EV))
         ? EV.find((e) => e && e.id === String(t.evento_id).split('#')[0]) : null;
@@ -3846,10 +3848,19 @@ function _migVueloHtml(t){
     + fila('Aerolínea', v.aerolinea) + fila('Salida', v.salida) + fila('Regreso', v.regreso) + fila('Clave de reservación', v.clave)
     + '<div style="font-size:11px;opacity:.6;margin-top:8px">Ya va incluido en el total de tu viaje.</div></div>';
 }
+// [GRUPO-WA-2] El botón se repite una vez por LINK, no por evento: una persona
+// con un CHEAP y un PLUS del mismo tour tiene DOS grupos y debe ver los dos.
+// 🔴 [GRUPO-LINK-VIVO-1] La causa de «el link de WhatsApp se borra» (Pa'l Norte
+// y FR, 9-nov): `_migGrupoVisto` se reseteaba al ARRANCAR el pintado y las tres
+// pintadas concurrentes de antes de PORTAL-CARGA-1 corrían así: A resetea · B
+// resetea · A pinta (anota el link) · B pinta → «ya visto» → SIN botón, y B es
+// la que queda en pantalla. El reset vive hoy pegado al .map, sin un await en
+// medio (ver _migPlanPintar). Es la familia de PS-EVENTOS-1: una bandera de
+// «ya hice X» que cruza un await es una promesa sobre otra pintada.
 function _migGrupoHtml(t){
   const l = String(t.grupo_whatsapp || '');
   if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/.test(l)) return '';
-  const llave = String(t.evento_id || '').split('#')[0];
+  const llave = l;
   if (_migGrupoVisto.has(llave)) return '';
   _migGrupoVisto.add(llave);
   return '<a href="' + escapeHtml(l) + '" target="_blank" rel="noopener" '

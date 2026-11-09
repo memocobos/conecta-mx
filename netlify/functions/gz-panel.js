@@ -141,7 +141,10 @@ exports.handler = async (event) => {
       ok: true, ver_como: verComo, evento_id,
       asignacion: asig[0] || null,
       rooming,
-      grupo_whatsapp: grupos[evento_id] || null,
+      // [GRUPO-WA-2] El coordi ve los DOS grupos (viaje y CHEAP); `grupo_whatsapp`
+      // sigue siendo el del viaje para el lector de siempre.
+      grupo_whatsapp: (grupos[evento_id] || {}).link || null,
+      grupo_whatsapp_cheap: (grupos[evento_id] || {}).link_cheap || null,
     });
   } catch (e) {
     return res(502, { error: 'No se pudo leer tu información', detail: String(e.message || e).slice(0, 300) });

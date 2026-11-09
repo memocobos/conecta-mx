@@ -1275,11 +1275,20 @@
          <!-- [GRUPO-WA-1] El link del grupo de WhatsApp del evento. Privado: sale
               en el correo de confirmación y en el Portal del viajero, jamás en
               la página pública. -->
+         <!-- [GRUPO-WA-2] DOS grupos: el del viaje (PLUS · STAY · RIDE) y el de
+              los CHEAP. Con uno solo capturado, ese es el grupo de todos. -->
          <div id="cc-grupo-wa" style="display:none;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px">
-          <div style="font-size:12px;font-weight:700;margin-bottom:6px">💬 Grupo de WhatsApp del evento <span id="cc-grupo-wa-estado" style="font-weight:400;opacity:.7"></span></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-           <input id="cc-grupo-wa-link" type="url" placeholder="https://chat.whatsapp.com/…" style="flex:1;min-width:220px">
-           <button type="button" class="btn btn-sm" onclick="grupoWaGuardar()">Guardar link</button>
+          <div style="font-size:12px;font-weight:700;margin-bottom:6px">💬 Grupos de WhatsApp del evento <span style="font-weight:400;opacity:.7">· cada cliente ve el de su paquete en su correo y en su Portal</span></div>
+          <div style="display:grid;gap:6px">
+           <label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px">
+            <span style="min-width:170px">🚌 Viaje (PLUS · STAY · RIDE) <span id="cc-grupo-wa-estado" style="font-weight:400;opacity:.7"></span></span>
+            <input id="cc-grupo-wa-link" type="url" placeholder="https://chat.whatsapp.com/…" style="flex:1;min-width:220px">
+           </label>
+           <label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px">
+            <span style="min-width:170px">🎫 Solo boleto (CHEAP) <span id="cc-grupo-wa-estado-cheap" style="font-weight:400;opacity:.7"></span></span>
+            <input id="cc-grupo-wa-link-cheap" type="url" placeholder="https://chat.whatsapp.com/… (vacío = usan el del viaje)" style="flex:1;min-width:220px">
+           </label>
+           <div><button type="button" class="btn btn-sm" onclick="grupoWaGuardar()">Guardar links</button></div>
           </div>
           <div id="cc-grupo-wa-msg" style="font-size:12px;margin-top:6px"></div>
          </div>

@@ -523,7 +523,9 @@ async function gzTourAbrir(eventoId) {
     ]);
     const esc = _iniEsc;
     let html = '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
-    if (tour && tour.grupo_whatsapp) html += `<a class="btn btn-ghost btn-sm" style="color:#25d366;border-color:rgba(37,211,102,.4);margin-bottom:10px" href="${esc(tour.grupo_whatsapp)}" target="_blank" rel="noopener">💬 Grupo de WhatsApp del tour</a>`;
+    if (tour && tour.grupo_whatsapp) html += `<a class="btn btn-ghost btn-sm" style="color:#25d366;border-color:rgba(37,211,102,.4);margin-bottom:10px" href="${esc(tour.grupo_whatsapp)}" target="_blank" rel="noopener">💬 Grupo de WhatsApp del tour${tour.grupo_whatsapp_cheap ? ' (PLUS · STAY · RIDE)' : ''}</a>`;
+    // [GRUPO-WA-2] el grupo de los CHEAP, cuando existe aparte
+    if (tour && tour.grupo_whatsapp_cheap && tour.grupo_whatsapp_cheap !== tour.grupo_whatsapp) html += ` <a class="btn btn-ghost btn-sm" style="color:#25d366;border-color:rgba(37,211,102,.4);margin-bottom:10px" href="${esc(tour.grupo_whatsapp_cheap)}" target="_blank" rel="noopener">💬 Grupo de WhatsApp (CHEAP)</a>`;
     // ── viajeros ──
     let total = 0, equipo = [];
     let tablas = '';

@@ -6114,25 +6114,39 @@ async function grupoWaCargar() {
   if (!box || !_ccEventoActual) return;
   if (!(currentUser && ['maestro_roshi', 'bulma', 'milk', 'yajirobe'].includes(currentUser.rol))) { box.style.display = 'none'; return; }
   box.style.display = '';
+  // [GRUPO-WA-2] dos cajas: viaje (PLUS·STAY·RIDE) y CHEAP. Cada una dice si es
+  // propia, heredada del evento base o si falta.
   const inp = document.getElementById('cc-grupo-wa-link');
+  const inpC = document.getElementById('cc-grupo-wa-link-cheap');
   const est = document.getElementById('cc-grupo-wa-estado');
+  const estC = document.getElementById('cc-grupo-wa-estado-cheap');
   const msg = document.getElementById('cc-grupo-wa-msg');
   if (msg) msg.textContent = '';
+  const pinta = (campo, estado, propio, heredado, rige, base, sinTxt) => {
+    if (campo) {
+      if (!campo.dataset.ph) campo.dataset.ph = campo.placeholder;   // el placeholder de fábrica, una vez
+      campo.value = propio || '';
+      campo.placeholder = (!propio && heredado && rige) ? rige : campo.dataset.ph;
+    }
+    if (estado) estado.textContent = propio ? '· activo' : (heredado ? '· usa el del evento (' + base + ')' : sinTxt);
+  };
   try {
     const j = await khViajeros._call({ accion: 'grupo_wa_ver', evento_id: _ccEventoActual });
-    if (inp) inp.value = j.propio || '';
-    if (est) est.textContent = j.propio ? '· activo' : (j.heredado ? '· usa el del evento (' + j.base + ')' : '· sin link todavía');
-    if (inp && !j.propio && j.heredado) inp.placeholder = j.link;
+    pinta(inp, est, j.propio, j.heredado, j.link, j.base, '· sin link todavía');
+    pinta(inpC, estC, j.propio_cheap, j.heredado_cheap, j.link_cheap, j.base, (j.link ? '· sin link: los CHEAP usan el del viaje' : '· sin link todavía'));
   } catch (e) { if (est) est.textContent = '· no se pudo leer'; }
 }
 async function grupoWaGuardar() {
   const inp = document.getElementById('cc-grupo-wa-link');
+  const inpC = document.getElementById('cc-grupo-wa-link-cheap');
   const msg = document.getElementById('cc-grupo-wa-msg');
   const link = String((inp && inp.value) || '').trim();
-  if (!link) { if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Pega el link del grupo (https://chat.whatsapp.com/…).'; } return; }
+  const link_cheap = String((inpC && inpC.value) || '').trim();
+  if (!link && !link_cheap) { if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Pega al menos un link de grupo (https://chat.whatsapp.com/…).'; } return; }
   try {
-    await khViajeros._call({ accion: 'grupo_wa_guardar', evento_id: _ccEventoActual, link });
-    showToast('Link del grupo guardado: ya sale en los correos y en el Portal', 'success');
+    // Las DOS cajas viajan siempre: una vacía QUITA ese grupo (la fila se queda con el otro).
+    await khViajeros._call({ accion: 'grupo_wa_guardar', evento_id: _ccEventoActual, link, link_cheap });
+    showToast(link && link_cheap ? 'Los dos links guardados: cada cliente ve el de su paquete' : 'Link del grupo guardado: ya sale en los correos y en el Portal', 'success');
     await grupoWaCargar();
   } catch (e) { if (msg) { msg.style.color = 'var(--red)'; msg.textContent = e.message; } }
 }

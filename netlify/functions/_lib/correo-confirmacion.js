@@ -122,10 +122,20 @@ function renderConfirmacion({ tipo, correo, ev, evento_id, nombres, recibido, to
   // [GRUPO-WA-1] El grupo de WhatsApp del evento, si Bulma/Milk ya pegaron el
   // link en KameHouse. Verde de WhatsApp a propósito: se distingue del botón
   // del Portal. Sin link no hay bloque (no se inventa uno).
-  const bloqueGrupo = grupo ? `<div style="margin:0 0 20px;padding:16px;border:1px solid #25d366;border-radius:10px;background:#0f1a12">
+  // [GRUPO-WA-2] `grupo` es un string (un solo grupo: el render de siempre, byte
+  // a byte) o un arreglo [{url, tipo:'cheap'|'viaje'}] cuando el MISMO buzón
+  // tiene gente en los dos grupos (un CHEAP y un PLUS al mismo correo): entonces
+  // salen los dos botones, cada uno dice de qué es.
+  const gruposLista = Array.isArray(grupo) ? grupo.filter((g) => g && g.url) : [];
+  const botonGrupo = (url, txt) => `<p style="margin:0;text-align:center"><a href="${esc(url)}" style="display:inline-block;background:#25d366;color:#000000;font-weight:800;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px">${txt}</a></p>`;
+  const bloqueGrupo = (typeof grupo === 'string' && grupo) ? `<div style="margin:0 0 20px;padding:16px;border:1px solid #25d366;border-radius:10px;background:#0f1a12">
           <p style="margin:0 0 10px;color:#ffffff;font-weight:700">Únete al grupo de WhatsApp de tu viaje</p>
           <p style="margin:0 0 12px;font-size:14px;color:#b3b3b3">Ahí mandamos los avisos, horarios y recordatorios de tu evento.</p>
-          <p style="margin:0;text-align:center"><a href="${esc(grupo)}" style="display:inline-block;background:#25d366;color:#000000;font-weight:800;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px">Entrar al grupo de WhatsApp →</a></p>
+          ${botonGrupo(grupo, 'Entrar al grupo de WhatsApp →')}
+        </div>` : gruposLista.length ? `<div style="margin:0 0 20px;padding:16px;border:1px solid #25d366;border-radius:10px;background:#0f1a12">
+          <p style="margin:0 0 10px;color:#ffffff;font-weight:700">Únete al grupo de WhatsApp de tu viaje</p>
+          <p style="margin:0 0 12px;font-size:14px;color:#b3b3b3">Ahí mandamos los avisos, horarios y recordatorios de tu evento. Tienes lugares en dos grupos: entra al que le toca a cada boleto.</p>
+          ${gruposLista.map((g) => botonGrupo(g.url, g.tipo === 'cheap' ? 'Grupo de los boletos CHEAP →' : 'Grupo del viaje (PLUS · STAY · RIDE) →')).join('<div style="height:8px"></div>')}
         </div>` : '';
   // [REQ-CORRIGE-1] Si la reserva se aprobó CORREGIDA (no había lugar en lo
   // que pidió), el correo lo DICE: qué pidió, dónde quedó y por qué. Sin
@@ -183,7 +193,7 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
   try {
     const ids = (viajeroIds || []).map((x) => '"' + x + '"').join(',');
     if (!ids) return { ok: false, aviso: 'sin viajeros' };
-    const sel = 'id,evento_id,nombre,correo,celular,talla_playera,emergencia_nombre,num_emergencia,portal_cliente_id,total_contrato,abonado_previo';
+    const sel = 'id,evento_id,nombre,correo,celular,talla_playera,emergencia_nombre,num_emergencia,portal_cliente_id,total_contrato,abonado_previo,tipo_paquete';
     const leer = async () => {
       const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids)})&select=${sel}`, { headers: hKH });
       if (!r.ok) throw new Error('no pude leer los viajeros');
@@ -215,18 +225,23 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
     const ev = (Array.isArray(EV) ? EV : []).find((e) => e && e.id === evBase) || null;
     if (!ev) return { ok: false, aviso: 'No pude leer el evento en el catálogo: no se mandó el correo.' };
     // 4b · [GRUPO-WA-1] El link del grupo de WhatsApp (privado, por evento).
-    const { gruposDe } = require('./grupo-whatsapp');
-    const linksWA = await gruposDe(vs.map((v) => v.evento_id).concat([evento_id]), { KH_URL, KH_KEY });
+    // [GRUPO-WA-2] Cuál grupo le toca a cada persona lo decide el dueño
+    // `linkPara` por el paquete de su fila; el buzón junta los distintos.
+    const { gruposDe, linkPara, esCheap } = require('./grupo-whatsapp');
+    const gruposWA = await gruposDe(vs.map((v) => v.evento_id).concat([evento_id]), { KH_URL, KH_KEY });
     // 5 · Grupos por correo.
     const grupos = new Map();
     const saltados = [];
     for (const v of vs) {
       const k = llaveCorreo(v.correo);
       if (!k || !esCorreoUsable(v.correo)) { saltados.push(v.nombre || v.id); continue; }
-      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], ids: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null, grupo: null });
+      if (!grupos.has(k)) grupos.set(k, { correo: k, nombres: [], ids: [], total: 0, abonado: 0, resta: 0, sinPlan: false, recibido: 0, portal_cliente_id: null, grupo: null, gruposWA: new Map() });
       const g = grupos.get(k);
       g.ids.push(v.id);
-      if (!g.grupo) g.grupo = linksWA[v.evento_id] || linksWA[evento_id] || null;
+      {
+        const url = linkPara(gruposWA[v.evento_id] || gruposWA[evento_id], v.tipo_paquete);
+        if (url && !g.gruposWA.has(url)) g.gruposWA.set(url, esCheap(v.tipo_paquete) ? 'cheap' : 'viaje');
+      }
       g.nombres.push(v.nombre);
       const s = saldoMigrado(v, porV[v.id] || []);
       if (s) { g.total += s.total; g.abonado += s.abonado; g.resta += s.resta; } else g.sinPlan = true;
@@ -237,6 +252,9 @@ async function enviarCorreoPago({ tipo, evento_id, viajeroIds, recibidoPorViajer
     const { aplicarModoPrueba } = require('./correo-guard');
     const enviados = [], errores = [];
     for (const g of grupos.values()) {
+      // Un solo grupo → string (el render de siempre); dos distintos → los dos, rotulados.
+      const urls = [...g.gruposWA.entries()];
+      g.grupo = urls.length === 1 ? urls[0][0] : urls.length > 1 ? urls.map(([url, tipo]) => ({ url, tipo })) : null;
       let portal = null;
       if (portalListo && ya && g.portal_cliente_id) portal = ya.has(g.correo) ? 'existente' : 'nuevo';
       const r = renderConfirmacion({ tipo, correo: g.correo, ev, evento_id, nombres: g.nombres, recibido: g.recibido,

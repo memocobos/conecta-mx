@@ -135,6 +135,7 @@ async function migAbrir() {
     const ev = await _fetchEVFromIndex();
     _migEV = (ev || []).find(e => e && e.id === _ccBase()) || null;   // [CC-FECHAS-1] el catálogo es del evento base
   } catch (_) { /* fails-soft: se avisa abajo */ }
+  _migRotularPreventa();
 
   const fw = _migEl('mig-fecha-wrap');
   const fijada = String(_ccEventoActual).includes('#');
@@ -178,6 +179,22 @@ function migCerrar() {
 // Las zonas dependen del paquete: CHEAP tiene su propia lista de precios, y en
 // varios eventos son OTROS nombres. Tomarlas de la lista equivocada guardaría
 // una zona que el stock no reconoce.
+// [MIG-PREVENTA-1] En un evento de PREVENTA A CIEGAS (la ficha vende solo la
+// zona «Preventa a ciegas» en CHEAP — se DERIVA de la ficha, la misma forma que
+// `_esPreventaCiegas` del index) el selector dice PREVENTA A CIEGAS en vez de
+// CHEAP: quien captura no tiene por qué saber que por dentro viaja por el camino
+// CHEAP. 🔒 El VALOR sigue siendo 'cheap' (precio, stock, careo y contrato beben
+// de él); solo cambia la etiqueta, y vuelve a «CHEAP» en cualquier otro evento.
+function _migEsPreventa() {
+  const cz = (_migEV && Array.isArray(_migEV.cheapZonas)) ? _migEV.cheapZonas : [];
+  return cz.some(z => z && String(z.n || '').trim().toLowerCase() === 'preventa a ciegas');
+}
+function _migRotularPreventa() {
+  const sel = _migEl('mig-paquete');
+  if (!sel) return;
+  const opt = sel.querySelector('option[value="cheap"]');
+  if (opt) opt.textContent = _migEsPreventa() ? 'PREVENTA A CIEGAS' : 'CHEAP';
+}
 function migZonas() {
   const paq = (_migEl('mig-paquete') || {}).value || '';
   const sel = _migEl('mig-zona');
@@ -195,6 +212,8 @@ function migZonas() {
     sel.innerHTML = '<option value="">— elegir —</option>' + fuente.map(z =>
       `<option value="${_esfEsc(z.n)}">${_esfEsc(z.n)}${z.p ? ' · $' + Number(z.p).toLocaleString('es-MX') : ''}${z.ag ? ' (agotada)' : ''}</option>`
     ).join('');
+    // [MIG-PREVENTA-1] la preventa tiene UNA sola zona: se pone sola.
+    if (paq === 'cheap' && _migEsPreventa() && fuente.length === 1) sel.value = fuente[0].n;
   }
   _migCuenta();
 }

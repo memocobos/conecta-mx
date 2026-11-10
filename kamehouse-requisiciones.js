@@ -471,7 +471,7 @@ function _reqBdjAprobarUI(id) {
       ${esRide ? '' : `<label class="rq-field">Zona del boleto *<input type="text" id="req-apr-zona-${id}" value="${_reqBdjEsc(r.zona || '')}"></label>`}
     </div>
     <div style="margin:8px 0">
-      <button class="rq-btn" id="req-cor-btn-${id}" onclick="_reqCorAbrir('${id}')" title="Cuando no hay lugar en lo que pidió: elige lo que SÍ hay y el cliente recibe el correo con el ajuste">🔁 No hay lugar: cambiar fecha / zona / paquete</button>
+      <button class="rq-btn" id="req-cor-btn-${id}" onclick="_reqCorAbrir('${id}')" title="No hay lugar o el cliente cambió de opinión: elige fecha, zona o paquete y el cliente recibe el correo con el ajuste">🔁 Cambiar fecha / zona / paquete</button>
       <div id="req-cor-${id}" style="display:none"></div>
     </div>
     ${_reqBdjDesgloseHtml(r, id)}
@@ -514,7 +514,7 @@ async function _reqCorAbrir(id) {
   if (!box) return;
   if (_reqCor[id] && _reqCor[id].on) {
     _reqCor[id].on = false; box.style.display = 'none';
-    if (btn) btn.textContent = '🔁 No hay lugar: cambiar fecha / zona / paquete';
+    if (btn) btn.textContent = '🔁 Cambiar fecha / zona / paquete';
     _reqCorZonaCampo(id, true);
     const r = _reqBdjRows.find((x) => x.id === id);
     const t = document.getElementById('req-apr-total-' + id);

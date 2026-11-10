@@ -2294,6 +2294,14 @@ function _esfMfProx(col) {
     ? donde + ' YA estaba en Próximamente — las ' + total + ' zona(s) quedaron re-marcadas.'
     : '✓ ' + donde + ' quedó en PRÓXIMAMENTE (' + total + ' zona(s)). El sitio la anuncia sin vender. Se ve al publicar.');
 }
+// [VIAJE-AG-1] La cara del botón dice el estado (la ley de _esfMfProxPintar).
+function _esfMfViajeAgPintar(box) {
+  const b = box && box.querySelector ? box.querySelector('.esf-mf-viajeag') : null;
+  if (!b) return;
+  b.textContent = box._esfViajeAg ? '✓ Viaje agotado · sigue CHEAP' : '🚌 Viaje agotado · sigue CHEAP';
+  b.style.color = box._esfViajeAg ? 'var(--yellow, #e8ff4c)' : '';
+  b.style.borderColor = box._esfViajeAg ? 'var(--yellow, #e8ff4c)' : '';
+}
 // El estado SE VE: el botón del bloque cambia de cara cuando la noche está en
 // próximamente — un estado que solo vive en memoria es un estado que se olvida.
 function _esfMfProxPintar(box) {
@@ -2476,6 +2484,9 @@ function _esfMfAddFecha(data) {
       // (que es lo que lee buildFechaButtons del index) Y en todas las zonas
       // (que es lo que frena al servidor y a la derivación del global).
       '<button type="button" class="btn btn-ghost esf-mf-prox" style="font-size:11px" title="Marca esta noche como PRÓXIMAMENTE: el sitio la anuncia pero aún no vende. Quita el agotado.">↻ Próximamente</button>' +
+      // [VIAJE-AG-1] Cierra el VIAJE de esta noche (PLUS/STAY/RIDE) y deja el
+      // CHEAP vendiendo con sus zonas. Alterna: el estado se ve en el botón.
+      '<button type="button" class="btn btn-ghost esf-mf-viajeag" style="font-size:11px" title="Se acabó el viaje de esta noche (transporte/hotel): cierra PLUS, STAY y RIDE y el CHEAP SIGUE vendiendo. Las zonas NO se agotan. Otro clic lo quita.">🚌 Viaje agotado · sigue CHEAP</button>' +
       '<button type="button" class="btn btn-ghost esf-mf-reabrir" style="font-size:11px" title="Abre la noche a la venta: quita el agotado Y el próximamente de todas sus zonas">Reabrir</button>' +
       // `margin-left:auto` lo manda al extremo: borrar la noche entera no puede
       // quedar pegado a Reabrir, que es lo contrario y se aprieta seguido.
@@ -2527,6 +2538,8 @@ function _esfMfAddFecha(data) {
   // lo siembran la ficha y el botón, y _esfGetMultifecha lo emite al guardar.
   box._esfProx = !!d.prox;
   _esfMfProxPintar(box);
+  box._esfViajeAg = !!d.viajeAg;   // [VIAJE-AG-1]
+  _esfMfViajeAgPintar(box);
   box.querySelector('.esf-mf-del').addEventListener('click', () => { box.remove(); _esfTabSync(); });
   box.querySelector('.esf-mf-lbl').addEventListener('input', () => _esfTableroPintar());
   // [ESF-UX-2b] «Copiar de arriba» se retiró con el mago: en un multifecha ya
@@ -2539,6 +2552,14 @@ function _esfMfAddFecha(data) {
   box.querySelector('.esf-mf-agotar').addEventListener('click', () => _esfTabAgotar(_col(), true));
   box.querySelector('.esf-mf-reabrir').addEventListener('click', () => _esfTabAgotar(_col(), false));
   box.querySelector('.esf-mf-prox').addEventListener('click', () => _esfMfProx(_col()));
+  box.querySelector('.esf-mf-viajeag').addEventListener('click', () => {
+    box._esfViajeAg = !box._esfViajeAg;
+    _esfMfViajeAgPintar(box);
+    const lbl = (box.querySelector('.esf-mf-lbl')?.value || 'esta fecha').trim() || 'esta fecha';
+    _esfAviso(box._esfViajeAg
+      ? '✓ «' + lbl + '»: viaje AGOTADO — se cierran PLUS, STAY y RIDE y el CHEAP sigue vendiendo con sus zonas. Si agotaste las zonas PLUS por esto, reábrelas (si no, el publish apaga también el CHEAP). Se ve al publicar.'
+      : '«' + lbl + '»: el viaje vuelve a la venta. Se ve al publicar.');
+  });
   cont.appendChild(box);
   _esfTabSync();
 }
@@ -2652,6 +2673,7 @@ function _esfGetMultifecha() {
       const previoPx = (b._esfMfOrig || {}).prox;
       o.prox = previoPx ? previoPx : 1;
     }
+    if (b._esfViajeAg) o.viajeAg = 1;   // [VIAJE-AG-1] (en MF_ADMINISTRADAS: quitarlo no lo revive)
     // [ESF-UX-1] PRESERVACIÓN. Toda llave de la ficha que este bloque no
     // administra vuelve intacta. Sin esto, una llave que el parser aprenda
     // mañana la borraría el primer guardado —que es justo lo que pasó con

@@ -151,6 +151,13 @@ function _calcularPrecio(ev, opts) {
     return { ok: false, motivo: 'el evento no tiene multifecha' };
   }
 
+  // [VIAJE-AG-1] Noche con el VIAJE agotado (Esferas «🚌 Viaje agotado · sigue
+  // CHEAP»): solo se vende boleto. Es un candado de VENTA, así que el careo pasa.
+  const mfSel = Array.isArray(ev.multifecha) ? ev.multifecha[fechaIdx] : null;
+  if (!paraCareo && mfSel && mfSel.viajeAg && paquete !== 'cheap') {
+    return { ok: false, motivo: 'el viaje de esta fecha está agotado — solo queda CHEAP (boleto)' };
+  }
+
   // 🔒 AUD-2 — el catálogo manda: no se vende lo que no está a la venta.
   const st = String(ev.st || '').toLowerCase();
   if (!paraCareo && ST_NO_VENDIBLE.includes(st)) {

@@ -11177,7 +11177,7 @@ const _MF_DESC_NOCHES = / · \d+ noches?$/;
 // PRESERVACIÓN lo re-insertaría desde la ficha original — el mismo bug que el
 // Set existe para evitar, en espejo.
 const MF_ADMINISTRADAS = new Set(
-  ['lbl', 'sublbl', 'ds', 'noches', 'music', 'zonas', 'cheapZonas', 'ride', 'hotel', 'rideAgotado', 'prox']);
+  ['lbl', 'sublbl', 'ds', 'noches', 'music', 'zonas', 'cheapZonas', 'ride', 'hotel', 'rideAgotado', 'prox', 'viajeAg']);
 
 
 

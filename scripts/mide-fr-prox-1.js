@@ -257,9 +257,11 @@ console.log('\n[F] sabotaje (sha1 careado, respaldo con cp — jamás checkout)'
   const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 8);
   const orig = fs.readFileSync(COMPILE, 'utf8');
   const shaAntes = sha(orig);
-  const ancla = "(f.prox ? (',prox:' + (f.prox === true ? 'true' : '1')) : '') + '}';";
+  // [VIAJE-AG-1] la línea del prox ya no cierra el objeto (le sigue viajeAg):
+  // el ancla se actualizó a la verdad nueva y el sabotaje sigue quitando el prox.
+  const ancla = "(f.prox ? (',prox:' + (f.prox === true ? 'true' : '1')) : '') +";
   af(orig.includes(ancla), 'el ancla del sabotaje existe');
-  const sab = orig.replace(ancla, "'}';");
+  const sab = orig.replace(ancla, "");
   af(sha(sab) !== shaAntes, 'el sabotaje MUTÓ (sha1 distinto)');
   fs.writeFileSync(COMPILE, sab);
   try {

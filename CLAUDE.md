@@ -188,6 +188,20 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🚌⏳ **VIAJE-AG-1 (10-nov-2026, en main local, cero SQL): «Viaje agotado · sigue CHEAP» por fecha.** Caso Mon Laferte
+  16-nov: Memo agotó TODAS las zonas PLUS para dejar de vender viaje, y la simetría del publish (AG-STOCK-2: «la zona física
+  es una», PLUS ag ⇒ CHEAP ag) apagó también el CHEAP → la fecha salía agotada. Hoy cada bloque de fecha en Esferas trae
+  **«🚌 Viaje agotado · sigue CHEAP»** (alterna, la cara dice el estado): escribe `viajeAg:1` en la ENTRADA del multifecha
+  (en MF_ADMINISTRADAS; compilador lo parsea y lo emite al final — sin él, byte-igual). Index: con PLUS/STAY/RIDE la noche
+  sale «Viaje agotado · solo boleto» deshabilitada, no ofrece zonas y `calcular()` lo dice; CHEAP sigue. Servidor:
+  `_calcularPrecio` rehúsa no-CHEAP en esa fecha (candado de venta: el careo pasa). 🔒 La simetría NO se tocó: las zonas
+  se agotan solo cuando no hay boletos; el viaje se cierra con la bandera. `mide:viaje-ag-1` **16** (control: sin bandera
+  PLUS vende; sabotaje al candado del servidor → 3 rojos → restaurado sha1 `ac01f8a3`). `mide:fr-prox-1` 27 (su ancla de
+  sabotaje se actualizó: la línea del prox ya no cierra el objeto). Vecinos verdes: nube-6 90 · req-b1 52 · mas-alla-1 73
+  · ride-callejon-1 11 · desde-paq-1 (preventa-pn27, sep-300-1, cotiza-vend-1 traen su rojo PREEXISTENTE, idéntico con
+  `git stash`). ⏳ Push de Memo → en Esferas, Mon Laferte 16-nov: **Reabrir la noche** (las zonas PLUS agotadas a mano
+  apagan el CHEAP por la simetría) → «🚌 Viaje agotado · sigue CHEAP» → Guardar → Publicar.
+
 - 💳⏳ **MP-RIESGO-1 (9-nov-2026, en main local, cero SQL): Mercado Pago rechazaba tarjetas por «alto riesgo».**
   Reporte de Memo («otra persona me indicó lo mismo, algo anda mal con Mercado Pago»). Medido en `mp_pagos`: del primer
   día, 2 de 3 tarjetas `rejected / cc_rejected_high_risk` (R-223EE crédito $633 · R-EDU5F débito $319), 1 aprobada (la

@@ -310,6 +310,10 @@ function parseMultifecha(raw) {
       // lector del index (`buildFechaButtons`) nunca lo recibía.
       prox: (f.prox === true) ? true
         : ((f.prox === 1 || f.prox === '1') ? 1 : 0),
+      // [VIAJE-AG-1] «Viaje agotado · sigue CHEAP» (palabra de Memo, 10-nov,
+      // caso Mon Laferte 16-nov): la fecha deja de vender PLUS/STAY/RIDE y el
+      // CHEAP sigue con sus zonas. Es de la ENTRADA, como `prox`.
+      viajeAg: (f.viajeAg === true || f.viajeAg === 1 || f.viajeAg === '1') ? 1 : 0,
     });
   }
   return out.length ? out : null;
@@ -349,7 +353,8 @@ function multifechaTexto(f) {
     (f.ride != null ? ',ride:' + f.ride : '') +
     (f.hotel ? ',hotel:[' + f.hotel.map(_hotelFilaTexto).join(',') + ']' : '') +
     (f.rideAgotado ? (',rideAgotado:' + (f.rideAgotado === true ? 'true' : '1')) : '') +
-    (f.prox ? (',prox:' + (f.prox === true ? 'true' : '1')) : '') + '}';
+    (f.prox ? (',prox:' + (f.prox === true ? 'true' : '1')) : '') +
+    (f.viajeAg ? ',viajeAg:1' : '') + '}';   // [VIAJE-AG-1] al final: sin él, byte-igual
 }
 
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona

@@ -7498,6 +7498,24 @@ async function _vjEditarZonas(id, v) {
     const lb = document.getElementById(`vjx-avz-${id}`);
     if (lb) lb.textContent = cambia ? ` · 📨 cambió la zona: le llegará «Tu lugar cambió de zona» (${actual || '—'} → ${sel.value || '—'})` : '';
   };
+  // [RIDE-ZONA-EDITA-1] Palabra de Memo (10-nov, caso Mónica Sámano PLUS→RIDE):
+  // el RIDE no lleva boleto, así que al ELEGIR RIDE en el paquete la zona se
+  // vuelve «— sin zona (RIDE) —» sola (el boleto regresa al inventario al
+  // guardar). La opción solo existía si la fila YA era RIDE. Volver a otro
+  // paquete quita la opción y regresa a la zona de antes. El servidor ya lo
+  // permitía (RIDE-SIN-ZONA-1); esto es solo la pantalla.
+  const paq = document.getElementById(`vjx-p-${id}`);
+  if (paq) paq.onchange = () => {
+    const vacia = sel.querySelector('option[value=""]');
+    if (paq.value === 'ride') {
+      if (!vacia) sel.insertAdjacentHTML('afterbegin', '<option value="">— sin zona (RIDE) —</option>');
+      sel.value = '';
+    } else {
+      if (vacia) vacia.remove();
+      if (actual) sel.value = actual;
+    }
+    if (typeof sel.onchange === 'function') sel.onchange();
+  };
 }
 // ═══ [CANCELAR-LUGAR-1] ⛔ Cancelar un lugar — jamás borrarlo ═════════════
 // Dos salidas firmadas por Memo (30-oct): el dinero se QUEDA (regla de la

@@ -2533,7 +2533,7 @@ function showPage(name) {
 // [DONOMAR-PREVENTA-1, 4-nov] donomar entra a la preventa: sus CHEAP son preventa.
 // [DONOMAR-VENTA-1, 10-nov] donomar sale a la venta: sus CHEAP NUEVOS son CHEAP
 // (banco Banamex); Leslie y cualquiera de la preventa siguen rotulados POR SU ZONA.
-const KH_PREVENTA_EVENTOS = ['palnorte'];
+const KH_PREVENTA_EVENTOS = [];   // [PN-VENTA-1, 11-nov] palnorte salió a la venta: los de la preventa se rotulan POR SU ZONA
 // [PREVENTA-AUTO-1] Espejo con nombre de PREVENTA_DESCUENTO (_lib/opciones-paquete):
 // el beneficio de la preventa son $300 menos sobre el precio de lista, por lugar.
 const KH_PREVENTA_DESCUENTO = 300;
@@ -7793,6 +7793,7 @@ async function _vjElegirAbrir(id, nombre) {
   tr.firstElementChild.innerHTML = `
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px;border:1px dashed var(--blue);border-radius:8px">
       <div style="font-size:11px;color:var(--ts);min-width:140px"><b style="color:var(--text)">${_esfEsc(nombre)}</b><br>de PREVENTA a su paquete<br><i>sus pagos se quedan como abonos</i></div>
+      <label style="font-size:10px;color:var(--ts);display:none" id="vje-fw-${e}">DÍAS / FECHA<br><select class="cot-input" id="vje-f-${e}" onchange="_vjElegirZonas('${_attrJs(id)}')"><option value="">— elige —</option></select></label>
       <label style="font-size:10px;color:var(--ts)">PAQUETE<br><select class="cot-input" id="vje-p-${e}" onchange="_vjElegirZonas('${_attrJs(id)}')">
         <option value="">— elige —</option><option value="plus">PLUS</option><option value="stay">STAY</option><option value="cheap">CHEAP</option><option value="ride">RIDE</option></select></label>
       <label style="font-size:10px;color:var(--ts)">ZONA<br><select class="cot-input" id="vje-z-${e}" onchange="_vjElegirSugerido('${_attrJs(id)}')"><option value="">— elige paquete primero —</option></select></label>
@@ -7808,19 +7809,38 @@ async function _vjElegirAbrir(id, nombre) {
     window.__vjeEV = (ev || []).find((x) => x && x.id === base) || null;
   } catch (_) { window.__vjeEV = null; }
   if (!window.__vjeEV) { const er = document.getElementById(`vje-e-${id}`); if (er) er.textContent = 'No se pudo leer el catálogo del evento: recarga y vuelve a intentar.'; }
+  // [PN-MULTI-1] Multifecha (Pa'l Norte 3·2·1 días): primero la fecha; el
+  // lugar se MUDA a esa fecha al guardar (slug#N).
+  const mf = window.__vjeEV && Array.isArray(window.__vjeEV.multifecha) ? window.__vjeEV.multifecha : null;
+  if (mf && mf.length) {
+    const w = document.getElementById(`vje-fw-${id}`), fs = document.getElementById(`vje-f-${id}`);
+    if (w) w.style.display = '';
+    if (fs) fs.innerHTML = '<option value="">— elige —</option>' + mf.map((f, i) => f && !f.prox ? `<option value="${i}">${_esfEsc(f.lbl || ('Fecha ' + (i + 1)))}${f.sublbl ? ' · ' + _esfEsc(f.sublbl) : ''}</option>` : '').join('');
+  }
+}
+function _vjElegirFecha(id) {
+  const ev = window.__vjeEV;
+  const mf = ev && Array.isArray(ev.multifecha) && ev.multifecha.length ? ev.multifecha : null;
+  if (!mf) return { multi: false, idx: null, mf: null };
+  const v = (document.getElementById(`vje-f-${id}`) || {}).value;
+  const idx = v === '' || v == null ? null : Number(v);
+  return { multi: true, idx, mf: idx == null ? null : mf[idx] };
 }
 function _vjElegirZonas(id) {
   const paq = (document.getElementById(`vje-p-${id}`) || {}).value || '';
   const sel = document.getElementById(`vje-z-${id}`);
   if (!sel) return;
   const ev = window.__vjeEV;
-  if (!paq) sel.innerHTML = '<option value="">— elige paquete primero —</option>';
+  const fe = _vjElegirFecha(id);
+  if (fe.multi && fe.idx == null) sel.innerHTML = '<option value="">— elige días / fecha primero —</option>';
+  else if (!paq) sel.innerHTML = '<option value="">— elige paquete primero —</option>';
   else if (paq === 'ride') sel.innerHTML = '<option value="">— RIDE no lleva boleto —</option>';
   else {
-    const fuente = ((paq === 'cheap' ? ev && ev.cheapZonas : ev && ev.zonas) || [])
+    const src = fe.mf || ev;
+    const fuente = ((paq === 'cheap' ? src && src.cheapZonas : src && src.zonas) || [])
       .filter((z) => z && z.n && !/^preventa a ciegas$/i.test(z.n));
     sel.innerHTML = fuente.length
-      ? '<option value="">— elegir —</option>' + fuente.map((z) => `<option value="${_esfEsc(z.n)}">${_esfEsc(z.n)}${z.p ? ' · $' + Number(z.p).toLocaleString('es-MX') : ''}${z.ag ? ' (agotada)' : ''}</option>`).join('')
+      ? '<option value="">— elegir —</option>' + fuente.map((z) => `<option value="${_esfEsc(z.n)}">${_esfEsc(z.n)}${z.p ? ' · $' + Number(z.p).toLocaleString('es-MX') : ''}${z.ag ? ' (agotada)' : ''}${z.prox ? ' (próximamente)' : ''}</option>`).join('')
       : '<option value="">— sin zonas para este paquete en la ficha —</option>';
   }
   _vjElegirSugerido(id);
@@ -7830,10 +7850,12 @@ async function _vjElegirSugerido(id) {
   const zona = (document.getElementById(`vje-z-${id}`) || {}).value || '';
   const sug = document.getElementById(`vje-s-${id}`);
   const tot = document.getElementById(`vje-t-${id}`);
-  if (!paq || (paq !== 'ride' && !zona)) { if (sug) sug.textContent = ''; return; }
+  const fe = _vjElegirFecha(id);
+  if (!paq || (paq !== 'ride' && !zona) || (fe.multi && fe.idx == null)) { if (sug) sug.textContent = ''; return; }
   if (sug) sug.textContent = 'Calculando el costo…';
   try {
-    const j = await khViajeros.precioSugerido({ evento_id: _ccEventoActual, tipo_paquete: paq, zona });
+    const evId = fe.multi ? String(_ccEventoActual || '').split('#')[0] + '#' + fe.idx : _ccEventoActual;
+    const j = await khViajeros.precioSugerido({ evento_id: evId, tipo_paquete: paq, zona });
     if (j && j.sugerido != null) {
       // [PREVENTA-AUTO-1] Se prellena YA con el descuento de la preventa (lista − $300 por lugar).
       const lista = Number(j.total != null ? j.total : j.sugerido);
@@ -7852,12 +7874,15 @@ async function _vjElegirGuardar(id) {
   const zona = (document.getElementById(`vje-z-${id}`) || {}).value || '';
   const total = Number((document.getElementById(`vje-t-${id}`) || {}).value);
   if (err) err.textContent = '';
+  const fe = _vjElegirFecha(id);
+  if (fe.multi && fe.idx == null) { if (err) err.textContent = 'Elige de cuántos días / qué fecha.'; return; }
   if (!paq) { if (err) err.textContent = 'Elige el paquete.'; return; }
   if (paq !== 'ride' && !zona) { if (err) err.textContent = 'Elige la zona.'; return; }
   if (!(total > 0)) { if (err) err.textContent = 'Escribe el costo total.'; return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id, tipo_paquete: paq, zona_boleto: zona, total_contrato: total });
+    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id, tipo_paquete: paq, zona_boleto: zona, total_contrato: total,
+      evento_destino: fe.multi ? String(_ccEventoActual || '').split('#')[0] + '#' + fe.idx : null });
     const avisos = [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean);
     // [CONTRATO-CLIENTE-1] Lo que pasó con su contrato, dicho en el mismo aviso.
     const k = (j && j.contrato) || {};

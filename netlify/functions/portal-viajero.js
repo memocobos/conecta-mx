@@ -119,7 +119,9 @@ exports.handler = async (event) => {
 
     if (accion === 'opciones_paquete') {
       if (pend) return json(200, headers, { ok: true, pendiente: pend });
-      const o = await op.opcionesPaquete(v.evento_id);
+      // [PN-MULTI-1] En un multifecha el Portal pregunta primero la fecha
+      // (`fecha_idx`); sin ella vienen las fechas y `paquetes: []`.
+      const o = await op.opcionesPaquete(v.evento_id, body.fecha_idx);
       if (!o.ok) return json(200, headers, { ok: false, error: o.motivo });
       // [PREVENTA-PORTAL-2] Si su elección anterior no procedió, el Portal lo DICE
       // con el motivo del equipo (el mismo que le llegó por correo).
@@ -141,11 +143,12 @@ exports.handler = async (event) => {
         precio_preventa: pq.precio != null ? op.totalPreventa(pq.precio, 1) : undefined,
         zonas: pq.zonas ? pq.zonas.map((z) => Object.assign({}, z, { precio_preventa: op.totalPreventa(z.precio, 1) })) : pq.zonas,
       }));
-      return json(200, headers, { ok: true, evento: o.evento, paquetes, rechazada, descuento: op.PREVENTA_DESCUENTO, boletos, pagado, automatico: true });
+      const fechas = o.multifecha ? o.fechas.map((f) => Object.assign({}, f, { desde_preventa: f.desde != null ? op.totalPreventa(f.desde, 1) : null })) : null;
+      return json(200, headers, { ok: true, evento: o.evento, paquetes, rechazada, descuento: op.PREVENTA_DESCUENTO, boletos, pagado, automatico: true, multifecha: !!o.multifecha, fechas, fecha_idx: o.fecha_idx != null ? o.fecha_idx : null });
     }
 
     if (pend) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.', pendiente: pend });
-    const e = await op.validarEleccion(v.evento_id, { paquete: body.paquete, zona: body.zona, hotel: body.hotel });
+    const e = await op.validarEleccion(v.evento_id, { paquete: body.paquete, zona: body.zona, hotel: body.hotel, fecha_idx: body.fecha_idx });
     if (!e.ok) return json(400, headers, { ok: false, error: e.motivo });
     // [PREVENTA-AUTO-1] Palabra de Memo (10-nov): «ella haga todo automático y ya
     // le llegue su confirmación». El precio lo pone el MOTOR (no el cliente: el
@@ -154,13 +157,13 @@ exports.handler = async (event) => {
     const boletos = Math.max(1, Number(v.boletos) || 1);
     const total = op.totalPreventa(e.precio, boletos);
     if (total == null) return json(400, headers, { ok: false, error: 'Esa opción no tiene precio válido: elige otra o escríbenos por WhatsApp.' });
-    const detalle = `Elige ${e.nombre}${e.zona ? ' · zona ' + e.zona : ''}${e.hotel ? ' · ' + e.hotel : ''} · lista $${e.precio.toLocaleString('es-MX')} − $${op.PREVENTA_DESCUENTO} de preventa${boletos > 1 ? ' × ' + boletos + ' lugares' : ''} = total $${total.toLocaleString('es-MX')} (sus $300 de separo ya están abonados)`;
-    const fila = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'paquete', detalle,
+    const detalle = `Elige ${e.fecha_lbl ? e.fecha_lbl + ' · ' : ''}${e.nombre}${e.zona ? ' · zona ' + e.zona : ''}${e.hotel ? ' · ' + e.hotel : ''} · lista $${e.precio.toLocaleString('es-MX')} − $${op.PREVENTA_DESCUENTO} de preventa${boletos > 1 ? ' × ' + boletos + ' lugares' : ''} = total $${total.toLocaleString('es-MX')} (sus $300 de separo ya están abonados)`;
+    const fila = { viajero_id, evento_id: e.evento_destino || v.evento_id, correo, nombre: v.nombre || null, tipo: 'paquete', detalle,
       paquete_pedido: e.paquete, zona_pedida: e.zona, hotel_pedido: e.hotel, precio_lista: e.precio };
     const { aplicarPaquetePreventa } = require('./_lib/preventa-aplicar');
     let ap;
     try {
-      ap = await aplicarPaquetePreventa({ id: viajero_id, paquete: e.paquete, zona: e.zona || '', total, hotel: e.hotel, quien: `el cliente desde su Portal (${correo})`,
+      ap = await aplicarPaquetePreventa({ id: viajero_id, paquete: e.paquete, zona: e.zona || '', total, hotel: e.hotel, evento_destino: e.evento_destino, quien: `el cliente desde su Portal (${correo})`,
         contratoSinCorreo: true, creado_por: correo, KH_URL, KH_KEY, PORTAL_URL: PT_URL, PORTAL_KEY: process.env.PORTAL_SUPABASE_SERVICE_KEY });
     } catch (err) { ap = { status: 502, body: { error: String((err && err.message) || err) } }; }
     if (ap.status === 200) {

@@ -164,6 +164,7 @@
     "mide:legal-1": "node scripts/mide-legal-1.js",
     "mide:cc-busca-global-1": "node scripts/mide-cc-busca-global-1.js",
     "mide:viaje-ag-1": "node scripts/mide-viaje-ag-1.js",
-    "mide:preventa-auto-1": "node scripts/mide-preventa-auto-1.js"
+    "mide:preventa-auto-1": "node scripts/mide-preventa-auto-1.js",
+    "mide:pn-multi-1": "node scripts/mide-pn-multi-1.js"
   }
 }

@@ -16,7 +16,8 @@ const f = ctx.f;
 console.log('══ mide:paq-preventa-1 ══');
 af(f({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'nsqkmty' }) === 'PREVENTA A CIEGAS', 'nsqkmty CHEAP con zona preventa → PREVENTA A CIEGAS');
 af(f({ tipo_paquete: 'CHEAP', zona_boleto: 'Preventa a ciegas', evento_id: 'palnorte' }) === 'PREVENTA A CIEGAS', 'palnorte «CHEAP» en mayúsculas también');
-af(f({ tipo_paquete: 'cheap', zona_boleto: null, evento_id: 'palnorte' }) === 'PREVENTA A CIEGAS', 'palnorte CHEAP sin zona (traspaso/acompañante) → PREVENTA');
+// [PN-VENTA-1, 11-nov] palnorte salió a la venta (KH_PREVENTA_EVENTOS = []): como donomar, los de la preventa se reconocen POR SU ZONA; un CHEAP sin zona ya no.
+af(f({ tipo_paquete: 'cheap', zona_boleto: null, evento_id: 'palnorte' }) === 'CHEAP', 'palnorte CHEAP sin zona ya NO es preventa (salió a la venta: se rotula por zona)');
 af(f({ tipo_paquete: 'cheap', zona_boleto: 'VIP', evento_id: 'karolg#0' }) === 'CHEAP', 'control: un CHEAP normal sigue diciendo CHEAP');
 af(f({ tipo_paquete: 'plus', zona_boleto: 'Preventa a ciegas', evento_id: 'nsqkmty' }) === 'PLUS', 'control: un PLUS (fases reales) NO se rotula preventa');
 af(f({ tipo_paquete: 'ride', evento_id: 'juniorh' }) === 'RIDE', 'control: RIDE intacto');

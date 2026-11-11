@@ -4007,7 +4007,21 @@ async function _paqAbrir(id){
   const j = await _migPost({ accion: 'opciones_paquete', viajero_id: id }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
   if (j && j.ok && j.pendiente) { body.innerHTML = _paqPendHtml(j.pendiente); return; }
   if (!j || !j.ok) { body.textContent = (j && j.error) || 'No pudimos cargar las opciones'; return; }
-  _paqOps[id] = { paquetes: j.paquetes, elegido: null, rechazada: j.rechazada || null, descuento: Number(j.descuento) || 0, boletos: Number(j.boletos) || 1, pagado: (j.pagado == null ? null : Number(j.pagado)) };
+  _paqOps[id] = { paquetes: j.paquetes, elegido: null, rechazada: j.rechazada || null, descuento: Number(j.descuento) || 0, boletos: Number(j.boletos) || 1, pagado: (j.pagado == null ? null : Number(j.pagado)),
+    multifecha: !!j.multifecha, fechas: j.fechas || [], fecha_idx: (j.fecha_idx == null ? null : Number(j.fecha_idx)) };
+  _paqPintar(id);
+}
+// [PN-MULTI-1] Multifecha (Pa'l Norte 3·2·1 días): primero los días; las
+// opciones de ESA fecha las vuelve a pedir al servidor (aquí no se calcula).
+async function _paqFecha(id, idx){
+  const o = _paqOps[id]; if (!o) return;
+  const c = _migCard(id); const p = c && c.querySelector('[data-mig-panel="paq"]');
+  o.fecha_idx = idx; o.elegido = null; o.paquetes = [];
+  _paqPintar(id);
+  const j = await _migPost({ accion: 'opciones_paquete', viajero_id: id, fecha_idx: idx }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (!j || !j.ok) { if (p) _migMsg(p, (j && j.error) || 'No pudimos cargar las opciones'); return; }
+  if (o.fecha_idx !== idx) return; // otro clic llegó después
+  o.paquetes = j.paquetes || [];
   _paqPintar(id);
 }
 function _paqPendHtml(pe){
@@ -4028,7 +4042,19 @@ function _paqPintar(id){
       + escapeHtml(String(o.rechazada.paquete_pedido || '').toUpperCase()) + (o.rechazada.zona_pedida ? ' · ' + escapeHtml(o.rechazada.zona_pedida) : '')
       + ') no se pudo aplicar: <b>' + escapeHtml(o.rechazada.respuesta || 'sin motivo') + '</b>. Elige otra opción.</div>';
   }
-  h += '<label style="' + lbl + '">1 · Paquete</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+  let nPaso = 1;
+  if (o.multifecha) {
+    h += '<label style="' + lbl + '">1 · ¿De cuántos días?</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+    (o.fechas || []).forEach((f) => {
+      const on = o.fecha_idx === f.idx;
+      h += '<button type="button" data-mig-act="paq-fecha" data-mig-id="' + escapeHtml(id) + '" data-idx="' + f.idx + '" style="padding:8px 12px;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:left;border:1px solid ' + (on ? '#e8ff4c' : 'rgba(255,255,255,.25)') + ';background:' + (on ? '#e8ff4c' : 'transparent') + ';color:' + (on ? '#000' : 'inherit') + '">' + escapeHtml(f.lbl) + (f.desde_preventa != null ? '<br><span style="font-weight:500;font-size:11px">desde ' + _paqMoney(f.desde_preventa) + '</span>' : '') + '</button>';
+    });
+    h += '</div>';
+    if (o.fecha_idx == null) { body.style.opacity = '1'; body.innerHTML = h; return; }
+    if (!o.paquetes.length) { body.style.opacity = '1'; body.innerHTML = h + '<div style="font-size:12px;opacity:.75">Cargando paquetes…</div>'; return; }
+    nPaso = 2;
+  }
+  h += '<label style="' + lbl + '">' + nPaso + ' · Paquete</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
   o.paquetes.forEach((pq) => {
     const on = o.elegido === pq.paquete;
     h += '<button type="button" data-mig-act="paq-pq" data-mig-id="' + escapeHtml(id) + '" data-paq="' + escapeHtml(pq.paquete) + '" style="padding:8px 12px;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:1px solid ' + (on ? '#e8ff4c' : 'rgba(255,255,255,.25)') + ';background:' + (on ? '#e8ff4c' : 'transparent') + ';color:' + (on ? '#000' : 'inherit') + '">' + escapeHtml(pq.nombre) + '</button>';
@@ -4037,11 +4063,11 @@ function _paqPintar(id){
   const pq = o.paquetes.find((x) => x.paquete === o.elegido);
   if (pq) {
     if (pq.zonas) {
-      h += '<label style="' + lbl + '">2 · Zona (precio por persona)</label><select data-paq-sel="zona" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '"><option value="">— elige tu zona —</option>'
+      h += '<label style="' + lbl + '">' + (nPaso + 1) + ' · Zona (precio por persona)</label><select data-paq-sel="zona" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '"><option value="">— elige tu zona —</option>'
         + pq.zonas.map((z) => '<option value="' + escapeHtml(z.zona) + '">' + escapeHtml(z.zona) + ' · ' + (z.precio_preventa != null ? _paqMoney(z.precio_preventa) + ' (lista ' + _paqMoney(z.precio) + ')' : _paqMoney(z.precio)) + '</option>').join('') + '</select>';
     }
     if (pq.habitaciones.length) {
-      h += '<label style="' + lbl + '">' + (pq.zonas ? '3' : '2') + ' · Habitación</label><select data-paq-sel="hotel" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '">'
+      h += '<label style="' + lbl + '">' + (nPaso + (pq.zonas ? 2 : 1)) + ' · Habitación</label><select data-paq-sel="hotel" data-mig-id="' + escapeHtml(id) + '" style="' + inp + '">'
         + pq.habitaciones.map((x, i) => '<option value="' + escapeHtml(x.nombre) + '"' + (i === 0 ? ' selected' : '') + '>' + escapeHtml(x.nombre) + (x.extra ? ' (+' + _paqMoney(x.extra) + ')' : '') + '</option>').join('') + '</select>'
         + '<div style="font-size:11px;opacity:.7;margin:-4px 0 8px">¿Van en pareja o en trío y quieren cuarto doble o triple? Elige Compartida y pídelo después en «Pedir un cambio».</div>';
     }
@@ -4081,7 +4107,8 @@ async function _paqEnviar(id){
   if (pq.zonas && !zona) return _migMsg(p, 'Elige tu zona');
   const b = p.querySelector('[data-mig-act="paq-enviar"]'); if (b) b.disabled = true;
   _migMsg(p, 'Enviando…', true);
-  const j = await _migPost({ accion: 'pedir_paquete', viajero_id: id, paquete: o.elegido, zona, hotel }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
+  if (o.multifecha && o.fecha_idx == null) return _migMsg(p, 'Elige de cuántos días');
+  const j = await _migPost({ accion: 'pedir_paquete', viajero_id: id, paquete: o.elegido, zona, hotel, fecha_idx: o.multifecha ? o.fecha_idx : undefined }).catch(() => ({ ok: false, error: 'Revisa tu conexión' }));
   if (j && j.ok && j.aplicado) {
     // [PREVENTA-AUTO-1] Quedó aplicado: se repinta la card (ya con su paquete,
     // su plan y su contrato para firmar).
@@ -4238,6 +4265,7 @@ document.addEventListener('click', (ev) => {
   else if (act === 'ctr-fecha') _ctrFecha(id);
   else if (act === 'ctr-firmar') _ctrFirmar(id);
   else if (act === 'paq-abrir') _paqAbrir(id);
+  else if (act === 'paq-fecha') _paqFecha(id, Number(b.getAttribute('data-idx')));
   else if (act === 'paq-pq') { if (_paqOps[id]) { _paqOps[id].elegido = b.getAttribute('data-paq'); _paqPintar(id); } }
   else if (act === 'paq-enviar') _paqEnviar(id);
   else if (act === 'ps-abrir') _psAbrir();

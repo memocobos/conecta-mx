@@ -228,7 +228,7 @@ async function _reqPaqAplicar(id) {
   let aviso = [];
   try {
     // contrato_sin_correo: el aviso al cliente es UNO, el de «paquete confirmado».
-    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id: c.viajero_id, tipo_paquete: c.paquete_pedido, zona_boleto: c.zona_pedida || '', total_contrato: total, contrato_sin_correo: true });
+    const j = await khViajeros._call({ accion: 'viajero_elegir_paquete', id: c.viajero_id, tipo_paquete: c.paquete_pedido, zona_boleto: c.zona_pedida || '', total_contrato: total, contrato_sin_correo: true, evento_destino: /#\d+$/.test(String(c.evento_id || '')) ? c.evento_id : null });   // [PN-MULTI-1] la fecha que eligió
     [j && j.zona_aviso, j && j.stock_aviso].filter(Boolean).forEach((a) => aviso.push(a));
     const k = (j && j.contrato) || {};
     if (k.aviso) aviso.push('contrato: ' + k.aviso);

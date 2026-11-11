@@ -1744,7 +1744,7 @@ ${entregables}
       const { aplicarPaquetePreventa } = require('./_lib/preventa-aplicar');
       const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
       const rr = await aplicarPaquetePreventa({
-        id: body.id, paquete: body.tipo_paquete, zona: body.zona_boleto, total, hotel: body.hotel || null, quien,
+        id: body.id, paquete: body.tipo_paquete, zona: body.zona_boleto, total, hotel: body.hotel || null, evento_destino: body.evento_destino || null, quien,
         contratoSinCorreo: body.contrato_sin_correo === true, creado_por: (auth.user && auth.user.correo) || null,
         KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE, PORTAL_URL: env.PORTAL_SB_URL, PORTAL_KEY: env.PORTAL_SB_SERVICE,
       });

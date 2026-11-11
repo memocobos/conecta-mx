@@ -80,7 +80,14 @@ function _opciones(ev, hoteles, fechaIdx) {
   return { ok: true, paquetes };
 }
 
-async function opcionesPaquete(eventoId) {
+// [PN-MULTI-1, 11-nov-2026] Un evento MULTIFECHA (Pa'l Norte: 3 · 2 · 1 día)
+// se elige en DOS pasos: primero la fecha/paquete de días (`fechas`), luego el
+// paquete y la zona DE ESA fecha. Sin `fechaIdx` la respuesta trae las fechas
+// con su «desde» y `paquetes: []`; con él, las opciones de esa fecha y su
+// `evento_destino` ('slug#N') — a donde se muda el lugar al aplicar.
+// Un evento de UNA fecha responde igual que siempre (sin `fechas`).
+function _hoyMx() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' }); }
+async function opcionesPaquete(eventoId, fechaIdx) {
   const slug = String(eventoId || '').split('#')[0];
   const lista = await fetchEventosRaw();
   if (!Array.isArray(lista)) return { ok: false, motivo: 'no pudimos leer el catálogo, intenta en un rato' };
@@ -88,16 +95,38 @@ async function opcionesPaquete(eventoId) {
   if (!ev) return { ok: false, motivo: 'el evento no está en el catálogo' };
   let hoteles = {};
   try { hoteles = await fetchHotelesGlobales(); } catch (_) { hoteles = {}; }
+  const evento = { nombre: ev.a || slug, fecha: ev.f || '' };
+  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    const fechas = [];
+    for (const f of fechasVendibles(ev, _hoyMx())) {
+      const mf = ev.multifecha[f.idx] || {};
+      if (mf.prox) continue;
+      const o = _opciones(ev, hoteles, f.idx);
+      if (!o.ok || !o.paquetes.length) continue;
+      const precios = [];
+      o.paquetes.forEach((pq) => { if (pq.precio != null) precios.push(pq.precio); (pq.zonas || []).forEach((z) => precios.push(z.precio)); });
+      fechas.push({ idx: f.idx, evento_id: f.evento_id, lbl: f.lbl, sublbl: String(mf.sublbl || ''), desde: precios.length ? Math.min.apply(null, precios) : null, _paquetes: o.paquetes });
+    }
+    if (!fechas.length) return { ok: false, motivo: 'todavía no hay paquetes a la venta para este evento' };
+    const fi = Number.isInteger(fechaIdx) ? fechaIdx : (fechaIdx != null && fechaIdx !== '' && Number.isInteger(Number(fechaIdx)) ? Number(fechaIdx) : null);
+    const elegida = fi == null ? null : fechas.find((f) => f.idx === fi);
+    if (fi != null && !elegida) return { ok: false, motivo: 'esa opción de fecha ya no está disponible' };
+    const publicas = fechas.map(({ _paquetes, ...r }) => r);
+    return { ok: true, evento, multifecha: true, fechas: publicas, fecha_idx: elegida ? elegida.idx : null,
+      evento_destino: elegida ? elegida.evento_id : null, paquetes: elegida ? elegida._paquetes : [], _ev: ev, _hoteles: hoteles };
+  }
   const o = _opciones(ev, hoteles);
   if (!o.ok) return o;
   if (!o.paquetes.length) return { ok: false, motivo: 'todavía no hay paquetes a la venta para este evento' };
-  return { ok: true, evento: { nombre: ev.a || slug, fecha: ev.f || '' }, paquetes: o.paquetes, _ev: ev, _hoteles: hoteles };
+  return { ok: true, evento, paquetes: o.paquetes, evento_destino: null, _ev: ev, _hoteles: hoteles };
 }
 
 // Valida una elección contra el catálogo VIVO y devuelve su precio de lista.
-async function validarEleccion(eventoId, { paquete, zona, hotel }) {
-  const o = await opcionesPaquete(eventoId);
+// [PN-MULTI-1] En un multifecha exige `fecha_idx` y devuelve `evento_destino`.
+async function validarEleccion(eventoId, { paquete, zona, hotel, fecha_idx }) {
+  const o = await opcionesPaquete(eventoId, fecha_idx);
   if (!o.ok) return o;
+  if (o.multifecha && o.fecha_idx == null) return { ok: false, motivo: 'elige primero de cuántos días (o qué fecha) es tu paquete' };
   const p = String(paquete || '').toLowerCase();
   const op = o.paquetes.find((x) => x.paquete === p);
   if (!op) return { ok: false, motivo: 'ese paquete no está disponible para este evento' };
@@ -113,9 +142,10 @@ async function validarEleccion(eventoId, { paquete, zona, hotel }) {
     if (!h) return { ok: false, motivo: 'elige el tipo de habitación' };
     h = h.nombre;
   }
-  const c = cotizar(o._ev, o._hoteles, { paquete: p, zona: z, hotel: h });
+  const c = cotizar(o._ev, o._hoteles, { paquete: p, zona: z, hotel: h, fechaIdx: o.multifecha ? o.fecha_idx : undefined });
   if (!c.ok) return { ok: false, motivo: c.motivo };
-  return { ok: true, paquete: p, zona: z, hotel: h, precio: c.precio, nombre: op.nombre, evento: o.evento };
+  const fechaLbl = o.multifecha ? ((o.fechas.find((f) => f.idx === o.fecha_idx) || {}).lbl || '') : '';
+  return { ok: true, paquete: p, zona: z, hotel: h, precio: c.precio, nombre: op.nombre, evento: o.evento, evento_destino: o.evento_destino, fecha_lbl: fechaLbl };
 }
 
 // [REQ-CORRIGE-1] Las fechas vendibles de un evento, con su evento_id

@@ -286,8 +286,10 @@ async function correr() {
   af(() => banco({ tipo_paquete: 'ride', evento_id: 'juniorh' }) === 'bbva', 'RIDE → BBVA');
   af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'nsqkmty' }) === 'bbva',
     '🔒 PREVENTA A CIEGAS por su ZONA → BBVA, aunque el paquete diga cheap [PN27-BANCO-1]');
-  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'palnorte#0' }) === 'bbva',
-    'y por su EVENTO (palnorte), con `slug#N` y todo');
+  // [PN-VENTA-1, 11-nov] palnorte salió a la venta: un CHEAP nuevo de palnorte#0 es CHEAP normal (Banamex);
+  // la preventa se sigue reconociendo POR SU ZONA (arriba).
+  af(() => banco({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'palnorte#0' }) === 'banamex',
+    'palnorte ya a la venta: un CHEAP nuevo con `slug#N` cobra en Banamex');
   af(() => banco({ tipo_paquete: 'cheap', zona_boleto: '  PREVENTA A CIEGAS ', evento_id: 'x' }) === 'bbva',
     'la zona se normaliza: espacios y mayúsculas no abren el hoyo');
   // 🔒 El ESPEJO se carea contra su dueño: kamehouse.js no se puede `require`, así

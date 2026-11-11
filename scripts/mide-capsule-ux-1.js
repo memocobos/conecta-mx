@@ -63,7 +63,7 @@ const FILAS = [
   { id: 'a', nombre: 'María Pérez',   correo: 'maria@x.mx',  celular: '8991112233', tipo_paquete: 'plus',  zona_boleto: 'VIP',               boletos: 2, evento_id: 'frontera' },
   { id: 'b', nombre: 'Sofía López',   correo: 'sofia@x.mx',  celular: '8990000001', tipo_paquete: 'cheap', zona_boleto: 'General',           boletos: 1, evento_id: 'karolg#0' },
   { id: 'c', nombre: 'Pedro Niño',    correo: '',            celular: '8990000002', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', boletos: 1, evento_id: 'nsqkmty' },
-  { id: 'd', nombre: 'Luisa Cantú',   correo: 'l@x.mx',      celular: '8990000003', tipo_paquete: 'cheap', zona_boleto: 'General',           boletos: 1, evento_id: 'palnorte#0' },
+  { id: 'd', nombre: 'Luisa Cantú',   correo: 'l@x.mx',      celular: '8990000003', tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', boletos: 1, evento_id: 'palnorte' },   // [PN-VENTA-1] la lista quedó vacía: se reconoce por zona
   { id: 'e', nombre: 'Coordi Prueba', correo: '',            celular: '',           tipo_paquete: 'plus',  zona_boleto: 'VIP',               boletos: 1, evento_id: 'frontera', tipo_viajero: 'coordinador' },
   { id: 'f', nombre: 'Baja Prueba',   correo: '',            celular: '',           tipo_paquete: 'cheap', zona_boleto: null,                boletos: 0, evento_id: 'frontera' },
   { id: 'g', nombre: 'Ride Gómez',    correo: '',            celular: '',           tipo_paquete: 'ride',  zona_boleto: null,                boletos: 1, evento_id: 'frontera', notas: 'paga en diciembre' },
@@ -85,8 +85,8 @@ af(res.paquetes.CHEAP && res.paquetes.CHEAP.filas === 1,
 af(res.paquetes.PLUS && res.paquetes.PLUS.filas === 2 && res.paquetes.PLUS.lugares === 3,
    'PLUS: 2 filas · 3 lugares (la de 2 boletos pesa 2): ' + JSON.stringify(res.paquetes.PLUS));
 af(res.paquetes.RIDE && res.paquetes.RIDE.filas === 1, 'RIDE: 1 fila (sin zona, 1 lugar)');
-af(res.zonas.VIP === 3 && res.zonas.General === 2 && res.zonas['Preventa a ciegas'] === 1,
-   'boletos por zona: VIP 3 · General 2 · Preventa 1 → ' + JSON.stringify(res.zonas));
+af(res.zonas.VIP === 3 && res.zonas.General === 1 && res.zonas['Preventa a ciegas'] === 2,
+   'boletos por zona: VIP 3 · General 1 · Preventa 2 → ' + JSON.stringify(res.zonas));
 
 // ── [B] el FILTRO: sin acentos, por todos los campos, y PURO ───────────────
 console.log('[B] _vjFiltraFilas · texto sin acentos + chips, sin tocar el universo');

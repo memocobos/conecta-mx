@@ -83,7 +83,7 @@ const semilla = () => ({ patches: [], compras: [], v: [
   const ctx = {}; vm.createContext(ctx); vm.runInContext(kh.slice(i, j) + ';this.f=khPaqueteTexto;this.p=khEsPreventaCiegas;', ctx);
   af(ctx.f({ tipo_paquete: 'cheap', zona_boleto: 'Oro', evento_id: 'nsqkmty' }) === 'CHEAP', 'un CHEAP nuevo de nsqk dice CHEAP');
   af(ctx.f({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'nsqkmty' }) === 'PREVENTA A CIEGAS', 'los de la preventa siguen rotulados por su zona');
-  af(ctx.p({ tipo_paquete: 'cheap', zona_boleto: null, evento_id: 'palnorte' }) === true, 'palnorte sigue en preventa');
+  af(ctx.p({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'palnorte' }) === true && ctx.p({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'palnorte#0' }) === false, 'palnorte (ya a la venta, PN-VENTA-1): la preventa se reconoce por su ZONA y un CHEAP nuevo no');
   af(/khEsPreventaCiegas\(v\) \? `<button[^`]*_vjElegirAbrir/.test(kh), 'el botón 🎟 Elegir paquete solo sale a quien está en preventa');
   af(/<td>\$\{_esfEsc\(khPaqueteTexto\(v\) \|\| '—'\)\}<\/td>/.test(kh), 'la lista principal pinta la etiqueta, no el paquete crudo');
 

@@ -51,7 +51,7 @@ const corre = (pkg) => {
   vm.createContext(ctx); vm.runInContext(fn + ';buildFechaButtons();', ctx);
   return Object.values(out).map((o) => o.innerHTML).join('');
 };
-af(() => { const h = corre('plus'); return /16 Noviembre<br><small>Viaje agotado · solo boleto<\/small>/.test(h) && /disabled/.test(h); }, 'PLUS: el 16 sale «Viaje agotado · solo boleto» y deshabilitado');
+af(() => { const h = corre('plus'); return /16 Noviembre<br><small>Viaje agotado · sigue CHEAP<\/small>/.test(h) && /disabled/.test(h); }, 'PLUS: el 16 sale «Viaje agotado · sigue CHEAP» (SIN-SOLO-BOLETO-1) y deshabilitado');
 af(() => !/Viaje agotado/.test(corre('cheap')), 'CHEAP: el 16 no se apaga');
 af(() => /viajeAg&&selPkg!=='cheap'\)return null;/.test(html), 'currentZonasToShow no ofrece zonas de viaje en esa noche');
 af(() => /cur\.multifecha\[selFechaIdx\]\.viajeAg\)\{\s*var _ph/.test(html), 'calcular() se rehúsa y lo DICE en el placeholder');

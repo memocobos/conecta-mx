@@ -5947,7 +5947,7 @@ function selPaquete(btn,pkg){
         $$('w-zona-card').style.display='block';guiaPintar();
       } else if(hasFecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].viajeAg&&pkg!=='cheap'){
         // [VIAJE-AG-1] La noche ya no vende viaje: se DICE, y se ofrece la salida.
-        $$('d-zonas').innerHTML='<div style="text-align:center;padding:20px;color:rgba(255,255,255,.55);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Viaje agotado para esta fecha — elige otra fecha o el paquete CHEAP (solo boleto)</div>';
+        $$('d-zonas').innerHTML='<div style="text-align:center;padding:20px;color:rgba(255,255,255,.55);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Viaje agotado para esta fecha — elige otra fecha o el paquete CHEAP</div>';
         $$('w-zona-card').style.display='block';guiaPintar();
       } else {
       var zonasToShow=currentZonasToShow();
@@ -6079,7 +6079,7 @@ function buildFechaButtons(){
     var viajeAg=!!mf.viajeAg&&!!selPkg&&selPkg!=='cheap';
     var cerr=allAg||viajeAg;
     fH+='<button class="f-btn'+(cerr?' f-ag':'')+(i===selFechaIdx?' active':'')+'"'+(cerr?' disabled':'')+
-      ' onclick="selFecha(this,'+i+')">'+mf.lbl+(viajeAg&&!allAg?'<br><small>Viaje agotado · solo boleto</small>':(allAg?'<br><small>Agotado</small>':''))+'</button>';
+      ' onclick="selFecha(this,'+i+')">'+mf.lbl+(viajeAg&&!allAg?'<br><small>Viaje agotado · sigue CHEAP</small>':(allAg?'<br><small>Agotado</small>':''))+'</button>';
   }
   $$('d-fechas').innerHTML=fH;
 }
@@ -8090,7 +8090,7 @@ function calcular(){
   // [VIAJE-AG-1] Noche con el viaje agotado: solo CHEAP cotiza (la fecha 0
   // queda elegida por default aunque su botón esté apagado).
   if(selPkg!=='cheap'&&cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].viajeAg){
-    var _ph=$$('d-placeholder');if(_ph){_ph.style.display='block';_ph.textContent='Viaje agotado para esta fecha: elige otra fecha o el paquete CHEAP (solo boleto).';}
+    var _ph=$$('d-placeholder');if(_ph){_ph.style.display='block';_ph.textContent='Viaje agotado para esta fecha: elige otra fecha o el paquete CHEAP.';}
     var _rs=$$('d-result');if(_rs)_rs.style.display='none';
     return;
   }

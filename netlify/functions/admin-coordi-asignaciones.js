@@ -2448,6 +2448,13 @@ ${entregables}
         abonado_previo: body.foto ? 0 : abonado,
         tipo_viajero: 'cliente',
         boletos: nBoletos,
+        // [ALTA-SELLO-1] Quien da de alta a mano YA revisó: tiene los datos y
+        // el comprobante enfrente (la misma ley de «aprobar ES revisar» de la
+        // requisición). Sin el sello, el contrato que sale aquí mandaba al
+        // cliente a un Portal que decía «estamos revisando tu viaje» y no lo
+        // dejaba firmar (caso Melany, FR, 11-nov).
+        portal_revisado_at: new Date().toISOString(),
+        portal_revisado_por: 'alta manual · ' + ((auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || jwtUserId || 'panel'),
       };
       // Los opcionales, con la misma regla que viajero_editar: vacío es NULL,
       // nunca cadena vacía — '' se cuela en los filtros de "sin correo" y en

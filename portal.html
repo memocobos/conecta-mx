@@ -3392,7 +3392,7 @@ async function _migPlanPintar(){
     const filas = j.tours.map((t) => {
       const ev = (typeof EV !== 'undefined' && Array.isArray(EV))
         ? EV.find((e) => e && e.id === String(t.evento_id).split('#')[0]) : null;
-      const titulo = ev && ev.a ? ev.a : t.evento_id;
+      const titulo = ev && ev.a ? ev.a : (t.evento_nombre || t.evento_id);   // [PORTAL-NOMBRE-1]
       // `sin_plan` = la fila no trae total. Se DICE, en vez de pintar $0, que se
       // leería como «no debes nada».
       // [PORTAL-RECUERDO-1] Un viaje que ya pasó es un RECUERDO: palabra de

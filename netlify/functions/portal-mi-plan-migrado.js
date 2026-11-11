@@ -383,6 +383,9 @@ exports.handler = async (event) => {
         // RECUERDO (sin dinero, plan, contrato ni botones). Sin fecha → false:
         // no se esconde el dinero de nadie por una fecha que no se pudo leer.
         pasado: !!(dsEv && /^\d{4}-\d{2}-\d{2}$/.test(dsEv) && dsEv < hoyDs),
+        // [PORTAL-NOMBRE-1] El nombre del evento lo dice el DUEÑO (`nombreEvento`,
+        // que conoce FUERA_CATALOGO): sin esto el Portal pintaba «PALNORTE2026».
+        evento_nombre: require('./_lib/portal-revision').nombreEvento(evRaw, v.evento_id).nombre || null,
         // 🔒 Los abonos van ORDENADOS por fecha y con su fecha tal cual está. Los
         // de la cosecha traen la fecha del careo, no la del pago: el Portal lo
         // dice con palabras en vez de presentarlas como fecha de pago.

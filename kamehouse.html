@@ -1185,6 +1185,10 @@
            <div><label class="mig-lbl">CELULAR</label><input class="cot-input" id="mig-celular" placeholder="opcional" autocomplete="off"></div>
            <div><label class="mig-lbl">PAQUETE *</label><select class="cot-input" id="mig-paquete" onchange="migZonas(); _migSugerirCosto()"><option value="">— elegir —</option><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
            <div><label class="mig-lbl">ZONA DEL BOLETO *</label><select class="cot-input" id="mig-zona" onchange="_migSugerirCosto()"><option value="">— elige paquete primero —</option></select></div>
+           <!-- [MIG-BOLETOS-1] CHEAP = BOLETOS, no pasajeros (palabra de Memo,
+                2-nov): N boletos a un nombre van en UNA fila. Nace en 1, anunciado. -->
+           <div><label class="mig-lbl">BOLETOS</label><input class="cot-input" id="mig-boletos" type="number" min="1" max="50" step="1" value="1" inputmode="numeric" oninput="_migPintaSugerencia(true)">
+            <div style="font-size:10px;color:var(--ts);margin-top:3px">a su nombre · el costo es el TOTAL de todos</div></div>
            <div><label class="mig-lbl">COSTO DEL PAQUETE *</label><input class="cot-input" id="mig-total" inputmode="decimal" placeholder="$">
             <!-- [CAP-MIG-FIX] La sugerencia se DICE, no se impone: lo que se
                  guarda es lo que quede en el campo. Si el Excel difiere, manda

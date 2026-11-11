@@ -256,6 +256,8 @@ function _migLeer() {
     celular: g('mig-celular'),
     tipo_paquete: g('mig-paquete'),
     zona_boleto: g('mig-zona'),
+    // [MIG-BOLETOS-1] Cuántos boletos a su nombre (el servidor valida 1-50).
+    boletos: g('mig-boletos') || '1',
     total_contrato: g('mig-total'),
     abonado_previo: g('mig-abonado'),
     talla_playera: g('mig-talla'),
@@ -317,16 +319,20 @@ function _migPintaSugerencia(rellenar) {
   if (_migSugBase == null) { pista.textContent = ''; return; }
   const d = Number(String(((_migEl('mig-desc') || {}).value || '')).replace(/[^0-9.-]/g, ''));
   const desc = (Number.isFinite(d) && d > 0) ? d : 0;
-  const sug = Math.max(0, _migSugBase - desc);
+  // [MIG-BOLETOS-1] El catálogo da el precio de UNO; con N boletos el total es N veces.
+  const nb = Math.max(1, parseInt(((_migEl('mig-boletos') || {}).value || '1'), 10) || 1);
+  const base = _migSugBase * nb;
+  const sug = Math.max(0, base - desc);
+  const baseTxt = nb > 1 ? `${nb} × $${_migSugBase.toLocaleString('es-MX')} = $${base.toLocaleString('es-MX')}` : `$${base.toLocaleString('es-MX')}`;
   pista.textContent = desc > 0
-    ? `sugerido del catálogo: $${_migSugBase.toLocaleString('es-MX')} − $${desc.toLocaleString('es-MX')} de descuento = $${sug.toLocaleString('es-MX')} · editable`
-    : `sugerido del catálogo: $${sug.toLocaleString('es-MX')} · editable`;
+    ? `sugerido del catálogo: ${baseTxt} − $${desc.toLocaleString('es-MX')} de descuento = $${sug.toLocaleString('es-MX')} · editable`
+    : `sugerido del catálogo: ${nb > 1 ? baseTxt : '$' + sug.toLocaleString('es-MX')} · editable`;
   // ⚠️ Solo se rellena si el campo está VACÍO o si trae la sugerencia anterior.
   // Pisar un número que Memo escribió a mano sería perder el dato del Excel —
   // justo lo que la regla de oro de VJ-3 protege.
   const actual = String(campo.value || '').trim();
   const eraSug = actual === '' || actual === String(campo.dataset.sug || '');
-  if ((rellenar || desc > 0) && eraSug) {
+  if ((rellenar || desc > 0 || nb > 1) && eraSug) {
     campo.value = String(sug);
     campo.dataset.sug = String(sug);
   }
@@ -424,6 +430,7 @@ async function _migEnviar(d) {
     ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-genero','mig-hab','mig-notas']
       .forEach(id => { const el = _migEl(id); if (el) el.value = ''; });
     { const fEl = _migEl('mig-foto'); if (fEl) fEl.value = ''; }
+    { const bEl = _migEl('mig-boletos'); if (bEl) bEl.value = '1'; }
     _migEl('mig-nombre') && _migEl('mig-nombre').focus();
     _migError('');
   } catch (e) {

@@ -192,7 +192,8 @@ function clausulas(d) {
   if (d.preventa) {
     c.push({ t: 'Anexo · Preventa a ciegas', anexo: true, items: [
       'Tu separo de <b>$300</b> de la preventa <b>cuenta como abono</b> a este contrato.',
-      'Como beneficio de la preventa tienes <b>$300 de descuento para una segunda persona en el mismo viaje, o para otro tour de 2027</b>.',
+      // [PREVENTA-AUTO-1] Palabra de Memo (10-nov): el beneficio es $300 menos sobre el precio de lista de SU paquete.
+      'Como beneficio de la preventa, tu paquete lleva <b>$300 de descuento por lugar sobre el precio de lista</b>, ya aplicado en el total de este contrato.',
       'Elegiste tu zona con prioridad; si la zona que pediste ya no tiene lugar al cargar el pedido, te ofrecemos otra zona del mismo precio o una distinta con su diferencia.',
     ] });
   }

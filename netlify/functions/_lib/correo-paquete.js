@@ -24,14 +24,14 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 const mxn = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-MX');
 const PAQ = { plus: 'PLUS · Todo incluido', stay: 'STAY · Sin transporte', ride: 'RIDE · Sin boleto', cheap: 'CHEAP · Solo boleto' };
 
-function renderPaquete({ estado, nombre, correo, evento, fecha, paquete, zona, hotel, cuenta, motivo, contratoVivo }) {
+function renderPaquete({ estado, nombre, correo, evento, fecha, paquete, zona, hotel, cuenta, motivo, contratoVivo, descuento }) {
   const primer = (String(nombre || '').trim().split(/\s+/)[0]) || 'Hola';
   const ok = estado === 'atendida';
   const subject = ok ? `Tu paquete quedó confirmado · ${evento}` : `Sobre tu elección de paquete · ${evento}`;
   const celda = 'padding:8px 10px;border-bottom:1px solid #333333;color:#ffffff;font-size:14px';
   const fila = (a, b) => `<tr><td style="${celda};color:#b3b3b3">${esc(a)}</td><td style="${celda};text-align:right"><b style="color:#ffffff">${b}</b></td></tr>`;
   const cuerpo = ok
-    ? `<p style="margin:0 0 14px;color:#ffffff">Ya aplicamos tu elección para <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Tus $300 de la preventa ya cuentan como pago.</p>
+    ? `<p style="margin:0 0 14px;color:#ffffff">Ya aplicamos tu elección para <b style="color:#e8ff4c">${esc(evento)}</b>${fecha ? ' (' + esc(fecha) + ')' : ''}. Tus $300 de la preventa ya cuentan como pago${descuento ? ' y tu <b>descuento de preventa de ' + mxn(descuento) + '</b> ya está aplicado en el total' : ''}.</p>
        <table style="width:100%;border-collapse:collapse;margin:0 0 18px">
          ${fila('Paquete', esc(PAQ[paquete] || String(paquete || '').toUpperCase()))}
          ${zona ? fila('Zona', esc(zona)) : ''}
@@ -89,6 +89,8 @@ async function avisarPaquete({ cambio, KH_URL, KH_KEY }) {
       evento: ev.a || ev.id, fecha: require('./fecha-evento').fechaDeEventoId(ev, (v && v.evento_id) || cambio.evento_id),
       paquete: (v && v.tipo_paquete) || cambio.paquete_pedido, zona: (v && v.zona_boleto) || cambio.zona_pedida,
       hotel: cambio.hotel_pedido, cuenta, motivo: cambio.respuesta, contratoVivo: CONTRATO_CLIENTE_VIVO,
+      // [PREVENTA-AUTO-1] Solo se DICE el descuento si la elección lo trae escrito.
+      descuento: /de preventa/.test(String(cambio.detalle || '')) ? require('./opciones-paquete').PREVENTA_DESCUENTO : null,
     });
     const mp = aplicarModoPrueba({ to: [r.to], subject: r.subject });
     const resp = await fetch('https://api.resend.com/emails', {

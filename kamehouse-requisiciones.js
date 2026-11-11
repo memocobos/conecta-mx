@@ -45,6 +45,7 @@ async function _reqBdjCall(body) {
 async function loadRequisiciones(filtro) {
   if (filtro) _reqBdjFiltro = filtro;
   try { loadCambiosPortal(); } catch (_) {}
+  try { loadPreventaCostos(); } catch (_) {}
   // [PORTAL-SOLO-1] Arriba de todo: lo que el cliente espera ver en su Portal.
   try { if (typeof loadRevisionesPortal === 'function') loadRevisionesPortal(); } catch (_) {}
   const cont = document.getElementById('req-bdj-lista');
@@ -76,6 +77,46 @@ async function loadRequisiciones(filtro) {
 // ── [PORTAL-EDIT-1] Solicitudes de cambio que el cliente manda desde el Portal ──
 // Viven ARRIBA de las requisiciones. No cambian nada solas: se atienden a mano
 // (el cambio se hace en el viajero) y se cierran aquí. Se calla en cero.
+// [PREVENTA-AUTO-1] «📣 ¡Ya hay paquetes!» a la preventa a ciegas de un evento
+// que ya salió a la venta. Solo se pinta si hay alguien en preventa en un evento
+// que YA vende paquetes reales. Ver el correo primero (seco), luego mandar.
+async function loadPreventaCostos() {
+  const lista = document.getElementById('req-bdj-lista');
+  if (!lista) return;
+  let box = document.getElementById('req-prev-costos');
+  if (!box) { box = document.createElement('div'); box.id = 'req-prev-costos'; lista.parentNode.insertBefore(box, lista); }
+  const j = await _reqBdjCall({ accion: 'preventa_costos_lista' }).catch(() => null);
+  const evs = ((j && j.eventos) || []).filter((e) => e.con_paquetes && e.correos > (e.enviados || 0));
+  if (!evs.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="rq-section">📣 Preventa a ciegas · ya hay paquetes <span class="rq-pill pend">${evs.length}</span></div>`
+    + evs.map((e) => `<div class="rq-cambio">
+      <div class="rq-name">${_reqBdjEsc(e.evento)}</div>
+      <div class="rq-ev">${e.personas} en preventa · ${e.correos} correos · ${e.enviados == null ? '?' : e.enviados} ya avisados</div>
+      <div style="font-size:12px;opacity:.85;margin:4px 0">Les llega «¡Ya hay paquetes!»: $300 de descuento + sus $300 cuentan como pago; eligen en su Portal y queda confirmado solo.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="rq-btn" onclick="_reqPrevCostos('${_reqBdjEsc(e.evento_id)}', false)">👁 Ver el correo y a quién</button>
+        <button class="rq-btn pri" onclick="_reqPrevCostos('${_reqBdjEsc(e.evento_id)}', true)">📨 Mandar</button>
+      </div>
+      <div id="req-prev-out-${_reqBdjEsc(e.evento_id)}" style="margin-top:8px"></div></div>`).join('');
+}
+async function _reqPrevCostos(slug, mandar) {
+  const out = document.getElementById('req-prev-out-' + slug);
+  if (mandar && !confirm('¿Mandar el correo «¡Ya hay paquetes!» a la preventa de este evento? Es un correo REAL.')) return;
+  if (out) out.textContent = mandar ? 'Mandando…' : 'Cargando…';
+  const j = await _reqBdjCall(mandar ? { accion: 'preventa_costos', evento_id: slug, seco: false, confirmar: true } : { accion: 'preventa_costos', evento_id: slug });
+  if (!out) return;
+  if (!j || !j.ok) { out.innerHTML = `<span style="color:var(--red)">${_reqBdjEsc((j && j.error) || 'No se pudo')}</span>`; return; }
+  if (j.seco) {
+    out.innerHTML = `<div style="font-size:12px">A quién (${j.a_quien.length}): ${j.a_quien.map((x) => _reqBdjEsc(x.nombre || x.correo)).join(', ') || '—'}`
+      + (j.ya_recibieron ? ` · ya lo recibieron ${j.ya_recibieron}` : '')
+      + (j.saltados.length ? `<br>Sin correo usable / sin publicar: ${j.saltados.map(_reqBdjEsc).join(', ')}` : '') + '</div>'
+      + (j.ejemplo ? `<iframe style="width:100%;height:520px;border:1px solid var(--border,#333);border-radius:8px;margin-top:6px;background:#000" srcdoc="${_reqBdjEsc('<meta charset="utf-8">' + j.ejemplo.html)}"></iframe>` : '');
+    return;
+  }
+  const sinBit = (j.enviados || []).filter((x) => !x.bitacora).length;
+  showToast(_reqBdjEsc(`Mandados ${j.enviados.length}` + (j.errores.length ? ` · ${j.errores.length} fallaron` : '') + (sinBit ? ` · ${sinBit} sin bitácora` : '') + (j.faltan ? ` · faltan ${j.faltan}: vuelve a apretar` : '')), j.errores.length || sinBit ? 'warning' : 'success');
+  loadPreventaCostos();
+}
 async function loadCambiosPortal() {
   const lista = document.getElementById('req-bdj-lista');
   if (!lista) return;
@@ -167,8 +208,8 @@ function _reqPaqAbrir(id) {
   box.dataset.abierto = 'paq';
   box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
     <label class="rq-field">Costo TOTAL del paquete para esta persona (sus $300 de preventa ya están abonados aparte) *
-      <input type="number" min="1" step="1" id="rq-paq-tot-${id}" value="${c.precio_lista != null ? Number(c.precio_lista) : ''}"></label>
-    <div style="font-size:11px;opacity:.75;margin-top:4px">Nace con el precio de lista. Si le toca el descuento de la preventa, réstalo aquí.${c.hotel_pedido ? ' Habitación pedida: <b>' + _reqBdjEsc(c.hotel_pedido) + '</b> — asígnala en Rooming.' : ''} Al aplicar nace su contrato.</div>
+      <input type="number" min="1" step="1" id="rq-paq-tot-${id}" value="${c.precio_lista != null ? Math.max(0, Number(c.precio_lista) - KH_PREVENTA_DESCUENTO) : ''}"></label>
+    <div style="font-size:11px;opacity:.75;margin-top:4px">Nace con el precio de lista${c.precio_lista != null ? ' ($' + Number(c.precio_lista).toLocaleString('es-MX') + ')' : ''} MENOS los $${KH_PREVENTA_DESCUENTO} del beneficio de preventa (por lugar: si son varios lugares, multiplícalo).${c.hotel_pedido ? ' Habitación pedida: <b>' + _reqBdjEsc(c.hotel_pedido) + '</b> — asígnala en Rooming.' : ''} Al aplicar nace su contrato.</div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="rq-btn pri" id="rq-paq-go-${id}" onclick="_reqPaqAplicar('${id}')">Aplicar y cerrar</button>
       <button class="rq-btn quiet" onclick="_reqPaqAbrir('${id}')">Cancelar</button>

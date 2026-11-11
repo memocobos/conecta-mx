@@ -1736,77 +1736,19 @@ ${entregables}
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede cambiar el paquete' }) };
       }
-      const id = String(body.id || '').trim();
-      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
-      const paquete = String(body.tipo_paquete || '').trim().toLowerCase();
-      if (!PAQUETES_MIGRAR.includes(paquete)) return bad(headers, `tipo_paquete inválido: se espera uno de ${PAQUETES_MIGRAR.join(', ')}`);
-      let zona = String(body.zona_boleto || '').trim();
-      const rideSinZona = paquete === 'ride' && !zona;
-      if (!zona && !rideSinZona) return bad(headers, 'la zona del boleto es obligatoria');
-      if (/^preventa a ciegas$/i.test(zona)) return bad(headers, 'elige la zona REAL, no «Preventa a ciegas»');
       const total = _numDinero(body.total_contrato);
       if (total === null || total <= 0) return bad(headers, 'el costo del paquete es obligatorio y debe ser mayor que cero');
-
-      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,evento_id,nombre,tipo_paquete,zona_boleto,total_contrato,boletos,notas&limit=1`, { headers: sbHeaders });
-      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
-      const v = (await pre.json())[0];
-      if (!v) return bad(headers, 'ese viajero no existe');
-      const zonaAct = String(v.zona_boleto || '').trim();
-      const enPreventa = String(v.tipo_paquete || '').toLowerCase() === 'cheap' && (!zonaAct || /^preventa a ciegas$/i.test(zonaAct));
-      if (!enPreventa) {
-        return { statusCode: 409, headers, body: JSON.stringify({ error: 'Este viajero ya no está en preventa (ya tiene paquete y zona). Si hay que cambiarlo, es un cambio manual aparte.', ya: true }) };
-      }
-
-      let zonaAviso = null, stockAviso = null;
-      if (!rideSinZona) {
-        const vz = await puertaZona(v.evento_id, zona);
-        if (vz.estado === 'desconocida') {
-          const lista = (vz.canonicas || []).join(' · ');
-          return bad(headers, `La zona «${zona}» no existe en la ficha. ` + (lista ? `Las de la ficha: ${lista}.` : ''));
-        }
-        if (vz.estado === 'canonizada') { zonaAviso = `Zona corregida a «${vz.zona}»`; zona = vz.zona; }
-        else if (vz.estado === 'sin-catalogo' || vz.estado === 'sin-evento') zonaAviso = 'La zona se guardó sin validar contra la ficha (catálogo ilegible).';
-        // El inventario: si Kamisama ya tiene el pedido de esa zona y no alcanza,
-        // NO se vende (palabra de Memo). Si todavía no hay pedido cargado, pasa
-        // CON aviso: hoy es el día de la venta y el pedido puede cargarse después.
-        if (paquete !== 'ride' && env.PORTAL_SB_URL && env.PORTAL_SB_SERVICE) {
-          try {
-            const disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id: v.evento_id });
-            if (!disp.error) {
-              const ez = evaluarZona(disp, zona, Number(v.boletos) || 1);
-              if (ez.gestionada && ez.sinCupo) {
-                return { statusCode: 409, headers, body: JSON.stringify({ error: `«${zona}» ya no tiene lugar en Kamisama (quedan ${ez.restante}). Ofrécele otra zona.`, agotada: true, restante: ez.restante }) };
-              }
-              if (!ez.gestionada) stockAviso = `«${zona}» todavía no tiene pedido cargado en Kamisama: no se pudo confirmar que haya lugar.`;
-            }
-          } catch (_) { stockAviso = 'No se pudo medir el inventario; revisa la zona en Kamisama.'; }
-        }
-      }
-
+      // [PREVENTA-AUTO-1] El cuerpo vive en `_lib/preventa-aplicar` (dos lectores:
+      // este botón y el wizard del Portal). Mismos candados, mismo sello, mismo contrato.
+      const { aplicarPaquetePreventa } = require('./_lib/preventa-aplicar');
       const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
-      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
-      const sello = `[PREVENTA→PAQUETE ${hoy}] de PREVENTA A CIEGAS $${Number(v.total_contrato) || 0} a ${paquete.toUpperCase()}${zona ? ' · ' + zona : ''} · total $${total} · capturó ${quien}`;
-      const notas = v.notas ? `${v.notas} · ${sello}` : sello;
-      // Valor esperado: paquete, zona y total TAL COMO se leyeron.
-      const filtroZona = v.zona_boleto == null ? 'zona_boleto=is.null' : `zona_boleto=eq.${encodeURIComponent(v.zona_boleto)}`;
-      const filtroTot = v.total_contrato == null ? 'total_contrato=is.null' : `total_contrato=eq.${v.total_contrato}`;
-      const r = await fetch(`${baseVE}?id=eq.${id}&tipo_paquete=eq.${encodeURIComponent(v.tipo_paquete)}&${filtroZona}&${filtroTot}`, {
-        method: 'PATCH',
-        headers: { ...sbHeaders, Prefer: 'return=representation' },
-        body: JSON.stringify({ tipo_paquete: paquete, zona_boleto: zona || null, total_contrato: total, notas }),
+      const rr = await aplicarPaquetePreventa({
+        id: body.id, paquete: body.tipo_paquete, zona: body.zona_boleto, total, hotel: body.hotel || null, quien,
+        contratoSinCorreo: body.contrato_sin_correo === true, creado_por: (auth.user && auth.user.correo) || null,
+        KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE, PORTAL_URL: env.PORTAL_SB_URL, PORTAL_KEY: env.PORTAL_SB_SERVICE,
       });
-      if (!r.ok) return upstream(headers, await r.text(), 'update');
-      const filas = await r.json();
-      if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien ya cambió a este viajero mientras tanto. Recarga la lista.', ya: true }) };
-      // [CONTRATO-CLIENTE-1] Con paquete REAL nace su contrato (decisión B de
-      // Memo: el de la preventa a ciegas espera a este momento), con el anexo
-      // de preventa. Jamás deshace el cambio de paquete.
-      const { emitirContratos } = require('./_lib/contrato-cliente');
-      // [PREVENTA-PORTAL-2] Desde la bandeja el aviso al cliente es UNO (el correo
-      // de «paquete confirmado», que ya dice que el contrato se firma en el Portal):
-      // la bandeja pide `contrato_sin_correo` y el contrato nace sin su propio correo.
-      const contrato = await emitirContratos({ viajeroIds: [filas[0].id], preventa: true, enviar: body.contrato_sin_correo !== true, creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
-      return ok(headers, { viajero: filas[0], zona_aviso: zonaAviso, stock_aviso: stockAviso, contrato });
+      if (rr.status === 200) return ok(headers, rr.body);
+      return { statusCode: rr.status, headers, body: JSON.stringify(rr.body) };
     }
 
     // ═══ [VIAJERO-MUDAR-1] LAS FECHAS DE UN EVENTO, PARA ELEGIR DESTINO ══════

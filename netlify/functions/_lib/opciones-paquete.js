@@ -16,6 +16,18 @@ const { _calcularPrecio, _zonaLista, _hotelLista, esCDMX, PAQUETES } = require('
 const { paqueteVendibleEnSitio } = require('./paquete-sitio');
 
 const ZONA_PREVENTA_RE = /^preventa a ciegas$/i;
+// [PREVENTA-AUTO-1] El beneficio de la preventa a ciegas (palabra de Memo,
+// 10-nov-2026): sobre el precio de lista de CUALQUIER paquete y zona, $300 de
+// descuento POR LUGAR — y sus $300 de separo cuentan aparte como pago.
+// «Si el paquete cuesta 5600 para todo mundo, para ella cuesta 5300 y sus 300
+// de reserva cuentan como pago: ya solo debe $5000.» Un solo dueño del número.
+const PREVENTA_DESCUENTO = 300;
+function totalPreventa(precioLista, boletos) {
+  const n = Math.max(1, Number(boletos) || 1);
+  const p = Math.round(Number(precioLista) || 0);
+  if (!(p > PREVENTA_DESCUENTO)) return null; // jamás un contrato en $0 o negativo
+  return (p - PREVENTA_DESCUENTO) * n;
+}
 const NOMBRES = { plus: 'PLUS · Todo incluido', stay: 'STAY · Sin transporte', ride: 'RIDE · Sin boleto', cheap: 'CHEAP · Solo boleto' };
 const ORDEN = ['plus', 'stay', 'ride', 'cheap'];
 
@@ -129,4 +141,4 @@ function fechasVendibles(ev, hoyISO) {
   return out;
 }
 
-module.exports = { opcionesPaquete, validarEleccion, enPreventa, _opciones, fechasVendibles, NOMBRES };
+module.exports = { opcionesPaquete, validarEleccion, enPreventa, _opciones, fechasVendibles, NOMBRES, PREVENTA_DESCUENTO, totalPreventa };

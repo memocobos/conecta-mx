@@ -2534,6 +2534,9 @@ function showPage(name) {
 // [DONOMAR-VENTA-1, 10-nov] donomar sale a la venta: sus CHEAP NUEVOS son CHEAP
 // (banco Banamex); Leslie y cualquiera de la preventa siguen rotulados POR SU ZONA.
 const KH_PREVENTA_EVENTOS = ['palnorte'];
+// [PREVENTA-AUTO-1] Espejo con nombre de PREVENTA_DESCUENTO (_lib/opciones-paquete):
+// el beneficio de la preventa son $300 menos sobre el precio de lista, por lugar.
+const KH_PREVENTA_DESCUENTO = 300;
 function khEsPreventaCiegas(v) {
   if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
   if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;
@@ -7829,8 +7832,13 @@ async function _vjElegirSugerido(id) {
   try {
     const j = await khViajeros.precioSugerido({ evento_id: _ccEventoActual, tipo_paquete: paq, zona });
     if (j && j.sugerido != null) {
-      if (tot && !tot.value) tot.value = j.total != null ? j.total : j.sugerido;
-      if (sug) sug.textContent = `Costo de la página: $${Number(j.total != null ? j.total : j.sugerido).toLocaleString('es-MX')} (habitación compartida). Ajústalo si cambia el cuarto o aplica el descuento.`;
+      // [PREVENTA-AUTO-1] Se prellena YA con el descuento de la preventa (lista − $300 por lugar).
+      const lista = Number(j.total != null ? j.total : j.sugerido);
+      const fila = (typeof _vj2Filas !== 'undefined' ? _vj2Filas : []).find((x) => x && x.id === id) || {};
+      const n = Math.max(1, Number(fila.boletos) || 1);
+      const conDesc = Math.max(0, (lista - KH_PREVENTA_DESCUENTO) * n);
+      if (tot && !tot.value) tot.value = conDesc;
+      if (sug) sug.textContent = `Costo de la página: $${lista.toLocaleString('es-MX')} (habitación compartida, por persona) − $${KH_PREVENTA_DESCUENTO} de preventa${n > 1 ? ' × ' + n + ' lugares' : ''} = $${conDesc.toLocaleString('es-MX')}. Ajústalo si cambia el cuarto.`;
     } else if (sug) sug.textContent = `Sin costo sugerido (${(j && j.motivo) || 'no se pudo calcular'}): escríbelo a mano.`;
   } catch (_) { if (sug) sug.textContent = 'Sin costo sugerido: escríbelo a mano.'; }
 }

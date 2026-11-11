@@ -84,7 +84,7 @@ exports.handler = async (event) => {
   const hKH = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   let v;
   try {
-    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,portal_revisado_at,usuario_id,tipo_viajero,grupo_viaje,total_contrato,abonado_previo,plan_pagos&limit=1`, { headers: hKH });
+    const r = await fetch(`${KH_URL}/rest/v1/viajeros_evento?id=eq.${viajero_id}&select=id,evento_id,nombre,correo,celular,tipo_paquete,zona_boleto,boletos,portal_revisado_at,usuario_id,tipo_viajero,grupo_viaje,total_contrato,abonado_previo,plan_pagos&limit=1`, { headers: hKH });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude leer tu viaje' });
     v = (await r.json())[0];
   } catch (e) { return json(502, headers, { ok: false, error: 'No pude leer tu viaje' }); }
@@ -128,23 +128,71 @@ exports.handler = async (event) => {
         const rr = await fetch(`${KH_URL}/rest/v1/cambios_viajero?viajero_id=eq.${viajero_id}&tipo=eq.paquete&estado=eq.rechazada&order=atendida_at.desc&limit=1&select=paquete_pedido,zona_pedida,respuesta,atendida_at`, { headers: hKH });
         if (rr.ok) rechazada = (await rr.json())[0] || null;
       } catch (_) { /* sin el aviso: las opciones siguen */ }
-      return json(200, headers, { ok: true, evento: o.evento, paquetes: o.paquetes, rechazada });
+      // [PREVENTA-AUTO-1] El Portal pinta SU precio: lista − $300 por lugar, y
+      // cuánto le faltaría con lo que ya pagó. El número lo da el dueño
+      // (`totalPreventa`), la pantalla solo lo pinta.
+      let pagado = null;
+      try {
+        const ar = await fetch(`${KH_URL}/rest/v1/abonos_viajero?viajero_id=eq.${viajero_id}&select=monto&limit=1000`, { headers: hKH });
+        if (ar.ok) pagado = require('./_lib/cuenta-evento').saldoMigrado(v, await ar.json()).abonado;
+      } catch (_) { pagado = null; }
+      const boletos = Math.max(1, Number(v.boletos) || 1);
+      const paquetes = o.paquetes.map((pq) => Object.assign({}, pq, {
+        precio_preventa: pq.precio != null ? op.totalPreventa(pq.precio, 1) : undefined,
+        zonas: pq.zonas ? pq.zonas.map((z) => Object.assign({}, z, { precio_preventa: op.totalPreventa(z.precio, 1) })) : pq.zonas,
+      }));
+      return json(200, headers, { ok: true, evento: o.evento, paquetes, rechazada, descuento: op.PREVENTA_DESCUENTO, boletos, pagado, automatico: true });
     }
 
     if (pend) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.', pendiente: pend });
     const e = await op.validarEleccion(v.evento_id, { paquete: body.paquete, zona: body.zona, hotel: body.hotel });
     if (!e.ok) return json(400, headers, { ok: false, error: e.motivo });
-    const detalle = `Elige ${e.nombre}${e.zona ? ' · zona ' + e.zona : ''}${e.hotel ? ' · ' + e.hotel : ''} · precio de lista $${e.precio.toLocaleString('es-MX')} por persona (sus $300 de preventa ya están abonados)`;
+    // [PREVENTA-AUTO-1] Palabra de Memo (10-nov): «ella haga todo automático y ya
+    // le llegue su confirmación». El precio lo pone el MOTOR (no el cliente: el
+    // cuerpo no trae precio) y el descuento su dueño; el dinero abonado no se
+    // toca. Aplica por el MISMO dueño que el botón 🎟 de Capsule.
+    const boletos = Math.max(1, Number(v.boletos) || 1);
+    const total = op.totalPreventa(e.precio, boletos);
+    if (total == null) return json(400, headers, { ok: false, error: 'Esa opción no tiene precio válido: elige otra o escríbenos por WhatsApp.' });
+    const detalle = `Elige ${e.nombre}${e.zona ? ' · zona ' + e.zona : ''}${e.hotel ? ' · ' + e.hotel : ''} · lista $${e.precio.toLocaleString('es-MX')} − $${op.PREVENTA_DESCUENTO} de preventa${boletos > 1 ? ' × ' + boletos + ' lugares' : ''} = total $${total.toLocaleString('es-MX')} (sus $300 de separo ya están abonados)`;
     const fila = { viajero_id, evento_id: v.evento_id, correo, nombre: v.nombre || null, tipo: 'paquete', detalle,
       paquete_pedido: e.paquete, zona_pedida: e.zona, hotel_pedido: e.hotel, precio_lista: e.precio };
+    const { aplicarPaquetePreventa } = require('./_lib/preventa-aplicar');
+    let ap;
+    try {
+      ap = await aplicarPaquetePreventa({ id: viajero_id, paquete: e.paquete, zona: e.zona || '', total, hotel: e.hotel, quien: `el cliente desde su Portal (${correo})`,
+        contratoSinCorreo: true, creado_por: correo, KH_URL, KH_KEY, PORTAL_URL: PT_URL, PORTAL_KEY: process.env.PORTAL_SUPABASE_SERVICE_KEY });
+    } catch (err) { ap = { status: 502, body: { error: String((err && err.message) || err) } }; }
+    if (ap.status === 200) {
+      const avisos = [ap.body.zona_aviso, ap.body.stock_aviso].filter(Boolean);
+      const k = ap.body.contrato || {};
+      if (k.aviso) avisos.push('contrato: ' + k.aviso);
+      (k.errores || []).forEach((x) => avisos.push('contrato: ' + x.aviso));
+      const cerrada = Object.assign({}, fila, { estado: 'atendida', atendida_por: 'automático (Portal)', atendida_at: new Date().toISOString(),
+        respuesta: `Aplicado automático desde el Portal · total $${total}` + (avisos.length ? ' · ⚠️ ' + avisos.join(' · ') : '') });
+      let row = null;
+      try {
+        const rr = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, { method: 'POST', headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify(cerrada) });
+        if (rr.ok) row = (await rr.json())[0] || null;
+      } catch (_) { row = null; }
+      // El correo «Tu paquete quedó confirmado» (total · pagado · te falta + firma
+      // tu contrato en el Portal). Jamás tumba la aplicación: si falla, se dice.
+      let correoR = null;
+      try { correoR = await require('./_lib/correo-paquete').avisarPaquete({ cambio: row || Object.assign({}, cerrada, { viajero_id }), KH_URL, KH_KEY }); } catch (_) { correoR = null; }
+      return json(200, headers, { ok: true, aplicado: true, eleccion: { paquete: e.paquete, zona: e.zona, hotel: e.hotel, precio: e.precio, total }, correo_enviado: !!(correoR && correoR.ok) });
+    }
+    // Rebotes con razón (zona agotada, ya no está en preventa, zona inválida): se le DICEN.
+    if (ap.status === 400 || ap.status === 409) return json(ap.status, headers, { ok: false, error: ap.body.error || 'No se pudo aplicar tu elección' });
+    // Cualquier otra falla (base caída): la elección NO se pierde — cae a la bandeja
+    // como antes y el equipo la aplica a mano.
     const r = await fetch(`${KH_URL}/rest/v1/cambios_viajero`, {
       method: 'POST',
       headers: Object.assign({}, hKH, { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify(fila),
+      body: JSON.stringify(Object.assign({}, fila, { detalle: detalle + ' · ⚠️ no se pudo aplicar solo: ' + String(ap.body.error || '').slice(0, 120) })),
     });
     if (r.status === 409) return json(409, headers, { ok: false, error: 'Ya enviaste tu elección: el equipo la está revisando.' });
     if (!r.ok) return json(502, headers, { ok: false, error: 'No pude enviar tu elección. Inténtalo otra vez.' });
-    return json(200, headers, { ok: true, solicitud: 'pendiente', eleccion: { paquete: e.paquete, zona: e.zona, hotel: e.hotel, precio: e.precio } });
+    return json(200, headers, { ok: true, solicitud: 'pendiente', eleccion: { paquete: e.paquete, zona: e.zona, hotel: e.hotel, precio: e.precio, total } });
   }
 
   // ── 3r · [ACOMP-2] REPARTIR LUGARES A LOS ACOMPAÑANTES ─────────────────

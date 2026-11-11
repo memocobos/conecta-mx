@@ -40,7 +40,16 @@ global.fetch = async (url, init) => {
   if (u.includes('api.resend.com')) { const b = JSON.parse(init.body); (DB.correos = DB.correos || []).push(b); return resp(200, { id: 'em_' + DB.correos.length }); }
   if (u.includes('/rest/v1/usuarios')) return resp(200, [{ id: 'u-roshi', activo: true, rol: 'maestro_roshi' }]);
   if (u.includes('/rest/v1/abonos_viajero')) { const vid = eq(u, 'viajero_id'); return resp(200, (DB.abonos || []).filter((a) => !vid || a.viajero_id === vid)); }
-  if (u.includes('/rest/v1/viajeros_evento')) { const id = eq(u, 'id'); return resp(200, DB.v.filter((v) => !id || v.id === id)); }
+  if (u.includes('/rest/v1/viajeros_evento')) {
+    const id = eq(u, 'id');
+    // [PREVENTA-AUTO-1] La red falsa aprende el PATCH con valor esperado (el wizard ya APLICA).
+    if (m === 'PATCH') {
+      const tp = eq(u, 'tipo_paquete'); const b = JSON.parse(init.body);
+      const f = DB.v.filter((v) => v.id === id && (!tp || v.tipo_paquete === tp)); f.forEach((v) => Object.assign(v, b)); (DB.patchV = DB.patchV || []).push(b); return resp(200, f);
+    }
+    return resp(200, DB.v.filter((v) => !id || v.id === id));
+  }
+  if (u.includes('/rest/v1/contratos_cliente')) return resp(200, []);
   if (u.includes('/rest/v1/cambios_viajero')) {
     if (m === 'PATCH') {
       const id = eq(u, 'id'), est = eq(u, 'estado'); const b = JSON.parse(init.body);
@@ -92,20 +101,36 @@ const llamar = async (b) => { const r = await H({ httpMethod: 'POST', headers: {
   af(r.s === 400 && DB.c.length === 0, 'zona inventada → 400 sin escribir');
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(1), paquete: 'plus', zona: AGOTADA, hotel: 'Compartida (4 personas)' });
   af(r.s === 400 && DB.c.length === 0, 'zona agotada → 400 sin escribir');
+  // [PREVENTA-AUTO-1] (10-nov, palabra de Memo) El wizard ya NO deja una solicitud
+  // pendiente: APLICA el paquete con lista − $300 y manda la confirmación.
+  // Las aserciones viejas («pendiente» · «en revisión») se actualizaron a esta verdad.
+  process.env.RESEND_API_KEY = 're_falso'; process.env.CORREOS_MODO = 'real'; DB.correos = [];
+  r = await llamar({ accion: 'opciones_paquete', viajero_id: U(1) });
+  af(r.s === 200 && r.j.descuento === 300 && (r.j.paquetes.find((p) => p.paquete === 'plus').zonas.find((z) => z.zona === 'General') || {}).precio_preventa === pubPlus - 300, () => 'opciones manda el precio de preventa (lista − 300) por zona · ' + JSON.stringify(r.j.paquetes && r.j.paquetes[0] && r.j.paquetes[0].zonas && r.j.paquetes[0].zonas[0]));
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(1), paquete: 'stay', zona: 'General', hotel: 'Compartida (4 personas)', precio: 1 });
   const fila = DB.c[0] || {};
-  af(r.s === 200 && fila.tipo === 'paquete' && fila.paquete_pedido === 'stay' && fila.zona_pedida === 'General' && fila.hotel_pedido === 'Compartida (4 personas)', () => 'nace la solicitud estructurada · ' + JSON.stringify(fila).slice(0, 160));
-  af(fila.precio_lista === pubPlus - 500 && fila.correo === 'ana@correo.mx', () => 'el precio lo pone el MOTOR (no el «precio:1» del cuerpo) y el correo va en minúsculas: ' + fila.precio_lista);
-  r = await llamar({ accion: 'opciones_paquete', viajero_id: U(1) });
-  af(r.s === 200 && r.j.pendiente && r.j.pendiente.paquete_pedido === 'stay', 'con una elección pendiente, opciones contesta «en revisión»');
+  const pv = (DB.patchV || [])[0] || {};
+  af(r.s === 200 && r.j.aplicado && pv.tipo_paquete === 'stay' && pv.zona_boleto === 'General', () => 'pedir APLICA: el viajero pasa a STAY General · ' + JSON.stringify(r.j).slice(0, 160));
+  af(pv.total_contrato === pubPlus - 500 - 300, () => 'total = lista del MOTOR − $300 de preventa (no el «precio:1» del cuerpo): ' + pv.total_contrato + ' vs ' + (pubPlus - 800));
+  af(/\[PREVENTA→PAQUETE /.test(pv.notas || '') && /desde su Portal/.test(pv.notas || ''), 'el sello de preventa queda en notas, diciendo que fue desde el Portal');
+  af(fila.tipo === 'paquete' && fila.estado === 'atendida' && fila.precio_lista === pubPlus - 500 && fila.correo === 'ana@correo.mx', () => 'queda el registro de la elección (atendida, precio de lista del motor) · ' + JSON.stringify(fila).slice(0, 160));
+  af(DB.correos.length === 1 && /confirmado/i.test(DB.correos[0].subject) && /descuento de preventa/.test(DB.correos[0].html), () => 'sale UN correo «confirmado» que dice el descuento · ' + DB.correos.length);
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(1), paquete: 'plus', zona: 'General', hotel: 'Compartida (4 personas)' });
-  af(r.s === 409 && DB.c.length === 1, '2º envío → 409, una sola solicitud');
+  af(r.s === 409 && DB.correos.length === 1, 'ya aplicado → el 2º envío rebota 409 sin otro correo');
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(2), paquete: 'plus', zona: 'General', hotel: 'Compartida (4 personas)' });
   af(r.s === 409 && r.j.ya, 'quien ya tiene paquete → 409 (lo suyo es «Pedir un cambio»)');
   r = await llamar({ accion: 'pedir_paquete', viajero_id: U(3), paquete: 'cheap', zona: 'General' });
   af(r.s === 404 && DB.c.length === 1, 'viajero de otra cuenta → 404 sin escribir');
-  r = await llamar({ accion: 'pedir_paquete', viajero_id: U(1), paquete: 'cheap', zona: 'General', hotel: 'x' });
-  af(r.s === 409, 'la guarda de pendiente corre ANTES de validar (no hay segunda vía)');
+  // Una elección pendiente (vieja) sigue mandando «en revisión» y bloquea la vía automática.
+  DB.c.push({ id: U(951), viajero_id: U(3), evento_id: 'nsqkmty', correo: 'otra@x.mx', tipo: 'paquete', estado: 'pendiente', paquete_pedido: 'cheap', zona_pedida: 'General' });
+  DB.v[2].correo = 'ana@correo.mx';
+  r = await llamar({ accion: 'pedir_paquete', viajero_id: U(3), paquete: 'cheap', zona: 'General', hotel: 'x' });
+  af(r.s === 409 && !(DB.patchV || [])[1], 'con una elección pendiente la guarda corre ANTES de aplicar (409, sin PATCH)');
+  DB.v[2].correo = 'otra@x.mx'; DB.c.pop();
+  // Para el bloque [C] (bandeja) se siembra una elección pendiente como las de antes.
+  Object.assign(DB.v[0], { tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas' });
+  DB.c.unshift({ id: U(950), viajero_id: U(1), evento_id: 'nsqkmty', correo: 'ana@correo.mx', nombre: 'Ana Pérez', tipo: 'paquete', estado: 'pendiente', paquete_pedido: 'stay', zona_pedida: 'General', hotel_pedido: 'Compartida (4 personas)', detalle: 'x' });
+  DB.correos = [];
 
   console.log('\n[C] la respuesta va por CORREO y al Portal (PREVENTA-PORTAL-2)');
   process.env.JWT_SECRET = 'secreto-de-arnes'; process.env.RESEND_API_KEY = 're_falso'; process.env.CORREOS_MODO = 'real';
@@ -148,7 +173,7 @@ const llamar = async (b) => { const r = await H({ httpMethod: 'POST', headers: {
   r = await bandeja({ accion: 'cambio_cerrar', id: U(951), estado: 'atendida' });
   af(r.s === 200 && DB.correos.length === 0 && r.j.correo === null, 'un cambio que NO es de paquete se cierra sin correo (sin cambios a PORTAL-EDIT-1)');
   const ac = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');
-  af(/enviar: body\.contrato_sin_correo !== true/.test(ac) && /contrato_sin_correo: true/.test(fs.readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8')), 'desde la bandeja el contrato nace SIN su propio correo: un aviso por decisión');
+  af(/contratoSinCorreo: body\.contrato_sin_correo === true/.test(ac) && /enviar: contratoSinCorreo !== true/.test(fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/preventa-aplicar.js'), 'utf8')) && /contrato_sin_correo: true/.test(fs.readFileSync(path.join(RAIZ, 'kamehouse-requisiciones.js'), 'utf8')), 'desde la bandeja el contrato nace SIN su propio correo: un aviso por decisión');
   af(!/por WhatsApp/.test(fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').slice(fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').indexOf('function _migPaqHtml('), fs.readFileSync(path.join(RAIZ, 'portal.html'), 'utf8').indexOf('async function _paqEnviar('))), 'el wizard del Portal ya no promete WhatsApp');
 
   console.log('\n[B] bandeja y Portal');

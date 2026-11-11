@@ -60,6 +60,10 @@ const ACCIONES = {
   // devuelve el guardado o genera uno (monto = separo + comisión, del servidor).
   // Cero dinero: un link es una invitación a pagar, no un pago.
   mp_link: ROLES_BANDEJA,
+  // [PREVENTA-AUTO-1] «¡Ya hay paquetes!» a la preventa a ciegas de un evento
+  // que salió a la venta: lista (solo lee) y mandar (seco por default).
+  preventa_costos_lista: ROLES_BANDEJA,
+  preventa_costos: ROLES_BANDEJA,
 };
 // [CONFIRMA-1] Al aprobar sale UN correo: confirmación + invitación al Portal
 // (palabra de Memo: «correo único»). El dueño es _lib/correo-confirmacion; sus
@@ -335,6 +339,78 @@ exports.handler = async (event) => {
     const pendientes = pc.ok ? (await pc.json()).length : null;
     return j(200, headers, { ok: true, cambios: rows.map((x) => Object.assign({}, x, { viajero: vmap[x.viajero_id] || null })), pendientes });
   }
+  // ── [PREVENTA-AUTO-1] «¡Ya hay paquetes!» a la preventa a ciegas ─────────
+  // Palabra de Memo (10-nov): «una vez que tengamos los costos le debe de llegar
+  // un correo con ya hay paquetes». Se le pregunta al MISMO dueño que el wizard
+  // (`opcionesPaquete`): si el evento sigue sin paquetes reales, no se manda.
+  if (accion === 'preventa_costos_lista' || accion === 'preventa_costos') {
+    const OP = require('./_lib/opciones-paquete');
+    const CPC = require('./_lib/correo-preventa-costos');
+    const sel = 'id,evento_id,nombre,correo,tipo_paquete,zona_boleto,portal_revisado_at,usuario_id,tipo_viajero';
+    const vr = await fetch(`${SB_URL}/rest/v1/viajeros_evento?tipo_paquete=ilike.cheap&zona_boleto=ilike.preventa%20a%20ciegas&select=${sel}&limit=2000`, { headers: sbH });
+    if (!vr.ok) return j(502, headers, { error: 'No se pudo leer a la preventa' });
+    const { esDelEquipo } = require('./_lib/portal-revision');
+    const todos = (await vr.json()).filter((v) => OP.enPreventa(v) && !esDelEquipo(v));
+    const porEv = {};
+    for (const v of todos) { const b = String(v.evento_id).split('#')[0]; (porEv[b] = porEv[b] || []).push(v); }
+    const leerBitacora = async (slug) => {
+      const r = await fetch(`${SB_URL}/rest/v1/portal_recordatorios?campana=eq.${encodeURIComponent(CPC.campanaDe(slug))}&select=correo&limit=5000`, { headers: sbH });
+      if (!r.ok) return null;
+      return new Set((await r.json()).map((x) => String(x.correo).toLowerCase()));
+    };
+    if (accion === 'preventa_costos_lista') {
+      const out = [];
+      for (const slug of Object.keys(porEv)) {
+        const o = await OP.opcionesPaquete(slug);
+        const bit = await leerBitacora(slug);
+        const filas = porEv[slug];
+        const correos = new Set(filas.map((v) => String(v.correo || '').trim().toLowerCase()).filter(Boolean));
+        out.push({ evento_id: slug, evento: (o.evento && o.evento.nombre) || slug, personas: filas.length, correos: correos.size,
+          enviados: bit ? [...correos].filter((c) => bit.has(c)).length : null,
+          con_paquetes: !!o.ok, motivo: o.ok ? null : o.motivo });
+      }
+      out.sort((a, b) => (b.con_paquetes - a.con_paquetes) || String(a.evento).localeCompare(String(b.evento)));
+      return j(200, headers, { ok: true, eventos: out });
+    }
+    const slug = String(body.evento_id || '').split('#')[0].trim();
+    if (!/^[a-z0-9-]+$/i.test(slug)) return j(400, headers, { error: 'evento_id inválido' });
+    const o = await OP.opcionesPaquete(slug);
+    if (!o.ok) return j(409, headers, { error: `Todavía no hay paquetes reales a la venta para este evento (${o.motivo}). Publica la ficha con sus zonas y precios primero.` });
+    const bit = await leerBitacora(slug);
+    if (!bit) return j(502, headers, { error: 'No se pudo leer la bitácora: no mando nada a ciegas (podría repetir correos).' });
+    const filas = porEv[slug] || [];
+    const porCorreo = {};
+    const sinCorreo = [];
+    for (const v of filas) {
+      const c = String(v.correo || '').trim().toLowerCase();
+      if (!/^[^\s@,()]+@[^\s@,()]+\.[^\s@,()]+$/.test(c)) { sinCorreo.push(v.nombre || v.id); continue; }
+      if (!v.portal_revisado_at) { sinCorreo.push((v.nombre || v.id) + ' (sin publicar en el Portal)'); continue; }
+      if (!porCorreo[c]) porCorreo[c] = v;
+    }
+    const tocan = Object.keys(porCorreo).filter((c) => !bit.has(c));
+    const yaRecibieron = Object.keys(porCorreo).filter((c) => bit.has(c));
+    const ejemplo = tocan.length ? CPC.renderPreventaCostos({ nombre: porCorreo[tocan[0]].nombre, correo: tocan[0], evento: o.evento.nombre, fecha: o.evento.fecha }) : null;
+    if (body.seco !== false) {
+      return j(200, headers, { ok: true, seco: true, evento: o.evento.nombre, a_quien: tocan.map((c) => ({ correo: c, nombre: porCorreo[c].nombre })), ya_recibieron: yaRecibieron.length, saltados: sinCorreo, ejemplo });
+    }
+    if (body.confirmar !== true) return j(400, headers, { error: 'falta confirmar:true para mandar' });
+    const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+    if (!RESEND_KEY) return j(500, headers, { error: 'falta RESEND_API_KEY' });
+    const enviados = [], errores = [];
+    for (const c of tocan.slice(0, 60)) {
+      const v = porCorreo[c];
+      const r = CPC.renderPreventaCostos({ nombre: v.nombre, correo: c, evento: o.evento.nombre, fecha: o.evento.fecha });
+      let e;
+      try { e = await CPC.enviarUno({ r, RESEND_KEY }); } catch (err) { e = { ok: false, aviso: String(err && err.message) }; }
+      if (!e.ok) { errores.push({ correo: c, aviso: e.aviso }); continue; }
+      // La bitácora DESPUÉS del envío (si falla, se dice: el próximo clic lo repetiría).
+      const b = await fetch(`${SB_URL}/rest/v1/portal_recordatorios`, { method: 'POST', headers: Object.assign({}, sbH, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ campana: CPC.campanaDe(slug), correo: c, nombre: v.nombre || null, evento_id: v.evento_id, email_id: e.id, enviado_por: quien }) }).catch(() => null);
+      enviados.push({ correo: c, bitacora: !!(b && b.ok) });
+    }
+    return j(200, headers, { ok: true, enviados, errores, saltados: sinCorreo, faltan: Math.max(0, tocan.length - 60) });
+  }
+
   if (accion === 'cambio_cerrar') {
     const cid = String(body.id || '');
     if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });

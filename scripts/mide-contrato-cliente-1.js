@@ -113,7 +113,7 @@ const KH = { KH_URL: 'https://kh.falso.test', KH_KEY: 'svc' };
   af(/punto de reunión/.test(t0) && /objetos personales/.test(t0), 'la cláusula del viaje se queda');
   af(!/Preventa a ciegas/.test(t0), 'sin preventa NO sale el anexo');
   const tp = txt(Object.assign({}, base, { preventa: true }));
-  af(/\$300<\/b> de la preventa <b>cuenta como abono/.test(tp) && /segunda persona/.test(tp) && /otra zona del mismo precio/.test(tp), 'con preventa SÍ sale el anexo (los 3 puntos)');
+  af(/\$300<\/b> de la preventa <b>cuenta como abono/.test(tp) && /\$300 de descuento por lugar sobre el precio de lista/.test(tp) && /otra zona del mismo precio/.test(tp), 'con preventa SÍ sale el anexo (los 3 puntos — [PREVENTA-AUTO-1] el beneficio es $300 menos sobre SU paquete, palabra de Memo 10-nov)');
   af(!/punto de reunión/.test(txt(Object.assign({}, base, { paquete: 'cheap', paquete_txt: 'CHEAP', con_transporte: false }))), 'CHEAP sin transporte no promete punto de reunión');
   af(JSON.stringify(lib.incluyeDe({ inc: ['Boleto zona elegida', 'Transporte Reynosa-Mty', 'Hospedaje compartido', 'Kit Conecta'] }, 'cheap')) === '["Boleto zona elegida","Kit Conecta"]', 'el «incluye» de CHEAP es el mismo filtro que el sitio');
   af(lib.motivoSinContrato({ tipo_viajero: 'coordinador', total_contrato: 5 }) && lib.motivoSinContrato({ total_contrato: 300, zona_boleto: 'Preventa a ciegas' }) && !lib.motivoSinContrato({ total_contrato: 5500, zona_boleto: 'Oro', boletos: 1 }), 'staff y preventa a ciegas no llevan contrato; cliente normal sí');

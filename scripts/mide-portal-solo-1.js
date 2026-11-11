@@ -224,7 +224,9 @@ const call = async (file, b, extraH) => {
   const ar = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-requisiciones.js'), 'utf8');
   af(() => /portal_revisado_at: new Date\(\)\.toISOString\(\), portal_revisado_por: 'requisición '/.test(ar) && /\]\)\.map\(\(f\) => Object\.assign\(f, sello\)\)/.test(ar), 'aprobar una requisición sella las filas que nacen (aprobar ES revisar)');
   const pv = fs.readFileSync(path.join(RAIZ, 'netlify/functions/portal-viajero.js'), 'utf8');
-  af(() => /portal_revisado_por: 'heredado del titular \(ACOMP-2\)'/.test(pv), 'los acompañantes repartidos heredan el sello del titular');
+  // [ACOMP-3] El cuerpo del reparto se mudó a _lib/repartir-lugares (dos lectores): el sello se lee del DUEÑO.
+  const rl = fs.readFileSync(path.join(RAIZ, 'netlify/functions/_lib/repartir-lugares.js'), 'utf8');
+  af(() => /require\('\.\/_lib\/repartir-lugares'\)/.test(pv) && /portal_revisado_por: sellado \? 'heredado del titular \(ACOMP-2\)'/.test(rl), 'los acompañantes repartidos heredan el sello del titular');
   const acta = fs.readFileSync(path.join(RAIZ, 'migraciones/PORTAL-SOLO-1.sql'), 'utf8');
   af(() => /grant select, insert, update, delete on public\.portal_revisiones to service_role/.test(acta) && /enable row level security/.test(acta), 'el acta trae RLS + GRANT service_role (regla del 30-oct)');
 

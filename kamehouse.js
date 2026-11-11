@@ -6845,6 +6845,9 @@ function _vj2Pintar() {
           ${khEsPreventaCiegas(v) ? `<button class="btn btn-primary btn-sm" style="font-size:10px"
             title="Pasar a ${_esfEsc(v.nombre || '')} de la preventa a su paquete real"
             onclick="_vjElegirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">🎟 Elegir paquete</button>` : ''}
+          ${(Number(v.boletos) || 1) >= 2 && !(v.tipo_viajero && v.tipo_viajero !== 'cliente') ? `<button class="btn btn-ghost btn-sm" style="font-size:10px"
+            title="${_esfEsc(v.nombre || '')} tiene ${Number(v.boletos)} lugares en una fila: dale su ficha a cada acompañante (el pago se reparte al peso)"
+            onclick="_vjRepartirAbrir('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}', ${Number(v.boletos) || 1})">👥 Repartir</button>` : ''}
           ${_vjCtrPuede(v) ? `<button class="btn btn-ghost btn-sm" style="font-size:10px"
             title="Contrato de ${_esfEsc(v.nombre || '')}: mandar el correo para firmar en el Portal, o ver su INE si ya firmó"
             onclick="_vjCtrEnviar('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">📜 Contrato</button>` : ''}
@@ -7867,6 +7870,70 @@ async function _vjElegirGuardar(id) {
   } catch (e) {
     if (err) err.textContent = (e && e.message) || 'No se pudo guardar.';
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar paquete'; }
+  }
+}
+
+// [ACOMP-3] 👥 Repartir — la fila de N lugares se vuelve fichas propias.
+// Caso Karina (Pa'l Norte, 10-nov): separó 3 lugares y mandó los datos por
+// Messenger. El servidor es el MISMO del «Agregar a mis acompañantes» del
+// Portal (_lib/repartir-lugares): contrato y pagado al peso, «viaja con».
+function _vjRepartirAbrir(id, nombre, n) {
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (!tr) return;
+  const abierto = tr.style.display !== 'none' && tr.dataset.modo === 'repartir';
+  document.querySelectorAll('tr[id^="vj-ab-"]').forEach((x) => { x.style.display = 'none'; x.dataset.modo = ''; });
+  if (abierto) return;
+  tr.style.display = '';
+  tr.dataset.modo = 'repartir';
+  const e = _esfEsc(id);
+  const tallas = ['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((t) => `<option value="${t}">${t}</option>`).join('');
+  let ren = '';
+  for (let i = 1; i < (Number(n) || 1); i++) {
+    ren += `<div data-rep-row style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+      <div style="font-size:10px;color:var(--ts);flex-basis:100%">Acompañante ${i}</div>
+      <label style="font-size:10px;color:var(--ts)">NOMBRE COMPLETO<br><input class="cot-input" data-a="nombre" maxlength="80" style="width:200px"></label>
+      <label style="font-size:10px;color:var(--ts)">CORREO <i>(vacío = el del titular)</i><br><input class="cot-input" data-a="correo" type="email" maxlength="120" style="width:190px"></label>
+      <label style="font-size:10px;color:var(--ts)">WHATSAPP<br><input class="cot-input" data-a="celular" inputmode="numeric" maxlength="14" style="width:110px"></label>
+      <label style="font-size:10px;color:var(--ts)">TALLA<br><select class="cot-input" data-a="talla_playera"><option value="">—</option>${tallas}</select></label>
+      <label style="font-size:10px;color:var(--ts)">GÉNERO<br><select class="cot-input" data-a="genero"><option value="">—</option><option value="M">♀ Mujer</option><option value="H">♂ Hombre</option></select></label>
+      <label style="font-size:10px;color:var(--ts)">EMERGENCIA<br><input class="cot-input" data-a="num_emergencia" inputmode="numeric" maxlength="16" style="width:120px"></label>
+    </div>`;
+  }
+  tr.firstElementChild.innerHTML = `
+    <div id="vjr-box-${e}" style="padding:10px;border:1px dashed var(--blue);border-radius:8px">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:8px"><b style="color:var(--text)">${_esfEsc(nombre)}</b> tiene <b>${Number(n)}</b> lugares. Cada acompañante nace con su propia ficha de 1 lugar, su parte del contrato y de lo pagado (al peso), y queda «viaja con» ${_esfEsc(nombre)}. Si su correo es distinto al del titular, le llega su invitación al Portal. Puedes dejar renglones vacíos y repartirlos después.</div>
+      ${ren}
+      <button class="btn btn-primary btn-sm" id="vjr-b-${e}" onclick="_vjRepartirGuardar('${_attrJs(id)}')">Repartir lugares</button>
+      <button class="btn btn-ghost btn-sm" onclick="_vjRepartirAbrir('${_attrJs(id)}')">Cancelar</button>
+      <div id="vjr-e-${e}" style="font-size:11px;color:var(--red);margin-top:6px"></div>
+    </div>`;
+}
+async function _vjRepartirGuardar(id) {
+  const box = document.getElementById(`vjr-box-${id}`);
+  const err = document.getElementById(`vjr-e-${id}`);
+  const btn = document.getElementById(`vjr-b-${id}`);
+  if (!box) return;
+  if (err) err.textContent = '';
+  const acompanantes = [];
+  box.querySelectorAll('[data-rep-row]').forEach((row) => {
+    const a = {};
+    row.querySelectorAll('[data-a]').forEach((el) => { a[el.getAttribute('data-a')] = String(el.value || '').trim(); });
+    if (Object.values(a).some(Boolean)) acompanantes.push(a);
+  });
+  if (!acompanantes.length) { if (err) err.textContent = 'Escribe al menos un acompañante.'; return; }
+  if (acompanantes.some((a) => !a.nombre || a.nombre.length < 2)) { if (err) err.textContent = 'Cada acompañante necesita su nombre completo.'; return; }
+  if (!confirm(`¿Repartir ${acompanantes.length} lugar(es)? El contrato y lo pagado se reparten al peso entre todos.`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Repartiendo…'; }
+  try {
+    const j = await khViajeros._call({ accion: 'viajero_repartir', id, acompanantes });
+    const avisos = [];
+    if (j && j.aviso) avisos.push(j.aviso);
+    if (j && j.invitados && j.invitados.length) avisos.push('invitación al Portal a ' + j.invitados.join(', '));
+    showToast(_esfEsc(`Listo: ${(j.acompanantes || []).length} acompañante(s) con su ficha` + (avisos.length ? ' · ' + avisos.join(' · ') : '')), j && j.aviso ? 'warning' : 'success');
+    await _vj2Cargar();
+  } catch (e) {
+    if (err) err.textContent = (e && e.message) || 'No se pudo repartir.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Repartir lugares'; }
   }
 }
 

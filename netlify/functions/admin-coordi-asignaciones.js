@@ -108,6 +108,7 @@ const ACCIONES = {
   viajero_eliminar: ROLES_ELIMINA_VIAJERO,
   viajero_editar: ROLES_EDITA_VIAJERO,
   viajero_elegir_paquete: ROLES_EDITA_VIAJERO, // [PREVENTA-ELEGIR-1]
+  viajero_repartir: ROLES_EDITA_VIAJERO,       // [ACOMP-3] una fila de N lugares → fichas propias (_lib/repartir-lugares)
   // [VIAJERO-EDITA-1] corregir paquete/zona/lugares/total/pagado-antes de
   // CUALQUIER viajero — publicado o no. `viajero_editar` solo toca contacto y
   // el `fila_editar` de la bandeja exige una revisión del Portal PENDIENTE
@@ -1746,6 +1747,30 @@ ${entregables}
         id: body.id, paquete: body.tipo_paquete, zona: body.zona_boleto, total, hotel: body.hotel || null, quien,
         contratoSinCorreo: body.contrato_sin_correo === true, creado_por: (auth.user && auth.user.correo) || null,
         KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE, PORTAL_URL: env.PORTAL_SB_URL, PORTAL_KEY: env.PORTAL_SB_SERVICE,
+      });
+      if (rr.status === 200) return ok(headers, rr.body);
+      return { statusCode: rr.status, headers, body: JSON.stringify(rr.body) };
+    }
+
+    // ═══ [ACOMP-3] REPARTIR LOS LUGARES DE UNA FILA (desde Capsule) ══════════
+    // Caso Karina (Pa'l Norte, 10-nov): separó 3 lugares y mandó los datos de los
+    // demás por Messenger. El cuerpo es EL MISMO del «Agregar a mis acompañantes»
+    // del Portal (_lib/repartir-lugares): contrato y pagado se reparten al peso,
+    // grupo «viaja con», plan fijo con las mismas fechas, invitación solo a
+    // correos distintos del titular. Desde aquí además viajan talla, emergencia
+    // y género de cada acompañante.
+    if (accion === 'viajero_repartir') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo el equipo puede repartir lugares' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return bad(headers, 'id inválido');
+      const { repartirLugares } = require('./_lib/repartir-lugares');
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const rr = await repartirLugares({
+        viajero_id: id, acompanantes: body.acompanantes, origen: 'capsule', quien,
+        capturado_por: (auth.user && auth.user.correo) || jwtUserId || 'panel',
+        KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE,
       });
       if (rr.status === 200) return ok(headers, rr.body);
       return { statusCode: rr.status, headers, body: JSON.stringify(rr.body) };

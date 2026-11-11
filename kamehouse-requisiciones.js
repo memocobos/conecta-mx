@@ -164,7 +164,9 @@ async function loadCambiosPortal() {
           : '';
         const desg = Array.isArray(c.desglose) && c.desglose.length > 1
           ? `<div style="font-size:12px;margin:4px 0;opacity:.9">👥 El cliente reparte: ${c.desglose.map((d) => _reqBdjEsc(d.nombre || String(d.viajero_id || '').slice(0, 8)) + ' <b>$' + (Number(d.monto) || 0).toLocaleString('es-MX') + '</b>').join(' · ')}</div>`
-          : '';
+          : (v.grupo && v.grupo.length > 1
+            ? `<div style="font-size:12px;margin:4px 0;color:#e8ff4c">👥 Viaja con ${v.grupo.filter((m) => m.id !== c.viajero_id).map((m) => _reqBdjEsc(m.nombre)).join(', ')} — revisa si el comprobante cubre a alguien más (al capturar puedes repartir)</div>`
+            : '');
         return `<div class="rq-cambio" id="rq-cambio-${c.id}">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
           <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
@@ -269,12 +271,23 @@ function _reqPagoAbrir(id) {
   // (el humano confirma o corrige: nada se captura solo).
   const dec = (String(c.detalle || '').match(/declara \$([\d,]+)/) || [])[1];
   const mpNeto = c.mp_pago_id ? Math.round((Number(c.mp_monto) || 0) - Math.max(0, (Number(c.mp_monto_cobrar) || 0) - (Number(c.mp_neto) || 0))) : null;
-  const desg = Array.isArray(c.desglose) && c.desglose.length > 1 ? c.desglose : null;
+  let desg = Array.isArray(c.desglose) && c.desglose.length > 1 ? c.desglose : null;
+  // [PAGO-GRUPO-1] El cliente no repartió, pero viaja en grupo: una caja por
+  // persona igual — la suya prellenada con lo que declaró, las de sus
+  // compañeros vacías. Quien mira el comprobante decide (caso Yesenia: subió
+  // $1,300 de ella y Giovanna y solo declaró $650). Cajas vacías no capturan.
+  const grupoVj = c.viajero && Array.isArray(c.viajero.grupo) ? c.viajero.grupo : [];
+  if (!desg && grupoVj.length > 1) {
+    const yo = grupoVj.find((m) => m.id === c.viajero_id);
+    const resto = grupoVj.filter((m) => m.id !== c.viajero_id);
+    desg = [{ viajero_id: c.viajero_id, nombre: (yo && yo.nombre) || c.nombre, monto: dec ? Number(dec.replace(/,/g, '')) : '' }]
+      .concat(resto.map((m) => ({ viajero_id: m.id, nombre: m.nombre, monto: '' })));
+  }
   const ayuda = mpNeto != null
     ? `Mercado Pago ya cobró: el abono es el NETO ($${mpNeto.toLocaleString('es-MX')}) y no se mueve${desg ? ' — repártelo entre las personas; la suma tiene que dar ese neto' : ''}. Al capturar: nace el abono con el pago de MP ligado, la solicitud se cierra y al cliente le llega «Recibimos tu pago» si su evento manda correo.`
     : 'Abre el 📎 comprobante y teclea lo que el banco dice. Al capturar: nace el abono (con el comprobante ligado), la solicitud se cierra y al cliente le llega «Recibimos tu pago» si su evento manda correo.';
   const campos = desg
-    ? `<div style="font-size:12px;margin-bottom:4px">👥 Reparto — una caja por persona (lo que el cliente declaró, corrígelo si el comprobante dice otra cosa):</div>` +
+    ? `<div style="font-size:12px;margin-bottom:4px">👥 Reparto — una caja por persona (${Array.isArray(c.desglose) && c.desglose.length > 1 ? 'lo que el cliente declaró, corrígelo si el comprobante dice otra cosa' : 'viaja en grupo: si el comprobante cubre a alguien más, pon su parte; deja vacío a quien no'}):</div>` +
       desg.map((d, i) => `<label class="rq-field" style="display:flex;gap:8px;align-items:center;margin:4px 0"><span style="flex:1">${_reqBdjEsc(d.nombre || String(d.viajero_id || '').slice(0, 8))}</span>
         <input type="number" min="1" step="1" class="rq-pago-rep-${id}" data-vid="${_reqBdjEsc(d.viajero_id)}" value="${Number(d.monto) || ''}" style="width:120px"></label>`).join('') +
       `<div style="font-size:12px;margin-top:4px">Suma: <b id="rq-pago-suma-${id}">—</b>${mpNeto != null ? ' · tiene que dar $' + mpNeto.toLocaleString('es-MX') : ''}</div>`

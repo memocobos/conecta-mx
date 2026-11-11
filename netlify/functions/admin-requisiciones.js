@@ -332,8 +332,25 @@ exports.handler = async (event) => {
     const ids = [...new Set(rows.map((x) => x.viajero_id))];
     let vmap = {};
     if (ids.length) {
-      const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto`, { headers: sbH });
+      const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto,grupo_viaje,evento_id`, { headers: sbH });
       if (rv.ok) (await rv.json()).forEach((v) => { vmap[v.id] = v; });
+      // [PAGO-GRUPO-1] Quién viaja con cada persona (su `grupo_viaje` del mismo
+      // evento): la bandeja ofrece repartir un comprobante entre ellos AUNQUE el
+      // cliente no haya marcado el desglose (caso Yesenia/Giovanna, 11-nov). Es
+      // la MISMA lista que `cambio_pago_capturar` deja nombrar en el reparto.
+      const grupos = [...new Set(Object.values(vmap).map((v) => v.grupo_viaje).filter(Boolean))];
+      if (grupos.length) {
+        try {
+          const rg = await fetch(`${SB_URL}/rest/v1/viajeros_evento?grupo_viaje=in.(${encodeURIComponent(grupos.map((g) => '"' + g + '"').join(','))})&select=id,nombre,grupo_viaje,evento_id&limit=1000`, { headers: sbH });
+          if (rg.ok) {
+            const miembros = await rg.json();
+            Object.values(vmap).forEach((v) => {
+              if (!v.grupo_viaje) return;
+              v.grupo = miembros.filter((m) => m.grupo_viaje === v.grupo_viaje && m.evento_id === v.evento_id).map((m) => ({ id: m.id, nombre: m.nombre }));
+            });
+          }
+        } catch (_) { /* sin grupo legible: la bandeja ofrece una sola caja, como antes */ }
+      }
     }
     const pc = await fetch(`${cb}?select=id&estado=eq.pendiente&limit=500${FILTRO_PAGO_VIVO}`, { headers: sbH });
     const pendientes = pc.ok ? (await pc.json()).length : null;

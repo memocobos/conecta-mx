@@ -3759,8 +3759,12 @@ function _migPagarHtml(t, p, vjId, comoPago, money){
   // Camino 🏦: la cuenta + el desglose (si viaja en grupo) + subir comprobante.
   let desg = '';
   if (grupo.length) {
-    desg = '<div style="margin-top:10px;padding:9px 10px;border-radius:8px;border:1px dashed rgba(255,255,255,.25)">'
-      + '<label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="mig-desg-on-' + id + '" data-mig-act="pago-desg" data-mig-id="' + id + '"> Este pago es por varias personas (repartir)</label>'
+    // [PAGO-GRUPO-1] La casilla NOMBRA a los compañeros y se ve: «varias
+    // personas (repartir)» pasaba de largo (caso Yesenia, 11-nov: pagó $1,300
+    // de ella y Giovanna y solo declaró lo suyo).
+    const quienes = grupo.map((g) => escapeHtml(String(g.nombre || 'tu acompañante').split(' ')[0])).join(', ');
+    desg = '<div style="margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid rgba(232,255,76,.55);background:rgba(232,255,76,.07)">'
+      + '<label style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:700;cursor:pointer"><input type="checkbox" id="mig-desg-on-' + id + '" data-mig-act="pago-desg" data-mig-id="' + id + '"> 👥 ¿Este pago también es de ' + quienes + '? Márcalo y di cuánto es de cada quien</label>'
       + '<div id="mig-desg-' + id + '" style="display:none;margin-top:8px">'
       + '<div style="font-size:12px;opacity:.75;margin-bottom:6px">Di cuánto va a cada quien. El equipo lo captura así.</div>'
       + '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;font-size:13px"><span style="flex:1">' + escapeHtml(t.nombre || 'Tú') + ' <span style="opacity:.6">(tú)</span></span><input type="number" inputmode="numeric" min="0" step="1" class="mig-desg-m-' + id + '" data-vid="' + id + '" value="' + (sug != null ? sug : '') + '" style="width:110px;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff"></div>'

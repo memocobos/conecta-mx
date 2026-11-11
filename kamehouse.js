@@ -2531,7 +2531,9 @@ function showPage(name) {
 // nuevo de nsqk es CHEAP de verdad. Sus 5 de la preventa se siguen rotulando
 // por su ZONA («Preventa a ciegas») hasta que eligen paquete.
 // [DONOMAR-PREVENTA-1, 4-nov] donomar entra a la preventa: sus CHEAP son preventa.
-const KH_PREVENTA_EVENTOS = ['palnorte', 'donomar'];
+// [DONOMAR-VENTA-1, 10-nov] donomar sale a la venta: sus CHEAP NUEVOS son CHEAP
+// (banco Banamex); Leslie y cualquiera de la preventa siguen rotulados POR SU ZONA.
+const KH_PREVENTA_EVENTOS = ['palnorte'];
 function khEsPreventaCiegas(v) {
   if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
   if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;

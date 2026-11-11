@@ -44,7 +44,7 @@ const { saldoMigrado } = require('./_lib/cuenta-evento');
 // venta deja de ser cheapOnly y los de la preventa siguen siéndolo). kamehouse.js
 // es navegador y no se puede `require`, así que la lista va de ESPEJO CON NOMBRE
 // y el careo las carea: el día que una se mueva sin la otra, suena.
-const PREVENTA_EVENTOS_ESPEJO = ['palnorte', 'donomar'];   // espejo de KH_PREVENTA_EVENTOS
+const PREVENTA_EVENTOS_ESPEJO = ['palnorte'];   // [DONOMAR-VENTA-1] donomar salió de preventa: se rotula por zona   // espejo de KH_PREVENTA_EVENTOS
 function esPreventaCiegasViajero(v) {
   if (!v || String(v.tipo_paquete || '').toLowerCase() !== 'cheap') return false;
   if (String(v.zona_boleto || '').trim().toLowerCase() === 'preventa a ciegas') return true;

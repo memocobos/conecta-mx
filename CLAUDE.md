@@ -188,6 +188,8 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🔥⏳ **DONOMAR-VENTA-1 (10-nov-2026, en main local, cero SQL): Don Omar sale de la preventa a la venta.** `KH_PREVENTA_EVENTOS` y su espejo `PREVENTA_EVENTOS_ESPEJO` (portal-mi-plan-migrado) quedan en `['palnorte']` — la forma de NSQK-VENTA-1: sin esto, todo CHEAP NUEVO de donomar saldría rotulado «PREVENTA A CIEGAS» en Capsule y con banco BBVA en el Portal (CHEAP = Banamex). La única de la preventa (Leslie Cruz, R-VTHEZ, $300, sellada, sin cuenta del Portal aún) sigue reconocida POR SU ZONA. El index se apaga solo: `_esPreventaCiegas` exige cheapOnly + una zona. `mide:preventa-pn27` (su aserción «traen donomar» se actualizó a la verdad nueva + caso por zona; 1 rojo PREEXISTENTE de red fuera del guion) · plan-pagos-1 81 · paq-preventa-1 8 · capsule-ux-1 83 · portal-solo-1 89. ⏳ Push de Memo → ficha en Esferas → publish → Leslie elige paquete (Portal o 🎟 en Capsule).
+
 - 🎟⏳ **MIG-PREVENTA-1 (10-nov-2026, en main local, cero SQL): en el alta manual de Capsule, la preventa dice «PREVENTA A CIEGAS», no CHEAP.** Caso: Bulma/Milk/Yajirobe capturando la preventa de Pa'l Norte elegían PLUS y salía «sin zonas en el catálogo». Si la ficha vende la zona «Preventa a ciegas» en CHEAP (DERIVADO de la ficha, no de una lista), la opción `cheap` se rotula PREVENTA A CIEGAS y la zona única se pone sola. 🔒 El VALOR sigue `cheap` (precio, stock, careo); en otros eventos vuelve a decir CHEAP. El contrato no se ve afectado: la preventa no lleva contrato hasta elegir paquete. Verificado en vm; capsule-ux-1 83 · ride-sin-zona-1 9. ⏳ Push de Memo.
 
 - 🚌⏳ **VIAJE-AG-1 (10-nov-2026, en main local, cero SQL): «Viaje agotado · sigue CHEAP» por fecha.** Caso Mon Laferte

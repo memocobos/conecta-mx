@@ -258,8 +258,14 @@ function extraerObj(contenido, id) {
     const KHsrc = fs.readFileSync(path.join(RAIZ, 'kamehouse.js'), 'utf8');
     const mKH = /const KH_PREVENTA_EVENTOS\s*=\s*(\[[^\]]*\])/.exec(KHsrc);
     const SRV = require(path.join(RAIZ, 'netlify/functions/portal-mi-plan-migrado.js'));
-    af(!!mKH && JSON.stringify(eval(mKH[1])) === JSON.stringify(SRV._PREVENTA_EVENTOS_ESPEJO) && SRV._PREVENTA_EVENTOS_ESPEJO.includes('donomar'),
-       'KH_PREVENTA_EVENTOS y su espejo del Portal son iguales y traen donomar (banco BBVA, etiqueta PREVENTA)');
+    // [DONOMAR-VENTA-1, 10-nov] donomar SALIÓ a la venta: sus CHEAP nuevos son CHEAP
+    // (Banamex). La verdad nueva: las dos listas iguales y SIN donomar; quien entró
+    // a la preventa sigue rotulado POR SU ZONA «Preventa a ciegas».
+    af(!!mKH && JSON.stringify(eval(mKH[1])) === JSON.stringify(SRV._PREVENTA_EVENTOS_ESPEJO) && !SRV._PREVENTA_EVENTOS_ESPEJO.includes('donomar'),
+       'KH_PREVENTA_EVENTOS y su espejo del Portal son iguales y ya NO traen donomar (salió a la venta)');
+    af(SRV._esPreventaCiegasViajero({ tipo_paquete: 'cheap', zona_boleto: 'Preventa a ciegas', evento_id: 'donomar' }) === true
+       && SRV._esPreventaCiegasViajero({ tipo_paquete: 'cheap', zona_boleto: 'General', evento_id: 'donomar' }) === false,
+       'en donomar la preventa se reconoce por su ZONA y un CHEAP nuevo ya no');
     // Época: sin fecha, la ficha nacida después del corte cuenta como nueva.
     const EP = require(path.join(RAIZ, 'netlify/functions/_lib/epoca.js'));
     af(EP.esEpocaNueva(EP.fechaParaEpoca(FICHA_DON)) === true, 'época: donomar (sin fecha, nacida 5-nov) es época nueva — su dinero sale en el Resumen');

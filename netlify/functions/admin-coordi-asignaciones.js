@@ -2335,6 +2335,11 @@ ${entregables}
           paquete: pq,
           zona: zn || undefined,
           num_personas: 1,          // un migrado = una persona
+          // [MIG-COSTO-1] El alta manual captura ventas que YA ocurrieron (del
+          // Excel o del Messenger): una zona agotada o un evento cerrado tienen
+          // precio igual. Abre SOLO los candados de «no se vende» (st, fecha,
+          // ag, prox) — jamás inventa una zona que no existe. Solo sugiere.
+          para_careo: true,
         });
         // Fails-soft y HONESTO: si el catálogo no alcanza para calcularlo, se
         // dice el motivo. Un cero aquí se leería como "cuesta cero".

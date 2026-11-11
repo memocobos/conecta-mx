@@ -299,7 +299,9 @@ async function _migSugerirCosto(soloDescuento) {
   if (pista) pista.textContent = 'calculando…';
   try {
     const j = await khViajeros.precioSugerido({ evento_id, tipo_paquete, zona });
-    _migSugBase = (j && Number.isFinite(Number(j.sugerido))) ? Number(j.sugerido) : null;
+    // [MIG-COSTO-1] `Number(null)` es 0: un «no hay sugerencia» se pintaba
+    // como «sugerido $0» y tapaba el motivo. Solo un número > 0 es sugerencia.
+    _migSugBase = (j && j.sugerido != null && Number(j.sugerido) > 0) ? Number(j.sugerido) : null;
     if (_migSugBase == null) {
       // Honesto: se dice el motivo. Un cero se leería como "cuesta cero".
       if (pista) pista.textContent = 'sin sugerencia: ' + ((j && j.motivo) || 'el catálogo no alcanza');

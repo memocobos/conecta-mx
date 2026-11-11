@@ -974,9 +974,14 @@ const CASO = () => ({
   }
   conPuerta.sort();
   console.log('    la nombran (sin comentarios): ' + JSON.stringify(conPuerta));
-  af(conPuerta.length === 2 && conPuerta.includes('precio-zona.js') && conPuerta.includes('excel-careo-correr.js'),
+  // [MIG-COSTO-1, 11-nov] El tercer cliente legítimo: el costo SUGERIDO del
+  // alta manual de Capsule (admin-coordi-asignaciones · precio_sugerido), que
+  // captura ventas ya ocurridas en zonas que hoy pueden estar agotadas. Solo
+  // sugiere y no escribe. Los de VENTA siguen sin pasarla.
+  const PUERTA_OK = ['admin-coordi-asignaciones.js', 'excel-careo-correr.js', 'precio-zona.js'];
+  af(conPuerta.length === PUERTA_OK.length && PUERTA_OK.every((f) => conPuerta.includes(f)),
      'la puerta `para_careo` la pasa alguien más: ' + JSON.stringify(conPuerta)
-     + ' — debe ser solo su dueño (precio-zona.js) y el careo (excel-careo-correr.js)');
+     + ' — debe ser solo su dueño (precio-zona.js), el careo (excel-careo-correr.js) y el sugerido del alta (admin-coordi-asignaciones.js)');
   // CONTROL DEL INSTRUMENTO: si el buscador no encuentra la puerta ni en su
   // propio dueño, su lista vacía no significaría «nadie la pasa».
   af(conPuerta.includes('precio-zona.js'),

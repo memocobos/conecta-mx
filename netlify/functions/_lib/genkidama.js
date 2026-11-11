@@ -142,10 +142,28 @@ function validarCampana(sitio, c, ahora) {
   if (!TIPOS[tipo]) return { ok: false, error: 'tipo de correo inválido' };
   const slogan = String(c.slogan || '').trim();
   if (slogan.length < 3 || slogan.length > 140) return { ok: false, error: 'el slogan va de 3 a 140 caracteres' };
-  const ev = sitio.EV.find((e) => e && e.id === String(c.evento_id || ''));
-  const idx = c.fecha_idx === '' || c.fecha_idx == null ? null : Number(c.fecha_idx);
-  const malo = eventoVendible(ev, idx, ahora);
-  if (malo) return { ok: false, error: malo };
+  // [GK-MULTI-1, 11-nov] evento_id '*' = «todos los tours donde aplica el
+  // código» (palabra de Memo: NOVIEMBRE abarca varios eventos). Exige código y
+  // el sitio decide la lista: solo los que están a la venta HOY y donde el
+  // código aplica. Sin código no hay «todos».
+  const multi = String(c.evento_id || '') === '*';
+  let ev, idx = null, eventos = null;
+  if (multi) {
+    const cod = String(c.codigo || '').trim().toUpperCase();
+    if (!cod) return { ok: false, error: 'para mandar a varios tours elige el código: él decide en qué tours aplica' };
+    const p = sitio.PROMOS[cod];
+    if (!p) return { ok: false, error: `el sitio no conoce el código ${cod} — publícalo desde Baba y vuelve a intentar` };
+    eventos = sitio.EV.filter((e) => e && e.id && !eventoVendible(e, null, ahora) && _codigoAplica(p, e.id))
+      .sort((a, b) => String(a.ds || '9').localeCompare(String(b.ds || '9')))
+      .map((e) => ({ id: e.id, a: e.a, f: e.f }));
+    if (!eventos.length) return { ok: false, error: `${cod} no aplica en ningún tour a la venta hoy` };
+    ev = { id: '*', a: eventos.length === 1 ? eventos[0].a : 'tus próximos tours', v: '', f: '' };
+  } else {
+    ev = sitio.EV.find((e) => e && e.id === String(c.evento_id || ''));
+    idx = c.fecha_idx === '' || c.fecha_idx == null ? null : Number(c.fecha_idx);
+    const malo = eventoVendible(ev, idx, ahora);
+    if (malo) return { ok: false, error: malo };
+  }
   // [GENKIDAMA-2] El mensaje libre: asunto y cuerpo de Memo, texto plano.
   let asuntoLibre = null, mensaje = null;
   if (TIPOS[tipo].libre) {
@@ -165,7 +183,7 @@ function validarCampana(sitio, c, ahora) {
     const t = (ahora || new Date()).getTime();
     if (p.startTs && t < p.startTs) return { ok: false, error: `el sitio dice que ${codigo} todavía no empieza` + baba };
     if (p.expiresTs && t > p.expiresTs) return { ok: false, error: `el sitio dice que ${codigo} ya venció` + baba };
-    if (!_codigoAplica(p, ev.id)) return { ok: false, error: `${codigo} no aplica en ${ev.a} en el sitio: el cliente lo vería rechazado` };
+    if (!multi && !_codigoAplica(p, ev.id)) return { ok: false, error: `${codigo} no aplica en ${ev.a} en el sitio: el cliente lo vería rechazado` };
     promo = { codigo, monto: _montoCodigo(p), vence: p.expiresTs || null, excludePkg: (p.excludePkg || []).map((x) => String(x).toUpperCase()) };
     // 🔒 Ni el slogan ni (en el libre) el asunto o el mensaje pueden prometer
     // otro monto que el del código.
@@ -181,7 +199,7 @@ function validarCampana(sitio, c, ahora) {
     const ms = Array.from(new Set(_montosEn(textos)));
     if (ms.length) avisos.push(`tu texto menciona ${ms.join(', ')} sin código que lo respalde: confirma que es lo que el sitio cobra hoy`);
   }
-  return { ok: true, tipo, slogan, ev, idx, fecha: _fechaDe(ev, idx), promo, asuntoLibre, mensaje, avisos };
+  return { ok: true, tipo, slogan, ev, idx, fecha: multi ? { etiqueta: '', ds: null } : _fechaDe(ev, idx), promo, asuntoLibre, mensaje, avisos, eventos };
 }
 
 // ── 3 · LOS CUATRO CORREOS ───────────────────────────────────────────────────
@@ -195,7 +213,8 @@ function asuntoDe(v) {
 }
 function renderGenkidama(v, nombre) {
   const hola = nombre ? `¡Hola ${esc(String(nombre).trim().split(/\s+/)[0])}!` : '¡Hola!';
-  const link = LINK_BASE + baseSlug(v.ev.id);
+  const multi = Array.isArray(v.eventos) && v.ev.id === '*';
+  const link = multi ? LINK_BASE : LINK_BASE + baseSlug(v.ev.id);
   const eyebrow = { promocion: 'Promoción', descuento: 'Descuento', codigo: 'Código exclusivo', ultimos: 'Últimos lugares', libre: 'Novedades' }[v.tipo];
   const titulo = v.tipo === 'ultimos' ? 'Quedan los últimos lugares' : (v.tipo === 'codigo' ? 'Tienes un código para ti' : v.slogan);
   const cta = { promocion: 'Ver paquetes →', descuento: 'Aprovechar mi descuento →', codigo: 'Usar mi código →', ultimos: 'Apartar mi lugar →', libre: 'Apartar mi lugar →' }[v.tipo];
@@ -203,7 +222,9 @@ function renderGenkidama(v, nombre) {
   const cuerpo = (v.tipo === 'libre' && v.mensaje)
     ? v.mensaje.split(/\n{2,}/).map((par) => `<p style="margin:0 0 12px;font-size:15px;color:#e6e6e6;line-height:1.55">${esc(par).replace(/\n/g, '<br>')}</p>`).join('')
     : '';
-  const detalle = [v.fecha.etiqueta, v.ev.v].filter(Boolean).map(esc).join(' · ');
+  const detalle = multi
+    ? 'Aplica en: ' + v.eventos.map((e) => esc(e.a) + (e.f ? ' (' + esc(e.f) + ')' : '')).join(' · ')
+    : [v.fecha.etiqueta, v.ev.v].filter(Boolean).map(esc).join(' · ');
   const sub = (v.tipo === 'ultimos' || v.tipo === 'codigo') ? `<p style="margin:0 0 16px;font-size:16px;color:#ffffff;font-weight:700">${esc(v.slogan)}</p>` : '';
   let caja = '';
   if (v.promo) {
@@ -221,7 +242,7 @@ function renderGenkidama(v, nombre) {
     <div style="max-width:540px;margin:0 auto;background:#0d0d0d;border:1px solid #222222;border-radius:14px;overflow:hidden">
       <div style="background:#e8ff4c;color:#000000;padding:16px 22px;border-bottom:4px solid #ff283b">
         <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase">Conecta Reynosa · ${esc(eyebrow)}</div>
-        <div style="font-size:22px;font-weight:900;margin-top:4px;line-height:1.2">${esc(v.ev.a)}</div>
+        <div style="font-size:22px;font-weight:900;margin-top:4px;line-height:1.2">${multi ? (v.eventos.length === 1 ? esc(v.eventos[0].a) : 'Para tus próximos tours') : esc(v.ev.a)}</div>
       </div>
       <div style="padding:22px">
         ${detalle ? `<p style="margin:0 0 14px;font-size:13px;color:#e8ff4c;font-weight:700">${detalle}</p>` : ''}

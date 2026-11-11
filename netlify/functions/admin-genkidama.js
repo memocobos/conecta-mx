@@ -180,7 +180,8 @@ exports.handler = async (event) => {
       const excluirBlast = body.excluir_blast === true;
       const [contactos, yaVan, blast] = await Promise.all([
         leer(R('genkidama_contactos') + '?select=correo,nombre,prioridad&baja_at=is.null&order=prioridad.asc,creado_at.asc&limit=50000'),
-        leer(R('viajeros_evento') + `?select=correo&evento_id=like.${encodeURIComponent(G.baseSlug(v.ev.id))}*&limit=50000`),
+        // [GK-MULTI-1] Con «todos los tours del código» no se excluye a nadie por evento.
+        v.ev.id === '*' ? Promise.resolve([]) : leer(R('viajeros_evento') + `?select=correo&evento_id=like.${encodeURIComponent(G.baseSlug(v.ev.id))}*&limit=50000`),
         excluirBlast ? leer(R('preventa_blast') + '?select=correo&enviado_at=not.is.null&limit=50000') : Promise.resolve([]),
       ]);
       const van = new Set(yaVan.map((x) => limpio(x.correo)).filter(Boolean));
@@ -189,7 +190,7 @@ exports.handler = async (event) => {
       const audiencia = sinVan.filter((c) => !yaBlast.has(c.correo));
       const asunto = G.asuntoDe(v);
       if (accion === 'seco') {
-        return j(200, headers, { ok: true, seco: true, asunto, html: G.renderGenkidama(v, (audiencia[0] || {}).nombre || 'Lucero'), audiencia: audiencia.length, excluidos_ya_van: contactos.length - sinVan.length, excluidos_blast: sinVan.length - audiencia.length, avisos: v.avisos || [], energia: await G.energia({ KH_URL, KH_KEY }) });
+        return j(200, headers, { ok: true, seco: true, eventos: v.eventos || undefined, asunto, html: G.renderGenkidama(v, (audiencia[0] || {}).nombre || 'Lucero'), audiencia: audiencia.length, excluidos_ya_van: contactos.length - sinVan.length, excluidos_blast: sinVan.length - audiencia.length, avisos: v.avisos || [], energia: await G.energia({ KH_URL, KH_KEY }) });
       }
       if (body.confirmar !== true) return j(400, headers, { error: 'Crear la campaña pide confirmar:true' });
       if (!audiencia.length) return j(409, headers, { error: 'La audiencia está vacía: siembra el concentrado primero' });

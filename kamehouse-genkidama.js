@@ -85,7 +85,7 @@ function _gkWizardHtml(j) {
   const evs = j.wizard.eventos || [];
   const ev = evs.find((e) => e.id === _gkW.evento_id);
   const tipos = _GK_TIPOS.map(([k, t, d]) => '<button type="button" class="btn ' + (_gkW.tipo === k ? '' : 'btn-ghost ') + 'btn-sm" style="text-align:left" onclick="gkSet(\'tipo\',\'' + k + '\')"><b>' + t + '</b><br><span style="font-size:11px;opacity:.75">' + d + '</span></button>').join('');
-  const opEv = '<option value="">— elige tour —</option>' + evs.map((e) => '<option value="' + _gkEsc(e.id) + '"' + (e.id === _gkW.evento_id ? ' selected' : '') + '>' + _gkEsc(e.a) + ' · ' + _gkEsc(e.f) + '</option>').join('');
+  const opEv = '<option value="">— elige tour —</option>' + '<option value="*"' + (_gkW.evento_id === '*' ? ' selected' : '') + '>🎟️ Todos los tours donde aplica el código</option>' + evs.map((e) => '<option value="' + _gkEsc(e.id) + '"' + (e.id === _gkW.evento_id ? ' selected' : '') + '>' + _gkEsc(e.a) + ' · ' + _gkEsc(e.f) + '</option>').join('');
   const fechas = ev && ev.fechas.length
     ? '<select id="gk-fecha" onchange="gkSet(\'fecha_idx\',this.value)" style="padding:8px;border-radius:8px;background:rgba(255,255,255,.07);color:var(--text);border:1px solid rgba(255,255,255,.2)"><option value="">Todas las fechas</option>' +
       ev.fechas.filter((f) => f.vendible).map((f) => '<option value="' + f.idx + '"' + (String(f.idx) === String(_gkW.fecha_idx) ? ' selected' : '') + '>' + _gkEsc(f.lbl) + '</option>').join('') + '</select>'
@@ -137,6 +137,7 @@ function _gkDatos() {
   _gkLeerCampos();
   if (!_gkW.tipo) return 'Elige el tipo de correo';
   if (!_gkW.evento_id) return 'Elige el tour';
+  if (_gkW.evento_id === '*' && !_gkW.codigo) return 'Elige el código: él decide en qué tours aplica';
   if ((_gkW.tipo === 'descuento' || _gkW.tipo === 'codigo') && !_gkW.codigo) return 'Este tipo de correo necesita un código';
   if (String(_gkW.slogan || '').trim().length < 3) return _gkW.tipo === 'libre' ? 'Escribe el título (slogan)' : 'Escribe el slogan';
   if (_gkW.tipo === 'libre' && String(_gkW.asunto || '').trim().length < 5) return 'Escribe el asunto del correo';

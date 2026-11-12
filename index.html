@@ -7306,6 +7306,7 @@ function _reqEnviar(){
       nombre:nombre,celular:cel,correo:correo,
       acompanantes:acomp.length?acomp:undefined,
       desglose:(acomp.length&&desglose.length)?desglose.map(function(v){return Math.round(v);}):undefined,
+      codigo:(typeof _promoActivo!=='undefined'&&_promoActivo&&_promoActivo.code)?_promoActivo.code:undefined,   // [REQ-CODIGO-1]
       datos_viaje:viaje||undefined,
       genero:genero,pide_genero:true,   // [GENERO-2]
       talla_playera:viaje?talla:undefined,

@@ -460,7 +460,7 @@ function _reqBdjCard(r) {
     ${_reqFichaHtml(r, np)}
     <div class="rq-nums">
       <div class="rq-num"><small>Separo</small><b>${_reqBdjMxn(r.separo_sistema)}</b></div>
-      <div class="rq-num"><small>Total</small><b>${_reqBdjMxn(r.total_sistema)}</b>${(r.transporte && r.total_sistema != null) ? '<i>sin transporte CDMX</i>' : ''}</div>
+      <div class="rq-num"><small>Total</small><b>${_reqBdjMxn(r.total_sistema)}</b>${r.codigo ? `<i style="color:var(--green)">🎟 ${_reqBdjEsc(r.codigo)} −${_reqBdjMxn(r.descuento)}${r.total_lista != null ? ' (lista ' + _reqBdjMxn(r.total_lista) + ')' : ''}</i>` : ''}${(r.transporte && r.total_sistema != null) ? '<i>sin transporte CDMX</i>' : ''}</div>
       <div class="rq-num"><small>Pagó por</small><b style="font-size:14px">${_reqBdjEsc(formaTxt)}</b>${r.comprobante_path ? '<i>📎 con comprobante</i>' : (r.mp_pago_id ? '<i style="color:var(--green)">💳 pagado en MP</i>' : '<i>sin comprobante</i>')}</div>
     </div>
     ${_reqMpChip(r)}

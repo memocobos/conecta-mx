@@ -272,6 +272,44 @@ exports.handler = async (event) => {
     return json(409, headers, { ok: false, error: 'Tu cotización ya no está disponible: ' + (precio.motivo || 'el evento cambió') + '. Vuelve a cotizar o escríbenos por WhatsApp.' });
   }
 
+  // ── [REQ-CODIGO-1] El código de descuento VIAJA con la requisición: se valida
+  // contra el PROMOS del index SERVIDO (lo que el cliente vio), se cuentan sus
+  // usos aquí (en el navegador solo vivían en localStorage) y el total nace YA
+  // con el descuento. Un código que no aplica NO se ignora en silencio: 409 con
+  // la razón, para que nadie pague creyendo que trae un descuento que no tiene.
+  let promoFila = null;
+  const codigoIn = String(body.codigo || '').trim().toUpperCase().slice(0, 40);
+  if (codigoIn) {
+    const PR = require('./_lib/promo-requisicion');
+    let PROMOS = null, evc = null;
+    try {
+      const SITE = (process.env.URL || 'https://conectareynosa.mx').replace(/\/$/, '');
+      const rh = await fetch(SITE + '/index.html', { headers: { 'Cache-Control': 'no-cache' } });
+      if (rh.ok) PROMOS = require('./_lib/promos-compile').evaluarPROMOS(await rh.text());
+      const { fetchEventosRaw } = require('./_lib/catalogo-index');
+      const EVc = await fetchEventosRaw();
+      evc = Array.isArray(EVc) ? EVc.find((x) => x && x.id === evento_id.split('#')[0]) : null;
+    } catch (e) { console.error('[requisicion-crear] promos:', e.message); }
+    if (!PROMOS) return json(502, headers, { ok: false, error: 'No pudimos verificar tu código de descuento en este momento. Inténtalo en unos minutos o escríbenos por WhatsApp.' });
+    const v = PR.validar({ PROMOS, codigo: codigoIn, ev: evc, paquete, zona: precio.zona || null, personas: num_personas });
+    if (!v.ok) return json(409, headers, { ok: false, codigo_invalido: true, error: 'Tu código no se pudo aplicar: ' + v.error + '. Quítalo y vuelve a enviar, o escríbenos por WhatsApp.' });
+    let usos = 0, mias = 0;
+    try {
+      const ru = await fetch(`${SB_URL}/rest/v1/requisiciones?select=celular,correo&codigo=eq.${encodeURIComponent(v.codigo)}&estado=in.(pendiente,aprobada)&limit=10000`, { headers: sbH });
+      const rows = ru.ok ? await ru.json() : null;
+      if (!Array.isArray(rows)) throw new Error('usos ' + ru.status);
+      usos = rows.length;
+      mias = rows.filter((x) => (x.celular && x.celular === celular) || (correo && x.correo && String(x.correo).toLowerCase() === correo)).length;
+    } catch (e) {
+      console.error('[requisicion-crear] usos del código:', e.message);
+      return json(502, headers, { ok: false, error: 'No pudimos verificar tu código de descuento en este momento. Inténtalo en unos minutos.' });
+    }
+    const u = PR.revisarUsos({ p: v.p, codigo: v.codigo, usos, mias });
+    if (!u.ok) return json(409, headers, { ok: false, codigo_invalido: true, error: 'Tu código no se pudo aplicar: ' + u.error + '. Quítalo y vuelve a enviar.' });
+    const a = PR.aplicar({ p: v.p, paquete, personas: num_personas, total: precio.total, precio_unit: precio.precio_unit });
+    promoFila = { codigo: v.codigo, descuento: a.descuento, total_lista: Math.round(precio.total), total: a.total };
+  }
+
   // ── Tope por celular: 3 pendientes del mismo evento ───────────────────────
   try {
     const r = await fetch(`${SB_URL}/rest/v1/requisiciones?select=id&celular=eq.${celular}&evento_id=eq.${encodeURIComponent(evento_id)}&estado=eq.pendiente&limit=${MAX_PENDIENTES_POR_CEL + 1}`, { headers: sbH });
@@ -342,8 +380,11 @@ exports.handler = async (event) => {
     hotel, transporte,
     nombre, celular, correo, forma_pago,
     acompanantes, talla_playera, num_emergencia, genero, desglose,
-    total_sistema: precio.total,
+    total_sistema: promoFila ? promoFila.total : precio.total,
     separo_sistema: precio.separo,
+    codigo: promoFila ? promoFila.codigo : null,          // [REQ-CODIGO-1]
+    descuento: promoFila ? promoFila.descuento : null,
+    total_lista: promoFila ? promoFila.total_lista : null,
     cotizacion_texto,
     comprobante_path, comprobante_tipo, comprobante_md5,
     estado: 'pendiente',

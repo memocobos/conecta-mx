@@ -670,8 +670,12 @@ function _reqBdjDesgloseHtml(r, id) {
   const ps = _reqBdjPersonas(r);
   if (!ps) return '';
   const n = ps.length;
-  const dec = Array.isArray(r.desglose) && r.desglose.length === n ? r.desglose.map((x) => Math.round(Number(x) || 0)) : null;
-  const base = Math.round(Number(r.separo_sistema || 0));
+  // [MP-DESG-1] Pagado en MP: la base es el NETO que cayó, y un desglose
+  // declarado que no suma eso se ignora (el cliente lo tecleó antes de pagar).
+  const mpNeto = r.mp_pago_id ? ((_reqMpNeto(r) || {}).neto || 0) : 0;
+  let dec = Array.isArray(r.desglose) && r.desglose.length === n ? r.desglose.map((x) => Math.round(Number(x) || 0)) : null;
+  if (dec && mpNeto > 0 && dec.reduce((a, b) => a + b, 0) !== mpNeto) dec = null;
+  const base = mpNeto > 0 ? mpNeto : Math.round(Number(r.separo_sistema || 0));
   const parejo = Array.from({ length: n }, (_, i) => Math.floor(base / n) + (i === 0 ? base - Math.floor(base / n) * n : 0));
   const vals = dec || parejo;
   const sumaDec = dec ? dec.reduce((a, b) => a + b, 0) : null;

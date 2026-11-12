@@ -6989,7 +6989,7 @@ function _reqPintar(){
     // el correo viene con el del titular (toda la info le llega a ella) y se
     // puede cambiar para que le llegue a esa persona.
     _reqAcompHtml(inp)+
-    _reqDesgloseHtml(inp)+
+    '<div id="req-desg-wrap"'+((_reqEstado&&_reqEstado.forma==='link_pago')?' style="display:none"':'')+'>'+_reqDesgloseHtml(inp)+'</div>'+
     '<div style="font-family:Montserrat,sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:4px 0 6px">¿Cómo pagaste? *</div>'+
     '<div id="req-formas" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></div>'+
     '<div id="req-file-wrap" style="display:none">'+
@@ -7143,6 +7143,11 @@ function _reqForma(f){
   var esLink=(f==='link_pago');
   var w=document.getElementById('req-file-wrap');if(w)w.style.display=esLink?'none':'block';
   var m=document.getElementById('req-link-msg');if(m)m.style.display=esLink?'block':'none';
+  // [MP-DESG-1, 11-nov] Con link de pago el cliente todavía NO pagó: el link
+  // cobra el separo del sistema, así que «¿cuánto pagó cada quien?» no aplica
+  // (caso Itzel, Feid: tecleó $1,000 + $300 y el link cobró $633). El reparto
+  // lo hace Bulma/Milk al aprobar, parejo sobre lo que cayó en MP.
+  var dw=document.getElementById('req-desg-wrap');if(dw)dw.style.display=esLink?'none':'block';
 }
 // Imagen → JPEG a máx 1600px antes de viajar (un ticket fotografiado pesa MB
 // y a 1600px sigue legible). PDF pasa tal cual si cabe. Devuelve Promise.
@@ -7274,7 +7279,7 @@ function _reqEnviar(){
       if(acomp[ai].num_emergencia.length!==10)return _reqMsg('El número de emergencia'+q+' va a 10 dígitos',true);
     }
   }
-  var desglose=_reqDesgloseLeer();
+  var desglose=(_reqEstado.forma==='link_pago')?[]:_reqDesgloseLeer();  // [MP-DESG-1]
   if(desglose.length){
     for(var di=0;di<desglose.length;di++){
       var dv=desglose[di];

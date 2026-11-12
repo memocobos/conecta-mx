@@ -2297,6 +2297,9 @@ const khViajeros = {
   // [ABONO-EDITA-1] Corregir monto/fecha de un abono (valor esperado en el servidor).
   abonoEditar(abono_id, campos) { return this._call(Object.assign({ accion: 'abono_editar', abono_id }, campos || {})); },
   abonoFoto(abono_id, foto) { return this._call({ accion: 'abono_foto', abono_id, foto }); },   // [ABONO-FOTO-4]
+  resguardosDe(viajero_id) { return this._call({ accion: 'resguardo_listar', viajero_id }).then(j => j.resguardos || []); },   // [RESGUARDO-1]
+  resguardoSubir(viajero_id, foto, fecha_pago, nota) { return this._call({ accion: 'resguardo_subir', viajero_id, foto, fecha_pago: fecha_pago || null, nota: nota || null }); },
+  resguardoQuitar(resguardo_id) { return this._call({ accion: 'resguardo_quitar', resguardo_id, confirmar: true }); },
   // [VJ-5] poner/quitar cuarto a un migrado
   habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
   // [MIG-1a] alta de un viajero del Excel, y la búsqueda de parecidos previa
@@ -6920,9 +6923,13 @@ async function _vjPagosVer(id, nombre) {
   try {
     // La URL firmada caduca (1 h): se pide FRESCA cada vez que se abre, igual
     // que el comprobante del separo. No se cachea a propósito.
-    const abonos = await khViajeros.abonosDe(id);   // [sec-coordi]
+    const [abonos, resg] = await Promise.all([
+      khViajeros.abonosDe(id),   // [sec-coordi]
+      khViajeros.resguardosDe(id).catch((e) => ({ error: (e && e.message) || 'no se pudo leer' })),   // [RESGUARDO-1]
+    ]);
+    const resgHtml = _vjResguardoHtml(id, nombre, resg);
     if (!abonos.length) {
-      celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--ts)">${_esfEsc(nombre)} no tiene abonos capturados aquí. (Lo migrado del Excel vive en «abonado previo», sin comprobante.)</div>`;
+      celda.innerHTML = `<div style="padding:10px;border:1px dashed var(--ts);border-radius:8px"><div style="font-size:12px;color:var(--ts)">${_esfEsc(nombre)} no tiene abonos capturados aquí. (Lo migrado del Excel vive en «abonado previo», sin comprobante.)</div>${resgHtml}</div>`;
       return;
     }
     celda.innerHTML = `<div style="padding:10px;border:1px dashed var(--ts);border-radius:8px">
@@ -6945,10 +6952,70 @@ async function _vjPagosVer(id, nombre) {
               onchange="_vjAbonoFoto(this,'${_attrJs(a.id)}','${_attrJs(id)}','${_attrJs(nombre)}',${a.foto_url ? 'true' : 'false'})">
           </label>
         </div>`).join('')}
+      ${resgHtml}
     </div>`;
   } catch (e) {
     celda.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--red)">No se pudieron leer los pagos: ${_esfEsc(e.message)}</div>`;
   }
+}
+
+// ═══ [RESGUARDO-1 · 12-nov-2026] COMPROBANTES DE RESGUARDO ══════════════════
+// Palabra de Memo: la Pandilla sube lo del 2026 y quiere guardar los
+// comprobantes VIEJOS «sin tener que sumar el comprobante». 🔒 No es dinero:
+// viven en su propia tabla y NO suman a ningún saldo (lo pagado de antes ya
+// está en «abonado previo»). Varias fotos de una vez; fecha y nota opcionales.
+function _vjResguardoHtml(id, nombre, resg) {
+  const lista = Array.isArray(resg) ? resg : [];
+  const err = (!Array.isArray(resg) && resg && resg.error) ? `<div style="font-size:11px;color:var(--red)">No se pudieron leer los comprobantes de resguardo: ${_esfEsc(resg.error)}</div>` : '';
+  return `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)">
+    <div style="font-size:11px;color:var(--ts);margin-bottom:6px"><b style="color:var(--text)">🗂 Comprobantes de resguardo</b> · ${lista.length} · solo se GUARDAN, no suman al saldo</div>
+    ${err}
+    ${lista.map((r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;font-size:12px">
+      <span style="min-width:84px;color:var(--ts)">${r.fecha_pago ? _esfEsc(r.fecha_pago) : 'sin fecha'}</span>
+      <a href="${_esfEsc(r.foto_url || '#')}" target="_blank" rel="noopener" style="color:var(--green)">📎 ver</a>
+      <span style="flex:1;color:var(--ts)">${r.nota ? _esfEsc(r.nota) : ''}${r.subido_por ? ' · ' + _esfEsc(r.subido_por) : ''}</span>
+      <button class="btn btn-ghost btn-sm" style="font-size:10px" title="Quitar este comprobante (se archiva, no se borra)" onclick="_vjResguardoQuitar('${_attrJs(r.id)}','${_attrJs(id)}','${_attrJs(nombre)}')">✕</button>
+    </div>`).join('')}
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <input type="date" id="vj-rg-f-${id}" title="Fecha del pago (opcional)" style="font-size:12px;padding:4px">
+      <input type="text" id="vj-rg-n-${id}" maxlength="300" placeholder="Nota (opcional): ej. Pago 2 de julio" style="font-size:12px;padding:4px;flex:1;min-width:160px">
+      <label class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--green);border-color:var(--green);cursor:pointer">📤 Subir comprobantes
+        <input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="_vjResguardoSubir(this,'${_attrJs(id)}','${_attrJs(nombre)}')">
+      </label>
+    </div>
+  </div>`;
+}
+async function _vjResguardoSubir(input, id, nombre) {
+  const files = Array.from((input && input.files) || []);
+  if (!files.length) return;
+  const fecha = (document.getElementById('vj-rg-f-' + id) || {}).value || null;
+  const nota = (document.getElementById('vj-rg-n-' + id) || {}).value || null;
+  let bien = 0; const malos = [];
+  for (let i = 0; i < files.length; i++) {
+    showToast(`Subiendo comprobante ${i + 1} de ${files.length}…`, 'info');
+    let foto;
+    try { foto = await _vj3LeerFoto({ files: [files[i]] }); }
+    catch (e) { malos.push((files[i].name || 'archivo ' + (i + 1)) + ': ' + ((e && e.message) || 'no se pudo leer')); continue; }
+    if (!foto) continue;
+    try { await khViajeros.resguardoSubir(id, foto, fecha, nota); bien++; }
+    catch (e) { malos.push((files[i].name || 'archivo ' + (i + 1)) + ': ' + ((e && e.message) || 'falló')); }
+  }
+  input.value = '';
+  if (malos.length) showToast(`Se guardaron ${bien} de ${files.length}. No se pudieron: ${malos.join(' · ')}`, 'error');
+  else showToast(`✓ ${bien} comprobante${bien === 1 ? '' : 's'} guardado${bien === 1 ? '' : 's'} de resguardo`, 'success');
+  const tr = document.getElementById(`vj-ab-${id}`);
+  if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
+  _vjPagosVer(id, nombre);
+}
+async function _vjResguardoQuitar(rid, id, nombre) {
+  if (!confirm('¿Quitar este comprobante de resguardo? Se archiva (no se borra) y deja de verse aquí.')) return;
+  try {
+    await khViajeros.resguardoQuitar(rid);
+    showToast('Comprobante quitado', 'success');
+    const tr = document.getElementById(`vj-ab-${id}`);
+    if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
+    _vjPagosVer(id, nombre);
+  } catch (e) { showToast('No se pudo quitar: ' + ((e && e.message) || ''), 'error'); }
 }
 
 // ═══ [PLAN-VJ-1 · 4-nov-2026] EL ROL DE PAGOS DE CADA CLIENTE ══════════════

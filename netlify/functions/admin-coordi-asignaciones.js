@@ -137,6 +137,9 @@ const ACCIONES = {
   // [ABONO-FOTO-4] Subir o CAMBIAR el comprobante de un abono que ya existe.
   abono_foto: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
+  resguardo_listar: ROLES_EDITA_VIAJERO,   // [RESGUARDO-1]
+  resguardo_subir: ROLES_EDITA_VIAJERO,
+  resguardo_quitar: ROLES_EDITA_VIAJERO,
   // [PLAN-VJ-1] El rol de pagos de UN viajero (fechas y montos), solo lectura.
   plan_viajero: ROLES_EDITA_VIAJERO,
   plan_fijar: ROLES_EDITA_VIAJERO,
@@ -2966,6 +2969,63 @@ ${entregables}
       const filas = await r.json();
       if (!filas.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Alguien cambió este comprobante mientras subías el tuyo. Recarga y revisa antes de volver a intentar.', ya: true, huerfano: nuevo }) };
       return ok(headers, { abono: filas[0], reemplazo: !!ab.foto_path, antes: ab.foto_path || null });
+    }
+
+    // ── [RESGUARDO-1 · 12-nov-2026] COMPROBANTES DE RESGUARDO ─────────────
+    // Palabra de Memo: «la Pandilla está subiendo todo lo del 2026… quieren
+    // subir los comprobantes viejos de los abonos pasados para tenerlos ahí
+    // sin tener que sumar el comprobante». 🔒 Un resguardo NO es dinero: vive
+    // en su PROPIA tabla (comprobantes_resguardo), jamás en abonos_viajero, así
+    // que ningún saldo, contrato, Resumen ni careo lo puede sumar. Misma foto y
+    // mismo bucket privado que los abonos (carpeta `resguardo/`); el path no
+    // viaja al navegador (URL firmada 1 h). Quitar es ARCHIVAR, no borrar.
+    if (accion === 'resguardo_listar' || accion === 'resguardo_subir' || accion === 'resguardo_quitar') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes manejar comprobantes' }) };
+      const baseRG = `${env.KH_SB_URL}/rest/v1/comprobantes_resguardo`;
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      if (accion === 'resguardo_quitar') {
+        const rid = String(body.resguardo_id || '').trim();
+        if (!UUID_RE.test(rid)) return bad(headers, 'resguardo_id inválido');
+        if (body.confirmar !== true) return bad(headers, 'Quitar pide confirmar:true');
+        const r = await fetch(`${baseRG}?id=eq.${rid}&archivado_at=is.null`, { method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' }, body: JSON.stringify({ archivado_at: new Date().toISOString(), archivado_por: String(quien).slice(0, 120) }) });
+        if (!r.ok) return upstream(headers, await r.text(), 'update');
+        const f = await r.json();
+        if (!f.length) return { statusCode: 409, headers, body: JSON.stringify({ error: 'Ese comprobante ya no está (¿ya lo quitaron?). Recarga.' }) };
+        return ok(headers, { quitado: rid });
+      }
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+      if (accion === 'resguardo_listar') {
+        const r = await fetch(`${baseRG}?viajero_id=eq.${viajero_id}&archivado_at=is.null&select=id,foto_path,fecha_pago,nota,subido_por,creado_at&order=fecha_pago.asc.nullslast,creado_at.asc&limit=200`, { headers: sbHeaders });
+        if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+        const filas = await r.json();
+        const out = [];
+        for (const x of filas) { const { foto_path, ...resto } = x; out.push({ ...resto, foto_url: await _firmarAbono(env, foto_path) }); }
+        return ok(headers, { resguardos: out });
+      }
+      // resguardo_subir — UNA foto por llamada (la pantalla manda varias en fila).
+      if (!body.foto) return bad(headers, 'Elige la foto o el PDF del comprobante');
+      const img = _decodeImagen(body.foto);
+      if (img.error) return bad(headers, 'Comprobante inválido: ' + img.error);
+      if (img.tooBig) return bad(headers, 'El comprobante pesa demasiado (máx 6 MB)');
+      let fecha_pago = null;
+      if (body.fecha_pago) {
+        const fp = String(body.fecha_pago).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fp) || isNaN(Date.parse(fp + 'T12:00:00Z'))) return bad(headers, 'fecha del pago inválida');
+        fecha_pago = fp;
+      }
+      const nota = body.nota ? String(body.nota).trim().slice(0, 300) : null;
+      const pv = await fetch(`${baseVE}?id=eq.${viajero_id}&select=evento_id&limit=1`, { headers: sbHeaders });
+      if (!pv.ok) return upstream(headers, await pv.text(), 'consulta');
+      const vv = (await pv.json())[0];
+      if (!vv) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Ese viajero no existe' }) };
+      const path = `resguardo/${_carpetaEvento(vv.evento_id)}/${viajero_id}/${_uuid()}.${img.ext}`;
+      try { await _subirAbono(env, path, img.bytes, img.mime); }
+      catch (e) { return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo subir el comprobante', detail: e.message }) }; }
+      const r = await fetch(baseRG, { method: 'POST', headers: { ...sbHeaders, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify({ viajero_id, foto_path: path, fecha_pago, nota, subido_por: String(quien).slice(0, 120) }) });
+      if (!r.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'El archivo subió pero no se pudo registrar. Vuelve a intentarlo.', detail: (await r.text()).slice(0, 200), huerfano: path }) };
+      const f = (await r.json())[0] || {};
+      return ok(headers, { resguardo: { id: f.id, fecha_pago: f.fecha_pago, nota: f.nota } });
     }
 
     if (accion === 'abonos_listar') {

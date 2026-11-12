@@ -44,9 +44,11 @@ function mundo({ tipo, nombre, size, data, decodeFalla, imgFalla, pinta }) {
   const todos = src + mont + caps;
   af(!/const foto = await _vj3LeerFoto/.test(todos), 'ningún lector sin try (el rechazo sería una promesa perdida)');
   // [ABONO-FOTO-4] +1 lector: 📎/🔁 comprobante de un abono que ya existe (eran 4).
-  af((todos.match(/try \{ foto = await _vj3LeerFoto/g) || []).length === 5, 'abono · cobranza · montaña · alta manual · cambiar comprobante');
+  // [RESGUARDO-1] +1 lector: los comprobantes de resguardo (varios de una vez).
+  af((todos.match(/try \{ foto = await _vj3LeerFoto/g) || []).length === 6, 'abono · cobranza · montaña · alta manual · cambiar comprobante · resguardo');
   // [ABONO-FOTO-4] +1 input (el de 📎 Pagos).
-  af((src.match(/accept="image\/\*,application\/pdf"/g) || []).length === 3 && /accept="image\/\*,application\/pdf"/.test(mont), 'los inputs aceptan PDF');
+  // [RESGUARDO-1] +1 input (el de resguardo, en 📎 Pagos).
+  af((src.match(/accept="image\/\*,application\/pdf"/g) || []).length === 4 && /accept="image\/\*,application\/pdf"/.test(mont), 'los inputs aceptan PDF');
 
   console.log('[C] el alta manual');
   const html = fs.readFileSync(path.join(RAIZ, 'kamehouse.html'), 'utf8');

@@ -1834,7 +1834,7 @@ ${entregables}
       const fechas = mf.length
         ? mf.map((m, i) => ({
             evento_id: `${base}#${i}`,
-            etiqueta: String((m && (m.f || m.ds)) || `Fecha ${i + 1}`),
+            etiqueta: String((m && [m.lbl, m.f || m.ds].filter(Boolean).join(' · ')) || `Fecha ${i + 1}`),   // [MUDAR-LBL-1] «2 Días · 2027-03-26»: en Pa'l Norte las 3 entradas comparten ds
             zonas: zonasDeFecha(ev, `${base}#${i}`),
           }))
         : [{ evento_id: base, etiqueta: String(ev.f || ev.ds || base), zonas: zonasDeFecha(ev, base) }];
@@ -2197,7 +2197,7 @@ ${entregables}
       const cambios = [];
       const etiqDe = (eid) => {
         const mm = /#(\d+)$/.exec(String(eid));
-        if (mm && mf[Number(mm[1])]) { const x = mf[Number(mm[1])]; return String(x.f || x.ds || eid); }
+        if (mm && mf[Number(mm[1])]) { const x = mf[Number(mm[1])]; return String([x.lbl, x.f || x.ds].filter(Boolean).join(' · ') || eid); }
         return String(ev.f || ev.ds || eid);
       };
       const etiqAntes = etiqDe(origen), etiqDest = etiqDe(destino);

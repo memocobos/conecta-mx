@@ -354,7 +354,83 @@ exports.handler = async (event) => {
     }
     const pc = await fetch(`${cb}?select=id&estado=eq.pendiente&limit=500${FILTRO_PAGO_VIVO}`, { headers: sbH });
     const pendientes = pc.ok ? (await pc.json()).length : null;
-    return j(200, headers, { ok: true, cambios: rows.map((x) => Object.assign({}, x, { viajero: vmap[x.viajero_id] || null })), pendientes });
+
+    // ── [PAGO-CLARO-1 · 13-nov-2026] EL COMPROBANTE CON SU CUENTA ENFRENTE ──
+    // Palabra de Memo: «lo de los comprobantes de pago de los abonos también
+    // siento que les falta más». Quien captura veía un nombre, un slug y un
+    // botón: para saber si el monto tenía sentido había que irse a Capsule a
+    // buscar a la persona. Ahora cada comprobante trae SU CUENTA: el evento con
+    // nombre y fecha, total / pagado / falta, lo que LE TOCA hoy por su rol, sus
+    // últimos abonos y un aviso si ya hay un abono reciente por el mismo monto.
+    // 🔒 Ni una suma aquí: el saldo es de `saldoMigrado` y «lo que le toca» de
+    // `estadoPlan`/`tocaHoy` (los MISMOS dueños del Portal y de Capsule), así la
+    // bandeja dice el número que el cliente ve en su Portal.
+    // 🔒 Es AYUDA para el humano: no captura, no rechaza y no bloquea nada. Si
+    // algo de esto no se puede leer, la tarjeta sale como siempre y lo DICE.
+    let evCat = null, ctxPago = {}, ctxError = null;
+    try { const l = await fetchEventosRaw(); if (Array.isArray(l)) { evCat = {}; l.forEach((e) => { if (e && e.id) evCat[e.id] = e; }); } } catch (_) { evCat = null; }
+    const { fechaDeEventoId } = require('./_lib/fecha-evento');
+    const eventoDe = (eventoId) => {
+      const ev = evCat ? evCat[String(eventoId || '').split('#')[0]] : null;
+      return ev ? { evento_nombre: ev.a || null, evento_fecha: fechaDeEventoId(ev, eventoId) || null } : { evento_nombre: null, evento_fecha: null };
+    };
+    const idsPago = [...new Set(rows.filter((x) => x.tipo === 'pago').map((x) => x.viajero_id))];
+    if (idsPago.length) {
+      try {
+        const { saldoMigrado } = require('./_lib/cuenta-evento');
+        const PF = require('./_lib/plan-fijo');
+        const lista = encodeURIComponent(idsPago.map((x) => '"' + x + '"').join(','));
+        const [rd, ra] = await Promise.all([
+          fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${lista})&select=id,total_contrato,abonado_previo,plan_pagos`, { headers: sbH }),
+          fetch(`${SB_URL}/rest/v1/abonos_viajero?viajero_id=in.(${lista})&select=viajero_id,monto,fecha,nota,foto_path,created_at&order=fecha.asc,created_at.asc&limit=5000`, { headers: sbH }),
+        ]);
+        if (!rd.ok || !ra.ok) throw new Error('lectura ' + rd.status + '/' + ra.status);
+        const dinero = {}; (await rd.json()).forEach((v) => { dinero[v.id] = v; });
+        const abonos = {}; (await ra.json()).forEach((a) => { (abonos[a.viajero_id] = abonos[a.viajero_id] || []).push(a); });
+        const ahora = new Date();
+        const hoyStr = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
+        const diasEntre = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 86400000);
+        idsPago.forEach((vid) => {
+          const v = dinero[vid]; if (!v) return;
+          const ab = abonos[vid] || [];
+          const s = saldoMigrado(v, ab);
+          let toca = null, sin_rol = false;
+          if (s && s.total > 0 && s.resta > 0) {
+            if (v.plan_pagos) {
+              const t = PF.tocaHoy(PF.estadoPlan(v.plan_pagos, { total: s.total, abonado: s.abonado, ahora }), s.resta);
+              if (t) toca = { monto: t.monto, etiqueta: t.etiqueta || null, hasta: t.hasta || null, atrasado: t.atrasado || 0 };
+            } else sin_rol = true;
+          }
+          ctxPago[vid] = {
+            total: s ? s.total : null, abonado: s ? s.abonado : null, resta: s ? s.resta : null,
+            toca, sin_rol,
+            // Los 3 más recientes, para ver de un vistazo qué ya se le capturó.
+            ultimos: ab.slice(-3).reverse().map((a) => ({ monto: Number(a.monto) || 0, fecha: a.fecha ? String(a.fecha).slice(0, 10) : null,
+              nota: a.nota ? String(a.nota).slice(0, 70) : null, tiene_foto: !!a.foto_path })),
+            _recientes: ab.filter((a) => a.fecha && Number(a.monto) > 0 && diasEntre(String(a.fecha).slice(0, 10), hoyStr) <= 15)
+              .map((a) => ({ monto: Number(a.monto), fecha: String(a.fecha).slice(0, 10) })),
+          };
+        });
+      } catch (e) { ctxError = 'no se pudo leer la cuenta de quien pagó (' + ((e && e.message) || 'error') + '): revisa su saldo en Capsule antes de capturar'; ctxPago = {}; }
+    }
+    const conContexto = (x) => {
+      const extra = Object.assign({ viajero: vmap[x.viajero_id] || null }, eventoDe(x.evento_id));
+      if (x.tipo === 'pago') {
+        const c = ctxPago[x.viajero_id] || null;
+        if (c) {
+          // «declara $X» lo escribió el Portal en el detalle (portal-viajero · subir_pago):
+          // es TEXTO del cliente; aquí solo se usa para avisar de un posible repetido.
+          const m = /declara \$([\d,]+)/.exec(String(x.detalle || ''));
+          const declarado = x.mp_pago_id ? null : (m ? Number(m[1].replace(/,/g, '')) : null);
+          const dup = declarado ? (c._recientes.find((a) => Math.round(a.monto) === Math.round(declarado)) || null) : null;
+          extra.cuenta = { total: c.total, abonado: c.abonado, resta: c.resta, toca: c.toca, sin_rol: c.sin_rol, ultimos: c.ultimos,
+            declarado, posible_repetido: dup };
+        } else extra.cuenta = null;
+        if (ctxError) extra.cuenta_error = ctxError;
+      }
+      return Object.assign({}, x, extra);
+    };
+    return j(200, headers, { ok: true, cambios: rows.map(conContexto), pendientes });
   }
   // ── [PREVENTA-AUTO-1] «¡Ya hay paquetes!» a la preventa a ciegas ─────────
   // Palabra de Memo (10-nov): «una vez que tengamos los costos le debe de llegar

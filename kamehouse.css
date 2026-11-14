@@ -4224,6 +4224,57 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
   .rq-actions .rq-sp{display:none}
 }
 
+/* ── [REQ-SIMPLE-1 · 13-nov-2026] La bandeja por TRABAJOS ───────────────────
+   El mapa (una tarjeta por trabajo, con su número) y las secciones en orden
+   fijo. Solo tokens del tema: ni un color tecleado. */
+.rq-mapa{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin:0 0 20px}
+.rq-tile{display:block;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:11px 12px 10px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s}
+.rq-tile:hover{border-color:var(--ts)}
+.rq-tile.on{border-color:var(--gold);background:var(--bg3)}
+.rq-tile-t{display:block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ts)}
+.rq-tile-n{display:block;font-size:27px;font-weight:900;line-height:1.1;margin:4px 0 2px;color:var(--gold)}
+.rq-tile-q{display:block;font-size:11px;color:var(--ts);line-height:1.35}
+.rq-tile.cero .rq-tile-n{color:var(--green);font-size:20px;margin:7px 0 6px}
+.rq-tile.cero{opacity:.62}
+.rq-tile.err .rq-tile-n{color:var(--red)}
+.rq-tile.todo .rq-tile-n{color:var(--text);font-size:15px;margin:10px 0 7px}
+.rq-sec{margin:0 0 24px}
+.rq-sec[hidden]{display:none}
+.rq-sec-h{margin:0 0 10px}
+.rq-sec-h>b{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px;font-weight:800}
+.rq-sec-h .rq-sec-q{display:block;font-size:12px;color:var(--ts);margin-top:3px;line-height:1.45}
+.rq-aldia{padding:14px 16px;border:1px dashed var(--border);border-radius:12px;color:var(--ts);font-size:13px;margin:0 0 10px}
+.rq-aviso{margin:8px 0;padding:8px 11px;border-radius:9px;font-size:12px;line-height:1.45;border:1px solid var(--border)}
+.rq-aviso.ok{border-color:var(--green);color:var(--green)}
+.rq-aviso.ojo{border-color:var(--gold);color:var(--gold)}
+.rq-aviso.mal{border-color:var(--red);color:var(--red)}
+.rq-aviso b{color:inherit}
+.rq-nota{font-size:12px;color:var(--ts);line-height:1.45;margin:4px 0}
+.rq-linea{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rq-linea .rq-sp{flex:1}
+.rq-in{background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px}
+/* [PAGO-CLARO-1] el comprobante con la cuenta de la persona enfrente */
+.rq-pago{display:grid;grid-template-columns:132px 1fr;gap:12px;align-items:start;margin:8px 0}
+.rq-comp{display:flex;align-items:center;justify-content:center;width:132px;min-height:132px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);color:var(--ts);font-size:11px;text-align:center;overflow:hidden;cursor:pointer;padding:0;font-family:inherit}
+.rq-comp img{display:block;width:100%;height:auto;max-height:260px;object-fit:cover}
+.rq-comp.grande{width:100%;max-width:560px;grid-column:1/-1;cursor:zoom-out}
+.rq-comp.grande img{max-height:none;object-fit:contain}
+.rq-cta{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;margin:0 0 6px}
+.rq-cta div{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:6px 9px}
+.rq-cta small{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ts)}
+.rq-cta b{display:block;font-size:15px;font-weight:800;margin-top:1px}
+.rq-cta .falta b{color:var(--gold)}
+.rq-cta .toca{border-color:var(--gold)}
+.rq-ult{font-size:12px;color:var(--ts);line-height:1.5}
+.rq-ult b{color:var(--text)}
+@media(max-width:600px){
+  .rq-pago{grid-template-columns:92px 1fr;gap:10px}
+  .rq-comp{width:92px;min-height:92px}
+  .rq-comp img{max-height:150px}
+  .rq-comp.grande{width:100%;max-width:none}
+  .rq-mapa{grid-template-columns:1fr 1fr}
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    [GZ-PLANTILLA-2 · 14-oct-2026] TEMAS DE COLECCIÓN — palabra de Memo: «unas
    plantillas de tema» además de las 7. Son PALETAS originales con su ambiente

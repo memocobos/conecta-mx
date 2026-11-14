@@ -123,6 +123,29 @@ exports.handler = async (event) => {
     if (PR.esDelEquipo(v)) return { error: 'Ese es un tour que trabaja (equipo): vive en KameHouse, no en el Portal', status: 409 };
     return { v };
   };
+  // [ROL-2027-1] Publicar ES registrar (palabra de Memo, 13-nov: «el día que
+  // hagamos registro es el día que se cuenta para su rol de pagos»): a los viajes
+  // de tours 2027 que se acaban de sellar y no tenían rol, se les fija AQUÍ
+  // (hoy + lo que llevan pagado) — así el cliente entra a su Portal y ya ve su
+  // calendario, y nadie teclea una fecha. Los de 2026 se saltan (van a «🗓 Fijar
+  // rol» con su separo real). Jamás tumba el publicar: si no se pudo, se DICE.
+  const rolAlPublicar = async (ids) => {
+    try {
+      if (!ids || !ids.length) return null;
+      const r = await require('./_lib/rol-auto').fijarAlRegistrar({
+        url: KH_URL, headers: h, ids, EV: await catalogo(), por: 'registro (Portal) · ' + quien, aunLiquidado: true,
+      });
+      return {
+        // Solo los que de verdad quedaron con pagos por hacer (un liquidado nace
+        // con su rol en $0, pero no hay nada que anunciarle a nadie).
+        fijados: r.fijados.filter((f) => f.n > 0).map((f) => ({ viajero_id: f.viajero_id, nombre: f.nombre, texto: f.texto })),
+        // Los de 2026 con saldo: su rol se fija a mano, con su fecha de separo real.
+        a_mano: r.saltados.filter((s) => s.auto === false).length,
+        error: r.error || null,
+      };
+    } catch (_) { return null; }
+  };
+
   // Cuando ya no queda ningún viaje sin decidir, la revisión se cierra SOLA y
   // sale UN correo: lo publicado (y, aparte, lo que no procedió con su motivo).
   const cerrarSiTermino = async (rev) => {
@@ -156,7 +179,9 @@ exports.handler = async (event) => {
     if (accion === 'listar') {
       const [rp, rr] = await Promise.all([
         fetch(`${T}?estado=eq.pendiente&tipo=in.(revisar,ligar)&select=*&order=creado_en.asc&limit=100`, { headers: h }),
-        fetch(`${T}?estado=in.(publicada,rechazada)&select=id,tipo,estado,correo,evento_id,nombre_dado,motivo,nota_staff,antes,despues,atendida_at,atendida_por,correo_enviado_at&order=atendida_at.desc.nullslast&limit=30`, { headers: h }),
+        // [REQ-SIMPLE-1] La bitácora también enseña lo cerrado con «ya quedó»
+        // (`resuelta`): era el cierre más usado (58 veces) y el único invisible.
+        fetch(`${T}?estado=in.(publicada,rechazada,resuelta)&select=id,tipo,estado,correo,evento_id,nombre_dado,motivo,nota_staff,antes,despues,atendida_at,atendida_por,correo_enviado_at&order=atendida_at.desc.nullslast&limit=30`, { headers: h }),
       ]);
       if (!rp.ok) return j(502, headers, { error: 'No pude leer las revisiones del Portal', detail: (await rp.text()).slice(0, 200) });
       const pend = await rp.json();
@@ -207,15 +232,30 @@ exports.handler = async (event) => {
       const { correrCareo } = require('./_lib/excel-careo-correr');
       const c = await correrCareo(evento_id);
       if (!c || c.error) return j(200, headers, { ok: false, motivo: (c && c.error && (c.error.mensaje || c.error.codigo)) || 'el careo no contestó' });
-      const tn = tok(nombre);
-      const hits = (c.personas || []).filter((p) => {
+      // [REQ-SIMPLE-1 · 13-nov] ¿CUÁL de los parecidos ES ella? La búsqueda trae
+      // a todo el que comparte dos palabras del nombre (hermanos, tocayos), y la
+      // pantalla comparaba a CADA UNO contra los números de la persona de la
+      // tarjeta: Jaime Eduardo Manzo salía «≠ KameHouse» junto a Stephani Manzo
+      // y se leía como un descuadre que no existía (caso real, 13-nov). Hoy el
+      // servidor dice quién es ELLA y solo esa se compara:
+      //   · la de nombre IDÉNTICO (mismas palabras, sin acentos ni orden);
+      //   · si no hay idéntica, la ÚNICA cuyo nombre contiene al suyo (o al revés).
+      // Los demás viajan rotulados como «otra persona» y no se comparan con nadie.
+      const tn = [...new Set(tok(nombre))];
+      const cands = (c.personas || []).map((p) => {
         const tp = new Set(tok(p.nombre));
         const comun = tn.filter((t) => tp.has(t)).length;
-        return comun >= 2 || (comun >= 1 && tn.length === 1);
-      }).map((p) => ({ nombre: p.nombre, total: p.total == null ? null : p.total, abonado: p.abonado == null ? null : p.abonado,
-        filas: p.filas || null, zonas: p.zonas || null, paquete: p.paquete || null, roja: !!p.roja, fuentes: p.fuentes || null,
-        pestanas: p.pestanas || null }));
-      return j(200, headers, { ok: true, personas: hits });
+        return { p, comun, exacta: comun === tn.length && tp.size === tn.length,
+          contenida: comun >= 2 && comun === Math.min(tn.length, tp.size) };
+      }).filter((x) => x.comun >= 2 || (x.comun >= 1 && tn.length === 1));
+      const hayExacta = cands.some((x) => x.exacta);
+      const contenidas = cands.filter((x) => x.contenida);
+      const esElla = (x) => x.exacta || (!hayExacta && x.contenida && contenidas.length === 1);
+      const hits = cands.map((x) => ({ nombre: x.p.nombre, total: x.p.total == null ? null : x.p.total, abonado: x.p.abonado == null ? null : x.p.abonado,
+        filas: x.p.filas || null, zonas: x.p.zonas || null, paquete: x.p.paquete || null, roja: !!x.p.roja, fuentes: x.p.fuentes || null,
+        pestanas: x.p.pestanas || null, es_ella: esElla(x) }))
+        .sort((a, b) => (b.es_ella ? 1 : 0) - (a.es_ella ? 1 : 0));
+      return j(200, headers, { ok: true, personas: hits, hay_ella: hits.some((h) => h.es_ella) });
     }
 
     // ── ligar: «Es esta persona» ────────────────────────────────────────────
@@ -276,13 +316,15 @@ exports.handler = async (event) => {
           return j(502, headers, { error: 'No pude publicar las filas; la solicitud sigue pendiente', detail: (await rs.text()).slice(0, 200) });
         }
       }
+      // 2b · [ROL-2027-1] su rol, ANTES del correo: cuando entre, ya lo ve.
+      const rol = await rolAlPublicar(sinSello.map((v) => v.id));
       // 3 · El correo: lo que verá en su Portal (todas sus filas ya revisadas).
       const EVx = await catalogo();
       const visibles = filas.filter((v) => PR.revisada(v) || sinSello.some((s) => s.id === v.id));
       const viajes = PR.foto(visibles, ab).map((f) => { const n = PR.nombreEvento(EVx, f.evento_id); return Object.assign({}, f, { evento: n.nombre, fecha: n.fecha }); });
       const correo = await PR.avisarRevision({ rev: Object.assign({}, rev, { estado: 'publicada' }), viajes, nombre: (filas[0] && filas[0].nombre) || rev.nombre_dado });
       if (correo.ok) await fetch(`${T}?id=eq.${rev.id}`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ correo_enviado_at: new Date().toISOString() }) });
-      return j(200, headers, { ok: true, publicadas: sinSello.length, correo });
+      return j(200, headers, { ok: true, publicadas: sinSello.length, correo, rol });
     }
 
     // ── [PRV-EDITA-1a] cerrar_resuelta: «✓ Ya quedó» ────────────────────────
@@ -312,8 +354,23 @@ exports.handler = async (event) => {
       const filas = await PR.filasDeCorreo(rev.correo, KH);
       const visibles = filas.filter((v) => PR.revisada(v));
 
+      // [REQ-SIMPLE-1 · 13-nov] «YA QUEDÓ» NO ES «ES ESTA PERSONA».
+      // 🔴 Medido en la base (13-nov): de 52 «no veo mi viaje» cerradas con este
+      // botón, 51 se cerraron SIN ligar ninguna fila («Listo», «Si es», «todo en
+      // orden») y 23 de esas personas siguen sin NINGÚN viaje a su correo — 8
+      // volvieron a pedirlo. En 18 de las 23 el parecido correcto estaba ahí
+      // mismo (16 con el mismo WhatsApp). El botón se usaba como un «confirmar».
+      // Hoy, cerrar un «ligar» cuyo correo NO tiene ningún viaje exige decirlo
+      // con todas sus letras (`sin_viaje:true`): la pantalla lo avisa antes y el
+      // candado vive aquí (esconder un botón no es la regla — COB-MIG-1).
+      if (rev.tipo === 'ligar' && !filas.length && body.sin_viaje !== true) {
+        return j(409, headers, { pide_confirmar_sin_viaje: true,
+          error: 'Este correo todavía NO tiene ningún viaje ligado: si cierras así, el cliente va a seguir sin ver nada en su Portal. Elige «✓ Es esta persona» en el parecido correcto. Si de verdad se resolvió por otro lado (se registró con otro correo, no era cliente), confírmalo.' });
+      }
+
       const rc = await fetch(`${T}?id=eq.${rev.id}&estado=eq.pendiente`, { method: 'PATCH', headers: hw({ Prefer: 'return=representation' }),
-        body: JSON.stringify({ estado: 'resuelta', atendida_at: new Date().toISOString(), atendida_por: quien, nota_staff: nota }) });
+        body: JSON.stringify({ estado: 'resuelta', atendida_at: new Date().toISOString(), atendida_por: quien,
+          nota_staff: ((body.sin_viaje === true && rev.tipo === 'ligar' && !filas.length ? '[cerrada SIN ligar ningún viaje] ' : '') + nota).slice(0, 1000) }) });
       if (!rc.ok) return j(502, headers, { error: 'No pude cerrar la solicitud', detail: (await rc.text()).slice(0, 200) });
       const cerrada = (await rc.json())[0];
       if (!cerrada) return j(409, headers, { error: 'Alguien más ya la atendió' });
@@ -442,8 +499,10 @@ exports.handler = async (event) => {
       if (!rs.ok) return j(502, headers, { error: 'No pude publicar ese viaje', detail: (await rs.text()).slice(0, 200) });
       if (!(await rs.json()).length) return j(409, headers, { error: 'Alguien más ya lo publicó' });
       await fetch(`${T}?id=eq.${rev.id}&estado=eq.pendiente`, { method: 'PATCH', headers: hw(), body: JSON.stringify({ viajero_ids: [...new Set([...(rev.viajero_ids || []), v.id])] }) });
+      // [ROL-2027-1] su rol, ANTES de que el cierre le mande «ya puedes ver tu viaje».
+      const rol = await rolAlPublicar([v.id]);
       const cierre = await cerrarSiTermino(rev);
-      return j(200, headers, { ok: true, publicada: v.id, cierre });
+      return j(200, headers, { ok: true, publicada: v.id, cierre, rol });
     }
 
     // ── [PRV-FILA-1] fila_no_procede: UN viaje no se publica (con motivo) ────
@@ -493,7 +552,9 @@ exports.handler = async (event) => {
         return { tipo: 'adelanto', estado: 'publicada', correo: c, evento_id: vs[0].evento_id, viajero_ids: vs.map((v) => v.id), antes: f, despues: f, nota_staff: nota, atendida_at: ahora, atendida_por: quien };
       });
       const rb = await fetch(T, { method: 'POST', headers: hw({ Prefer: 'return=minimal' }), body: JSON.stringify(bit) });
-      return j(200, headers, { ok: true, publicadas: selladas.length, bitacora: rb.ok ? bit.length : 0, bitacora_error: rb.ok ? null : 'no se pudo asentar la bitácora (las filas sí quedaron revisadas)' });
+      // [ROL-2027-1] Lo recién sellado de tours 2027 nace con su rol.
+      const rol = await rolAlPublicar(selladas.map((v) => v.id));
+      return j(200, headers, { ok: true, publicadas: selladas.length, bitacora: rb.ok ? bit.length : 0, bitacora_error: rb.ok ? null : 'no se pudo asentar la bitácora (las filas sí quedaron revisadas)', rol });
     }
   } catch (e) {
     return j(502, headers, { error: 'Error en la revisión del Portal', detail: e && e.message });

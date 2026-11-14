@@ -1418,20 +1418,34 @@
        <div class="page-head">
         <div>
          <div class="page-title"><svg class="ic"><use href="#ic-solicitudes"/></svg> REQUISICIONES</div>
-         <div class="page-sub">// Las reservaciones del sitio: comprobante + forma de pago. Aprobar crea el viajero con su abono — tú verificas el dinero.</div>
+         <div class="page-sub">// Todo lo que hay que atender, separado por trabajo. Toca una tarjeta y haz solo eso — el número es lo que falta.</div>
         </div>
         <div class="page-actions">
-         <span class="chip" style="font-weight:800">PENDIENTES <b id="req-bdj-pend">—</b></span>
+         <span class="chip" style="font-weight:800" title="La suma de todo lo que falta por atender en esta pantalla">POR ATENDER <b id="req-bdj-pend">—</b></span>
          <button class="btn btn-ghost btn-sm" onclick="loadRequisiciones()">↻ Refrescar</button>
         </div>
        </div>
-       <div class="rq-seg" id="req-bdj-tabs">
-        <button class="tab-btn active" data-filtro="pendiente" onclick="loadRequisiciones('pendiente')">Pendientes</button>
-        <button class="tab-btn" data-filtro="aprobada" onclick="loadRequisiciones('aprobada')">Aprobadas</button>
-        <button class="tab-btn" data-filtro="rechazada" onclick="loadRequisiciones('rechazada')">Rechazadas</button>
-        <button class="tab-btn" data-filtro="todas" onclick="loadRequisiciones('todas')">Todas</button>
+       <!-- [REQ-SIMPLE-1 · 13-nov-2026] EL MAPA: una tarjeta por trabajo, con su
+            número y qué se hace ahí. Debajo, cada trabajo en SU sección y en un
+            orden FIJO (antes las cajas se inyectaban según cuál contestaba
+            primero y todas bajo el título «las reservaciones del sitio»). -->
+       <div class="rq-mapa" id="req-mapa"></div>
+       <div class="rq-sec" id="req-sec-sitio" data-sec="sitio">
+        <div class="rq-sec-h"><b>🧾 Reservaciones del sitio</b><span class="rq-sec-q">Abre el comprobante, revisa los datos y aprueba: al aprobar nace el viajero con su abono (y su rol de pagos).</span></div>
+        <div class="rq-seg" id="req-bdj-tabs">
+         <button class="tab-btn active" data-filtro="pendiente" onclick="loadRequisiciones('pendiente')">Pendientes</button>
+         <button class="tab-btn" data-filtro="aprobada" onclick="loadRequisiciones('aprobada')">Aprobadas</button>
+         <button class="tab-btn" data-filtro="rechazada" onclick="loadRequisiciones('rechazada')">Rechazadas</button>
+         <button class="tab-btn" data-filtro="todas" onclick="loadRequisiciones('todas')">Todas</button>
+        </div>
+        <div id="req-bdj-lista"><div style="color:var(--ts);padding:20px">Cargando…</div></div>
        </div>
-       <div id="req-bdj-lista"><div style="color:var(--ts);padding:20px">Cargando…</div></div>
+       <div class="rq-sec" id="req-sec-pagos" data-sec="pagos"><div id="req-pagos"></div></div>
+       <div class="rq-sec" id="req-sec-ligar" data-sec="ligar"><div id="req-ligar"></div></div>
+       <div class="rq-sec" id="req-sec-portal" data-sec="portal"><div id="req-portal"></div></div>
+       <div class="rq-sec" id="req-sec-rol" data-sec="rol"><div id="req-rol-fijar"></div></div>
+       <div class="rq-sec" id="req-sec-cambios" data-sec="cambios"><div id="req-cambios"></div><div id="req-prev-costos"></div></div>
+       <div class="rq-sec" id="req-sec-extras" data-sec="extras"><div id="req-extras"></div></div>
      </div>
 
      <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->

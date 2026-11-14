@@ -149,6 +149,9 @@ const ACCIONES = {
   // recordatorios del rol fijo (solo LEE, jamás manda).
   plan_pendientes: ROLES_EDITA_VIAJERO,
   rol_avisos_ensayo: ROLES_EDITA_VIAJERO,
+  // [ROL-2027-1] «Fijar de una vez» los pendientes de tours 2027 (o los ids
+  // elegidos en la tarjeta): hoy + lo que llevan pagado. En seco sin `confirmar`.
+  rol_auto_fijar: ROLES_EDITA_VIAJERO,
   // [GRUPO-WA-1] El link del grupo de WhatsApp por evento.
   grupo_wa_ver: ROLES_EDITA_VIAJERO,
   grupo_wa_guardar: ROLES_EDITA_VIAJERO,
@@ -2595,12 +2598,35 @@ ${entregables}
         }
       }
 
+      // [ROL-2027-1] Palabra de Memo (13-nov): «TODOS LOS TOURS 2027 QUE SE
+      // SEPAREN, EL DÍA QUE HAGAMOS REGISTRO ES EL DÍA QUE SE CUENTA PARA SU ROL
+      // DE PAGOS … PARA NO ESTAR METIENDO UNO POR UNO MANUAL». El alta ES el
+      // registro: aquí nace su rol (hoy + lo que lleva pagado; lo que falta,
+      // parejo en las quincenas que quedan). Va DESPUÉS del abono —el dueño lee
+      // lo pagado de la base, no de este formulario— y ANTES del contrato.
+      // Un tour 2026 se salta (su separo real se captura a mano). Jamás tumba
+      // el alta: lo que no se pudo se DICE y cae a «🗓 Fijar rol».
+      let rolAuto = null;
+      if (creado) {
+        try {
+          const quienRol = (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || jwtUserId || 'panel';
+          const rr = await require('./_lib/rol-auto').fijarAlRegistrar({
+            url: env.KH_SB_URL, headers: sbHeaders, ids: [creado.id], por: 'registro (alta) · ' + quienRol, aunLiquidado: true,
+          });
+          if (rr.fijados[0]) rolAuto = { fijado: true, fecha: rr.fijados[0].fecha, n: rr.fijados[0].n, texto: rr.fijados[0].texto };
+          else {
+            const s0 = rr.saltados[0] || {};
+            rolAuto = { fijado: false, es2027: s0.auto !== false, motivo: s0.motivo || rr.error || 'no se pudo fijar' };
+          }
+        } catch (_) { rolAuto = null; }
+      }
+
       let contrato = null;
       if (creado && body.contrato !== false) {
         const { emitirContratos } = require('./_lib/contrato-cliente');
         contrato = await emitirContratos({ viajeroIds: [creado.id], creado_por: (auth.user && auth.user.correo) || null, KH_URL: env.KH_SB_URL, KH_KEY: env.KH_SB_SERVICE });
       }
-      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig, contrato, abono: abonoAlta, abono_error: abonoError, abono_monto: fotoAlta ? abonado : null });
+      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble, zona_aviso: zonaAvisoMig, contrato, abono: abonoAlta, abono_error: abonoError, abono_monto: fotoAlta ? abonado : null, rol: rolAuto });
     }
 
     // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────
@@ -3307,8 +3333,36 @@ ${entregables}
       try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
       if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo: sin la fecha del evento no se sabe quién viene.' }) };
       try {
-        const r = await require('./_lib/rol-avisos').listarPendientes({ url: env.KH_SB_URL, headers: sbHeaders, EV, ahora: new Date() });
-        return ok(headers, { ok: true, pendientes: r.lista, sin_fecha: r.sin_fecha });
+        // [ROL-2027-1] La MISMA población (pendientesDeFijar, su dueño) + la
+        // propuesta de cada quien si su rol se fija hoy, y cuáles son de un
+        // tour 2027 (esos se fijan de un clic: la regla de Memo).
+        const r = await require('./_lib/rol-auto').pendientes({ url: env.KH_SB_URL, headers: sbHeaders, EV, ahora: new Date() });
+        return ok(headers, { ok: true, pendientes: r.lista, sin_fecha: r.sin_fecha, de2027: r.de2027, regla_desde: r.regla_desde });
+      } catch (e) { return upstream(headers, e.message, 'consulta'); }
+    }
+
+    // ── [ROL-2027-1] FIJAR DE UNA VEZ: hoy + lo que llevan pagado ───────────
+    // Palabra de Memo (13-nov): en los tours 2027 «el día que hagamos registro
+    // es el día que se cuenta para su rol … para no estar metiendo uno por uno
+    // manual». Los que se registran o publican desde hoy ya nacen con su rol
+    // (`_lib/rol-auto` en el alta y en el sello del Portal); esto es para los
+    // que YA estaban publicados sin rol, y para fijar «desde hoy» a quien un
+    // humano elija en la tarjeta (`viajero_ids`, del año que sea).
+    // 🔒 Sin `confirmar:true` es EN SECO: contesta a quién y qué rol, sin escribir.
+    // 🔒 Jamás pisa un rol que ya existe y no escribe un peso: es calendario.
+    if (accion === 'rol_auto_fijar') {
+      const ids = Array.isArray(body.viajero_ids) ? body.viajero_ids.map(String).filter((x) => UUID_RE.test(x)) : null;
+      if (Array.isArray(body.viajero_ids) && !ids.length) return bad(headers, 'viajero_ids inválidos');
+      let EV = null;
+      try { EV = await require('./_lib/catalogo-index').fetchEventosRaw(); } catch (_) { EV = null; }
+      if (!Array.isArray(EV)) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el catálogo: sin la fecha del evento no se arma el rol.' }) };
+      try {
+        const quienRol = (auth && auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || jwtRol;
+        const r = await require('./_lib/rol-auto').barrer({
+          url: env.KH_SB_URL, headers: sbHeaders, EV, ahora: new Date(),
+          por: 'registro (bandeja) · ' + quienRol, ids, confirmar: body.confirmar === true,
+        });
+        return ok(headers, r);
       } catch (e) { return upstream(headers, e.message, 'consulta'); }
     }
 

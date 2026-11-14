@@ -427,6 +427,12 @@ async function _migEnviar(d) {
       else if (k && (k.sin_correo || []).length) showToast('Sin correo: manda su contrato con «📜 Contrato» en la lista de viajeros', 'warning');
       else if (k && (k.saltados || []).length) showToast('Sin contrato: ' + _esfEsc(k.saltados[0].motivo), 'warning');
       else if (k && (k.aviso || (k.errores || []).length)) showToast('Contrato: ' + _esfEsc(k.aviso || k.errores.map((e) => e.aviso).join(' · ')), 'error'); }
+    // [ROL-2027-1] Su rol de pagos nació con el alta (tours 2027): se DICE. Si
+    // es de 2027 y no se pudo, también — ese cae a «🗓 Fijar rol» en Requisiciones.
+    // Un tour 2026 no dice nada aquí: su separo real se captura aparte.
+    { const ro = (r && r.rol) || null;
+      if (ro && ro.fijado && ro.n > 0) showToast('🗓 Rol de pagos fijo desde hoy · ' + _esfEsc(ro.texto || ''), 'success');
+      else if (ro && ro.es2027 && ro.motivo && !/liquidado|equipo/.test(ro.motivo)) showToast('🗓 Su rol no se fijó solo (' + _esfEsc(ro.motivo) + '): revísalo en Requisiciones → Fijar rol', 'warning'); }
     // Uno tras otro: se limpia lo de la persona y se CONSERVA paquete y zona,
     // que en una tanda del Excel se repiten. El foco vuelve al nombre.
     ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-genero','mig-hab','mig-notas']

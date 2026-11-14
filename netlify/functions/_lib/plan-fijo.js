@@ -16,6 +16,10 @@
 // Las tres decisiones de Memo (4-nov), firmadas:
 //   1. Los migrados del Excel (sin fecha de separo real) NO ven calendario hasta
 //      que Bulma/Milk capturen su fecha de separo en Capsule.
+//      ⚰️ [ROL-2027-1 · 13-nov] SUPERADA para los tours 2027+ por palabra de
+//      Memo: «el día que hagamos registro es el día que se cuenta para su rol».
+//      Ahí el rol se fija SOLO al registrar/publicar (`_lib/rol-auto`), con
+//      `origen:'registro'`. Para los tours 2026 esta decisión sigue viva.
 //   2. Un pago no hecho sale VENCIDO y se suma aparte; los demás no cambian. Lo
 //      que abone de más se aplica a los pagos EN ORDEN.
 //   3. Si cambia el total: MISMAS fechas, nuevo monto en las que faltan. Eso lo
@@ -95,7 +99,7 @@ function armarPlanFijo(o) {
     // del evento (la fila `liq` de rol.html).
     cuotas = deuda > 0 ? [{ n: 1, lbl: 'Antes del evento', ini: o.separo_fecha, fin: ds, monto: deuda, liq: true }] : [];
   }
-  return {
+  const plan = {
     v: VERSION,
     separo_fecha: String(o.separo_fecha).slice(0, 10),
     separo_monto: sepMonto,
@@ -107,6 +111,13 @@ function armarPlanFijo(o) {
     creado_por: o.por || null,
     ajustes: [],
   };
+  // [ROL-2027-1] De dónde salió la fecha. Solo viaja cuando alguien lo dice
+  // ('registro' = el día que se registró en el sistema, con lo que llevaba
+  // pagado como punto de partida); sin él, el plan es byte a byte el de siempre
+  // y la fecha ES la de su separo. Las pantallas lo usan para no decirle «tu
+  // separo del 13 nov» a quien separó en septiembre.
+  if (o.origen) plan.origen = String(o.origen);
+  return plan;
 }
 
 // ── LEER (cada vez que alguien lo mira) ────────────────────────────────────
@@ -129,6 +140,7 @@ function estadoPlan(plan, o) {
     separo_monto: plan.separo_monto,
     fijo: true,
   };
+  if (plan.origen) base.origen = plan.origen;   // [ROL-2027-1] 'registro' → la pantalla no dice «tu separo»
   if (resta <= 0) return Object.assign({ estado: 'liquidado', resta: 0, cuotas: [], atrasado: 0 }, base);
   if (ds && ds < hoy) return Object.assign({ estado: 'evento_pasado', resta, cuotas: [], atrasado: 0 }, base);
 
@@ -225,13 +237,13 @@ function diaReynosa(ts) {
 // lanza: devuelve { ok, error }. El catálogo (`ev`) da la fecha del #N.
 async function fijarEnBase(o) {
   try {
-    const { url, headers, viajero, ev, fecha_separo, separo_monto, por, reemplazar } = o || {};
+    const { url, headers, viajero, ev, fecha_separo, separo_monto, por, reemplazar, origen } = o || {};
     if (!viajero || !viajero.id) return { ok: false, error: 'sin viajero' };
     if (!ev) return { ok: false, error: 'el catálogo no trae este evento' };
     const ds = PP.dsDeEvento(ev, viajero.evento_id);
     const plan = armarPlanFijo({
       separo_fecha: fecha_separo, separo_monto, total: viajero.total_contrato,
-      paquete: viajero.tipo_paquete, ds, diasAntes: ev.diasAntes, por,
+      paquete: viajero.tipo_paquete, ds, diasAntes: ev.diasAntes, por, origen,
     });
     if (plan.error) return { ok: false, error: plan.error };
     const filtro = reemplazar ? '' : '&plan_pagos=is.null';

@@ -42,12 +42,89 @@ async function _reqBdjCall(body) {
   return j;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [REQ-SIMPLE-1 · 13-nov-2026] EL MAPA DE LA BANDEJA
+// Palabra de Memo: «son muchos clicks, muchas cosas que poner atención, hay
+// momentos en los que no sé qué estoy haciendo … si yo no la entiendo, cómo le
+// explico a mi team». Lo que había: cinco cajas distintas bajo un solo título
+// («las reservaciones del sitio»), en el orden en que contestaba cada lectura, y
+// un contador «PENDIENTES 0» que solo contaba UNA de las cinco.
+// Lo que hay: UNA tarjeta por TRABAJO, con su número y qué se hace ahí. Tocar una
+// enseña solo ese trabajo; el contador de arriba es la suma de todos.
+// 🔒 Cada número lo cuenta su propia lectura (la misma lista que se pinta abajo:
+// el número y la lista no pueden decir cosas distintas). null = cargando ·
+// -1 = no se pudo leer — que NO es cero y se pinta «?».
+// 🔒 El orden es de urgencia y es FIJO: primero el dinero (reservaciones y
+// pagos), luego quien no ve su viaje, luego publicar, el rol y los cambios.
+// ═══════════════════════════════════════════════════════════════════════════
+const _REQ_SECS = [
+  { k: 'sitio', ico: '🧾', t: 'Reservaciones nuevas', q: 'Revisar el comprobante y aprobar' },
+  { k: 'pagos', ico: '💳', t: 'Pagos por capturar', q: 'Ver el comprobante y capturar el abono' },
+  { k: 'ligar', ico: '🔗', t: 'No ven su viaje', q: 'Decir quién es: «Es esta persona»' },
+  { k: 'portal', ico: '🪪', t: 'Viajes por publicar', q: 'Revisar sus números y publicar' },
+  { k: 'rol', ico: '🗓', t: 'Rol por fijar', q: 'Fijar su calendario de pagos' },
+  { k: 'cambios', ico: '🔁', t: 'Cambios pedidos', q: 'Atender y cerrar' },
+];
+const _reqConteo = { sitio: null, pagos: null, ligar: null, portal: null, rol: null, cambios: null };
+let _reqFoco = null;          // el trabajo a la vista ('todo' = todos)
+let _reqFocoManual = false;   // ya eligió una tarjeta: no se le mueve sola
+function _reqContar(sec, n) {
+  const antes = _reqConteo[sec];
+  _reqConteo[sec] = (n == null) ? -1 : n;
+  // Acabó el último de ESE trabajo (pasó de algo a cero): se suelta la elección
+  // para que la bandeja lo lleve sola al siguiente trabajo con pendientes.
+  if (_reqFocoManual && _reqFoco === sec && antes > 0 && n === 0) _reqFocoManual = false;
+  _reqMapaPintar();
+}
+function _reqEnfocar(sec) { _reqFoco = sec; _reqFocoManual = true; _reqMapaPintar(); }
+function _reqMapaHtml(foco) {
+  return _REQ_SECS.map((s) => {
+    const n = _reqConteo[s.k];
+    const cls = 'rq-tile' + (foco === s.k ? ' on' : '') + (n === 0 ? ' cero' : '') + (n === -1 ? ' err' : '');
+    const num = n == null ? '…' : n === -1 ? '?' : n === 0 ? '✓ al día' : String(n);
+    return `<button type="button" class="${cls}" onclick="_reqEnfocar('${s.k}')"><span class="rq-tile-t">${s.ico} ${s.t}</span><span class="rq-tile-n">${num}</span><span class="rq-tile-q">${s.q}</span></button>`;
+  }).join('')
+    + `<button type="button" class="rq-tile todo${foco === 'todo' ? ' on' : ''}" onclick="_reqEnfocar('todo')"><span class="rq-tile-t">📋 Ver todo junto</span><span class="rq-tile-n">Todo</span><span class="rq-tile-q">Todos los trabajos, uno tras otro</span></button>`;
+}
+function _reqMapaPintar() {
+  const vals = _REQ_SECS.map((s) => _reqConteo[s.k]);
+  const listos = vals.every((n) => n != null);
+  // Sin elección del usuario: el primer trabajo con algo pendiente (orden de
+  // urgencia). Mientras alguna lectura no contesta, todo a la vista: no se
+  // enfoca a ciegas para brincar medio segundo después.
+  if (!_reqFocoManual) {
+    if (listos) { const p = _REQ_SECS.find((s) => _reqConteo[s.k] > 0 || _reqConteo[s.k] === -1); _reqFoco = p ? p.k : 'sitio'; }
+    else _reqFoco = null;
+  }
+  const foco = _reqFoco || 'todo';
+  const mapa = document.getElementById('req-mapa');
+  if (mapa) mapa.innerHTML = _reqMapaHtml(foco);
+  const secs = document.querySelectorAll ? document.querySelectorAll('#page-requisiciones .rq-sec') : [];
+  Array.prototype.forEach.call(secs, (el) => {
+    const k = el.dataset ? el.dataset.sec : null;
+    // «extras» (bitácora, ensayo de recordatorios) va siempre al final, plegado.
+    el.hidden = !(foco === 'todo' || k === foco || k === 'extras');
+  });
+  const badge = document.getElementById('req-bdj-pend');
+  if (badge) {
+    const tot = vals.reduce((a, n) => a + (n > 0 ? n : 0), 0);
+    // Un trabajo que no se pudo leer NO es cero: el total lo dice con «+?».
+    badge.textContent = !listos ? '…' : String(tot) + (vals.some((n) => n === -1) ? '+?' : '');
+  }
+}
+
 async function loadRequisiciones(filtro) {
+  // Cambiar de pestaña (Pendientes/Aprobadas/…) solo recarga las reservaciones
+  // del sitio: los otros trabajos no dependen de ese filtro.
+  const soloPestana = !!filtro && filtro !== _reqBdjFiltro && _reqConteo.sitio != null;
   if (filtro) _reqBdjFiltro = filtro;
-  try { loadCambiosPortal(); } catch (_) {}
-  try { loadPreventaCostos(); } catch (_) {}
-  // [PORTAL-SOLO-1] Arriba de todo: lo que el cliente espera ver en su Portal.
-  try { if (typeof loadRevisionesPortal === 'function') loadRevisionesPortal(); } catch (_) {}
+  if (!soloPestana) {
+    try { loadCambiosPortal(); } catch (_) {}
+    try { loadPreventaCostos(); } catch (_) {}
+    // [PORTAL-SOLO-1] Lo que el cliente espera ver en su Portal (y, dentro, el rol).
+    try { if (typeof loadRevisionesPortal === 'function') loadRevisionesPortal(); } catch (_) {}
+  }
+  _reqMapaPintar();
   const cont = document.getElementById('req-bdj-lista');
   if (!cont) return;
   if (_reqBdjCargando) return;
@@ -61,12 +138,12 @@ async function loadRequisiciones(filtro) {
   });
   if (!j || !j.ok) {
     cont.innerHTML = `<div class="rq-empty" style="color:var(--red)"><b>No se pudo leer la bandeja</b>${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`;
+    _reqContar('sitio', -1);
     return;
   }
   _reqBdjRows = j.requisiciones || [];
-  const badge = document.getElementById('req-bdj-pend');
-  // j.pendientes en null = «no se pudo contar», que NO es cero.
-  if (badge) badge.textContent = (j.pendientes == null) ? '?' : String(j.pendientes);
+  // j.pendientes en null = «no se pudo contar», que NO es cero (el mapa pinta «?»).
+  _reqContar('sitio', j.pendientes);
   if (!_reqBdjRows.length) {
     cont.innerHTML = `<div class="rq-empty"><b>${_reqBdjFiltro === 'pendiente' ? 'Bandeja al día ✓' : 'Nada por aquí'}</b>No hay requisiciones ${_reqBdjFiltro === 'todas' ? '' : _reqBdjEsc(_reqBdjFiltro + 's')} por ahora. Las que lleguen del sitio caen aquí solas.</div>`;
     return;
@@ -87,6 +164,9 @@ async function loadPreventaCostos() {
   if (!box) { box = document.createElement('div'); box.id = 'req-prev-costos'; lista.parentNode.insertBefore(box, lista); }
   const j = await _reqBdjCall({ accion: 'preventa_costos_lista' }).catch(() => null);
   const evs = ((j && j.eventos) || []).filter((e) => e.con_paquetes && e.correos > (e.enviados || 0));
+  // [REQ-SIMPLE-1] Cuenta dentro del trabajo «🔁 Cambios pedidos» (vive en su sección).
+  _reqPrevN = evs.length;
+  if (_reqCambiosN != null) _reqContar('cambios', _reqCambiosN + _reqPrevN);
   if (!evs.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<div class="rq-section">📣 Preventa a ciegas · ya hay paquetes <span class="rq-pill pend">${evs.length}</span></div>`
     + evs.map((e) => `<div class="rq-cambio">
@@ -117,87 +197,201 @@ async function _reqPrevCostos(slug, mandar) {
   showToast(_reqBdjEsc(`Mandados ${j.enviados.length}` + (j.errores.length ? ` · ${j.errores.length} fallaron` : '') + (sinBit ? ` · ${sinBit} sin bitácora` : '') + (j.faltan ? ` · faltan ${j.faltan}: vuelve a apretar` : '')), j.errores.length || sinBit ? 'warning' : 'success');
   loadPreventaCostos();
 }
+// [REQ-SIMPLE-1] El encabezado de cada trabajo: título + número + qué se hace ahí.
+function _reqSecH(titulo, que, n) {
+  return `<div class="rq-sec-h"><b>${titulo}${n ? ` <span class="rq-pill pend">${n}</span>` : ''}</b><span class="rq-sec-q">${que}</span></div>`;
+}
+let _reqCambiosN = null, _reqPrevN = null;   // las dos mitades del trabajo «Cambios pedidos»
+function _reqCajaDe(id) {
+  let b = document.getElementById(id);
+  if (!b) {
+    const lista = document.getElementById('req-bdj-lista');
+    if (!lista) return null;
+    b = document.createElement('div'); b.id = id; lista.parentNode.insertBefore(b, lista);
+  }
+  return b;
+}
+// Una lectura, DOS trabajos: los comprobantes de pago van a «💳 Pagos por
+// capturar» (dinero: lo primero) y lo demás a «🔁 Cambios pedidos».
 async function loadCambiosPortal() {
-  const lista = document.getElementById('req-bdj-lista');
-  if (!lista) return;
-  let box = document.getElementById('req-cambios');
-  if (!box) { box = document.createElement('div'); box.id = 'req-cambios'; lista.parentNode.insertBefore(box, lista); }
+  const box = _reqCajaDe('req-cambios'), boxPagos = _reqCajaDe('req-pagos');
+  if (!box || !boxPagos) return;
   const j = await _reqBdjCall({ accion: 'cambios_listar', estado: 'pendiente' }).catch((e) => ({ error: e.message }));
-  if (!j || !j.ok) { box.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:10px">No se pudieron leer las solicitudes de cambio del Portal: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`; return; }
+  if (!j || !j.ok) {
+    const err = `<div class="rq-aviso mal">No se pudieron leer las solicitudes del Portal: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</div>`;
+    boxPagos.innerHTML = _reqSecH('💳 Pagos por capturar', 'Los comprobantes que suben los clientes desde su Portal.') + err;
+    box.innerHTML = _reqSecH('🔁 Cambios pedidos desde el Portal', 'Lo que el cliente pide cambiar de su viaje.') + err;
+    _reqContar('pagos', -1); _reqCambiosN = null; _reqContar('cambios', -1);
+    return;
+  }
   const rows = j.cambios || [];
-  if (!rows.length) { box.innerHTML = ''; return; }
-  const TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro', paquete: '🎟 Elige su paquete (preventa)', pago: '💳 Comprobante de pago' };
   _reqCambiosRows = rows;
-  box.innerHTML = `<div class="rq-section">Cambios pedidos desde el Portal <span class="rq-pill pend">${rows.length}</span></div>`
-    + rows.map((c) => {
-      const v = c.viajero || {};
-      const wa = String(v.celular || '').replace(/\D/g, '');
-      // [PREVENTA-PORTAL-1] La elección de paquete de la preventa se APLICA desde
-      // aquí: «Aplicar» llama a viajero_elegir_paquete (el mismo dueño que el
-      // botón 🎟 de la lista: puerta de zonas, inventario, contrato) y cierra.
-      if (c.tipo === 'paquete') {
-        return `<div class="rq-cambio" id="rq-cambio-${c.id}">
+  const pagos = rows.filter((c) => c.tipo === 'pago');
+  const otros = rows.filter((c) => c.tipo !== 'pago');
+  boxPagos.innerHTML = _reqSecH('💳 Pagos por capturar', 'El cliente subió su comprobante (o pagó en Mercado Pago). Mira el comprobante junto a su cuenta, teclea lo que dice el banco y captura: nace su abono y le llega «Recibimos tu pago».', pagos.length)
+    + (pagos.length ? pagos.map(_reqPagoCard).join('') : '<div class="rq-aldia">✓ Ningún comprobante esperando. Cuando un cliente suba su pago desde el Portal, cae aquí solo.</div>');
+  box.innerHTML = _reqSecH('🔁 Cambios pedidos desde el Portal', 'El cliente pidió cambiar algo de su viaje (habitación, zona, fecha, paquete de la preventa). Haz el cambio en su viajero y ciérralo aquí; «No procede» le avisa con tu motivo.', otros.length)
+    + (otros.length ? otros.map(_reqCambioCard).join('') : '<div class="rq-aldia">✓ Nadie ha pedido cambios.</div>');
+  _reqContar('pagos', pagos.length);
+  _reqCambiosN = otros.length;
+  _reqContar('cambios', otros.length + (_reqPrevN || 0));
+  _reqPagoFotos(pagos);
+}
+const _REQ_TIPO = { hotel: 'Habitación / hotel', zona: 'Zona', fecha: 'Fecha', otro: 'Otro', paquete: '🎟 Elige su paquete (preventa)', pago: '💳 Comprobante de pago' };
+// El evento con su NOMBRE y la fecha de su #N (los pone el servidor); sin
+// catálogo cae al identificador, que es lo que había.
+function _reqEvTxt(c) {
+  return _reqBdjEsc(c.evento_nombre || c.evento_id || '—') + (c.evento_fecha ? ' · ' + _reqBdjEsc(c.evento_fecha) : '');
+}
+function _reqCambioCard(c) {
+  const TIPO = _REQ_TIPO;
+  const v = c.viajero || {};
+  const wa = String(v.celular || '').replace(/\D/g, '');
+  const hoy = _reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—');
+  // [PREVENTA-PORTAL-1] La elección de paquete de la preventa se APLICA desde
+  // aquí: «Aplicar» llama a viajero_elegir_paquete (el mismo dueño que el
+  // botón 🎟 de la lista: puerta de zonas, inventario, contrato) y cierra.
+  if (c.tipo === 'paquete') {
+    return `<div class="rq-cambio" id="rq-cambio-${c.id}">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
           <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
           <span class="rq-tag">${_reqBdjEsc(TIPO.paquete)}</span>
         </div>
-        <div class="rq-ev">${_reqBdjEsc(c.evento_id)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        <div class="rq-ev">${_reqEvTxt(c)} · hoy: ${hoy} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
         <div style="font-size:14px;margin:6px 0"><b>${_reqBdjEsc(String(c.paquete_pedido || '').toUpperCase())}</b>${c.zona_pedida ? ' · ' + _reqBdjEsc(c.zona_pedida) : ''}${c.hotel_pedido ? ' · ' + _reqBdjEsc(c.hotel_pedido) : ''}${c.precio_lista != null ? ' · lista $' + Number(c.precio_lista).toLocaleString('es-MX') : ''}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+        <div class="rq-linea">
           <button class="rq-btn pri" onclick="_reqPaqAbrir('${c.id}')">✓ Aplicar paquete</button>
-          <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
-        </div>
-        <div id="rq-cambio-form-${c.id}"></div></div>`;
-      }
-      // [PAGOS-PORTAL-2] El comprobante que el cliente subió desde el Portal:
-      // «Ver comprobante» (URL firmada por el servidor) y «➕ Capturar abono» con
-      // el monto TECLEADO por quien lo vio. «No procede» sigue para lo que no
-      // es un pago de verdad (foto equivocada, pago de otra cosa).
-      // [PORTAL-PAGO-2] Dos caras más: el pago en MERCADO PAGO ya acreditado
-      // (chip verde con bruto/comisión/neto — el pago ES el comprobante) y el
-      // DESGLOSE que el cliente declaró («$650 a Jose, $650 a Jonathan»).
-      if (c.tipo === 'pago') {
-        const mpNeto = c.mp_pago_id ? Math.round((Number(c.mp_monto) || 0) - Math.max(0, (Number(c.mp_monto_cobrar) || 0) - (Number(c.mp_neto) || 0))) : null;
-        const chipMp = c.mp_pago_id
-          ? `<div style="margin:6px 0;padding:6px 10px;border-radius:8px;background:rgba(136,234,78,.12);border:1px solid rgba(136,234,78,.45);font-size:12px"><b>💳 Pagado en Mercado Pago</b> · cobró $${(Number(c.mp_monto) || 0).toLocaleString('es-MX')} (incluye $${Math.max(0, (Number(c.mp_monto) || 0) - mpNeto).toLocaleString('es-MX')} de comisión → abono <b>$${mpNeto.toLocaleString('es-MX')}</b>) · #${_reqBdjEsc(c.mp_pago_id)}</div>`
-          : '';
-        const desg = Array.isArray(c.desglose) && c.desglose.length > 1
-          ? `<div style="font-size:12px;margin:4px 0;opacity:.9">👥 El cliente reparte: ${c.desglose.map((d) => _reqBdjEsc(d.nombre || String(d.viajero_id || '').slice(0, 8)) + ' <b>$' + (Number(d.monto) || 0).toLocaleString('es-MX') + '</b>').join(' · ')}</div>`
-          : (v.grupo && v.grupo.length > 1
-            ? `<div style="font-size:12px;margin:4px 0;color:#e8ff4c">👥 Viaja con ${v.grupo.filter((m) => m.id !== c.viajero_id).map((m) => _reqBdjEsc(m.nombre)).join(', ')} — revisa si el comprobante cubre a alguien más (al capturar puedes repartir)</div>`
-            : '');
-        return `<div class="rq-cambio" id="rq-cambio-${c.id}">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
-          <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
-          <span class="rq-tag">${_reqBdjEsc(TIPO.pago)}</span>
-        </div>
-        <div class="rq-ev">${_reqBdjEsc(c.evento_id)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
-        ${chipMp}
-        <q>${_reqBdjEsc(c.detalle)}</q>
-        ${desg}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${c.foto_path ? `<button class="rq-btn" onclick="_reqPagoVer('${c.id}')">📎 Ver comprobante</button>` : ''}
-          <button class="rq-btn pri" onclick="_reqPagoAbrir('${c.id}')">➕ Capturar abono</button>
           ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+          <span class="rq-sp"></span>
           <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
         </div>
         <div id="rq-cambio-form-${c.id}"></div></div>`;
-      }
-      return `<div class="rq-cambio" id="rq-cambio-${c.id}">
+  }
+  return `<div class="rq-cambio" id="rq-cambio-${c.id}">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
           <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
           <span class="rq-tag">${_reqBdjEsc(TIPO[c.tipo] || c.tipo)}</span>
         </div>
-        <div class="rq-ev">${_reqBdjEsc(c.evento_id)} · hoy: ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        <div class="rq-ev">${_reqEvTxt(c)} · hoy: ${hoy} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
         <q>${_reqBdjEsc(c.detalle)}</q>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+        <div class="rq-linea">
           <button class="rq-btn pri" onclick="_reqCambioCerrar('${c.id}','atendida')">✓ Ya lo atendí</button>
+          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+          <span class="rq-sp"></span>
           <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
         </div>
         <div id="rq-cambio-form-${c.id}"></div></div>`;
-    }).join('');
+}
+
+// ── [PAGO-CLARO-1 · 13-nov-2026] EL COMPROBANTE CON SU CUENTA ENFRENTE ──────
+// Palabra de Memo: «lo de los comprobantes de pago de los abonos también siento
+// que les falta más». La tarjeta enseñaba un nombre, un identificador de evento
+// y un botón que abría la foto EN OTRA PESTAÑA: para saber si el monto tenía
+// sentido había que irse a Capsule a buscar a la persona. Ahora, sin salir:
+//   · el comprobante A LA VISTA (clic = verlo grande ahí mismo);
+//   · su cuenta: total · pagado · le falta · lo que LE TOCA hoy por su rol;
+//   · lo que declaró, sus últimos abonos y un aviso si ya hay uno reciente por
+//     el mismo monto (el archivo idéntico ya lo frena COMPROBANTE-DUP-1; esto
+//     caza la foto re-tomada del mismo ticket).
+// 🔒 Los números los manda el servidor (saldoMigrado / estadoPlan): aquí no se
+// suma ni se resta un peso. Y es AYUDA: quien captura sigue tecleando el monto.
+// [PAGOS-PORTAL-2] «Ver comprobante» (URL firmada por el servidor) y «➕ Capturar
+// abono» con el monto TECLEADO por quien lo vio. [PORTAL-PAGO-2] Dos caras más:
+// el pago en MERCADO PAGO ya acreditado (chip verde con bruto/comisión/neto — el
+// pago ES el comprobante) y el DESGLOSE que el cliente declaró.
+const _REQ_MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function _reqDiaCorto(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  return m ? Number(m[3]) + ' ' + _REQ_MES[Number(m[2]) - 1] : '';
+}
+function _reqPagoCuentaHtml(c) {
+  const ct = c.cuenta || null;
+  if (!ct) return `<div class="rq-aviso ojo">${_reqBdjEsc(c.cuenta_error || 'No se pudo leer su cuenta: revisa su saldo en Capsule antes de capturar.')}</div>`;
+  if (ct.total == null) return '<div class="rq-aviso ojo">Este viaje <b>no trae total de contrato</b>: el abono se puede capturar, pero ponle su total con ✏️ en Capsule para que su cuenta y su rol salgan bien.</div>';
+  const caja = (cls, lbl, val) => `<div${cls ? ' class="' + cls + '"' : ''}><small>${lbl}</small><b>${_reqBdjMxn(Math.round(val))}</b></div>`;
+  let h = `<div class="rq-cta">${caja('', 'Total', ct.total)}${caja('', 'Pagado', ct.abonado)}${caja('falta', 'Le falta', Math.max(0, ct.resta))}`
+    + (ct.toca ? caja('toca', 'Le toca hoy', ct.toca.monto) : '')
+    + (ct.declarado ? caja('', 'Declaró', ct.declarado) : '') + '</div>';
+  if (ct.toca) {
+    h += `<div class="rq-nota">Por su rol le toca <b>${_reqBdjEsc(ct.toca.etiqueta || 'su siguiente pago')}</b>${ct.toca.hasta ? ' (hasta el ' + _reqBdjEsc(_reqDiaCorto(ct.toca.hasta)) + ')' : ''}${ct.toca.atrasado > 0 ? ' · incluye ' + _reqBdjMxn(ct.toca.atrasado) + ' de un pago atrasado' : ''}.</div>`;
+  } else if (ct.sin_rol) {
+    h += '<div class="rq-nota">Todavía no tiene su rol de pagos fijo (está en «🗓 Rol por fijar»).</div>';
+  } else if (ct.resta <= 0) {
+    h += '<div class="rq-aviso ojo">Su viaje ya aparece <b>liquidado</b>: si este pago es real, va a quedar con saldo a favor. Revísalo antes de capturar.</div>';
+  }
+  if (ct.posible_repetido) {
+    h += `<div class="rq-aviso mal">⚠️ <b>Ojo, puede ser repetido:</b> ya tiene un abono de ${_reqBdjMxn(ct.posible_repetido.monto)} capturado el ${_reqBdjEsc(_reqDiaCorto(ct.posible_repetido.fecha))}. Compara este comprobante con el de ese abono (📎 Pagos en Capsule) antes de capturar.</div>`;
+  } else if (ct.declarado && ct.resta > 0 && ct.declarado > ct.resta + 1) {
+    h += `<div class="rq-aviso ojo">Declaró <b>más de lo que le falta</b>: quedaría con ${_reqBdjMxn(ct.declarado - ct.resta)} a favor. Confírmalo con el comprobante.</div>`;
+  }
+  const ult = (ct.ultimos || []).map((a) => `<b>${_reqBdjMxn(a.monto)}</b> · ${_reqBdjEsc(_reqDiaCorto(a.fecha) || 'sin fecha')}${a.tiene_foto ? ' 📎' : ''}`).join(' &nbsp;|&nbsp; ');
+  h += `<div class="rq-ult">${ult ? 'Sus últimos abonos: ' + ult : 'Todavía no tiene abonos capturados en el sistema.'}</div>`;
+  return h;
+}
+function _reqPagoCard(c) {
+  const v = c.viajero || {};
+  const wa = String(v.celular || '').replace(/\D/g, '');
+  const mpNeto = c.mp_pago_id ? Math.round((Number(c.mp_monto) || 0) - Math.max(0, (Number(c.mp_monto_cobrar) || 0) - (Number(c.mp_neto) || 0))) : null;
+  const chipMp = c.mp_pago_id
+    ? `<div class="rq-aviso ok"><b>💳 Pagado en Mercado Pago</b> · cobró $${(Number(c.mp_monto) || 0).toLocaleString('es-MX')} (incluye $${Math.max(0, (Number(c.mp_monto) || 0) - mpNeto).toLocaleString('es-MX')} de comisión → abono <b>$${mpNeto.toLocaleString('es-MX')}</b>) · #${_reqBdjEsc(c.mp_pago_id)}</div>`
+    : '';
+  const desg = Array.isArray(c.desglose) && c.desglose.length > 1
+    ? `<div class="rq-nota">👥 El cliente reparte: ${c.desglose.map((d) => _reqBdjEsc(d.nombre || String(d.viajero_id || '').slice(0, 8)) + ' <b>$' + (Number(d.monto) || 0).toLocaleString('es-MX') + '</b>').join(' · ')}</div>`
+    : (v.grupo && v.grupo.length > 1
+      ? `<div class="rq-aviso ojo">👥 Viaja con ${v.grupo.filter((m) => m.id !== c.viajero_id).map((m) => _reqBdjEsc(m.nombre)).join(', ')} — revisa si el comprobante cubre a alguien más (al capturar puedes repartir).</div>`
+      : '');
+  const comp = c.foto_path
+    ? `<button type="button" class="rq-comp" id="rq-comp-${c.id}" onclick="_reqPagoZoom('${c.id}')" title="Clic: verlo grande aquí mismo">Cargando comprobante…</button>`
+    : `<div class="rq-comp" style="cursor:default">${c.mp_pago_id ? '💳 Pago en línea: no hay foto, el pago de Mercado Pago es el comprobante' : 'Sin comprobante'}</div>`;
+  return `<div class="rq-cambio" id="rq-cambio-${c.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
+          <div class="rq-name">${_reqBdjEsc(c.nombre || v.nombre || '—')}</div>
+          <span class="rq-tag">${_reqBdjEsc(_REQ_TIPO.pago)}</span>
+        </div>
+        <div class="rq-ev">${_reqEvTxt(c)} · ${_reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—')} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
+        ${chipMp}
+        <div class="rq-pago">
+          ${comp}
+          <div>
+            ${_reqPagoCuentaHtml(c)}
+            <q>${_reqBdjEsc(c.detalle)}</q>
+            ${desg}
+          </div>
+        </div>
+        <div class="rq-linea">
+          <button class="rq-btn pri" onclick="_reqPagoAbrir('${c.id}')">➕ Capturar abono</button>
+          ${c.foto_path ? `<button class="rq-btn" onclick="_reqPagoVer('${c.id}')">📎 Abrir aparte</button>` : ''}
+          ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
+          <span class="rq-sp"></span>
+          <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
+        </div>
+        <div id="rq-cambio-form-${c.id}"></div></div>`;
+}
+// Las miniaturas: una URL firmada por comprobante (el servidor firma el path DE
+// LA FILA, 1 h). Una que falle no tumba a las demás: su cuadro lo DICE y el
+// botón «📎 Abrir aparte» sigue ahí. Un PDF no se pinta: se abre aparte.
+const _reqPagoUrl = {};
+async function _reqPagoFotos(pagos) {
+  for (const c of (pagos || [])) {
+    if (!c.foto_path) continue;
+    const el = () => document.getElementById('rq-comp-' + c.id);
+    if (/\.pdf$/i.test(String(c.foto_path))) { const e = el(); if (e) e.textContent = '📄 Es un PDF — clic para abrirlo'; _reqPagoUrl[c.id] = 'pdf'; continue; }
+    let j = null;
+    try { j = await _reqBdjCall({ accion: 'cambio_foto', id: c.id }); } catch (_) { j = null; }
+    const e = el();
+    if (!e) continue;
+    if (j && j.ok && j.signed_url) {
+      _reqPagoUrl[c.id] = j.signed_url;
+      e.innerHTML = `<img alt="Comprobante de ${_reqBdjEsc(c.nombre || 'cliente')}" src="${_reqBdjEsc(j.signed_url)}" onerror="this.parentNode.textContent='No se pudo pintar: usa «📎 Abrir aparte»'">`;
+    } else e.textContent = 'No se pudo cargar: usa «📎 Abrir aparte»';
+  }
+}
+// Clic en la miniatura: grande ahí mismo (otro clic la regresa). PDF o sin URL: aparte.
+function _reqPagoZoom(id) {
+  const e = document.getElementById('rq-comp-' + id);
+  const u = _reqPagoUrl[id];
+  if (!e || !u || u === 'pdf') { _reqPagoVer(id); return; }
+  e.classList.toggle('grande');
 }
 // [PREVENTA-PORTAL-1] Aplicar la elección: el TOTAL lo confirma quien aplica
 // (nace con el precio de lista; si va el descuento de la preventa, se resta aquí).
@@ -323,7 +517,14 @@ async function _reqPagoCapturar(id) {
   const cuerpo = reparto.length ? { accion: 'cambio_pago_capturar', id, reparto } : { accion: 'cambio_pago_capturar', id, monto };
   const j = await _reqBdjCall(cuerpo).catch((e) => ({ error: e.message }));
   if (j && j.ok) {
-    showToast(_reqBdjEsc('Abono capturado: $' + Math.round(monto).toLocaleString('es-MX') + (reparto.length > 1 ? ' entre ' + reparto.length : '') + ' · ' + (_reqCorreoTxt(j.correo) || 'sin correo (evento fuera de la lista)')), 'success');
+    // [PAGO-CLARO-1] Y se dice cómo quedó su cuenta (con UNA persona: la resta
+    // que mandó el servidor menos lo que se acaba de capturar; con reparto no
+    // se adivina la de cada quien).
+    const fila = _reqCambiosRows.find((x) => x.id === id) || {};
+    const cx = fila.cuenta || null;
+    const soloTitular = !reparto.length || (reparto.length === 1 && reparto[0].viajero_id === fila.viajero_id);
+    const queda = (cx && cx.resta != null && soloTitular) ? ' · le quedan por pagar $' + Math.max(0, Math.round(cx.resta - monto)).toLocaleString('es-MX') : '';
+    showToast(_reqBdjEsc('Abono capturado: $' + Math.round(monto).toLocaleString('es-MX') + (reparto.length > 1 ? ' entre ' + reparto.length : '') + queda + ' · ' + (_reqCorreoTxt(j.correo) || 'sin correo (evento fuera de la lista)')), 'success');
     loadCambiosPortal();
   } else {
     // El 207 del servidor: la solicitud quedó cerrada pero el abono NO entró —

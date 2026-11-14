@@ -155,6 +155,13 @@ function renderCorreo(grupo, ctx) {
   const nombre = String(prim.v.nombre || 'cliente').trim().split(/\s+/)[0] || 'cliente';
   const bloques = grupo.map((a) => bloqueViaje(a, (ctx.nombreEvento && ctx.nombreEvento(a.v.evento_id)) || 'Tu viaje')).join('');
   const caja = ctx.cuentaDe ? cajaCuentaHtml(ctx.cuentaDe(prim.v)) : '';
+  // [ROL-2027-1] Un rol que nació «al registrar» (tours 2027) no se cuenta desde
+  // su separo: decirle «fijas desde tu separo» a quien separó meses antes sería
+  // un letrero falso. Con cualquier viaje así en el correo, la frase es neutra.
+  const delRegistro = grupo.some((a) => a.v && a.v.plan_pagos && a.v.plan_pagos.origen === 'registro');
+  const fraseFijo = delRegistro
+    ? 'Tus fechas son las de tu rol de pagos: son fijas y ya no cambian.'
+    : 'Tus fechas son las de tu rol de pagos, fijas desde tu separo.';
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
@@ -163,7 +170,7 @@ function renderCorreo(grupo, ctx) {
     </div>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0;color:#fff">Hola <strong>${esc(nombre)}</strong>,</p>
     <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">${bloques}
-      <p style="margin:0 0 14px 0">Tus fechas son las de tu rol de pagos, fijas desde tu separo. Envíanos tu comprobante y lo registramos.</p>
+      <p style="margin:0 0 14px 0">${fraseFijo} Envíanos tu comprobante y lo registramos.</p>
       ${caja}
       <p style="margin:18px 0 0 0"><a href="${PORTAL}" style="display:inline-block;background:#e8ff4c;color:#000;font-weight:800;text-decoration:none;padding:12px 18px;border-radius:6px">Ver mi rol en el Portal →</a></p>
     </div>
@@ -212,9 +219,11 @@ function cuentaDe(v) {
   } catch (_) { return null; }
 }
 
-// La bandeja «🗓 Fijar rol»: solo LEE.
+// La bandeja «🗓 Fijar rol»: solo LEE. El filtro tiene nombre porque lo piden
+// DOS lectores (esta lista y la de `_lib/rol-auto`, que le agrega la propuesta).
+const FILTRO_PENDIENTES = 'portal_revisado_at=not.is.null&plan_pagos=is.null&total_contrato=gt.0';
 async function listarPendientes({ url, headers, EV, ahora }) {
-  const filas = await leerFilas(url, headers, 'portal_revisado_at=not.is.null&plan_pagos=is.null&total_contrato=gt.0');
+  const filas = await leerFilas(url, headers, FILTRO_PENDIENTES);
   const ab = filas.length ? await leerAbonos(url, headers, filas.map((f) => f.id)) : {};
   return pendientesDeFijar(filas, ab, EV, ahora);
 }
@@ -263,4 +272,6 @@ module.exports = {
   ROL_AVISOS_VIVO, TIPOS, VSEL, DIAS_ANTES_EVENTO,
   pendientesDeFijar, avisosDeHoy, renderCorreo, agruparPorCorreo, hoyStr, masDias,
   listarPendientes, correrAvisos, cuentaDe,
+  // [ROL-2027-1] las lecturas, para que `_lib/rol-auto` no estrene las suyas.
+  FILTRO_PENDIENTES, leerFilas, leerAbonos,
 };

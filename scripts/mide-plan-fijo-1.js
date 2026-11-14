@@ -100,8 +100,13 @@ af(pv0 > 0 && pv1 > 0 && /PF\.estadoPlan/.test(coordi.slice(pv0, pv1)) && !/plan
 af(/plan_fijar: ROLES_EDITA_VIAJERO/.test(coordi), 'plan_fijar está en ACCIONES (o el portero lo rechaza)');
 const req = sc('netlify/functions/admin-requisiciones.js');
 af(/PF\.fijarEnBase/.test(req) && /diaReynosa\(req\.creado_en\)/.test(req), 'al aprobar una requisición el rol nace fijo desde el día de su separo');
+// ⚠️ Arnés actualizado a la verdad nueva (13-nov, al pasar por ROL-2027-1): leía
+// `portal-viajero.js`, pero ACOMP-3 (10-nov) MUDÓ el cuerpo del reparto a su
+// dueño `_lib/repartir-lugares` y la aserción quedó roja sin que el código
+// estuviera mal. Hoy mira al dueño — y que el Portal de verdad lo pida.
+const rep = sc('netlify/functions/_lib/repartir-lugares.js');
 const pvj = sc('netlify/functions/portal-viajero.js');
-af(/PF\.fijarEnBase/.test(pvj), 'el reparto a acompañantes reparte también el rol (mismas fechas)');
+af(/PF\.fijarEnBase/.test(rep) && /repartir-lugares/.test(pvj), 'el reparto a acompañantes reparte también el rol (mismas fechas) — en su dueño, y el Portal se lo pide');
 
 console.log('\n' + (V === 0 ? 'NADA MEDIDO · esto NO es un verde' : (R ? '🔴 ROJO' : '✅ VERDE')) + ' · ' + V + ' en verde, ' + R + ' en rojo');
 process.exit(R || !V ? 1 : 0);

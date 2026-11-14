@@ -2289,6 +2289,9 @@ const khViajeros = {
   // [PLAN-VJ-1] el rol de pagos de un viajero (lo arma el servidor; aquí se pinta)
   planDe(viajero_id) { return this._call({ accion: 'plan_viajero', viajero_id }); },
   planFijar(viajero_id, fecha_separo, separo_monto, reemplazar) { return this._call({ accion: 'plan_fijar', viajero_id, fecha_separo, separo_monto, reemplazar: !!reemplazar }); },
+  // [ROL-2027-1] fijar «desde hoy» (hoy + lo que lleva pagado). Sin ids: todos
+  // los ya publicados sin rol de tours 2027. Sin `confirmar` contesta en seco.
+  rolAutoFijar(viajero_ids, confirmar) { return this._call(Object.assign({ accion: 'rol_auto_fijar', confirmar: !!confirmar }, viajero_ids ? { viajero_ids } : {})); },
   // [VUELO-1] el vuelo de un viajero (uno por uno): prellenado de la Nube + guardar
   vueloPrellenar(viajero_id) { return this._call({ accion: 'vuelo_prellenar', viajero_id }); },
   vueloGuardar(payload) { return this._call(Object.assign({ accion: 'vuelo_guardar' }, payload)); },
@@ -7031,7 +7034,7 @@ const _VJPLAN_ESTADO = {
   sin_fecha: 'El catálogo no trae la fecha de este viaje: no se puede armar el calendario.',
   evento_pasado: 'El evento ya pasó.',
   liquidar: 'Ya no caben quincenas: lo que falta se liquida antes del evento.',
-  sin_plan_fijo: 'Todavía no tiene su rol de pagos fijo: captura su fecha de separo abajo y queda fijo (es lo que verá en su Portal).',
+  sin_plan_fijo: 'Todavía no tiene su rol de pagos fijo: fíjalo abajo (⚡ desde hoy, o con su fecha de separo real) y eso es lo que verá en su Portal.',
 };
 function _vjPlanFecha(ds) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ds || ''));
@@ -7088,12 +7091,17 @@ async function _vjPlanVer(id, nombre) {
     </div>
     ${cuotas.length ? `<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ts)">Lo que le falta</div>
       <table class="cob-table" style="width:100%;margin:4px 0 10px"><tbody>${cuotas.map((q) => fila(_esfEsc(q.lbl), _esfEsc(q.cuando), _spFmtMxn(q.monto))).join('')}</tbody></table>` : ''}
-    ${pl && pl.estado === 'calendario' ? `<div style="font-size:12px;color:var(--ts);margin-bottom:6px">Rol FIJO desde su separo del <b style="color:var(--text)">${_esfEsc(_vjPlanFecha(pl.separo_fecha))}</b> ($${Number(pl.separo_monto || 0).toLocaleString('es-MX')})${pl.atrasado > 0 ? ` · <b style="color:var(--red)">vencido ${_spFmtMxn(pl.atrasado)}</b>` : ''}</div>
+    ${pl && pl.estado === 'calendario' ? `<div style="font-size:12px;color:var(--ts);margin-bottom:6px">${pl.origen === 'registro'
+      ? `Rol FIJO desde su REGISTRO del <b style="color:var(--text)">${_esfEsc(_vjPlanFecha(pl.separo_fecha))}</b> (llevaba $${Number(pl.separo_monto || 0).toLocaleString('es-MX')} pagados; lo que faltaba se repartió de ahí al evento)`
+      : `Rol FIJO desde su separo del <b style="color:var(--text)">${_esfEsc(_vjPlanFecha(pl.separo_fecha))}</b> ($${Number(pl.separo_monto || 0).toLocaleString('es-MX')})`}${pl.atrasado > 0 ? ` · <b style="color:var(--red)">vencido ${_spFmtMxn(pl.atrasado)}</b>` : ''}</div>
       <details style="margin-bottom:8px"><summary style="font-size:12px;cursor:pointer">Su rol completo (${(pl.cuotas || []).length} pagos)</summary>
       <table class="cob-table" style="width:100%;margin-top:4px"><tbody>${(pl.cuotas || []).map((q) => fila(_esfEsc((q.liq ? 'Liquidar' : 'Pago ' + q.n)), _esfEsc(q.lbl) + ' · ' + ({ pagada: '✓ pagado', vencida: '⚠ vencido', parcial: 'abonado ' + _spFmtMxn(q.pagado) }[q.estado] || 'pendiente'), _spFmtMxn(q.monto), q.estado === 'pagada' ? 'var(--green)' : q.estado === 'vencida' ? 'var(--red)' : '')).join('')}</tbody></table></details>` : ''}
     ${nota ? `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">${_esfEsc(nota)}</div>` : ''}
     ${pl && (pl.estado === 'sin_plan_fijo' || pl.estado === 'calendario') ? `<details ${pl.estado === 'sin_plan_fijo' ? 'open' : ''} style="margin-bottom:8px;border:1px solid var(--line,#333);border-radius:8px;padding:8px">
       <summary style="font-size:12px;cursor:pointer;font-weight:700">${pl.estado === 'sin_plan_fijo' ? '🗓 Fijar su rol de pagos' : '🔁 Rehacer su rol (cambiar fecha de separo)'}</summary>
+      ${pl.estado === 'sin_plan_fijo' ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="_vjPlanFijarHoy('${_attrJs(id)}','${_attrJs(nombre)}')">⚡ Fijar desde hoy</button>
+        <span style="font-size:11px;color:var(--ts)"> cuenta desde hoy: lo que le falta se reparte parejo en las quincenas que quedan (así nacen los tours 2027).</span></div>
+        <div style="font-size:11px;color:var(--ts);margin-top:10px">…o con su fecha de separo real (tours 2026 que vienen del Excel):</div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">
         <label style="font-size:11px">FECHA DE SEPARO<br><input type="date" id="vjpf-f-${_attrJs(id)}" class="input" value="${_esfEsc((pl.estado === 'calendario' ? pl.separo_fecha : (d.sugerido && d.sugerido.fecha)) || '')}"></label>
         <label style="font-size:11px">MONTO DEL SEPARO<br><input type="number" min="0" step="1" id="vjpf-m-${_attrJs(id)}" class="input" style="width:110px" value="${_esfEsc(String((pl.estado === 'calendario' ? pl.separo_monto : (d.sugerido && d.sugerido.monto)) ?? ''))}"></label>
@@ -7205,6 +7213,19 @@ async function _vjPlanFijar(id, nombre, reemplazar) {
     const j = await khViajeros.planFijar(id, f, m, reemplazar);
     if (!j || !j.ok) throw new Error((j && j.error) || 'No se pudo fijar');
     showToast('✓ Rol de pagos fijo', 'success');
+    const tr = document.getElementById(`vj-ab-${id}`); if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
+    _vjPlanVer(id, nombre);
+  } catch (e) { showToast('No se pudo fijar el rol: ' + ((e && e.message) || ''), 'error'); }
+}
+// [ROL-2027-1] «⚡ Fijar desde hoy»: hoy + lo que lleva pagado (la regla de los
+// tours 2027; aquí la elige un humano para ESTE viajero, del año que sea). El
+// rol lo arma el servidor (`_lib/rol-auto` → plan-fijo); la pantalla solo lo pide.
+async function _vjPlanFijarHoy(id, nombre) {
+  try {
+    const j = await khViajeros.rolAutoFijar([id], true);
+    const f = j && (j.fijados || [])[0];
+    if (!f) throw new Error(((j && (j.saltados || [])[0]) || {}).motivo || (j && j.error) || 'No se pudo fijar');
+    showToast('✓ Rol fijo desde hoy · ' + f.texto, 'success');
     const tr = document.getElementById(`vj-ab-${id}`); if (tr) { tr.style.display = 'none'; tr.dataset.modo = ''; }
     _vjPlanVer(id, nombre);
   } catch (e) { showToast('No se pudo fijar el rol: ' + ((e && e.message) || ''), 'error'); }

@@ -127,12 +127,21 @@ const alta = (H, x) => llamar(H, Object.assign({ accion: 'viajero_migrar', event
   res = await alta(H); j = JSON.parse(res.body);
   af(res.statusCode === 200 && W.abonos.length === 0, 'sin storage no nace abono');
   af(Number(W.viajero.abonado_previo) === 500, 'el monto queda como pagado-antes: ' + (W.viajero && W.viajero.abonado_previo));
-  af(W.patches.length === 1 && /abonado_previo=eq\.0/.test(W.patches[0].u), 'el respaldo va con VALOR ESPERADO (abonado_previo=eq.0)');
+  // ⚠️ Arnés actualizado a la verdad nueva (13-nov, ROL-2027-1): en un tour 2027
+  // (fuerzaregida#0 lo es) el alta TAMBIÉN fija el rol de pagos, y eso es un
+  // PATCH más a viajeros_evento — pero de CALENDARIO (`fecha_separo` +
+  // `plan_pagos`), no de dinero. La guarda vieja contaba «un solo parche» y se
+  // puso roja con razón; hoy mira QUÉ escribe cada uno: los de dinero son los de
+  // siempre, y el del rol no toca un peso.
+  const deDinero = () => W.patches.filter((x) => !('plan_pagos' in x.p));
+  const delRol = () => W.patches.filter((x) => 'plan_pagos' in x.p);
+  af(deDinero().length === 1 && /abonado_previo=eq\.0/.test(deDinero()[0].u), 'el respaldo va con VALOR ESPERADO (abonado_previo=eq.0)');
+  af(delRol().every((x) => Object.keys(x.p).sort().join(',') === 'fecha_separo,plan_pagos' && /plan_pagos=is\.null/.test(x.u)), 'y el parche del rol (ROL-2027-1) escribe SOLO el calendario, con su valor esperado: ' + delRol().length);
   af(/pagado-antes/.test(W.viajero.notas || '') && /SÍ quedó guardado/.test(j.abono_error || ''), 'la nota y la respuesta lo DICEN: ' + j.abono_error);
   W.storageCaido = false;
   mundo('fuerzaregida#0');
   res = await alta(H, { foto: undefined });
-  af(Number(W.viajero.abonado_previo) === 500 && W.patches.length === 0, 'regresión: sin foto, pagado-antes como siempre y cero parches');
+  af(Number(W.viajero.abonado_previo) === 500 && W.patches.filter((x) => !('plan_pagos' in x.p)).length === 0, 'regresión: sin foto, pagado-antes como siempre y cero parches de dinero (el del rol es calendario)');
 
   console.log('[D] la fuente');
   const src = fs.readFileSync(path.join(RAIZ, 'netlify/functions/admin-coordi-asignaciones.js'), 'utf8');

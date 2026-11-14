@@ -188,6 +188,151 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- 🗓⚡⏳ **ROL-2027-1 (13-nov-2026, en main local, cero SQL): EL ROL DE PAGOS SE FIJA SOLO AL
+  REGISTRAR — tours 2027 en adelante.** Palabra de Memo, citada: *«TODOS LOS TOURS 2027 QUE SE
+  SEPAREN, EL DÍA QUE HAGAMOS REGISTRO ES EL DÍA QUE SE CUENTA PARA SU ROL DE PAGOS A PARTIR DE
+  AHÍ, PARA NO ESTAR METIENDO UNO POR UNO MANUAL»*. ⚰️ **Supera, SOLO para 2027+, la decisión 1 de
+  PLAN-FIJO-1** («los migrados no ven calendario hasta que Bulma/Milk capturen su fecha de
+  separo»); para los tours 2026 (vienen del Excel con su separo real) esa decisión sigue viva.
+  `npm run mide:rol-2027-1` **77** (sin ancla — árbol; reloj congelado y catálogo sintético para
+  que no caduque).
+  - **Medido antes (13-nov):** viajeros 2027 sin rol y con saldo: **4 publicados** (los 4 Junior H
+    de la tarjeta) + **95 por publicar** — cada uno habría caído a «🗓 Fijar rol» para teclearle
+    fecha y monto uno por uno, con la pandilla registrando a todo el 2027.
+  - 🔒 **LA REGLA, en un renglón:** el rol cuenta desde el DÍA DEL REGISTRO (hoy, en Reynosa) y lo
+    que la persona LLEVA PAGADO es su punto de partida; lo que FALTA se reparte parejo en las
+    quincenas de siempre que quedan de ahí al evento. Nadie nace con un pago vencido (la 1ª
+    ventana es siempre posterior a hoy+5 días) y nadie teclea una fecha.
+  - **`_lib/rol-auto` es el dueño** de A QUIÉN le toca (`ROL_AUTO_DESDE='2027-01-01'` contra la
+    fecha de SU `#N`, no la del evento base) y con qué dos datos se llama a los dueños de siempre:
+    las fechas y el reparto son de `armarPlanFijo` (plan-fijo), lo pagado de `saldoMigrado`, la
+    fecha del #N de `dsDeEvento`. Aquí no se arma una quincena ni se suma un abono.
+    `propuesta` (pura) · `fijarAlRegistrar` · `pendientes` · `barrer`.
+  - **Dónde nace el rol (los tres «registros»):** (1) **alta manual de Capsule** (`viajero_migrar`,
+    DESPUÉS del abono y ANTES del contrato — también las altas del careo, que entran por esa
+    puerta); (2) **al publicar en el Portal** (`publicar` · `fila_publicar` · `adelanto`: sello →
+    rol → correo, así cuando el cliente entra ya ve su calendario); (3) la requisición aprobada
+    sigue como estaba (PLAN-FIJO-1: el día de su solicitud). Un liquidado de 2027 (p. ej.
+    preventa $300/$300) nace con su rol en $0 y las ventanas guardadas: si le sube el total, el
+    trigger de la base lo reparte solo.
+  - **Lo que ya estaba publicado sin rol:** acción `rol_auto_fijar` (ROLES_EDITA_VIAJERO) — sin
+    `confirmar` contesta EN SECO; sin ids toma SOLO los publicados de tours 2027 («Fijar los N de
+    una vez» en la tarjeta); con `viajero_ids`, los que un humano eligió, del año que sean («⚡
+    Fijar desde hoy» por fila y en el 🗓 Plan de Capsule). `plan_pendientes` trae ahora la
+    PROPUESTA de cada quien (`auto.texto`, `es2027`).
+  - 🔒 **Es CALENDARIO, no dinero:** escribe solo `fecha_separo` + `plan_pagos` (medido por el
+    hecho: cero escrituras a abonos). Jamás pisa un rol (`plan_pagos=is.null` en el PATCH del
+    dueño; la carrera está careada). Jamás tumba el alta ni el publicar: lo que no se pudo se
+    DICE y cae a la tarjeta. Sin catálogo no arma nada y lo dice.
+  - **`origen:'registro'`** viaja en el plan (sin él, el plan de siempre es byte a byte el mismo):
+    el Portal dice «fijo desde el 13 nov (cuando quedó registrado tu viaje; lo que ya habías pagado
+    está contado)» y no «tu separo del 13 nov» a quien separó en septiembre; Capsule y el correo
+    del recordatorio también.
+  - ⚠️ **Consecuencia dicha:** un rol fijo enciende sus recordatorios (ROL-AVISOS-1, vivo desde el
+    4-nov) en SUS fechas. Fijar hoy no manda nada hoy: el primero cae el día que abre su 1ª
+    ventana (careado: 24-nov apertura · 1-dic último día · 2-dic vencido).
+  - **Ensayo contra los datos reales (solo lectura, 13-nov):** el barrido tocaría exactamente a
+    los 4 de Junior H (5 pagos de $480 · de $49 · 4 de $106 + $103 · de $49, 1ª ventana 24 nov–1
+    dic); el de Julión (2026) queda a mano; los pasados y liquidados no entran. ⚠️ Quien debe
+    $245 sale con «5 pagos de $49»: la fórmula no tiene pago mínimo (regla de negocio sin
+    decidir — dicho a Memo, no tocado).
+  - Cinco sabotajes con sha1 careado y restaurados byte a byte: regla sin el corte 2027 → 10
+    rojos · PATCH sin valor esperado → 1 · `fila_publicar` sin el hook → 8 · lo pagado leído del
+    previo y no del dueño → 5 · el alta sin el hook → 8.
+  - Vecinos: `mide:abono-hash-1` **21** (su guarda «un solo parche» se actualizó con su razón:
+    hoy distingue el parche de DINERO del de CALENDARIO) · `mide:plan-fijo-1` **25** (su ancla
+    del reparto leía `portal-viajero.js`; ACOMP-3 mudó el cuerpo a `_lib/repartir-lugares` y
+    estaba roja desde el 10-nov: hoy mira al dueño) · rol-avisos-1 28 · portal-solo-1 89 ·
+    alta-gen-hab-1 13 · abono-foto-3 23 · contrato-cliente-1 31 · ride-sin-zona-1 9 ·
+    capsule-ux-1 83 · plan-vj-1 35.
+  - ⏳ Push de Memo → en Requisiciones → «🗓 Rol por fijar» → «Fijar los N de una vez» (los 4 de
+    Junior H) → registrar/publicar uno de 2027 y ver el aviso «🗓 Rol de pagos fijo desde hoy».
+
+- 🧭⏳ **REQ-SIMPLE-1 (13-nov-2026, en main local, cero SQL): LA BANDEJA DE REQUISICIONES POR
+  TRABAJOS.** Palabra de Memo: *«son muchos clicks, muchas cosas que poner atención, hay momentos
+  en los que no sé qué estoy haciendo … si yo no la entiendo, cómo le explico a mi team»*.
+  `npm run mide:req-simple-1` **46** (sin ancla — árbol).
+  - 🔴 **LO MEDIDO EN LA BASE (13-nov), y es la razón del rediseño:** de **52** «no veo mi viaje»
+    cerradas con «✓ Ya quedó», **51 se cerraron SIN tocar «Es esta persona»** (notas: «Listo»,
+    «Si es», «todo en orden») — **23 de esas personas siguen sin NINGÚN viaje a su correo y 8
+    volvieron a pedirlo**; en 18 de las 23 el parecido correcto estaba en la misma tarjeta (16
+    con el mismo WhatsApp). Los cuatro botones del pie pesaban igual y «Ya quedó» sonaba a
+    «confirmar». Y «📊 Excel» comparaba a TODO el que se pareciera de nombre contra los números
+    de la persona de la tarjeta: un hermano salía «≠ KameHouse» (caso Stephani/Jaime — yo mismo
+    lo leí mal la primera vez).
+  - **EL MAPA** (`#req-mapa`): una tarjeta por TRABAJO con su número y qué se hace ahí, en orden
+    de urgencia FIJO — 🧾 Reservaciones nuevas · 💳 Pagos por capturar · 🔗 No ven su viaje · 🪪
+    Viajes por publicar · 🗓 Rol por fijar · 🔁 Cambios pedidos (+ «Ver todo junto»). Tocar una
+    enseña SOLO ese trabajo; sin elegir, enfoca el primero con pendientes; al acabar el último de
+    un trabajo te lleva sola al siguiente. El contador de arriba («POR ATENDER») es la SUMA de
+    todos (antes «PENDIENTES 0» contaba solo las reservaciones del sitio). 🔒 Un trabajo que no se
+    pudo leer NO es cero: su tarjeta dice «?» y el total «+?».
+  - **La página** (`kamehouse.html`): las secciones viven en orden FIJO (`.rq-sec[data-sec]`);
+    antes las cajas se inyectaban según cuál lectura contestaba primero. Las pestañas
+    Pendientes/Aprobadas/… viven DENTRO de «Reservaciones del sitio» y cambiarlas ya no recarga
+    los otros trabajos. Bitácora y ensayo de recordatorios, plegados al final (`extras`).
+  - **Una lectura, dos trabajos:** `cambios_listar` → 💳 pagos y 🔁 cambios; el `listar` del
+    Portal → 🔗 ligar y 🪪 por publicar (antes revueltos bajo un título).
+  - **La tarjeta dice su estado y su ÚNICO paso en verde:** sin ningún viaje a su correo → rojo
+    «Hoy NO ve ningún viaje» y el verde es «✓ Es esta persona» en cada parecido · ya ve su viaje →
+    «✓ Cerrar y avisarle» (un clic, la nota la pone el sistema) · por publicar → «✓ Publicar».
+    «No procede» y «Ya quedó» quedan discretos, a la derecha. Varios viajes pasados → «📸
+    Publicar los N pasados como recuerdo» (cada uno por `fila_publicar`).
+  - 🔒 **El candado vive en el SERVIDOR** (COB-MIG-1): `cerrar_resuelta` sobre un «ligar» cuyo
+    correo no tiene ningún viaje exige `sin_viaje:true` (si no, 409 `pide_confirmar_sin_viaje`,
+    cero escrituras) y la bitácora queda marcada «[cerrada SIN ligar ningún viaje]». La bitácora
+    reciente ahora enseña también lo `resuelta` (era el cierre más usado y el único invisible).
+  - **El Excel dice quién es ELLA** (`excel` → `es_ella`): la de nombre idéntico (sin acentos ni
+    orden); si no hay, la ÚNICA cuyo nombre contiene al suyo; dos candidatas igual de buenas →
+    ninguna (no se adivina). Solo ella se compara; los demás salen plegados como «otras personas…
+    no se comparan». Cuando no cuadra dice los dos números y la pista (falta capturar un abono /
+    el Excel aún no lo tiene).
+  - Los botones nuevos que ESCRIBEN llevan en su nombre un verbo que el CSS de solo-lectura
+    (DIRECTOR-1) ya esconde (`_rfFijarHoy`, `_prvCerrarAvisar`, `_prvPublicarPasados`); los que
+    navegan no. Careado derivando los patrones del CSS.
+  - Cuatro sabotajes (sha1 careado, restaurados): cerrar sin ligar sin confirmar → 3 rojos ·
+    todos son «ella» → 3 · el mapa no enfoca → 4 · la tarjeta no distingue al que no ve nada → 1.
+  - ✅ **Mirado en pantalla** (vista previa autocontenida con el CSS y los JS reales + datos de
+    mentira): el ojo cazó DOS defectos que los careos no ven — un `span` genérico del CSS
+    estiraba la pastilla del número a todo el ancho, y un `<b>` de la descripción heredaba el
+    tamaño del título. Corregidos (`.rq-sec-h>b`, `.rq-sec-q`).
+  - ⚠️ **NO se remedió el dato:** las ~23 personas que siguen sin ver su viaje (8 volvieron a
+    pedirlo y hoy 5 de las 7 «ligar» pendientes están así) se ligan con el botón correcto; un
+    barrido para las ya cerradas escribe correos de clientes y pide palabra de Memo.
+  - ⏳ Push de Memo → recargar KameHouse → Requisiciones.
+
+- 💳🔎⏳ **PAGO-CLARO-1 (13-nov-2026, en main local, cero SQL): EL COMPROBANTE CON LA CUENTA DE LA
+  PERSONA ENFRENTE.** Palabra de Memo: *«lo de los comprobantes de pago de los abonos también
+  siento que les falta más»*. `npm run mide:pago-claro-1` **32** (sin ancla — árbol; la pantalla
+  se ejecuta de punta a punta contra el handler real).
+  - **Lo que había:** nombre, identificador del evento («juniorh») y un botón que abría la foto
+    EN OTRA PESTAÑA; para saber si el monto tenía sentido había que irse a Capsule.
+  - **Hoy, sin salir de la tarjeta:** el comprobante A LA VISTA (miniatura; clic = grande ahí
+    mismo; un PDF se abre aparte) · el evento con nombre y fecha · **Total · Pagado · Le falta ·
+    Le toca hoy · Declaró** · sus últimos 3 abonos · avisos: «⚠️ puede ser repetido» (ya tiene un
+    abono del MISMO monto en los últimos 15 días — la foto re-tomada que COMPROBANTE-DUP-1 no
+    caza), «declaró más de lo que le falta», «sin total», «sin rol». Al capturar, el aviso dice
+    cuánto le queda por pagar.
+  - 🔒 **Ni una suma nueva:** `cambios_listar` le pide el saldo a `saldoMigrado` y «le toca hoy» a
+    `estadoPlan`/`tocaHoy` — el MISMO número que el cliente ve en su Portal (careado contra los
+    dueños). El plan y el dinero crudos no viajan dentro de `viajero`. Solo LEE.
+  - 🔒 **Es AYUDA, no candado:** si la cuenta no se puede leer, la lista sale IGUAL (200) con
+    `cuenta:null` y su `cuenta_error`; el monto lo sigue tecleando quien vio el comprobante
+    (nada automático decide dinero).
+  - Tres sabotajes (sha1, restaurados): la cuenta sin los abonos → 6 rojos · ventana de 150 días →
+    1 (el control del abono viejo) · la tarjeta calla el repetido → 1. Vecinos verdes:
+    pagos-portal-2 38 · portal-pago-2 78 · ticket-circuito-1 32 · req-b1 52.
+  - ⚠️ Lección del instrumento: la primera red falsa devolvía la fila ENTERA sin importar el
+    `select` y la aserción «el plan crudo no viaja» salió roja con el código sano — hoy la red
+    PROYECTA las columnas pedidas, como PostgREST.
+  - 🔴 **Rojos PREEXISTENTES, idénticos en HEAD limpio (`git archive`), que NO son de estas tres
+    tuercas:** confirma-1 (1) · cotiza-vend-1 (1) · director-1 (1) · emma-1 (1) ·
+    preventa-auto-1 (6) · preventa-elegir-1 (1) · preventa-pn27 (1) · req-corrige-1 (2) ·
+    util-solo-roshi (2: su control positivo lee `HEAD` y caducó con su propio merge) ·
+    alarmas-1 (se cae: su red falsa no entiende el `or=` de PORTAL-PAGO-2). Barrido: 96 careos
+    de nodo que tocan estos archivos — 86 verdes; los 5 de Playwright no corren en el sandbox.
+  - ⏳ Push de Memo → un comprobante real desde el Portal y capturarlo mirando la tarjeta.
+
 - 👥⏳ **ACOMP-3 (10-nov-2026, en main local, cero SQL): «👥 Repartir» en Capsule — el equipo reparte los lugares de una fila.** Caso Karina Treviño (Pa'l Norte, 3 lugares, $900; datos de las otras 2 por Messenger a Ximena). Palabra de Memo: «sí, constrúyelo». 🔒 El cuerpo de `repartir` (ACOMP-2) se MUDÓ a `_lib/repartir-lugares` — dos lectores: el Portal (titular) y la acción nueva `viajero_repartir` de `admin-coordi-asignaciones` (ROLES_EDITA_VIAJERO). Mismas leyes: contrato y pagado al peso, reclamo con valor esperado, cero DELETEs, grupo «viaja con», plan fijo con las mismas fechas, invitación solo a correos distintos del titular. Desde Capsule además viajan talla (lista XS–XXL), emergencia (10-13 díg, ≠ su celular) y género; el sello del Portal se HEREDA solo si el titular está sellado. Botón en la fila de cualquier cliente con 2+ lugares. Karina: su talla S y emergencia ya se escribieron (valor esperado). `mide:acomp-3` **20** · acomp-2 43 · portal-solo-1 89 (su ancla leía el cuerpo viejo; hoy lee al dueño) · preventa-portal-1 38 · capsule-ux-1 83 · yajirobe-1 53. ⏳ Push de Memo → Ximena: fila de Karina → «👥 Repartir» → Kaleb (L, ♂, 8148061376) y Brihana (XS, ♀, 7821953184), emergencia 9568200852, correo vacío (va al de Karina).
 
 - 🔴⏳ **VIAJE-AG-1b (10-nov-2026, en main local, cero SQL): mi «Viaje agotado · solo boleto» bloqueaba el PUBLISH.** VIAJE-AG-1 metió tres textos con «solo boleto» al index y el candado SIN-SOLO-BOLETO-1 (palabra de Memo, 19-oct) rehusó el publish de Don Omar (409). Hoy dicen «Viaje agotado · sigue CHEAP» / «el paquete CHEAP». `mide:viaje-ag-1` 16 (literal actualizado) · `mide:sin-solo-boleto` 12. 🔒 La lección: **un careo de pantalla nuevo corre también el candado de leyendas del sitio** — mide:viaje-ag-1 estaba verde con la frase prohibida. ⏳ Push de Memo → publicar Don Omar.

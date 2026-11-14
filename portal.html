@@ -3723,7 +3723,14 @@ function _migPagosHtml(t){
       + '<span><b>' + money(c.monto) + '</b></span></div>';
   });
   const sep = p.separo_fecha ? (function(){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.separo_fecha); const MM = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return m ? Number(m[3]) + ' ' + MM[Number(m[2]) - 1] : ''; })() : '';
-  const nota = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">Tu calendario es fijo desde tu separo' + (sep ? ' (' + sep + ')' : '') + ': las fechas son las quincenas de siempre (del 9 al 16 y del 24 al 1). Si abonas de más, se aplica a tus siguientes pagos.</div>';
+  // [ROL-2027-1] Con origen 'registro' la fecha NO es la de su separo: es el día
+  // que su viaje quedó registrado en el sistema (lo que llevaba pagado fue su
+  // punto de partida). Decirle «tu separo del 13 nov» a quien separó en
+  // septiembre sería un letrero falso; sin origen, el texto es el de siempre.
+  const desde = p.origen === 'registro'
+    ? 'Tu calendario es fijo desde el ' + (sep || 'día que registramos tu viaje') + ' (cuando quedó registrado tu viaje; lo que ya habías pagado está contado)'
+    : 'Tu calendario es fijo desde tu separo' + (sep ? ' (' + sep + ')' : '');
+  const nota = '<div style="font-size:12px;opacity:.7;margin-top:8px;line-height:1.5">' + desde + ': las fechas son las quincenas de siempre (del 9 al 16 y del 24 al 1). Si abonas de más, se aplica a tus siguientes pagos.</div>';
 
   return caja(barra + avisoAtr + destacado
     + '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.6;margin-bottom:2px">Tu rol de pagos · te faltan ' + money(p.resta) + '</div>'

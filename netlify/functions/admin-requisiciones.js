@@ -45,6 +45,10 @@ const ACCIONES = {
   // [PORTAL-EDIT-1] las solicitudes de cambio que el cliente manda desde el Portal.
   cambios_listar: ROLES_BANDEJA,
   cambio_cerrar: ROLES_BANDEJA,
+  // [CAMBIO-APLICA-1] «✏️ Hacer el cambio» desde la bandeja: cómo está HOY el
+  // viajero, qué hay en su evento y cuánto es la diferencia — SOLO LEE. El
+  // cambio lo escriben los dueños (viajero_editar_full / viajero_mudar_fecha).
+  cambio_opciones: ROLES_BANDEJA,
   // [PAGOS-PORTAL-2] El comprobante que el cliente subió desde el Portal:
   // verlo (URL firmada) y CAPTURAR el abono con el monto TECLEADO por quien lo
   // vio — el humano decide el dinero, la solicitud solo lo avisa.
@@ -101,8 +105,8 @@ const FILTRO_PAGO_VIVO = '&or=(tipo.neq.pago,foto_path.not.is.null,mp_pago_id.no
 // 🔒 Solo dentro del MISMO evento (otra fecha, otra zona, otro paquete, otra
 // habitación). Mandar a otro tour es otra venta, no una corrección.
 const { fetchEventosRaw, fetchHotelesGlobales } = require('./_lib/catalogo-index');
-const { _calcularPrecio, _hotelLista, esCDMX, hoyMx } = require('./_lib/precio-zona');
-const { _opciones, fechasVendibles, NOMBRES } = require('./_lib/opciones-paquete');
+const { _calcularPrecio, _hotelLista, _zonaLista, esCDMX, hoyMx } = require('./_lib/precio-zona');
+const { _opciones, fechasVendibles, NOMBRES, enPreventa } = require('./_lib/opciones-paquete');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 // [GENERO-2] El género de un acompañante viaja dentro del jsonb de la
 // requisición (lo validó requisicion-crear); aquí se vuelve a pasar por el dueño
@@ -208,6 +212,260 @@ async function resolverCorreccion(req, c, ctx) {
   if (cdmx && paquete !== 'cheap') out.avisos.push('Evento de CDMX: el total sugerido NO incluye el transporte — súmalo al total si va.');
   out.eleccion = { evento_id: f.evento_id, paquete, zona, hotel, hotel_tipo: normHotelTipo(hotel), fecha: f.lbl };
   out.total_sugerido = Math.round(Number(r.total)) || null;
+  return out;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// [CAMBIO-APLICA-1 · 13-nov-2026] HACER EL CAMBIO DESDE LA BANDEJA
+// ═════════════════════════════════════════════════════════════════════════════
+// Palabra de Memo, citada: «lo único que cambiaría es en cambios pedidos poder
+// hacer el cambio desde requisiciones y aprobar y que quede guardado».
+//
+// 🔴 Lo medido en la base (13-nov): de los 16 cambios de hotel / zona / fecha /
+// otro que han llegado del Portal, 13 se atendieron — y en los 13 hubo que irse
+// a Capsule, buscar a la persona, corregirla ahí y REGRESAR a cerrar la
+// solicitud tecleando qué se hizo. En 12 el cambio sí quedó; en 1 la solicitud
+// se cerró diciendo «pasó a paquete PLUS» y la fila sigue en CHEAP. Cerrar y
+// cambiar eran dos gestos en dos pantallas, y uno se quedó sin hacer.
+//
+// 🔒 ESTO SOLO LEE. Para UNA solicitud contesta: cómo está HOY su viajero, qué
+// fechas / paquetes / zonas (con precio y cupo) / habitaciones tiene su evento
+// y —si viene una elección— cuánto es la DIFERENCIA de lista entre lo que tiene
+// y lo que se elige. El cambio lo ESCRIBEN los dueños de siempre
+// (`viajero_editar_full` y `viajero_mudar_fecha`: su puerta de zonas, su valor
+// esperado, su nota y su correo) y la solicitud la cierra `cambio_cerrar`.
+// Aquí NO nace un tercer escritor de un viaje.
+//
+// 🔒 CERO REGLA DE PRECIO NUEVA: cada número sale de `_calcularPrecio` (el
+// motor que sella una venta) por la puerta `para_careo` —la de «esto ya se
+// vendió»—: una zona agotada tiene precio igual, porque quien pasa de CHEAP a
+// PLUS conserva SU boleto de una zona que quizá ya no se vende. Las listas son
+// `_zonaLista` y `_hotelLista`; el cupo, `evaluarZona` del Palacio.
+//
+// 🔒 EL TOTAL SE SUGIERE POR DIFERENCIA, NO POR LISTA:
+//       total de hoy + (lista de lo nuevo − lista de lo que tiene)
+// Así sobrevive lo que su total ya trae y el catálogo no sabe: un descuento
+// negociado, el beneficio de la preventa, el vuelo o el autobús de un CDMX.
+// Poner el precio de lista a secas se lo comería. Y es SUGERENCIA: el número
+// que entra es el que confirme quien aprueba (nada automático decide dinero).
+const ZONA_PREVENTA_RE = /^preventa a ciegas$/i;
+const HAB_TIPOS = ['Compartida', 'Doble', 'Triple', 'Individual'];
+async function resolverCambio(v, dinero, c, ctx) {
+  c = c || {};
+  const slug = String(v.evento_id || '').split('#')[0];
+  let lista;
+  try { lista = await fetchEventosRaw(); } catch (_) { lista = null; }
+  if (!Array.isArray(lista)) return { ok: false, status: 502, error: 'No se pudo leer el catálogo — sin él no se cambia a ciegas. Reintenta en un momento.' };
+  const ev = lista.find((x) => x && x.id === slug);
+  if (!ev) return { ok: false, status: 409, error: `El evento ${slug} ya no está en el catálogo (¿cancelado?). Atiéndela en Capsule o ciérrala con «No procede».` };
+  const { dsDeEvento } = require('./_lib/plan-pagos');
+  const { fechaDeEventoId } = require('./_lib/fecha-evento');
+  const { duerme } = require('./_lib/paquete-viaje');
+  const { paqueteVendibleEnSitio } = require('./_lib/paquete-sitio');
+  const hoyISO = hoyMx();
+  const mf = Array.isArray(ev.multifecha) ? ev.multifecha : [];
+  const esMulti = mf.length > 0;
+  const cdmx = esCDMX(ev);
+  let hoteles = {};
+  try { hoteles = await fetchHotelesGlobales(); } catch (_) { hoteles = {}; }
+
+  // ── Las fechas de la FICHA — todas, no solo las vendibles: mover a alguien
+  //    es corregir un viaje que ya existe, no venderle uno. La pasada se rotula.
+  const etiq = (id, m, i) => {
+    const fx = String(fechaDeEventoId(ev, id) || '');
+    const lbl = String((m && m.lbl) || '').trim();
+    if (!fx) return lbl || `Fecha ${i + 1}`;
+    // La etiqueta de la ficha se antepone solo cuando DICE algo que la fecha no
+    // («1 Día», «Sábado»): un «12 Enero» junto a «12 ene 2027» sería repetirse.
+    return lbl && !/^\d/.test(lbl) && !fx.toLowerCase().includes(lbl.toLowerCase()) ? `${lbl} · ${fx}` : fx;
+  };
+  const fechas = esMulti
+    ? mf.map((m, i) => {
+      const id = `${slug}#${i}`; const ds = dsDeEvento(ev, id) || null;
+      return { evento_id: id, idx: i, etiqueta: etiq(id, m, i), ds, pasada: !!(ds && ds < hoyISO), prox: !!(m && m.prox), actual: id === v.evento_id };
+    })
+    // Un evento de UNA fecha: su única entrada lleva el evento_id DE LA FILA
+    // (hay filas viejas con `slug#0`), para que jamás parezca un cambio de fecha.
+    : [{ evento_id: v.evento_id, idx: null, etiqueta: String(fechaDeEventoId(ev, v.evento_id) || ev.f || slug), ds: ev.ds ? String(ev.ds) : null,
+      pasada: !!(ev.ds && String(ev.ds) < hoyISO), prox: false, actual: true }];
+  const fActual = fechas.find((x) => x.actual) || null;   // null = multifecha y su fila no dice cuál
+
+  const lugares = Math.max(1, Number(v.boletos) || 1);
+  const paqActual = String(v.tipo_paquete || '').toLowerCase();
+  const totalHoy = v.total_contrato != null && Number(v.total_contrato) > 0 ? Math.round(Number(v.total_contrato)) : null;
+  dinero = dinero || {};
+  const hoy = {
+    evento_id: v.evento_id, fecha: fActual ? fActual.etiqueta : null, paquete: paqActual || null,
+    zona: v.zona_boleto || null, hotel_tipo: v.hotel_tipo || null, lugares,
+    total: totalHoy, abonado: dinero.abonado == null ? null : Math.round(dinero.abonado),
+    resta: totalHoy != null && dinero.abonado != null ? Math.round(totalHoy - dinero.abonado) : null,
+    publicado: !!v.portal_revisado_at, con_correo: !!String(v.correo || '').trim(), con_rol: !!v.plan_pagos,
+    // Lo que el dueño de la mudanza SUELTA al cambiar de fecha (eran de ese día):
+    // la pantalla lo dice ANTES de guardar, no después.
+    con_cuarto: !!v.habitacion_id, con_grupo: !!v.grupo_viaje,
+  };
+
+  // La fecha sobre la que se enseñan las listas: la elegida, o la suya.
+  let f = fActual;
+  if (c.evento_id) {
+    const dest = String(c.evento_id);
+    if (dest.split('#')[0] !== slug) return { ok: false, status: 400, error: 'El cambio es dentro del MISMO evento — pasar a otro tour es un traspaso, no un cambio.' };
+    f = fechas.find((x) => x.evento_id === dest) || null;
+    if (!f) return { ok: false, status: 409, error: 'Esa fecha no existe en la ficha del evento' };
+  }
+  const fi = f && f.idx != null ? f.idx : 0;
+
+  // El inventario del Palacio para ESA fecha. Ilegible → `quedan:null` y SE DICE.
+  let disp = null;
+  if (f) {
+    try {
+      disp = await cargarDisponibilidad({ khUrl: ctx.SB_URL, khKey: ctx.SB_KEY,
+        portalUrl: process.env.PORTAL_SUPABASE_URL, portalKey: process.env.PORTAL_SUPABASE_SERVICE_KEY, evento_id: f.evento_id });
+      if (disp && disp.error) disp = null;
+    } catch (_) { disp = null; }
+  }
+
+  // El precio de UNA combinación para ESTA fila (por los dueños; jamás lanza).
+  // 🔒 La habitación se cotiza con el número de personas que ese cuarto pide
+  // (la Doble de la lista global cuesta $1,300 ENTRE DOS): con `num_personas:1`
+  // se le cargaría el cuarto entero a una sola persona. `viaj` es del catálogo.
+  const precioDe = (o) => {
+    try {
+      const p = String(o.paquete || '').toLowerCase();
+      const n0 = Math.max(1, o.lugares || 1);
+      let hNombre; let n = n0;
+      if (o.hotel_tipo && duerme(p) && !ev.noHotel) {
+        const h = (_hotelLista(ev, o.fi, cdmx, hoteles) || []).find((x) => x && x.n && normHotelTipo(x.n) === o.hotel_tipo);
+        if (!h) return { ok: false, motivo: `la habitación ${o.hotel_tipo} no está en la ficha de esa fecha` };
+        hNombre = h.n;
+        if (Array.isArray(h.viaj) && h.viaj.length && !h.viaj.includes(n)) n = h.viaj[0];
+      }
+      const r = _calcularPrecio(ev, { hoteles, paquete: p, zona: o.zona || undefined, hotel_nombre: hNombre, num_personas: n,
+        fecha_idx: o.fi, hoyISO, para_careo: true, transporte_cost: 0 });
+      if (!r || !r.ok) return { ok: false, motivo: (r && r.motivo) || 'no se pudo cotizar' };
+      const pp = Math.round(Number(r.precio_unit));
+      return { ok: true, por_persona: pp, total: pp * n0 };
+    } catch (_) { return { ok: false, motivo: 'no se pudo cotizar' }; }
+  };
+
+  // ── Paquetes y zonas de esa fecha. Los paquetes son los que el sitio vende
+  //    en ese evento (espejo de sus botones) MÁS el que la persona ya tiene.
+  //    Las zonas son TODAS las de la ficha para esa fecha, agotadas incluidas
+  //    (rotuladas): aquí se corrige un viaje, y el cupo real lo dice el Palacio.
+  const paquetes = [];
+  if (f) {
+    for (const p of ['plus', 'stay', 'ride', 'cheap']) {
+      const esElSuyo = p === paqActual;
+      if (!esElSuyo && !paqueteVendibleEnSitio(ev, p).ok) continue;
+      const llevaZona = p !== 'ride' || !!ev.forceZona;
+      const duermeP = duerme(p) && !ev.noHotel;
+      if (!llevaZona) {
+        const pr = precioDe({ paquete: p, fi, lugares: 1 });
+        paquetes.push({ paquete: p, nombre: NOMBRES[p] || p.toUpperCase(), duerme: duermeP, zonas: null, precio: pr.ok ? pr.por_persona : null });
+        continue;
+      }
+      const zonas = [];
+      for (const z of (_zonaLista(ev, p, fi) || [])) {
+        if (!z || !z.n || ZONA_PREVENTA_RE.test(z.n)) continue;
+        const pr = precioDe({ paquete: p, zona: z.n, fi, lugares: 1 });
+        const ez = disp ? evaluarZona(disp, z.n, lugares) : null;
+        zonas.push({ zona: z.n, precio: pr.ok ? pr.por_persona : null, ag: !!z.ag, prox: !!z.prox,
+          quedan: ez && ez.gestionada ? ez.restante : null, gestionada: !!(ez && ez.gestionada) });
+      }
+      if (!zonas.length && !esElSuyo) continue;   // sin zonas en la ficha, ese paquete no se puede elegir
+      paquetes.push({ paquete: p, nombre: NOMBRES[p] || p.toUpperCase(), duerme: duermeP, zonas });
+    }
+  }
+
+  // ── Habitaciones: los tipos del rooming que la ficha de esa fecha trae. Sin
+  //    lista en la ficha, los cuatro tipos igual (el dueño los acepta), sin precio.
+  let habitaciones = [];
+  if (f && !ev.noHotel) {
+    for (const h of (_hotelLista(ev, fi, cdmx, hoteles) || [])) {
+      const t = h && h.n ? normHotelTipo(h.n) : null;
+      if (t && !habitaciones.some((x) => x.tipo === t)) habitaciones.push({ tipo: t, nombre: h.n });
+    }
+    if (!habitaciones.length) habitaciones = HAB_TIPOS.map((t) => ({ tipo: t, nombre: t, sin_precio: true }));
+    habitaciones.sort((a, b) => HAB_TIPOS.indexOf(a.tipo) - HAB_TIPOS.indexOf(b.tipo));
+  }
+
+  const out = { ok: true, evento: { nombre: ev.a || slug, cdmx, multifecha: esMulti }, hoy, fechas, fecha: f ? f.evento_id : null,
+    paquetes, habitaciones, inventario_ok: !!disp, eleccion: null, guia: null, avisos: [] };
+  if (dinero.error) out.avisos.push(dinero.error);
+  if (f && !disp) out.avisos.push('No se pudo leer el inventario del Palacio: los «quedan» no se muestran — revisa el cupo antes de mover de zona.');
+  if (!f) { out.guia = 'Su fila no dice de qué fecha es: elige la fecha.'; return out; }
+  if (!c.paquete) return out;
+
+  // ── La elección: se VALIDA contra esas mismas listas y se cotiza ──────────
+  const p = String(c.paquete || '').toLowerCase();
+  const pq = paquetes.find((x) => x.paquete === p);
+  if (!pq) return { ok: false, status: 409, error: `El paquete ${p.toUpperCase()} no está en esa fecha` };
+  let zona = null;
+  if (pq.zonas) {
+    zona = String(c.zona || '').trim();
+    if (!zona) { out.guia = 'Elige la zona.'; return out; }
+    // La zona es de ESA fecha y ESE paquete — o la que ya tiene, si no se mueve
+    // de fecha (una zona vieja que la ficha ya no trae no se le quita por esto).
+    const esLaSuya = f.actual && zona === String(v.zona_boleto || '');
+    if (!esLaSuya && !pq.zonas.some((z) => z.zona === zona)) {
+      return { ok: false, status: 409, error: `«${zona}» no es zona de esa fecha para ${p.toUpperCase()}` };
+    }
+  }
+  let hotelTipo = null;
+  const hIn = String(c.hotel || '').trim();
+  if (hIn) {
+    hotelTipo = HAB_TIPOS.find((t) => t.toLowerCase() === hIn.toLowerCase()) || null;
+    if (!hotelTipo) return { ok: false, status: 400, error: 'Habitación inválida: ' + HAB_TIPOS.join(', ') };
+    if (!pq.duerme) return { ok: false, status: 409, error: `El paquete ${p.toUpperCase()} no lleva habitación` };
+  }
+  const cambia = {
+    fecha: f.evento_id !== v.evento_id,
+    paquete: p !== paqActual,
+    zona: String(zona || '') !== String(v.zona_boleto || ''),
+    hotel: String(hotelTipo || '') !== String(v.hotel_tipo || ''),
+  };
+  const sinCambio = !cambia.fecha && !cambia.paquete && !cambia.zona && !cambia.hotel;
+
+  const nueva = precioDe({ paquete: p, zona, hotel_tipo: hotelTipo, fi, lugares });
+  const actual = !fActual ? { ok: false, motivo: 'su fila no dice de qué fecha es' }
+    : !paqActual ? { ok: false, motivo: 'su fila no tiene paquete' }
+      : precioDe({ paquete: paqActual, zona: v.zona_boleto || '', hotel_tipo: v.hotel_tipo || null, fi: fActual.idx != null ? fActual.idx : 0, lugares });
+
+  // `modo` dice de dónde salió el sugerido — y con eso la pantalla sabe si lo
+  // pone sola en la caja o solo lo ofrece:
+  //   igual       → no cambia nada que tenga precio: su total de hoy
+  //   diferencia  → total de hoy + (lista nueva − lista actual)        ✔ confiable
+  //   lista       → la fila no tenía total: nace con el de lista        ✔ confiable
+  //   lista_sin_base → tenía total pero lo que tiene hoy no se pudo cotizar:
+  //                 el de lista se OFRECE, no se pone solo (podría comerse un
+  //                 descuento o un transporte que su total ya traía).
+  let sugerido = null; let modo = null;
+  if (sinCambio) { sugerido = totalHoy; modo = 'igual'; }
+  else if (nueva.ok && actual.ok && totalHoy != null) { sugerido = Math.max(0, totalHoy + (nueva.total - actual.total)); modo = 'diferencia'; }
+  else if (nueva.ok && totalHoy == null) { sugerido = nueva.total; modo = 'lista'; }
+  else if (nueva.ok) { sugerido = nueva.total; modo = 'lista_sin_base'; }
+
+  if (!sinCambio && !nueva.ok) out.avisos.push(`No pude cotizar lo nuevo (${nueva.motivo}): teclea el total.`);
+  else if (modo === 'lista_sin_base') out.avisos.push(`No pude cotizar lo que tiene hoy (${actual.motivo}): el sugerido es el precio de LISTA de lo nuevo — revisa que no se pierda un descuento o un transporte que su total ya traía.`);
+  if (cdmx && p !== 'cheap' && !sinCambio && (modo !== 'diferencia' || paqActual === 'cheap')) {
+    out.avisos.push('Evento de CDMX: el sugerido NO incluye autobús ni vuelo — súmalo al total si va.');
+  }
+  // El cupo AVISA, no bloquea (igual que el dueño): solo cuando el cambio mueve
+  // un boleto — otra zona u otra fecha. La misma zona el mismo día ya es suya.
+  if (zona && (cambia.zona || cambia.fecha)) {
+    const ez = disp ? evaluarZona(disp, zona, lugares) : null;
+    if (ez && ez.gestionada) {
+      if (ez.restante < lugares) out.avisos.push(`Ojo: «${zona}» ${ez.restante <= 0 ? 'ya no tiene lugares' : 'solo tiene ' + ez.restante + ' lugar(es)'} en el Palacio — con este cambio queda sobrevendida.`);
+    } else if (disp) out.avisos.push(`«${zona}» no tiene pedido cargado en Kamisama: no se pudo medir el cupo.`);
+  }
+  if (f.pasada) out.avisos.push('Esa fecha ya pasó.');
+
+  out.eleccion = {
+    evento_id: f.evento_id, fecha: f.etiqueta, paquete: p, zona: zona || null, hotel_tipo: hotelTipo, cambia, sin_cambio: sinCambio,
+    lista_actual: actual.ok ? actual.total : null, lista_nueva: nueva.ok ? nueva.total : null,
+    diferencia: nueva.ok && actual.ok ? nueva.total - actual.total : null,
+    total_hoy: totalHoy, total_sugerido: sugerido, modo, confiable: modo === 'igual' || modo === 'diferencia' || modo === 'lista',
+  };
   return out;
 }
 
@@ -325,6 +583,10 @@ exports.handler = async (event) => {
     // marca (mp_pago_id) o trae comprobante, entra a la bandeja.
     let q = `${cb}?select=*&order=creado_en.desc&limit=200${FILTRO_PAGO_VIVO}`;
     if (estado !== 'todas') q += `&estado=eq.${encodeURIComponent(estado)}`;
+    // [CAMBIO-APLICA-1] «Cambios ya atendidos»: la bitácora de lo que se le
+    // cambió a quién. Sin los comprobantes (esos viven en 📎 Pagos del viajero),
+    // así no se arma la cuenta de cada pago solo para leer un historial.
+    if (body.solo_cambios === true) q += '&tipo=neq.pago';
     const r = await fetch(q, { headers: sbH });
     if (!r.ok) return j(502, headers, { error: 'No se pudieron leer las solicitudes de cambio', detail: (await r.text()).slice(0, 300) });
     const rows = await r.json();
@@ -332,7 +594,7 @@ exports.handler = async (event) => {
     const ids = [...new Set(rows.map((x) => x.viajero_id))];
     let vmap = {};
     if (ids.length) {
-      const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto,grupo_viaje,evento_id`, { headers: sbH });
+      const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=in.(${encodeURIComponent(ids.map((x) => '"' + x + '"').join(','))})&select=id,nombre,celular,tipo_paquete,zona_boleto,hotel_tipo,boletos,grupo_viaje,evento_id`, { headers: sbH });
       if (rv.ok) (await rv.json()).forEach((v) => { vmap[v.id] = v; });
       // [PAGO-GRUPO-1] Quién viaja con cada persona (su `grupo_viaje` del mismo
       // evento): la bandeja ofrece repartir un comprobante entre ellos AUNQUE el
@@ -502,6 +764,55 @@ exports.handler = async (event) => {
       enviados.push({ correo: c, bitacora: !!(b && b.ok) });
     }
     return j(200, headers, { ok: true, enviados, errores, saltados: sinCorreo, faltan: Math.max(0, tocan.length - 60) });
+  }
+
+  // ── [CAMBIO-APLICA-1] «✏️ Hacer el cambio»: lo que hay para ESTA solicitud ──
+  // SOLO LEE (ver `resolverCambio`). El viajero se lee por el id que trae la
+  // SOLICITUD, jamás por uno del cuerpo: quien abre el panel no elige a quién
+  // se le cotiza. Los comprobantes y la elección de paquete de la preventa
+  // tienen cada uno su propio botón y su propio dueño: aquí se rehúsan.
+  if (accion === 'cambio_opciones') {
+    const cid = String(body.id || '');
+    if (!/^[0-9a-f-]{36}$/.test(cid)) return j(400, headers, { error: 'id inválido' });
+    const rc = await fetch(`${SB_URL}/rest/v1/cambios_viajero?id=eq.${cid}&select=id,viajero_id,evento_id,tipo,estado,detalle&limit=1`, { headers: sbH });
+    if (!rc.ok) return j(502, headers, { error: 'No se pudo leer la solicitud' });
+    const cam = (await rc.json())[0];
+    if (!cam) return j(404, headers, { error: 'Esa solicitud no existe' });
+    if (cam.estado !== 'pendiente') return j(409, headers, { error: 'Esa solicitud ya no está pendiente — alguien más la cerró' });
+    if (cam.tipo === 'pago') return j(400, headers, { error: 'Un comprobante se captura con «➕ Capturar abono»' });
+    if (cam.tipo === 'paquete') return j(400, headers, { error: 'La elección de paquete de la preventa se aplica con «✓ Aplicar paquete»' });
+    const rv = await fetch(`${SB_URL}/rest/v1/viajeros_evento?id=eq.${cam.viajero_id}&select=id,nombre,correo,evento_id,tipo_paquete,zona_boleto,hotel_tipo,boletos,total_contrato,abonado_previo,portal_revisado_at,plan_pagos,habitacion_id,grupo_viaje&limit=1`, { headers: sbH });
+    if (!rv.ok) return j(502, headers, { error: 'No se pudo leer al viajero' });
+    const v = (await rv.json())[0];
+    if (!v) return j(409, headers, { error: 'Ese viajero ya no existe: cierra la solicitud con «No procede».' });
+    // Un lugar CANCELADO (boletos 0 y sin zona en un paquete con boleto) no se
+    // edita desde aquí: revivirlo es otra decisión, con su dinero enfrente.
+    if (Number(v.boletos) === 0 && !v.zona_boleto && String(v.tipo_paquete || '').toLowerCase() !== 'ride') {
+      return j(409, headers, { error: 'Ese lugar está CANCELADO: no se le puede hacer un cambio. Ciérrala con «No procede» (o revísalo en Capsule).' });
+    }
+    // Quien sigue en PREVENTA A CIEGAS no se saca de ahí por esta puerta: su
+    // paquete lo aplica `viajero_elegir_paquete` (el beneficio de $300, su
+    // contrato con anexo, la fecha que eligió) — PAQ-SOLO-APLICAR-1. Editarle
+    // paquete y zona «a mano» lo dejaría fuera de la preventa sin nada de eso.
+    if (enPreventa(v)) {
+      return j(409, headers, { error: 'Esta persona sigue en PREVENTA A CIEGAS: su paquete se aplica con «🎟 Elegir paquete» en Capsule (pone su descuento y emite su contrato). Hazlo ahí y cierra esta solicitud con «Ya lo atendí por fuera».' });
+    }
+    // Lo pagado, por su dueño. Si no se puede leer se DICE y lo demás sale igual
+    // (el total de contrato viene de la fila; lo pagado es ayuda para decidir).
+    const dinero = { abonado: null, error: null };
+    try {
+      const ra = await fetch(`${SB_URL}/rest/v1/abonos_viajero?viajero_id=eq.${v.id}&select=monto&limit=2000`, { headers: sbH });
+      if (!ra.ok) throw new Error('lectura ' + ra.status);
+      const { saldoMigrado } = require('./_lib/cuenta-evento');
+      const s = saldoMigrado(Object.assign({}, v, { total_contrato: v.total_contrato == null ? 0 : v.total_contrato }), await ra.json());
+      dinero.abonado = s ? s.abonado : null;
+    } catch (_) { dinero.error = 'No pude leer sus pagos: lo pagado no se muestra (revísalo en Capsule).'; }
+    const elec = (body.paquete || body.evento_id)
+      ? { evento_id: body.evento_id ? String(body.evento_id) : null, paquete: body.paquete ? String(body.paquete) : null, zona: body.zona, hotel: body.hotel }
+      : null;
+    const o = await resolverCambio(v, dinero, elec, { SB_URL, SB_KEY });
+    if (!o.ok) return j(o.status || 409, headers, { error: o.error });
+    return j(200, headers, Object.assign({ cambio: { id: cam.id, tipo: cam.tipo, detalle: cam.detalle }, viajero: { id: v.id, nombre: v.nombre || null } }, o));
   }
 
   if (accion === 'cambio_cerrar') {

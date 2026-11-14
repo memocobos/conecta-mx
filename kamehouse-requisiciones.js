@@ -230,8 +230,9 @@ async function loadCambiosPortal() {
   const otros = rows.filter((c) => c.tipo !== 'pago');
   boxPagos.innerHTML = _reqSecH('💳 Pagos por capturar', 'El cliente subió su comprobante (o pagó en Mercado Pago). Mira el comprobante junto a su cuenta, teclea lo que dice el banco y captura: nace su abono y le llega «Recibimos tu pago».', pagos.length)
     + (pagos.length ? pagos.map(_reqPagoCard).join('') : '<div class="rq-aldia">✓ Ningún comprobante esperando. Cuando un cliente suba su pago desde el Portal, cae aquí solo.</div>');
-  box.innerHTML = _reqSecH('🔁 Cambios pedidos desde el Portal', 'El cliente pidió cambiar algo de su viaje (habitación, zona, fecha, paquete de la preventa). Haz el cambio en su viajero y ciérralo aquí; «No procede» le avisa con tu motivo.', otros.length)
-    + (otros.length ? otros.map(_reqCambioCard).join('') : '<div class="rq-aldia">✓ Nadie ha pedido cambios.</div>');
+  box.innerHTML = _reqSecH('🔁 Cambios pedidos desde el Portal', 'El cliente pidió cambiar algo de su viaje (fecha, paquete, zona, habitación). «✏️ Hacer el cambio» lo aplica AQUÍ mismo: se guarda en su viaje, la solicitud queda aprobada y a él le llega un correo. «No procede» le avisa con tu motivo.', otros.length)
+    + (otros.length ? otros.map(_reqCambioCard).join('') : '<div class="rq-aldia">✓ Nadie ha pedido cambios.</div>')
+    + _reqCambiosHistCaja();
   _reqContar('pagos', pagos.length);
   _reqCambiosN = otros.length;
   _reqContar('cambios', otros.length + (_reqPrevN || 0));
@@ -247,7 +248,10 @@ function _reqCambioCard(c) {
   const TIPO = _REQ_TIPO;
   const v = c.viajero || {};
   const wa = String(v.celular || '').replace(/\D/g, '');
-  const hoy = _reqBdjEsc([v.tipo_paquete, v.zona_boleto].filter(Boolean).join(' · ') || '—');
+  // [CAMBIO-APLICA-1] Cómo está HOY, completo: quien pide «habitación doble»
+  // se atiende sabiendo en cuál está (y cuántos lugares trae su fila).
+  const hoy = _reqBdjEsc([v.tipo_paquete ? String(v.tipo_paquete).toUpperCase() : null, v.zona_boleto,
+    v.hotel_tipo ? 'hab. ' + v.hotel_tipo : null, Number(v.boletos) > 1 ? v.boletos + ' lugares' : null].filter(Boolean).join(' · ') || '—');
   // [PREVENTA-PORTAL-1] La elección de paquete de la preventa se APLICA desde
   // aquí: «Aplicar» llama a viajero_elegir_paquete (el mismo dueño que el
   // botón 🎟 de la lista: puerta de zonas, inventario, contrato) y cierra.
@@ -275,9 +279,10 @@ function _reqCambioCard(c) {
         <div class="rq-ev">${_reqEvTxt(c)} · hoy: ${hoy} · ${_reqBdjEsc(c.correo)}${wa ? ' · WA ' + _reqBdjEsc(wa) : ''}</div>
         <q>${_reqBdjEsc(c.detalle)}</q>
         <div class="rq-linea">
-          <button class="rq-btn pri" onclick="_reqCambioCerrar('${c.id}','atendida')">✓ Ya lo atendí</button>
+          <button class="rq-btn pri" onclick="_reqCambioAplicarAbrir('${c.id}')">✏️ Hacer el cambio</button>
           ${wa.length === 10 ? `<a class="rq-btn wa" target="_blank" rel="noopener" href="https://wa.me/52${wa}">💬 WhatsApp</a>` : ''}
           <span class="rq-sp"></span>
+          <button class="rq-btn quiet" title="Solo si ya se resolvió por otro lado o no había nada que cambiar en su viaje" onclick="_reqCambioCerrar('${c.id}','atendida')">Ya lo atendí por fuera</button>
           <button class="rq-btn dan" onclick="_reqCambioCerrar('${c.id}','rechazada')">No procede</button>
         </div>
         <div id="rq-cambio-form-${c.id}"></div></div>`;
@@ -562,6 +567,350 @@ async function _reqCambioCerrarGo(id, estado) {
   const j = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado, respuesta }).catch((e) => ({ error: e.message }));
   if (j && j.ok) { if (j.correo) showToast(_reqBdjEsc('Cerrada · ' + _reqCorreoTxt(j.correo)), j.correo.ok ? 'success' : 'warning'); loadCambiosPortal(); }
   else { if (msg) { msg.textContent = 'No se pudo cerrar: ' + ((j && j.error) || 'sin respuesta'); msg.style.color = 'var(--red)'; } if (btn) btn.disabled = false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// [CAMBIO-APLICA-1 · 13-nov-2026] «✏️ HACER EL CAMBIO» — aquí mismo
+// ═════════════════════════════════════════════════════════════════════════════
+// Palabra de Memo: «lo único que cambiaría es en cambios pedidos poder hacer el
+// cambio desde requisiciones y aprobar y que quede guardado».
+// Lo que había: «✓ Ya lo atendí» solo CERRABA la solicitud; el cambio había que
+// hacerlo en Capsule (buscar el evento, buscar a la persona, ✏️ Corregir o 📅
+// Mover fecha) y regresar a cerrarla tecleando qué se hizo. Medido (13-nov): 13
+// atendidas así, y una se cerró diciendo «pasó a PLUS» con la fila aún en CHEAP.
+//
+// Hoy la tarjeta abre un panel con lo que la persona TIENE (fecha, paquete,
+// zona, habitación, total) ya puesto; se cambia lo que pidió y UN botón:
+//   1. guarda el cambio en su viaje por los DUEÑOS de siempre —
+//      `viajero_editar_full` (paquete · zona · habitación · total) y, si cambia
+//      de día, `viajero_mudar_fecha` — con su puerta de zonas, su valor
+//      esperado, su nota y su correo;
+//   2. cierra la solicitud como atendida, y lo que queda escrito en ella son
+//      las FRASES DEL DUEÑO («zona «A» → «B»; total $x → $y»), no un texto
+//      tecleado: lo guardado y lo que se dice que se guardó son lo mismo.
+// 🔒 Esta pantalla NO calcula un peso: listas, precios, cupo y la diferencia
+// vienen del servidor (`cambio_opciones`). El total SUGERIDO cae en la caja
+// solo cuando es confiable y nadie la ha tecleado — lo tecleado MANDA.
+// 🔒 Si el viaje se guardó y la solicitud no se pudo cerrar, se DICE con lo que
+// sí quedó; el segundo intento no vuelve a escribir (el dueño contesta «no
+// cambiaste nada») y solo la cierra.
+const _reqCam = {};
+const _REQ_CAM_NOTA = 'Aplicamos el cambio que pediste desde tu Portal.';
+function _reqCamTxt(x) {
+  if (!x) return '—';
+  return [x.fecha, _REQ_PAQ_TXT[x.paquete] || (x.paquete ? String(x.paquete).toUpperCase() : null), x.zona,
+    x.hotel_tipo ? 'hab. ' + x.hotel_tipo : null, Number(x.lugares) > 1 ? x.lugares + ' lugares' : null].filter(Boolean).join(' · ') || '—';
+}
+async function _reqCambioAplicarAbrir(id) {
+  const box = document.getElementById('rq-cambio-form-' + id);
+  const c = _reqCambiosRows.find((x) => x.id === id);
+  if (!box || !c) return;
+  if (box.dataset.abierto === 'aplicar') { box.innerHTML = ''; box.dataset.abierto = ''; delete _reqCam[id]; return; }
+  box.dataset.abierto = 'aplicar';
+  _reqCam[id] = { tok: 0, op: null, sel: null, tocado: false, revalidar: false, cargando: false, err: '' };
+  // El esqueleto se pinta UNA vez: las cajas que se teclean (total, mensaje) no
+  // se vuelven a crear cuando llegan las listas — un repintado a media tecla
+  // se come lo escrito (la lección de RECHAZO-EDITA-1).
+  box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0">
+    <div class="rq-sub">✏️ Hacer el cambio · se guarda en su viaje y la solicitud queda aprobada</div>
+    <div class="rq-nota" id="rq-cam-hoy-${id}">Leyendo cómo está hoy su viaje…</div>
+    <div class="rq-grid" id="rq-cam-sel-${id}"></div>
+    <div class="rq-grid">
+      <label class="rq-field">Total de su viaje (lo confirmas tú)
+        <input type="number" min="0" step="1" id="rq-cam-tot-${id}" oninput="_reqCambioAplicarTotal('${id}')" placeholder="sin capturar"></label>
+      <label class="rq-field" style="grid-column:1/-1">Qué le decimos (sale en su correo)
+        <input type="text" id="rq-cam-nota-${id}" maxlength="300" value="${_reqBdjEsc(_REQ_CAM_NOTA)}"></label>
+    </div>
+    <div class="rq-nota" id="rq-cam-sug-${id}"></div>
+    <div id="rq-cam-avi-${id}"></div>
+    <div class="rq-nota" id="rq-cam-avw-${id}"><label style="cursor:pointer"><input type="checkbox" id="rq-cam-av-${id}" checked> 📨 Avisarle por correo lo que cambió (con su total y lo que le falta)</label></div>
+    <div class="rq-aviso" id="rq-cam-res-${id}">Aún no cambias nada.</div>
+    <div class="rq-linea" style="margin-top:10px">
+      <button class="rq-btn pri" id="rq-cam-go-${id}" onclick="_reqCambioAplicarGo('${id}')">✓ Guardar el cambio y aprobar</button>
+      <button class="rq-btn quiet" onclick="_reqCambioAplicarAbrir('${id}')">Cancelar</button>
+    </div>
+    <div class="rq-msg" id="rq-cambio-msg-${id}"></div></div>`;
+  await _reqCambioAplicarCargar(id);
+}
+// Pide al servidor lo que hay (y, con una elección completa, la diferencia).
+async function _reqCambioAplicarCargar(id) {
+  const st = _reqCam[id]; if (!st) return;
+  const tok = ++st.tok;
+  const q = { accion: 'cambio_opciones', id };
+  if (st.sel && st.sel.evento_id) q.evento_id = st.sel.evento_id;
+  // Tras cambiar de FECHA se piden primero las listas de esa fecha (la zona de
+  // antes puede no existir ese día): la elección se manda ya revalidada.
+  if (st.sel && st.sel.paquete && !st.revalidar) { q.paquete = st.sel.paquete; q.zona = st.sel.zona; q.hotel = st.sel.hotel; }
+  st.cargando = true;
+  const j = await _reqBdjCall(q).catch((e) => ({ error: e.message }));
+  if (!_reqCam[id] || _reqCam[id].tok !== tok) return;   // llegó tarde: ya se eligió otra cosa
+  st.cargando = false;
+  if (!j || !j.ok) { st.err = (j && j.error) || 'No se pudo leer lo disponible'; _reqCambioAplicarPintar(id); return; }
+  st.err = ''; st.op = j;
+  const tot = document.getElementById('rq-cam-tot-' + id);
+  if (!st.sel) {
+    // Primera carga: el panel nace con lo que la persona TIENE hoy.
+    const h = j.hoy || {};
+    st.sel = { evento_id: j.fecha || '', paquete: h.paquete || '', zona: h.zona || '', hotel: h.hotel_tipo || '' };
+    if (tot) tot.value = h.total != null ? h.total : '';
+  } else if (st.revalidar) {
+    // Llegaron las listas de la fecha nueva: lo elegido se revalida contra ellas.
+    st.revalidar = false;
+    const pq = (j.paquetes || []).find((p) => p.paquete === st.sel.paquete) || null;
+    if (!pq) { st.sel.paquete = ''; st.sel.zona = ''; st.sel.hotel = ''; }
+    else {
+      if (!pq.zonas || !pq.zonas.some((z) => z.zona === st.sel.zona)) st.sel.zona = '';
+      if (!pq.duerme) st.sel.hotel = '';
+    }
+    _reqCambioAplicarPintar(id);
+    if (st.sel.paquete) return _reqCambioAplicarCargar(id);   // ahora sí: la diferencia
+    return;
+  }
+  // El sugerido cae a la caja SOLO si es confiable y nadie la ha tecleado.
+  const e = j.eleccion;
+  if (e && e.confiable && e.total_sugerido != null && !st.tocado && tot) tot.value = e.total_sugerido;
+  _reqCambioAplicarPintar(id);
+}
+function _reqCambioAplicarPintar(id) {
+  const st = _reqCam[id]; if (!st) return;
+  const el = (k) => document.getElementById('rq-cam-' + k + '-' + id);
+  const hoyBox = el('hoy'), selBox = el('sel'), aviBox = el('avi'), avw = el('avw');
+  if (!hoyBox || !selBox) return;
+  const e = _reqBdjEsc;
+  if (!st.op) {
+    // Ni siquiera se pudo leer su viaje (o no se puede cambiar por aquí): el
+    // panel se vuelve el porqué — un botón de «Guardar» sin nada detrás confunde.
+    const box = document.getElementById('rq-cambio-form-' + id);
+    // (solo si ESTE panel sigue abierto: una respuesta tardía no pisa el «No procede» que se abrió después)
+    if (box && box.dataset.abierto === 'aplicar') box.innerHTML = `<div class="rq-panel" style="margin:10px 0 0"><div class="rq-aviso mal">⚠️ ${e(st.err || 'No se pudo leer su viaje')}</div>
+      <div class="rq-linea"><button class="rq-btn quiet" onclick="_reqCambioAplicarAbrir('${id}')">Cerrar</button></div></div>`;
+    return;
+  }
+  const op = st.op, h = op.hoy || {}, s = st.sel || {};
+  hoyBox.innerHTML = `Hoy tiene: <b>${e(_reqCamTxt(h))}</b> · total <b>${h.total != null ? _reqBdjMxn(h.total) : 'sin capturar'}</b>`
+    + (h.abonado != null ? ` · pagado <b>${_reqBdjMxn(h.abonado)}</b>` : '')
+    + (h.resta != null ? ` · le falta <b>${_reqBdjMxn(Math.max(0, h.resta))}</b>` : '');
+  const fSel = (op.fechas || []).find((f) => f.evento_id === s.evento_id) || null;
+  const pq = (op.paquetes || []).find((p) => p.paquete === s.paquete) || null;
+  const campo = (rot, k, opts) => `<label class="rq-field">${rot}<select class="rq-in" onchange="_reqCambioAplicarSel('${id}','${k}',this.value)">${opts}</select></label>`;
+  const fijo = (rot, txt) => `<div class="rq-field">${rot}<div class="rq-in" style="opacity:.7">${txt}</div></div>`;
+  const elige = '<option value="">— elige —</option>';
+  // FECHA (solo si el evento tiene más de una)
+  const selF = (op.fechas || []).length > 1 ? campo('Fecha', 'evento_id', (s.evento_id ? '' : elige)
+    + op.fechas.map((f) => `<option value="${e(f.evento_id)}"${f.evento_id === s.evento_id ? ' selected' : ''}${f.pasada && !f.actual ? ' disabled' : ''}>${e(f.etiqueta)}${f.actual ? ' (la suya)' : ''}${f.pasada ? ' · ya pasó' : ''}${f.prox ? ' · próximamente' : ''}</option>`).join('')) : '';
+  // PAQUETE
+  const selP = campo('Paquete', 'paquete', (s.paquete ? '' : elige)
+    + (op.paquetes || []).map((p) => `<option value="${e(p.paquete)}"${p.paquete === s.paquete ? ' selected' : ''}>${e(p.nombre)}${p.paquete === h.paquete ? ' (el suyo)' : ''}</option>`).join(''));
+  // ZONA: las de la ficha para esa fecha y paquete, con precio y cupo del Palacio.
+  let selZ = '';
+  if (pq && pq.zonas) {
+    const esSuFecha = !!(fSel && fSel.actual);
+    const zs = pq.zonas.slice();
+    // Su zona de hoy no se pierde aunque la ficha ya no la traiga (zona vieja).
+    if (esSuFecha && h.zona && s.paquete === h.paquete && !zs.some((z) => z.zona === h.zona)) zs.unshift({ zona: h.zona, precio: null, quedan: null, fuera: true });
+    selZ = campo('Zona', 'zona', (s.zona ? '' : elige) + zs.map((z) => {
+      const cupo = z.quedan == null ? '' : (z.quedan <= 0 ? ' · sin lugares' : ' · quedan ' + z.quedan);
+      const suya = esSuFecha && z.zona === h.zona;
+      return `<option value="${e(z.zona)}"${z.zona === s.zona ? ' selected' : ''}>${e(z.zona)}${z.precio != null ? ' · ' + _reqBdjMxn(z.precio) : ''}${cupo}${z.ag ? ' · agotada en la ficha' : ''}${z.prox ? ' · próximamente' : ''}${z.fuera ? ' · ya no está en la ficha' : ''}${suya ? ' (la suya)' : ''}</option>`;
+    }).join(''));
+  } else if (pq) selZ = fijo('Zona', 'Sin boleto (RIDE)');
+  // HABITACIÓN: solo si el paquete duerme.
+  let selH = '';
+  if (pq && pq.duerme && (op.habitaciones || []).length) {
+    selH = campo('Habitación', 'hotel', `<option value=""${s.hotel ? '' : ' selected'}>— sin dato —</option>`
+      + op.habitaciones.map((x) => `<option value="${e(x.tipo)}"${x.tipo === s.hotel ? ' selected' : ''}>${e(x.tipo)}${x.tipo === h.hotel_tipo ? ' (la suya)' : ''}</option>`).join(''));
+  } else if (pq && !pq.duerme) selH = fijo('Habitación', 'Sin habitación (' + e(_REQ_PAQ_TXT[pq.paquete] || pq.paquete) + ')');
+  selBox.innerHTML = selF + selP + selZ + selH;
+  if (aviBox) aviBox.innerHTML = (st.err ? [st.err] : []).concat(op.avisos || []).map((a) => `<div class="rq-aviso ojo">⚠️ ${e(a)}</div>`).join('');
+  // El aviso por correo solo existe si el viaje está publicado y tiene correo.
+  if (avw && !avw.dataset.listo) {
+    avw.dataset.listo = '1';
+    if (!h.publicado) avw.innerHTML = '🪪 Su viaje no está publicado en su Portal: no se le puede avisar por correo — avísale por WhatsApp.';
+    else if (!h.con_correo) avw.innerHTML = 'Esta persona no tiene correo: avísale por WhatsApp.';
+  }
+  _reqCambioAplicarSug(id);
+  _reqCambioAplicarResumen(id);
+}
+// La línea del total sugerido (de dónde sale el número; el número lo da el servidor).
+function _reqCambioAplicarSug(id) {
+  const st = _reqCam[id]; const box = document.getElementById('rq-cam-sug-' + id);
+  if (!st || !box || !st.op) return;
+  const x = st.op.eleccion, m = _reqBdjMxn;
+  if (!x) { box.innerHTML = st.op.guia ? _reqBdjEsc(st.op.guia) : (st.cargando ? 'Calculando…' : ''); return; }
+  const tot = document.getElementById('rq-cam-tot-' + id);
+  const enCaja = tot && String(tot.value) !== '' && Number(tot.value) === Number(x.total_sugerido);
+  const usar = x.total_sugerido != null && !enCaja ? ` <a href="#" onclick="_reqCambioAplicarUsar('${id}');return false" style="color:var(--yellow)">usar ${m(x.total_sugerido)}</a>` : '';
+  if (x.modo === 'diferencia') {
+    const d = Number(x.diferencia) || 0;
+    box.innerHTML = d === 0
+      ? `De lista cuesta lo mismo (${m(x.lista_nueva)}): su total se queda en <b>${m(x.total_sugerido)}</b>.${usar}`
+      : `De lista: lo que tiene ${m(x.lista_actual)} → lo nuevo ${m(x.lista_nueva)}, diferencia <b>${d > 0 ? '+' : '−'}${m(Math.abs(d))}</b>. Su total de hoy ${m(x.total_hoy)} ${d > 0 ? '+' : '−'} la diferencia = <b>${m(x.total_sugerido)}</b>${enCaja ? ' (ya está en «Total»; ajústalo si acordaron otra cosa).' : '.'}${usar}`;
+  } else if (x.modo === 'lista') box.innerHTML = `No tenía total capturado. De lista, lo nuevo cuesta <b>${m(x.total_sugerido)}</b>${enCaja ? ' (ya está en «Total»).' : '.'}${usar}`;
+  else if (x.modo === 'lista_sin_base') box.innerHTML = `De lista, lo nuevo cuesta ${m(x.total_sugerido)} — no se puso solo porque no pude cotizar lo que tiene hoy.${usar}`;
+  else box.innerHTML = '';
+}
+// Lo que cambia: lo elegido contra lo que tiene. Lo usan el resumen y el guardar.
+function _reqCamDif(id) {
+  const st = _reqCam[id]; if (!st || !st.op || !st.sel) return null;
+  const h = st.op.hoy || {}, s = st.sel;
+  const inp = document.getElementById('rq-cam-tot-' + id);
+  const txt = String(inp && inp.value != null ? inp.value : '').trim();
+  const total = txt === '' ? null : Number(txt);   // vacío = «no lo toco», no «$0»
+  const d = {
+    fecha: !!s.evento_id && s.evento_id !== h.evento_id,
+    paquete: !!s.paquete && s.paquete !== (h.paquete || ''),
+    zona: (s.zona || '') !== (h.zona || ''),
+    hotel: (s.hotel || '') !== (h.hotel_tipo || ''),
+    totalNuevo: total,
+    total: total != null && Number.isFinite(total) && total !== (h.total == null ? null : Number(h.total)),
+  };
+  d.nada = !d.fecha && !d.paquete && !d.zona && !d.hotel && !d.total;
+  return d;
+}
+function _reqCambioAplicarResumen(id) {
+  const st = _reqCam[id]; const box = document.getElementById('rq-cam-res-' + id);
+  if (!st || !box || !st.op || !st.sel) return;
+  const d = _reqCamDif(id), h = st.op.hoy || {}, s = st.sel, e = _reqBdjEsc, m = _reqBdjMxn;
+  if (!d || d.nada) { box.className = 'rq-aviso'; box.innerHTML = 'Aún no cambias nada: elige lo que el cliente pidió.'; return; }
+  const fe = (id2) => ((st.op.fechas || []).find((f) => f.evento_id === id2) || {}).etiqueta || id2 || '—';
+  const partes = [];
+  if (d.fecha) partes.push(`fecha ${e(h.fecha || '—')} → <b>${e(fe(s.evento_id))}</b>`);
+  if (d.paquete) partes.push(`paquete ${e(_REQ_PAQ_TXT[h.paquete] || '—')} → <b>${e(_REQ_PAQ_TXT[s.paquete] || s.paquete)}</b>`);
+  if (d.zona) partes.push(`zona ${e(h.zona || '—')} → <b>${e(s.zona || 'sin boleto')}</b>`);
+  if (d.hotel) partes.push(`habitación ${e(h.hotel_tipo || '—')} → <b>${e(s.hotel || '—')}</b>`);
+  if (d.total) partes.push(`total ${h.total != null ? m(h.total) : '—'} → <b>${m(d.totalNuevo)}</b>`);
+  const totFin = d.totalNuevo != null && Number.isFinite(d.totalNuevo) ? d.totalNuevo : h.total;
+  let cuenta = '';
+  if (totFin != null && h.abonado != null) {
+    const r = Math.round(Number(totFin) - Number(h.abonado));
+    cuenta = ` · lleva pagado ${m(h.abonado)}: ${r >= 0 ? 'le faltarán <b>' + m(r) + '</b>' : 'queda con <b>' + m(-r) + ' a favor</b>'}`;
+  }
+  // Lo que este cambio arrastra, dicho ANTES de guardar.
+  const ojo = [];
+  if (d.fecha && (h.con_cuarto || h.con_grupo)) ojo.push('al moverlo de fecha se le suelta ' + [h.con_cuarto ? 'su cuarto del rooming' : null, h.con_grupo ? 'su grupo «viaja con»' : null].filter(Boolean).join(' y ') + ' (eran de la fecha anterior)');
+  if (d.hotel && h.con_grupo && !d.fecha) ojo.push('viaja en grupo: si su acompañante tiene fila propia, cámbiale también la habitación (en Capsule)');
+  box.className = 'rq-aviso ok';
+  box.innerHTML = `Va a cambiar: ${partes.join(' · ')}${d.total ? '' : ' · su total se queda igual'}${cuenta}${h.con_rol && d.total ? ' · su rol de pagos se re-reparte solo' : ''}`
+    + ojo.map((x) => `<br>⚠️ ${e(x)}`).join('');
+}
+function _reqCambioAplicarSel(id, campo, valor) {
+  const st = _reqCam[id]; if (!st || !st.sel || !st.op) return;
+  st.sel[campo] = valor;
+  if (campo === 'evento_id') st.revalidar = true;
+  if (campo === 'paquete') {
+    const pq = (st.op.paquetes || []).find((p) => p.paquete === valor) || null;
+    if (!pq || !pq.zonas || !pq.zonas.some((z) => z.zona === st.sel.zona)) st.sel.zona = '';   // RIDE va sin boleto; otra lista de zonas → se elige
+    if (!pq || !pq.duerme) st.sel.hotel = '';                                                  // CHEAP no lleva habitación
+  }
+  st.op.eleccion = null; st.op.guia = null; st.err = '';
+  _reqCambioAplicarPintar(id);   // se pinta YA con lo elegido; la diferencia llega del servidor
+  _reqCambioAplicarCargar(id);
+}
+function _reqCambioAplicarTotal(id) {
+  const st = _reqCam[id]; if (!st) return;
+  st.tocado = true;               // lo tecleado MANDA: el sugerido ya no pisa la caja
+  _reqCambioAplicarSug(id); _reqCambioAplicarResumen(id);
+}
+function _reqCambioAplicarUsar(id) {
+  const st = _reqCam[id]; const tot = document.getElementById('rq-cam-tot-' + id);
+  const x = st && st.op && st.op.eleccion;
+  if (!st || !tot || !x || x.total_sugerido == null) return;
+  tot.value = x.total_sugerido; st.tocado = false;
+  _reqCambioAplicarSug(id); _reqCambioAplicarResumen(id);
+}
+async function _reqCambioAplicarGo(id) {
+  const st = _reqCam[id]; const c = _reqCambiosRows.find((x) => x.id === id);
+  if (!st || !c) return;
+  const msg = document.getElementById('rq-cambio-msg-' + id);
+  const say = (t, ok) => { if (msg) { msg.textContent = t; msg.style.color = ok ? 'var(--green, #88ea4e)' : 'var(--red)'; } };
+  if (!st.op || !st.sel) return say('Todavía no carga su viaje: espera un segundo.');
+  // Con una lectura en vuelo las listas en pantalla pueden ser las de la fecha
+  // anterior: no se guarda hasta que lleguen las de la que se eligió.
+  if (st.cargando || st.revalidar) return say('Espera un segundo: estoy leyendo lo que hay en esa fecha.');
+  const d = _reqCamDif(id), h = st.op.hoy || {}, s = st.sel;
+  if (!d || d.nada) return say('Aún no cambias nada. Elige lo que el cliente pidió — o usa «Ya lo atendí por fuera» si se resolvió de otra forma.');
+  const pq = (st.op.paquetes || []).find((p) => p.paquete === s.paquete) || null;
+  if ((st.op.fechas || []).length > 1 && !s.evento_id) return say('Elige la fecha.');
+  if (!pq) return say('Elige el paquete.');
+  if (pq.zonas && !s.zona) return say('Elige la zona.');
+  if (d.totalNuevo != null && !(Number.isFinite(d.totalNuevo) && d.totalNuevo >= 0)) return say('El total no es válido.');
+  const nota = String((document.getElementById('rq-cam-nota-' + id) || {}).value || '').trim();
+  const avisar = !!h.publicado && !!h.con_correo && !!(document.getElementById('rq-cam-av-' + id) || {}).checked;
+  const btn = document.getElementById('rq-cam-go-' + id); if (btn) btn.disabled = true;
+  say('Guardando el cambio en su viaje…', true);
+  const vid = c.viajero_id, frases = [], avisos = [];
+  let correo = null;
+  // «no cambiaste nada» / «ya está en esa fecha» = el cambio YA está en su viaje
+  // (un intento anterior a medias, o alguien lo hizo en Capsule): no es error,
+  // la solicitud se cierra igual.
+  const yaHecho = (er) => /no cambiaste nada|ya est[aá] en esa fecha/i.test(String((er && er.message) || ''));
+  const anota = (j) => { (j.cambios || []).forEach((x) => frases.push(x)); [j.zona_aviso, j.stock_aviso, j.total_aviso].filter(Boolean).forEach((a) => avisos.push(a)); if ((j.sueltos || []).length) avisos.push('se soltó ' + j.sueltos.join(' y ')); };
+  try {
+    if (!d.fecha) {
+      const campos = {};
+      if (d.paquete) campos.tipo_paquete = s.paquete;
+      if (d.zona) campos.zona_boleto = s.zona || '';
+      if (d.hotel) campos.hotel_tipo = s.hotel || '';
+      if (d.total) campos.total_contrato = d.totalNuevo;
+      try { const j = await khViajeros.editarFull(vid, campos, { avisar, nota_cliente: nota }); anota(j); correo = j.aviso || null; }
+      catch (er) { if (!yaHecho(er)) throw er; }
+    } else {
+      // Cambia de FECHA. El dueño de la mudanza mueve fecha + zona + total; lo
+      // que él no toca (paquete, habitación) va ANTES por su dueño y SIN correo:
+      // el aviso al cliente es UNO, el de la mudanza, y nombra lo demás.
+      if (d.paquete || d.hotel) {
+        const c1 = {};
+        if (d.paquete) { c1.tipo_paquete = s.paquete; if (!pq.zonas) c1.zona_boleto = ''; else if (!h.zona) c1.zona_boleto = s.zona; }
+        if (d.hotel) c1.hotel_tipo = s.hotel || '';
+        try { anota(await khViajeros.editarFull(vid, c1, { avisar: false })); }
+        catch (er) { if (!yaHecho(er)) throw er; }
+      }
+      const previas = frases.slice();
+      try {
+        const j2 = await khViajeros.mudarFecha({ id: vid, destino: s.evento_id, zona_boleto: s.zona || '',
+          total_contrato: d.totalNuevo != null ? d.totalNuevo : undefined, motivo: 'cambio pedido desde su Portal', avisar,
+          nota_cliente: [nota, previas.length ? 'También: ' + previas.join('; ') + '.' : ''].filter(Boolean).join(' ').slice(0, 300) });
+        anota(j2); correo = j2.aviso || null;
+      } catch (er) {
+        if (!yaHecho(er)) throw new Error((previas.length ? 'Sí se guardó: ' + previas.join('; ') + '. Pero la FECHA no se movió: ' : '') + ((er && er.message) || 'no se pudo mover la fecha'));
+      }
+    }
+  } catch (er) { say((er && er.message) || 'No se pudo guardar el cambio'); if (btn) btn.disabled = false; return; }
+  // Lo que queda escrito en la solicitud: las frases del DUEÑO.
+  const hecho = frases.length ? frases.join('; ') : 'ya estaba aplicado en su viaje';
+  const j3 = await _reqBdjCall({ accion: 'cambio_cerrar', id, estado: 'atendida', respuesta: ('Cambio aplicado: ' + hecho).slice(0, 500) }).catch((e) => ({ error: e.message }));
+  if (j3 && j3.ok) {
+    const partes = ['✓ Cambio guardado y aprobado', hecho];
+    partes.push(correo ? _reqCorreoTxt(correo) : (avisar ? 'sin correo (no hubo nada nuevo que avisar)' : 'sin correo al cliente'));
+    avisos.forEach((a) => partes.push('⚠️ ' + a));
+    showToast(_reqBdjEsc(partes.join(' · ')), (avisos.length || (correo && !correo.ok)) ? 'warning' : 'success');
+    delete _reqCam[id];
+    loadCambiosPortal();
+  } else {
+    say('El cambio SÍ quedó guardado en su viaje (' + hecho + '), pero la solicitud no se pudo cerrar: ' + ((j3 && j3.error) || 'sin respuesta') + '. Vuelve a apretar el botón o ciérrala con «Ya lo atendí por fuera».');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── «Cambios ya atendidos»: lo que se le cambió a quién (se pide al abrirlo) ──
+function _reqCambiosHistCaja() {
+  return `<details class="rq-nota" style="margin-top:10px" ontoggle="if(this.open)_reqCambiosHist()">
+    <summary style="cursor:pointer">Ver los cambios ya atendidos</summary><div id="req-cambios-hist" style="margin-top:8px">Cargando…</div></details>`;
+}
+async function _reqCambiosHist() {
+  const box = document.getElementById('req-cambios-hist'); if (!box) return;
+  const j = await _reqBdjCall({ accion: 'cambios_listar', estado: 'todas', solo_cambios: true }).catch((e) => ({ error: e.message }));
+  if (!j || !j.ok) { box.innerHTML = `<span style="color:var(--red)">No se pudo leer: ${_reqBdjEsc((j && j.error) || 'sin respuesta')}</span>`; return; }
+  const filas = (j.cambios || []).filter((c) => c.estado !== 'pendiente').slice(0, 30);
+  if (!filas.length) { box.textContent = 'Todavía no hay cambios atendidos.'; return; }
+  box.innerHTML = filas.map((c) => {
+    const no = c.estado === 'rechazada';
+    return `<div class="rq-ult" style="padding:6px 0;border-top:1px solid var(--border)">
+      <b>${_reqBdjEsc(c.nombre || (c.viajero && c.viajero.nombre) || '—')}</b> · ${_reqEvTxt(c)} · ${_reqBdjEsc(_REQ_TIPO[c.tipo] || c.tipo)}
+      <br>Pidió: «${_reqBdjEsc(String(c.detalle || '').slice(0, 160))}»
+      <br><span style="color:${no ? 'var(--red)' : 'var(--green)'}">${no ? '✗ No procedió' : '✓ Atendido'}</span>${c.respuesta ? ': ' + _reqBdjEsc(c.respuesta) : (no ? '' : ' (sin nota de qué se hizo)')}
+      · ${_reqBdjEsc(c.atendida_por || '—')}${c.atendida_at ? ' · ' + _reqBdjEsc(_reqBdjFecha(c.atendida_at)) : ''}</div>`;
+  }).join('');
 }
 
 // [REQ-FICHA-1 · 4-nov-2026] LA FICHA de la solicitud, a la vista sin abrir

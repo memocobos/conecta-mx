@@ -188,6 +188,86 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✏️🔁⏳ **CAMBIO-APLICA-1 (13-nov-2026, en main local, cero SQL): «✏️ HACER EL CAMBIO» DESDE
+  REQUISICIONES — se guarda en su viaje y la solicitud queda aprobada.** Palabra de Memo, citada:
+  *«lo único que cambiaría es en cambios pedidos poder hacer el cambio desde requisiciones y aprobar
+  y que quede guardado»*. `npm run mide:cambio-aplica-1` **90** (sin ancla — árbol; reloj congelado
+  y catálogo sintético).
+  - 🔴 **Lo medido antes (13-nov):** de los 16 cambios de hotel/zona/fecha/otro que han llegado del
+    Portal, 13 se atendieron — y en los 13 hubo que irse a Capsule (buscar evento, buscar persona,
+    ✏️ Corregir o 📅 Mover fecha) y REGRESAR a cerrar la solicitud tecleando qué se hizo. En 12 el
+    cambio sí quedó; **en 1 la solicitud se cerró diciendo «pasó a paquete PLUS» y la fila sigue
+    en CHEAP** (fuerzaregida#0, cerrada el 9-nov — ⏳ sin tocar: es dato de un cliente, lo decide
+    Memo). Cerrar y cambiar eran dos gestos en dos pantallas.
+  - **La tarjeta:** el botón verde es **«✏️ Hacer el cambio»** → panel con lo que la persona TIENE
+    (fecha · paquete · zona con precio y «quedan N» · habitación · total) ya puesto; se cambia lo
+    que pidió y **«✓ Guardar el cambio y aprobar»**. «Ya lo atendí por fuera» y «No procede» quedan
+    discretos. La línea «hoy:» de la tarjeta ya dice también la habitación y los lugares.
+  - 🔒 **CERO escritor nuevo:** el cambio lo guardan los DUEÑOS de siempre por su puerta —
+    `viajero_editar_full` (paquete · zona · habitación · total) y, si cambia de día,
+    `viajero_mudar_fecha` (fecha + zona + total)— con su puerta de zonas, su valor esperado, su
+    nota `[EDITA]`/`[MUDANZA]` y su correo. La pantalla los llama en orden y DESPUÉS cierra con
+    `cambio_cerrar` (la forma de `_reqPaqAplicar`, PREVENTA-PORTAL-1). Lo que queda escrito en la
+    solicitud son **las frases del dueño** («Cambio aplicado: habitación Compartida → Doble; total
+    $5900 → $6550»), no un texto tecleado.
+  - **Con cambio de FECHA + paquete/habitación:** primero lo que la mudanza no toca (por
+    `viajero_editar_full`, `avisar:false` EXPLÍCITO — ZONA-AVISO-1 mandaría correo solo), luego la
+    mudanza con zona + total y el ÚNICO correo, que nombra lo demás en su nota («También: …»).
+  - **`cambio_opciones` (admin-requisiciones, ROLES_BANDEJA, SOLO LEE)** + `resolverCambio`: cómo
+    está hoy (lo pagado por `saldoMigrado`), TODAS las fechas de la ficha (mover es corregir, no
+    vender), paquetes (el espejo de los botones del sitio + el suyo), zonas de ESA fecha con
+    precio y cupo (`_zonaLista` · `_calcularPrecio` · `evaluarZona`), habitaciones (`_hotelLista`).
+    🔒 Cotiza por la puerta `para_careo`: una zona agotada tiene precio igual (quien pasa de CHEAP a
+    PLUS conserva SU boleto). 🔒 La habitación se cotiza con las personas que ese cuarto pide
+    (`viaj` del catálogo): la Doble global cuesta $1,300 ENTRE DOS → +$650, no +$1,300.
+  - 🔒 **EL TOTAL SE SUGIERE POR DIFERENCIA, NO POR LISTA:** total de hoy + (lista de lo nuevo −
+    lista de lo que tiene). Así sobrevive lo que su total ya trae y el catálogo no sabe: un
+    descuento negociado, el beneficio de la preventa, el vuelo o autobús de un CDMX. Cuatro modos
+    dichos: `igual` · `diferencia` · `lista` (no tenía total) · `lista_sin_base` (lo que tiene hoy no
+    se pudo cotizar → se OFRECE con «usar $X», no cae solo a la caja). Y **lo tecleado MANDA**: un
+    total escrito a mano no lo pisa el sugerido. Nada automático decide dinero: el número que
+    entra es el que confirma quien aprueba.
+  - **El cupo AVISA, no bloquea** (como el dueño), y solo cuando el cambio mueve un boleto (otra
+    zona u otra fecha). CDMX que pasa de solo-boleto a paquete con viaje: avisa que el sugerido no
+    trae transporte. Lo que la mudanza SUELTA (su cuarto del rooming, su grupo «viaja con») se
+    dice ANTES de guardar; si viaja en grupo y cambia de habitación, recuerda a su acompañante.
+  - **El correo:** casilla «📨 Avisarle por correo lo que cambió» que nace PRENDIDA y a la vista
+    (DEFAULTS-1 b), con el mensaje «Aplicamos el cambio que pediste desde tu Portal.» editable. Es
+    el correo de siempre (`_lib/correo-ajuste`: «Actualizamos tu viaje» / «Tu viaje cambió de
+    fecha»), no una plantilla nueva. ⚠️ **Decisión mía, dicha a Memo:** en ✏️ Corregir de Capsule
+    la casilla nace apagada (palabra suya del 28-oct, por las correcciones en masa); aquí el
+    cliente PIDIÓ el cambio y espera respuesta — el «No procede» ya le escribe siempre. Si la
+    quiere apagada es un `checked` menos. Sin publicar o sin correo: no hay casilla y se dice.
+  - **Candados:** quien sigue en PREVENTA A CIEGAS no entra por aquí (409: su paquete lo aplica
+    «🎟 Elegir paquete» — descuento y contrato, PAQ-SOLO-APLICAR-1) · comprobantes y elección de
+    paquete conservan su botón (400) · solicitud ya cerrada 409 · lugar cancelado 409 · catálogo
+    caído 502 · si el viaje NO se guardó, la solicitud NO se cierra · si se guardó y el cierre
+    falló, se DICE con lo que sí quedó y el segundo clic solo cierra (el dueño contesta «no
+    cambiaste nada»: 0 escrituras y 0 correos de más).
+  - **«Ver los cambios ya atendidos»** (plegado, se pide al abrirlo): a quién se le cambió qué,
+    quién y cuándo (`cambios_listar` con `solo_cambios:true`, sin comprobantes).
+  - De paso: `.rq-btn` traía `font:600 12.5px/1 inherit`, un shorthand INVÁLIDO que el navegador
+    tiraba entero — el `<a>` de WhatsApp salía más grande que sus vecinos. Van las propiedades
+    sueltas (los botones de la bandeja quedan en 12.5px/600, como se diseñaron).
+  - Ocho sabotajes con sha1 careado y restaurados byte a byte: sugerido por lista → 5 rojos ·
+    habitación para una persona → 14 · sin la puerta del careo → 4 · cerrar aunque el dueño falle
+    → 2 · el sugerido pisa lo tecleado → 1 · dos correos en fecha+paquete → 2 · no confiable cae
+    solo → 1 · preventa entra → 2. ⚠️ El careo salió casi verde a la primera (mismo autor que el
+    código): por eso los ocho. Sus 3 rojos iniciales eran míos (un conteo del fixture y la sesión
+    viva cacheada por usuario).
+  - ✅ **Mirado en pantalla** (vista previa con el CSS y el JS reales + datos de mentira): el
+    panel de habitación y el de fecha. ⚠️ No probado en el KameHouse real con sesión.
+  - Vecinos (31 careos que tocan estos archivos): verdes; director-1 (1), preventa-auto-1 (6) y
+    req-corrige-1 (2) traen su rojo PREEXISTENTE, idéntico en HEAD limpio. `vigia:color-literal`
+    sin cambio (274); `vigia:color` +3, los tres `var(--token)`.
+  - 🔴⏳ **Hallazgo vecino NOMBRADO sin tocar (pide palabra de Memo):** `dsDeEvento` usa
+    `dsList[i]` antes que `multifecha[i].ds`, y en los multifecha de PAQUETES DE DÍAS `dsList`
+    son los días del calendario, no las entradas: **vivelatino#1 («Sábado», ds 13-mar) contesta
+    14-mar** y palnorte#1/#2 contestan 27/28-mar. Es lo que imprime `fechaDeEventoId` en los
+    correos y lo que usa el rol. Medido: 0 viajeros en vivelatino (nadie lo ha recibido mal),
+    5 en palnorte#1/#2 (su rol corre 1-2 días). Cambiarle la respuesta al dueño es tuerca propia.
+  - ⏳ Push de Memo → recargar KameHouse → Requisiciones → 🔁 Cambios pedidos.
+
 - 🗓⚡⏳ **ROL-2027-1 (13-nov-2026, en main local, cero SQL): EL ROL DE PAGOS SE FIJA SOLO AL
   REGISTRAR — tours 2027 en adelante.** Palabra de Memo, citada: *«TODOS LOS TOURS 2027 QUE SE
   SEPAREN, EL DÍA QUE HAGAMOS REGISTRO ES EL DÍA QUE SE CUENTA PARA SU ROL DE PAGOS A PARTIR DE

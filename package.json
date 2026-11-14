@@ -171,6 +171,7 @@
     "mide:pn-multi-1": "node scripts/mide-pn-multi-1.js",
     "mide:rol-2027-1": "node scripts/mide-rol-2027-1.js",
     "mide:req-simple-1": "node scripts/mide-req-simple-1.js",
-    "mide:pago-claro-1": "node scripts/mide-pago-claro-1.js"
+    "mide:pago-claro-1": "node scripts/mide-pago-claro-1.js",
+    "mide:cambio-aplica-1": "node scripts/mide-cambio-aplica-1.js"
   }
 }

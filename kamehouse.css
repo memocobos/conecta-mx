@@ -4180,7 +4180,8 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .rq-note{font-size:12px;padding:8px 10px;border-radius:8px;background:var(--bg3)}
 .rq-note.no{color:var(--red)}
 .rq-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-top:1px solid var(--border);background:rgba(255,255,255,.015)}
-.rq-btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:9px;font:600 12.5px/1 inherit;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-decoration:none;transition:background .15s,border-color .15s,transform .1s}
+/* [CAMBIO-APLICA-1] Aquí decía `font:600 12.5px/1 inherit`: un shorthand INVÁLIDO (no admite `inherit` como familia), así que el navegador lo tiraba entero y cada botón caía a su tamaño por defecto — el <a> de WhatsApp salía más grande que sus vecinos. Van las propiedades sueltas. */
+.rq-btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:9px;font-weight:600;font-size:12.5px;line-height:1;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-decoration:none;transition:background .15s,border-color .15s,transform .1s}
 .rq-btn:hover{background:var(--bg4);border-color:rgba(255,255,255,.2)}
 .rq-btn:active{transform:translateY(1px)}
 .rq-btn:disabled{opacity:.5;cursor:default}
